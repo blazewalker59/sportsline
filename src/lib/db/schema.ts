@@ -128,6 +128,9 @@ export const players = sqliteTable(
     id: text('id').primaryKey(),
     league: text('league').$type<League>().notNull(),
     name: text('name').notNull(),
+    /** Current Team, from the nightly roster sync; null until synced. */
+    teamId: text('team_id'),
+    position: text('position'),
   },
   (table) => [index('players_league_name_idx').on(table.league, table.name)],
 )
@@ -222,3 +225,31 @@ export const itemPlayers = sqliteTable(
     index('item_players_player_idx').on(table.playerId),
   ],
 )
+
+// ─── Viewers ────────────────────────────────────────────────────────────────
+
+/** A Viewer's Follows (CONTEXT.md). `target` is a League code, Team id or Player id. */
+export const follows = sqliteTable(
+  'follows',
+  {
+    viewerId: text('viewer_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    kind: text('kind').$type<'league' | 'team' | 'player'>().notNull(),
+    target: text('target').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.viewerId, table.kind, table.target] }),
+  ],
+)
+
+/** Where each Viewer stopped reading the Timeline (CONTEXT.md, "Read Marker"). */
+export const readMarkers = sqliteTable('read_markers', {
+  viewerId: text('viewer_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  /** occurredAt of the newest item the Viewer had seen. */
+  readAt: text('read_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})

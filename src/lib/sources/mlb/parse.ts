@@ -9,12 +9,14 @@
 
 import type {
   MlbFeed,
+  MlbPeople,
   MlbPlay,
   MlbPlayEvent,
   MlbRunner,
   MlbSchedule,
   MlbStatus,
   MlbTeam,
+  MlbTeams,
 } from './feed'
 import type {
   GameSnapshot,
@@ -26,6 +28,7 @@ import type {
   SourceItem,
   SourceMilestone,
   SourcePlay,
+  SourceRoster,
   SourceTeam,
 } from '@/lib/model/types'
 
@@ -500,4 +503,18 @@ export function parseSchedule(schedule: MlbSchedule): Array<ScheduledGame> {
       home: team(g.teams.home.team),
       score: { away: g.teams.away.score ?? 0, home: g.teams.home.score ?? 0 },
     }))
+}
+
+export function parseRoster(teams: MlbTeams, people: MlbPeople): SourceRoster {
+  return {
+    teams: (teams.teams ?? []).filter((t) => t.active !== false).map(team),
+    players: (people.people ?? [])
+      .filter((p) => p.active !== false)
+      .map((p) => ({
+        sourceId: String(p.id),
+        name: p.fullName,
+        teamSourceId: p.currentTeam ? String(p.currentTeam.id) : null,
+        position: p.primaryPosition?.abbreviation ?? null,
+      })),
+  }
 }

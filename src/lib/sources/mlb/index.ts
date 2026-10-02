@@ -1,7 +1,7 @@
 /** MLB Source adapter: MLB StatsAPI (statsapi.mlb.com). */
 
-import { parseFeed, parseSchedule } from './parse'
-import type { MlbFeed, MlbSchedule } from './feed'
+import { parseFeed, parseRoster, parseSchedule } from './parse'
+import type { MlbFeed, MlbPeople, MlbSchedule, MlbTeams } from './feed'
 import type { SourceAdapter } from '@/lib/model/types'
 
 const BASE = 'https://statsapi.mlb.com/api'
@@ -26,5 +26,12 @@ export const mlbAdapter: SourceAdapter = {
       `${BASE}/v1.1/game/${encodeURIComponent(sourceGameId)}/feed/live`,
     )
     return parseFeed(feed)
+  },
+  async roster(season) {
+    const [teams, people] = await Promise.all([
+      getJson<MlbTeams>(`${BASE}/v1/teams?sportId=1&season=${season}`),
+      getJson<MlbPeople>(`${BASE}/v1/sports/1/players?season=${season}`),
+    ])
+    return parseRoster(teams, people)
   },
 }

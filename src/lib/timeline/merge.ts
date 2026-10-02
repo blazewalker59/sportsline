@@ -88,3 +88,17 @@ export function orderedGames(state: TimelineState): Array<GameSummary> {
       a.startsAt.localeCompare(b.startsAt),
   )
 }
+
+/**
+ * Where the "you were here" divider goes: the index of the first item the
+ * Viewer had already seen, or null when there is nothing new above it (or
+ * nothing seen below it).
+ */
+export function readMarkerIndex(
+  items: ReadonlyArray<TimelineItem>,
+  readAt: string | null,
+): number | null {
+  if (!readAt) return null
+  const index = items.findIndex((item) => item.occurredAt <= readAt)
+  return index > 0 ? index : null
+}

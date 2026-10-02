@@ -114,6 +114,19 @@ export interface ScheduledGame {
   score: Score
 }
 
+/** A Player as a Source's roster lists them. */
+export interface SourcePlayer extends SourceRef {
+  /** Source id of the Team they currently play for, if any. */
+  teamSourceId: string | null
+  position: string | null
+}
+
+/** A League's Teams and Players, for the nightly roster sync. */
+export interface SourceRoster {
+  teams: Array<SourceTeam>
+  players: Array<SourcePlayer>
+}
+
 /** One League's Source, behind the boundary (CONTEXT.md, "Source"). */
 export interface SourceAdapter {
   league: League
@@ -121,4 +134,5 @@ export interface SourceAdapter {
   source: string
   schedule: (sportsDay: string) => Promise<Array<ScheduledGame>>
   snapshot: (sourceGameId: string) => Promise<GameSnapshot>
+  roster: (season: number) => Promise<SourceRoster>
 }

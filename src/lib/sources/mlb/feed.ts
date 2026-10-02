@@ -151,3 +151,17 @@ export interface MlbScheduleGame {
 export interface MlbSchedule {
   dates?: Array<{ games?: Array<MlbScheduleGame> }>
 }
+
+export interface MlbTeams {
+  teams?: Array<MlbTeam & { active?: boolean }>
+}
+
+export interface MlbPeople {
+  people?: Array<{
+    id: number
+    fullName: string
+    active?: boolean
+    currentTeam?: { id: number }
+    primaryPosition?: { abbreviation?: string }
+  }>
+}

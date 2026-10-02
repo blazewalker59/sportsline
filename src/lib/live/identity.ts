@@ -17,6 +17,16 @@ const PREFIX: Record<Entity, string> = { team: 'tm', player: 'pl', game: 'gm' }
 // D1 caps bound parameters per statement at 100.
 const CHUNK = 90
 
+export function chunk<T>(
+  items: ReadonlyArray<T>,
+  size: number,
+): Array<Array<T>> {
+  const out: Array<Array<T>> = []
+  for (let i = 0; i < items.length; i += size)
+    out.push(items.slice(i, i + size))
+  return out
+}
+
 export function newId(entity: Entity): string {
   return `${PREFIX[entity]}_${crypto.randomUUID().replaceAll('-', '').slice(0, 20)}`
 }
@@ -72,23 +82,41 @@ export async function resolve(
 
   const created = missing.map((ref) => ({ ref, id: newId(entity) }))
   const statements: Array<BatchItem<'sqlite'>> = []
-  for (const { ref, id } of created) {
-    if (entity === 'team') {
+  // Multi-row inserts, sized to stay under D1's 100 bound parameters.
+  if (entity === 'team') {
+    for (const part of chunk(created, 20)) {
       statements.push(
-        db.insert(teams).values({
-          id,
-          league,
-          name: ref.name,
-          abbreviation: 'abbreviation' in ref ? ref.abbreviation : ref.name,
-        }),
+        db.insert(teams).values(
+          part.map(({ ref, id }) => ({
+            id,
+            league,
+            name: ref.name,
+            abbreviation: 'abbreviation' in ref ? ref.abbreviation : ref.name,
+          })),
+        ),
       )
-    } else if (entity === 'player') {
-      statements.push(db.insert(players).values({ id, league, name: ref.name }))
     }
+  } else if (entity === 'player') {
+    for (const part of chunk(created, 30)) {
+      statements.push(
+        db
+          .insert(players)
+          .values(part.map(({ ref, id }) => ({ id, league, name: ref.name }))),
+      )
+    }
+  }
+  for (const part of chunk(created, 24)) {
     statements.push(
       db
         .insert(sourceIds)
-        .values({ entity, source, sourceId: ref.sourceId, internalId: id })
+        .values(
+          part.map(({ ref, id }) => ({
+            entity,
+            source,
+            sourceId: ref.sourceId,
+            internalId: id,
+          })),
+        )
         .onConflictDoNothing(),
     )
   }

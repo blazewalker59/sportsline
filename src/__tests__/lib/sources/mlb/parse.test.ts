@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import finalFeed from '../../../fixtures/mlb/final-849848.json'
 import liveFeed from '../../../fixtures/mlb/live-849844.json'
-import type { MlbFeed } from '@/lib/sources/mlb/feed'
+import playersFixture from '../../../fixtures/mlb/players-2026.json'
+import teamsFixture from '../../../fixtures/mlb/teams-2026.json'
+import type { MlbFeed, MlbPeople, MlbTeams } from '@/lib/sources/mlb/feed'
 import type { SourceMilestone, SourcePlay } from '@/lib/model/types'
-import { ordinal, parseFeed } from '@/lib/sources/mlb/parse'
+import { ordinal, parseFeed, parseRoster } from '@/lib/sources/mlb/parse'
 
 const final = parseFeed(finalFeed as unknown as MlbFeed)
 const live = parseFeed(liveFeed as unknown as MlbFeed)
@@ -123,4 +125,23 @@ describe('ordinal', () => {
     [12, '12th'],
     [21, '21st'],
   ])('%i → %s', (n, s) => expect(ordinal(n)).toBe(s))
+})
+
+describe('MLB parseRoster', () => {
+  const roster = parseRoster(
+    teamsFixture as MlbTeams,
+    playersFixture as unknown as MlbPeople,
+  )
+
+  it('lists the 30 Teams and every active Player', () => {
+    expect(roster.teams).toHaveLength(30)
+    expect(roster.players.length).toBeGreaterThan(1000)
+  })
+
+  it('carries each Player’s current Team and position', () => {
+    const judge = roster.players.find((p) => p.name === 'Aaron Judge')!
+    const nyy = roster.teams.find((t) => t.abbreviation === 'NYY')!
+    expect(judge.teamSourceId).toBe(nyy.sourceId)
+    expect(judge.position).toBe('RF')
+  })
 })

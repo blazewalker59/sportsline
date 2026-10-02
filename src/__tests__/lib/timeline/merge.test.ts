@@ -5,6 +5,7 @@ import {
   emptyState,
   orderedGames,
   orderedItems,
+  readMarkerIndex,
   withItems,
 } from '@/lib/timeline/merge'
 
@@ -111,5 +112,24 @@ describe('Timeline merge', () => {
       { type: 'game', game: game('live', 'live', '2026-10-01T23:00:00Z') },
     ])
     expect(orderedGames(s).map((g) => g.id)).toEqual(['live', 'later', 'final'])
+  })
+})
+
+describe('readMarkerIndex', () => {
+  const items = [
+    item('c', '2026-10-01T23:30:00Z'),
+    item('b', '2026-10-01T23:20:00Z'),
+    item('a', '2026-10-01T23:10:00Z'),
+  ]
+
+  it('sits above the first item already seen', () => {
+    expect(readMarkerIndex(items, '2026-10-01T23:20:00Z')).toBe(1)
+    expect(readMarkerIndex(items, '2026-10-01T23:25:00Z')).toBe(1)
+  })
+
+  it('is hidden when nothing is new, nothing was seen, or there is no marker', () => {
+    expect(readMarkerIndex(items, '2026-10-01T23:30:00Z')).toBeNull()
+    expect(readMarkerIndex(items, '2026-10-01T22:00:00Z')).toBeNull()
+    expect(readMarkerIndex(items, null)).toBeNull()
   })
 })
