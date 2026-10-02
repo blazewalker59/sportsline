@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GameSummary, TimelineItem } from '@/lib/model/timeline'
 import {
+  bubbleTints,
   buildChat,
   notableLead,
   scoringHeadline,
@@ -189,5 +190,20 @@ describe('textOn', () => {
   it('picks readable text for a team color', () => {
     expect(textOn('#ffb612')).toBe('#111318')
     expect(textOn('#041e42')).toBe('#ffffff')
+  })
+})
+
+describe('bubbleTints', () => {
+  it('uses the primary color on light and the brighter color on dark', () => {
+    // Steelers: black primary, gold secondary.
+    expect(bubbleTints({ primary: '#000000', secondary: '#ffb612' })).toEqual({
+      light: '#000000',
+      dark: '#ffb612',
+    })
+    // Oilers: navy primary, orange secondary.
+    expect(
+      bubbleTints({ primary: '#041e42', secondary: '#ff4c00' })?.dark,
+    ).toBe('#ff4c00')
+    expect(bubbleTints(null)).toBeNull()
   })
 })

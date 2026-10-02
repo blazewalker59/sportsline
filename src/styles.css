@@ -109,3 +109,35 @@ body {
     animation: none !important;
   }
 }
+
+/*
+  Team-tinted chat bubbles: a light wash of the acting team's color so each
+  team's messages read as theirs. --tint-light / --tint-dark are set per
+  bubble from the team's colors (bubbleTints); without them the bubble is
+  plain.
+*/
+.team-tint {
+  background-color: color-mix(
+    in srgb,
+    var(--tint-light, var(--bubble)) 10%,
+    var(--bubble)
+  );
+  border-color: color-mix(
+    in srgb,
+    var(--tint-light, var(--bubble-border)) 24%,
+    var(--bubble-border)
+  );
+}
+
+.dark .team-tint {
+  background-color: color-mix(
+    in srgb,
+    var(--tint-dark, var(--bubble)) 16%,
+    var(--bubble)
+  );
+  border-color: color-mix(
+    in srgb,
+    var(--tint-dark, var(--bubble-border)) 30%,
+    var(--bubble)
+  );
+}

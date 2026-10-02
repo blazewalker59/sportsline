@@ -12,7 +12,12 @@ import type { League } from '@/lib/model/types'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { timeAgo } from '@/components/timeline/format'
-import { notableLead, scoringHeadline, textOn } from '@/lib/timeline/chat'
+import {
+  bubbleTints,
+  notableLead,
+  scoringHeadline,
+  textOn,
+} from '@/lib/timeline/chat'
 import { gameSearch, vtName } from '@/lib/timeline/gameLink'
 import { cn } from '@/lib/utils'
 
@@ -157,15 +162,24 @@ export function PlayBubble({
   }
 
   const lead = notableLead(item)
+  const tints = bubbleTints(actingTeam(item).colors)
   return (
     <Link
       to="/plays/$playId"
       params={{ playId: item.id }}
       className={cn(
-        'block max-w-[300px] border border-bubble-border bg-bubble px-3.5 py-2.5 text-[15px] leading-snug transition-colors hover:border-muted/40',
+        'team-tint block max-w-[300px] border px-3.5 py-2.5 text-[15px] leading-snug transition-colors hover:brightness-[0.97] dark:hover:brightness-110',
         shape,
         struck && 'line-through opacity-60',
       )}
+      style={
+        tints
+          ? ({
+              '--tint-light': tints.light,
+              '--tint-dark': tints.dark,
+            } as React.CSSProperties)
+          : undefined
+      }
     >
       {lead && <span className="mr-1 font-bold text-notable">{lead}.</span>}
       {item.description}
@@ -189,14 +203,23 @@ export function FoldBubble({
 }) {
   const [open, setOpen] = useState(false)
   if (open) return <>{renderOpen(items)}</>
+  const tints = bubbleTints(actingTeam(items[0]).colors)
   return (
     <button
       type="button"
       onClick={() => setOpen(true)}
       className={cn(
-        'flex min-h-11 max-w-[300px] items-center gap-2 rounded-full border border-dashed border-bubble-border px-4 text-left text-[13px] text-muted hover:text-foreground',
+        'team-tint flex min-h-11 max-w-[300px] items-center gap-2 rounded-full border border-dashed px-4 text-left text-[13px] text-muted hover:text-foreground',
         align === 'right' && 'self-end',
       )}
+      style={
+        tints
+          ? ({
+              '--tint-light': tints.light,
+              '--tint-dark': tints.dark,
+            } as React.CSSProperties)
+          : undefined
+      }
     >
       <span className="shrink-0 font-semibold text-foreground">
         +{items.length} plays

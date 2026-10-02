@@ -257,16 +257,42 @@ export function typingFor(game: GameSummary): Typing | null {
   }
 }
 
-/** Readable text on a team-color fill: near-black on light colors, white on dark. */
-export function textOn(hex: string): string {
+/** Relative luminance (WCAG) of a `#rrggbb` color, 0–1; null if unparseable. */
+export function luminance(hex: string): number | null {
   const m = hex
     .replace('#', '')
     .match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i)
-  if (!m) return '#ffffff'
+  if (!m) return null
   const [r, g, b] = m.slice(1).map((h) => {
     const c = parseInt(h, 16) / 255
     return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
   })
-  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
-  return luminance > 0.4 ? '#111318' : '#ffffff'
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+/** Readable text on a team-color fill: near-black on light colors, white on dark. */
+export function textOn(hex: string): string {
+  const l = luminance(hex)
+  if (l === null) return '#ffffff'
+  return l > 0.4 ? '#111318' : '#ffffff'
+}
+
+/**
+ * The colors a team's bubbles are washed with: its primary on a light
+ * ground; on a dark ground whichever of its two colors is brighter, since
+ * navy, black and brown primaries vanish there.
+ */
+export function bubbleTints(
+  colors: { primary: string; secondary: string } | null | undefined,
+): {
+  light: string
+  dark: string
+} | null {
+  if (!colors) return null
+  const p = luminance(colors.primary) ?? 0
+  const s = luminance(colors.secondary) ?? 0
+  return {
+    light: colors.primary,
+    dark: s > p ? colors.secondary : colors.primary,
+  }
 }
