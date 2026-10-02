@@ -1,12 +1,17 @@
-import { Link } from '@tanstack/react-router'
-import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useRouter } from '@tanstack/react-router'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { timeAgo, useNow } from './format'
 import { DayButton } from './DayButton'
 import { DayStrip } from './DayStrip'
+import { ScopeBar } from './ScopeBar'
 import { GameStrip } from './GameStrip'
+import type { Scope } from '@/lib/model/scope'
 import type { FeedEntry, Typing } from '@/lib/timeline/chat'
 import type { Follow, GameSummary } from '@/lib/model/timeline'
 import type { Connection } from '@/lib/timeline/useLiveTimeline'
+import { defaultScope, scopeFollows } from '@/lib/model/scope'
+import { takePlayOpened } from '@/lib/timeline/playSheet'
+import { PlaySheet } from '@/components/games/PlayDetailScreen'
 import { useHideOnScroll } from '@/lib/useHideOnScroll'
 import { withViewTransition } from '@/lib/viewTransition'
 import { gameSearch, vtName } from '@/lib/timeline/gameLink'
@@ -21,7 +26,6 @@ import {
   TypingDots,
 } from '@/components/chat/ChatParts'
 import { AppHeader } from '@/components/layout/AppHeader'
-import { DEFAULT_FOLLOWS } from '@/lib/model/timeline'
 import { sportsDayOf } from '@/lib/model/sportsDay'
 import { buildChat, typingFor } from '@/lib/timeline/chat'
 import { ensureSportsDay } from '@/lib/timeline/server'
@@ -32,9 +36,13 @@ import { useReadMarkerWriter, useViewer } from '@/lib/viewer/useViewer'
 export function TimelineScreen({
   day,
   gameId,
+  scope,
+  playId,
 }: {
   day?: string
   gameId?: string
+  scope?: Scope
+  playId?: string
 }) {
   const viewerState = useViewer()
   const [today] = useState(() => sportsDayOf(new Date()))
@@ -55,7 +63,25 @@ export function TimelineScreen({
       sportsDay={sportsDay}
       today={today}
       gameId={gameId ?? null}
+      scope={scope}
+      playId={playId ?? null}
     />
+  )
+}
+
+/** Does this Game belong on the score cards for the Scope? */
+function inScope(
+  game: GameSummary,
+  scope: Scope,
+  viewerFollows: ReadonlyArray<Follow>,
+  items: ReadonlyArray<{ gameId: string }>,
+): boolean {
+  if (scope === 'all') return true
+  if (scope !== 'following') return game.league === scope
+  // Player Follows can't be judged from the Game alone: include any Game
+  // that has Plays on this Timeline.
+  return (
+    followsGame(game, viewerFollows) || items.some((i) => i.gameId === game.id)
   )
 }
 
@@ -77,18 +103,32 @@ function Timeline({
   sportsDay,
   today,
   gameId,
+  scope: requestedScope,
+  playId,
 }: {
   sportsDay: string
   today: string
   gameId: string | null
+  scope?: Scope
+  playId: string | null
 }) {
   const isToday = sportsDay === today
   const { data } = useViewer()
   const viewer = data?.viewer ?? null
   const followed = data?.follows
-  const follows = useMemo(
-    () => (followed?.length ? followed.map((f) => f.follow) : DEFAULT_FOLLOWS),
+  const viewerFollows = useMemo(
+    () => (followed ?? []).map((f) => f.follow),
     [followed],
+  )
+  // The Scope from the URL, else Following for a Viewer who follows
+  // something, else All (CONTEXT.md, "Scope").
+  const scope: Scope =
+    requestedScope === 'following' && viewerFollows.length === 0
+      ? 'all'
+      : (requestedScope ?? defaultScope(viewerFollows))
+  const follows = useMemo(
+    () => scopeFollows(scope, viewerFollows),
+    [scope, viewerFollows],
   )
   // The divider marks where the Viewer stopped last time, so it is fixed at
   // load while the stored marker keeps moving.
@@ -108,6 +148,21 @@ function Timeline({
   const [dayOpen, setDayOpen] = useState(false)
   useEffect(() => setDayOpen(false), [sportsDay])
   const cardsHidden = useHideOnScroll()
+  const navigate = useNavigate()
+  const router = useRouter()
+  const closePlay = useCallback(() => {
+    // Opened from a bubble: go Back, exactly like the Back gesture.
+    if (takePlayOpened()) router.history.back()
+    else
+      void navigate({
+        to: '/',
+        search: (prev) => ({ ...prev, play: undefined }),
+        replace: true,
+      })
+  }, [navigate, router])
+  useEffect(() => {
+    if (!playId) takePlayOpened()
+  }, [playId])
   useEffect(() => setBoxOpen(false), [gameId])
 
   // Selecting a Game only filters this same feed (newest first, same
@@ -170,14 +225,7 @@ function Timeline({
               onToggle={() => setDayOpen((v) => !v)}
             />
           }
-          right={
-            <HighlightsButton
-              on={highlights}
-              onChange={(value) =>
-                withViewTransition(() => setHighlights(value))
-              }
-            />
-          }
+          right={null}
         >
           <ConnectionDot connection={timeline.connection} />
         </AppHeader>
@@ -190,13 +238,20 @@ function Timeline({
         </Collapse>
         {/* Score cards tuck away while reading down and return on the way up. */}
         <Collapse open={dayOpen || !cardsHidden}>
+          <ScopeBar
+            scope={scope}
+            canFollow={viewerFollows.length > 0}
+            highlights={highlights}
+            onHighlights={(value) =>
+              withViewTransition(() => setHighlights(value))
+            }
+          />
           <div className={cn('transition-opacity', dimmed && 'opacity-50')}>
             <GameStrip
-              games={
-                dimmed && timeline.previousGames.length
-                  ? timeline.previousGames
-                  : timeline.games
-              }
+              games={(dimmed && timeline.previousGames.length
+                ? timeline.previousGames
+                : timeline.games
+              ).filter((g) => inScope(g, scope, viewerFollows, timeline.items))}
               selected={gameId ?? undefined}
               onBox={() => setBoxOpen(true)}
             />
@@ -277,6 +332,8 @@ function Timeline({
         </button>
       )}
 
+      {playId && <PlaySheet playId={playId} onClose={closePlay} />}
+
       {boxOpen && selectedGame && (
         <BoxSheet
           game={selectedGame}
@@ -349,7 +406,11 @@ function Cluster({
     >
       <Link
         to="/"
-        search={gameSearch(entry.gameId, lead.sportsDay)}
+        search={(prev) => ({
+          ...prev,
+          play: undefined,
+          ...gameSearch(entry.gameId, lead.sportsDay),
+        })}
         viewTransition
         resetScroll={false}
         aria-label={`Show only the ${team.abbreviation} game`}
@@ -393,7 +454,11 @@ function TypingRow({
   return (
     <Link
       to="/"
-      search={gameSearch(game.id, game.sportsDay)}
+      search={(prev) => ({
+        ...prev,
+        play: undefined,
+        ...gameSearch(game.id, game.sportsDay),
+      })}
       viewTransition
       resetScroll={false}
       className={cn('flex items-end gap-2', right && 'flex-row-reverse')}
@@ -415,38 +480,6 @@ function TypingRow({
         <TypingDots align={right ? 'right' : 'left'} />
       </div>
     </Link>
-  )
-}
-
-/** Highlights on/off (Scoring and Notable only); a compact pill in the header. */
-function HighlightsButton({
-  on,
-  onChange,
-}: {
-  on: boolean
-  onChange: (on: boolean) => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!on)}
-      aria-pressed={on}
-      className={cn(
-        'flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold transition-colors',
-        on ? 'bg-foreground text-background' : 'bg-notice text-muted',
-      )}
-    >
-      <svg
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        aria-hidden="true"
-      >
-        <path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z" />
-      </svg>
-      Highlights
-    </button>
   )
 }
 

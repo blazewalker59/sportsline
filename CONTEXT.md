@@ -83,8 +83,16 @@ A viewer's declared interest in a Team, Player or League. A Team Follow covers e
 _Avoid_: subscription, favorite, watch
 
 **Timeline**:
-The live, reverse-chronological stream of Plays and Game Milestones matching a viewer's Follows, deduplicated, then narrowed by any active filters.
+The live, reverse-chronological stream of Plays and Game Milestones in the Viewer's chosen Scope on one Sports Day, deduplicated, then narrowed by any active filters (one Game, Highlights).
 _Avoid_: feed, stream, ticker
+
+**Scope**:
+Which Plays a Timeline draws from: All (every League), Following (the Viewer's Follows) or a single League. A Viewer switches Scope freely; it starts on Following when they follow anything, otherwise All.
+_Avoid_: view, tab, mode
+
+**Highlights**:
+A Timeline filter that keeps only Scoring and Notable Plays (and Game Milestones).
+_Avoid_: top plays, key plays
 
 **Sports Day**:
 The calendar day a Game belongs to for display, rolling over at 6am Eastern so late West Coast Games count toward the evening they started. The Timeline opens on today's Sports Day.

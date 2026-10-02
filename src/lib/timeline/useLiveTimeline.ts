@@ -26,12 +26,18 @@ import { useHubSocket } from './useHubSocket'
 import type { InfiniteData } from '@tanstack/react-query'
 import type { TimelinePage } from './server'
 import type { Follow, GameSummary } from '@/lib/model/timeline'
-import { followsToParam } from '@/lib/model/timeline'
+import {
+  DEFAULT_FOLLOWS,
+  followsFromParam,
+  followsToParam,
+  matchesFilter,
+} from '@/lib/model/timeline'
 import { shiftSportsDay } from '@/lib/model/sportsDay'
 
 export type { Connection } from './useHubSocket'
 
 const STALE_MS = 30_000
+const ALL_PARAM = followsToParam(DEFAULT_FOLLOWS)
 
 export function timelineKey(sportsDay: string, followParam: string) {
   return ['timeline', sportsDay, followParam] as const
@@ -110,16 +116,31 @@ export function useLiveTimeline(
     ])
   }, [queryClient, sportsDay, followParam])
 
+  // One live connection for every League; each cached Scope for this day
+  // takes the events its Follows cover, so switching Scope never reconnects
+  // and every cached Scope stays current.
   const connection = useHubSocket(
     live
-      ? new URLSearchParams({ follows: followParam, routine: '1' }).toString()
+      ? new URLSearchParams({ follows: ALL_PARAM, routine: '1' }).toString()
       : null,
     (events) => {
-      queryClient.setQueryData<InfiniteData<TimelinePage, string | null>>(
-        timelineKey(sportsDay, followParam),
-        (old) =>
-          old ? { ...old, pages: applyEventsToPages(old.pages, events) } : old,
-      )
+      for (const [key] of queryClient.getQueriesData({
+        queryKey: ['timeline', sportsDay],
+      })) {
+        const filter = {
+          follows: followsFromParam(String(key[2])),
+          includeRoutine: true,
+        }
+        const mine = events.filter(
+          (e) => e.type !== 'upsert' || matchesFilter(e.item, filter),
+        )
+        if (mine.length === 0) continue
+        queryClient.setQueryData<InfiniteData<TimelinePage, string | null>>(
+          key,
+          (old) =>
+            old ? { ...old, pages: applyEventsToPages(old.pages, mine) } : old,
+        )
+      }
       const gameEvents = events.flatMap((e) =>
         e.type === 'game' ? [e.game] : [],
       )
@@ -135,7 +156,8 @@ export function useLiveTimeline(
         )
       }
     },
-    () => void reload(),
+    () =>
+      void queryClient.invalidateQueries({ queryKey: ['timeline', sportsDay] }),
   )
 
   // Placeholder data is the previous day's: don't present it as this one's.

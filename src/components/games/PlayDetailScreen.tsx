@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
 import type { ZonePitch } from '@/components/mlb/StrikeZone'
 import type { PlayDetail } from '@/lib/games/server'
+import { Sheet } from '@/components/chat/Sheet'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamMark } from '@/components/brand/TeamMark'
 import { PlayText } from '@/components/chat/PlayText'
@@ -151,20 +153,59 @@ const ROLE_LABELS: Record<string, string> = {
   substitute: 'Substitute',
 }
 
+/**
+ * Old Play Detail links (/plays/:id) open the Play as a sheet over the
+ * Timeline, on the Play's Sports Day.
+ */
 export function PlayDetailScreen({ playId }: { playId: string }) {
-  const { data, isPending } = useQuery({
-    queryKey: ['play', playId],
-    queryFn: () => getPlayDetail({ data: { playId } }),
-  })
+  const navigate = useNavigate()
+  const { data, isPending } = useQuery(playQuery(playId))
+  useEffect(() => {
+    if (!data) return
+    const day = gameSearch(data.game.id, data.item.sportsDay).day
+    void navigate({
+      to: '/',
+      search: { play: playId, ...(day ? { day } : {}) },
+      replace: true,
+    })
+  }, [data, playId, navigate])
   return (
-    <div className="mx-auto max-w-xl px-4 pb-16">
+    <div className="mx-auto max-w-xl px-4">
       <AppHeader />
-      {isPending ? null : !data ? (
+      {!isPending && !data && (
         <p className="mt-16 text-center text-sm text-muted">Play not found.</p>
+      )}
+    </div>
+  )
+}
+
+function playQuery(playId: string) {
+  return {
+    queryKey: ['play', playId] as const,
+    queryFn: () => getPlayDetail({ data: { playId } }),
+    staleTime: 60_000,
+  }
+}
+
+/** A Play's detail in a sheet over the Timeline. */
+export function PlaySheet({
+  playId,
+  onClose,
+}: {
+  playId: string
+  onClose: () => void
+}) {
+  const { data, isPending } = useQuery(playQuery(playId))
+  return (
+    <Sheet title="Play" onClose={onClose}>
+      {isPending ? (
+        <p className="py-10 text-center text-sm text-muted">Loading…</p>
+      ) : !data ? (
+        <p className="py-10 text-center text-sm text-muted">Play not found.</p>
       ) : (
         <Play detail={data} />
       )}
-    </div>
+    </Sheet>
   )
 }
 
@@ -176,7 +217,11 @@ function Play({ detail }: { detail: PlayDetail }) {
     <article className="flex flex-col gap-4">
       <Link
         to="/"
-        search={gameSearch(game.id, game.sportsDay)}
+        search={(prev) => ({
+          ...prev,
+          play: undefined,
+          ...gameSearch(game.id, game.sportsDay),
+        })}
         className="flex items-center justify-between rounded-xl border border-border bg-surface px-4 py-2.5 text-sm"
       >
         <span className="flex items-center gap-2 tabular-nums">

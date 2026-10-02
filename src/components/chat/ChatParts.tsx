@@ -21,6 +21,7 @@ import {
   textOn,
 } from '@/lib/timeline/chat'
 import { gameSearch, vtName } from '@/lib/timeline/gameLink'
+import { markPlayOpened } from '@/lib/timeline/playSheet'
 import { cn } from '@/lib/utils'
 
 export type Align = 'left' | 'right'
@@ -126,8 +127,10 @@ export function PlayBubble({
       item.kind === 'overturn' ? null : (team.colors?.primary ?? null)
     return (
       <Link
-        to="/plays/$playId"
-        params={{ playId: item.id }}
+        to="/"
+        search={(prev) => ({ ...prev, play: item.id })}
+        resetScroll={false}
+        onClick={markPlayOpened}
         className={cn(
           'flex max-w-[300px] flex-col gap-1.5 px-4 py-3 transition-transform active:scale-[0.99]',
           shape,
@@ -165,8 +168,10 @@ export function PlayBubble({
   const tints = bubbleTints(actingTeam(item).colors)
   return (
     <Link
-      to="/plays/$playId"
-      params={{ playId: item.id }}
+      to="/"
+      search={(prev) => ({ ...prev, play: item.id })}
+      resetScroll={false}
+      onClick={markPlayOpened}
       className={cn(
         'team-tint block max-w-[300px] border px-3.5 py-2.5 text-[15px] leading-snug transition-colors hover:brightness-[0.97] dark:hover:brightness-110',
         shape,
@@ -325,7 +330,11 @@ export function Notice({
     return (
       <Link
         to="/"
-        search={gameSearch(item.gameId, item.sportsDay)}
+        search={(prev) => ({
+          ...prev,
+          play: undefined,
+          ...gameSearch(item.gameId, item.sportsDay),
+        })}
         className={className}
       >
         {body}
@@ -334,8 +343,10 @@ export function Notice({
   }
   return (
     <Link
-      to="/plays/$playId"
-      params={{ playId: item.id }}
+      to="/"
+      search={(prev) => ({ ...prev, play: item.id })}
+      resetScroll={false}
+      onClick={markPlayOpened}
       className={cn(
         'flex max-w-[320px] items-center gap-1.5 self-center rounded-full bg-notice px-3 py-1 text-xs font-semibold text-muted hover:text-foreground',
         item.milestone === 'final' && 'text-foreground',

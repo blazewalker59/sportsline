@@ -4,9 +4,9 @@
  * so it never feels like a new screen.
  */
 
-import { useEffect, useRef } from 'react'
 import type { GameSummary } from '@/lib/model/timeline'
 import type { GameBox } from '@/lib/model/types'
+import { Sheet } from '@/components/chat/Sheet'
 import { TeamLogo, TeamMark } from '@/components/brand/TeamMark'
 import { FollowButton } from '@/components/follows/FollowButton'
 import { cn } from '@/lib/utils'
@@ -21,57 +21,19 @@ export function BoxSheet({
   box: GameBox | null
   onClose: () => void
 }) {
-  const close = useRef<HTMLButtonElement>(null)
-  useEffect(() => {
-    close.current?.focus()
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onKey)
-    const overflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      document.body.style.overflow = overflow
-    }
-  }, [onClose])
   return (
-    <div
-      className="fixed inset-0 z-30 flex flex-col justify-end"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Box score"
-    >
-      <button
-        type="button"
-        aria-label="Close box score"
-        onClick={onClose}
-        className="absolute inset-0 bg-black/40"
-      />
-      <div className="animate-in slide-in-from-bottom relative mx-auto flex max-h-[calc(100dvh-max(env(safe-area-inset-top),1.5rem))] w-full max-w-xl flex-col rounded-t-3xl bg-background pb-[env(safe-area-inset-bottom)] shadow-2xl duration-300">
-        <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-          <span className="flex-1 text-base font-bold">Box score</span>
-          <button
-            ref={close}
-            type="button"
-            onClick={onClose}
-            className="min-h-11 rounded-full bg-notice px-4 text-[13px] font-semibold"
-          >
-            Done
-          </button>
-        </div>
-        <div className="flex flex-col gap-4 overflow-y-auto overscroll-contain px-4 py-4 [&>*]:shrink-0">
-          <div className="flex justify-between gap-2">
-            {[game.awayTeam, game.homeTeam].map((team) => (
-              <div key={team.id} className="flex items-center gap-2">
-                <TeamMark team={team} size={20} bold />
-                <FollowButton follow={{ kind: 'team', teamId: team.id }} />
-              </div>
-            ))}
+    <Sheet title="Box score" onClose={onClose}>
+      <div className="flex justify-between gap-2">
+        {[game.awayTeam, game.homeTeam].map((team) => (
+          <div key={team.id} className="flex items-center gap-2">
+            <TeamMark team={team} size={20} bold />
+            <FollowButton follow={{ kind: 'team', teamId: team.id }} />
           </div>
-          {box && <Linescore box={box} game={game} />}
-          <BoxTables box={box} game={game} />
-        </div>
+        ))}
       </div>
-    </div>
+      {box && <Linescore box={box} game={game} />}
+      <BoxTables box={box} game={game} />
+    </Sheet>
   )
 }
 
