@@ -99,4 +99,4 @@ jobs:
       # Verifies the Worker + D1 and starts the Scheduler loop (docs/adr/0001,
       # "Scheduling"), so schedules sync without waiting for a visitor.
       - name: Smoke check /health
-        run: curl -fsS --retry 5 --retry-delay 3 --retry-all-errors https://sportsline.blazewalker59.workers.dev/health
+        run: curl -fsS --retry 5 --retry-delay 3 --retry-all-errors https://sportsline.dev/health

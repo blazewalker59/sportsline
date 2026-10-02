@@ -23,7 +23,9 @@ wakes a LiveGame per live Game.
 
 ## Deploy
 
-Merges to `main` deploy to production via GitHub Actions (no staging).
+Production is **https://sportsline.dev** (a Cloudflare Custom Domain declared in
+`wrangler.jsonc`; `sportsline.blazewalker59.workers.dev` also serves it). Merges
+to `main` deploy to production via GitHub Actions (no staging).
 By hand: `bun run ship`. Migrations are applied by hand:
 `bun run db:migrate:remote -- --env production`.
 

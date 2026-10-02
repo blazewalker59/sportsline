@@ -52,9 +52,16 @@
   "env": {
     "production": {
       "name": "sportsline",
-      // Served at sportsline.blazewalker59.workers.dev until a custom domain
-      // is added (then: `routes` with `custom_domain: true`, as dreamteam).
+      // Production is sportsline.dev (a Custom Domain, declared here so every
+      // deploy keeps it, as dreamteam does). workers.dev stays on as a
+      // fallback.
       "workers_dev": true,
+      "routes": [
+        {
+          "pattern": "sportsline.dev",
+          "custom_domain": true,
+        },
+      ],
       "observability": {
         "logs": {
           "enabled": true,
