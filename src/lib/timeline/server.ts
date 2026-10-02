@@ -4,15 +4,27 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import { aliasedTable, and, desc, eq, inArray, lt, ne, or } from 'drizzle-orm'
+import {
+  aliasedTable,
+  and,
+  desc,
+  eq,
+  inArray,
+  lt,
+  ne,
+  or,
+  sql,
+} from 'drizzle-orm'
 import { z } from 'zod'
+import { BACKFILL_DAYS } from './days'
 import type { SQL } from 'drizzle-orm'
 import type { GameSummary, TeamRef, TimelineItem } from '@/lib/model/timeline'
 import type { League } from '@/lib/model/types'
 import { teamColors } from '@/lib/brand/teamColors'
-import { getDb } from '@/lib/db'
+import { getCloudflareEnv, getDb } from '@/lib/db'
 import { games, itemPlayers, teams, timelineItems } from '@/lib/db/schema'
-import { sportsDayOf } from '@/lib/model/sportsDay'
+import { shiftSportsDay, sportsDayOf } from '@/lib/model/sportsDay'
+import { syncDay } from '@/lib/live/schedule'
 import { followsFromParam } from '@/lib/model/timeline'
 import { toGameSummary, toTimelineItem } from '@/lib/live/rows'
 
@@ -163,3 +175,34 @@ function withColors(t: {
     colors: teamColors(t.league, t.name),
   }
 }
+
+/**
+ * Make sure a past Sports Day has its Games: if none are stored, sync that
+ * day's schedules so each finished Game is backfilled once. Idempotent;
+ * returns how many Games the day has after the sync.
+ */
+export const ensureSportsDay = createServerFn({ method: 'POST' })
+  .validator((data: { sportsDay: string }) =>
+    z.object({ sportsDay: SPORTS_DAY }).parse(data),
+  )
+  .handler(async ({ data }): Promise<{ games: number; loading: boolean }> => {
+    const today = sportsDayOf(new Date())
+    const oldest = shiftSportsDay(today, -BACKFILL_DAYS)
+    if (data.sportsDay >= today || data.sportsDay < oldest) {
+      return { games: 0, loading: false }
+    }
+    const db = getDb()
+    const existing = await db
+      .select({ n: sql<number>`count(*)` })
+      .from(games)
+      .where(eq(games.sportsDay, data.sportsDay))
+      .get()
+    if ((existing?.n ?? 0) > 0) return { games: existing!.n, loading: false }
+    await syncDay(getCloudflareEnv(), data.sportsDay, new Date())
+    const after = await db
+      .select({ n: sql<number>`count(*)` })
+      .from(games)
+      .where(eq(games.sportsDay, data.sportsDay))
+      .get()
+    return { games: after?.n ?? 0, loading: (after?.n ?? 0) > 0 }
+  })

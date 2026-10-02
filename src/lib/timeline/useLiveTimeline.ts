@@ -109,5 +109,7 @@ export function useLiveTimeline(
     hasMore: nextBefore !== null,
     loadingMore,
     loadMore,
+    /** Refetch the newest page (e.g. while a past day is being backfilled). */
+    reload: loadFirstPage,
   }
 }

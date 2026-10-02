@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { timeAgo, useNow } from './format'
+import { DayBar } from './DayBar'
 import { GameStrip } from './GameStrip'
 import type { FeedEntry, Typing } from '@/lib/timeline/chat'
 import type { Follow, GameSummary } from '@/lib/model/timeline'
@@ -17,12 +18,15 @@ import { AppHeader } from '@/components/layout/AppHeader'
 import { DEFAULT_FOLLOWS } from '@/lib/model/timeline'
 import { sportsDayOf } from '@/lib/model/sportsDay'
 import { buildChat, typingFor } from '@/lib/timeline/chat'
+import { ensureSportsDay } from '@/lib/timeline/server'
 import { useLiveTimeline } from '@/lib/timeline/useLiveTimeline'
 import { cn } from '@/lib/utils'
 import { useReadMarkerWriter, useViewer } from '@/lib/viewer/useViewer'
 
-export function TimelineScreen() {
+export function TimelineScreen({ day }: { day?: string }) {
   const viewerState = useViewer()
+  const [today] = useState(() => sportsDayOf(new Date()))
+  const sportsDay = day && day < today ? day : today
   // Wait for the session so a signed-in Viewer never flashes the default Timeline.
   if (viewerState.isPending) {
     return (
@@ -31,7 +35,13 @@ export function TimelineScreen() {
       </div>
     )
   }
-  return <Timeline key={viewerState.data?.viewer?.id ?? 'guest'} />
+  return (
+    <Timeline
+      key={`${viewerState.data?.viewer?.id ?? 'guest'}:${sportsDay}`}
+      sportsDay={sportsDay}
+      today={today}
+    />
+  )
 }
 
 /** Is this live Game one the Viewer's Follows cover (for its typing indicator)? */
@@ -48,7 +58,8 @@ function followsGame(
   )
 }
 
-function Timeline() {
+function Timeline({ sportsDay, today }: { sportsDay: string; today: string }) {
+  const isToday = sportsDay === today
   const { data } = useViewer()
   const viewer = data?.viewer ?? null
   const followed = data?.follows
@@ -60,9 +71,10 @@ function Timeline() {
   // load while the stored marker keeps moving.
   const [readAt] = useState(() => data?.readAt ?? null)
   const [includeRoutine, setIncludeRoutine] = useState(false)
-  const [sportsDay] = useState(() => sportsDayOf(new Date()))
   const timeline = useLiveTimeline(follows, includeRoutine, sportsDay)
-  useReadMarkerWriter(timeline.items, viewer !== null)
+  // Only today's Timeline moves the Read Marker; browsing history must not.
+  useReadMarkerWriter(timeline.items, viewer !== null && isToday)
+  const backfill = usePastDay(sportsDay, isToday, timeline.reload)
   const now = useNow()
 
   const entries = useMemo(
@@ -71,20 +83,21 @@ function Timeline() {
   )
   const typing = useMemo(
     () =>
-      timeline.games
+      (isToday ? timeline.games : [])
         .filter((g) => followsGame(g, follows))
         .flatMap((g) => {
           const t = typingFor(g)
           return t ? [{ typing: t, game: g }] : []
         }),
-    [timeline.games, follows],
+    [timeline.games, follows, isToday],
   )
-  const newCount = readAt
-    ? timeline.items.filter((i) => i.occurredAt > readAt).length
-    : 0
-  const dividerAt = readAt
-    ? entries.findIndex((e) => entryTime(e) <= readAt)
-    : -1
+  const showMarker = isToday && readAt !== null
+  const newCount =
+    showMarker && readAt
+      ? timeline.items.filter((i) => i.occurredAt > readAt).length
+      : 0
+  const dividerAt =
+    showMarker && readAt ? entries.findIndex((e) => entryTime(e) <= readAt) : -1
 
   return (
     <div className="mx-auto max-w-xl px-4 pb-16">
@@ -121,6 +134,8 @@ function Timeline() {
         </Link>
       )}
 
+      <DayBar sportsDay={sportsDay} today={today} />
+
       <GameStrip games={timeline.games} />
 
       <ol className="mt-4 flex flex-col gap-3">
@@ -146,7 +161,11 @@ function Timeline() {
 
       {timeline.items.length === 0 && typing.length === 0 && (
         <p className="mt-16 text-center text-sm text-muted">
-          No plays yet today.
+          {backfill === 'loading'
+            ? 'Loading this day’s games…'
+            : isToday
+              ? 'No plays yet today.'
+              : 'No plays on this day.'}
         </p>
       )}
 
@@ -162,6 +181,36 @@ function Timeline() {
       )}
     </div>
   )
+}
+
+/**
+ * A past Sports Day that was never loaded is fetched on first open; its
+ * finished Games then backfill in the background, so refetch a few times.
+ */
+function usePastDay(
+  sportsDay: string,
+  isToday: boolean,
+  reload: () => Promise<unknown>,
+): 'idle' | 'loading' | 'done' {
+  const [state, setState] = useState<'idle' | 'loading' | 'done'>('idle')
+  useEffect(() => {
+    if (isToday) return
+    let cancelled = false
+    const timers: Array<ReturnType<typeof setTimeout>> = []
+    void ensureSportsDay({ data: { sportsDay } }).then((r) => {
+      if (cancelled || !r.loading) return
+      setState('loading')
+      for (const ms of [3_000, 8_000, 15_000, 30_000]) {
+        timers.push(setTimeout(() => void reload(), ms))
+      }
+      timers.push(setTimeout(() => setState('done'), 30_000))
+    })
+    return () => {
+      cancelled = true
+      timers.forEach(clearTimeout)
+    }
+  }, [sportsDay, isToday, reload])
+  return state
 }
 
 function entryTime(entry: FeedEntry): string {

@@ -41,13 +41,28 @@ export async function syncSchedules(
   env: CloudflareEnv,
   now: Date,
 ): Promise<void> {
-  const sportsDay = sportsDayOf(now)
+  await syncDay(env, sportsDayOf(now), now)
+}
+
+/**
+ * Sync one Sports Day's schedules for every League: today's from the
+ * Scheduler, a past day's when a Viewer opens it (finished Games are then
+ * backfilled once by their LiveGames).
+ */
+export async function syncDay(
+  env: CloudflareEnv,
+  sportsDay: string,
+  now: Date,
+): Promise<void> {
   const results = await Promise.allSettled(
     ACTIVE_LEAGUES.map((league) => syncLeague(env, league, sportsDay, now)),
   )
   for (const r of results) {
     if (r.status === 'rejected')
-      console.error('Schedule sync failed', String(r.reason))
+      console.error('Schedule sync failed', {
+        sportsDay,
+        reason: String(r.reason),
+      })
   }
 }
 
