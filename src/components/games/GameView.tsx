@@ -123,7 +123,7 @@ export function BoxSheet({
             Done
           </button>
         </div>
-        <div className="flex flex-col gap-4 overflow-y-auto px-4 py-4">
+        <div className="flex flex-col gap-4 overflow-y-auto overscroll-contain px-4 py-4 [&>*]:shrink-0">
           <div className="flex justify-between gap-2">
             {[game.awayTeam, game.homeTeam].map((team) => (
               <div key={team.id} className="flex items-center gap-2">
