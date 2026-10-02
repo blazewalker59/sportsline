@@ -9,10 +9,13 @@ import { VIEWER_KEY, useViewer } from '@/lib/viewer/useViewer'
 export function AppHeader({
   children,
   right,
+  title,
   pinned = true,
 }: {
   children?: React.ReactNode
   right?: React.ReactNode
+  /** Replaces the wordmark (the Timeline shows its day here). */
+  title?: React.ReactNode
   /** False when a parent pins a larger top section that includes this bar. */
   pinned?: boolean
 }) {
@@ -21,15 +24,17 @@ export function AppHeader({
       className={
         pinned
           ? 'sticky top-0 z-10 -mx-4 mb-3 bg-background/90 px-4 pt-[max(env(safe-area-inset-top),0.75rem)] pb-3 backdrop-blur'
-          : 'pt-[max(env(safe-area-inset-top),0.75rem)] pb-2'
+          : 'pt-[max(env(safe-area-inset-top),0.5rem)] pb-1'
       }
     >
-      <div className="flex items-center gap-3">
-        <Link to="/" className="text-lg font-bold tracking-tight">
-          Sportsline
-        </Link>
+      <div className="flex items-center gap-2">
+        {title ?? (
+          <Link to="/" className="text-lg font-bold tracking-tight">
+            Sportsline
+          </Link>
+        )}
         {children}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1.5">
           {right}
           <ThemeButton />
           <AccountButton />

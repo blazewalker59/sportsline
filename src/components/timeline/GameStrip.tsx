@@ -14,17 +14,43 @@ import { cn } from '@/lib/utils'
 export function GameStrip({
   games,
   selected,
+  onBox,
 }: {
   games: Array<GameSummary>
   selected?: string
+  /** Opens the selected Game's box score; its button sits beside the card. */
+  onBox?: () => void
 }) {
   if (games.length === 0) return null
   return (
     <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none]">
-      <ul className="flex gap-2 pt-1.5 pb-1">
+      <ul className="flex gap-2 pt-1.5 pb-0.5">
         {games.map((game) => (
-          <li key={game.id} className="shrink-0">
+          <li key={game.id} className="flex shrink-0 gap-1.5">
             <GameCard game={game} selected={game.id === selected} />
+            {game.id === selected && onBox && (
+              <button
+                type="button"
+                onClick={onBox}
+                aria-label="Box score"
+                className="animate-in fade-in zoom-in-95 flex w-12 flex-col items-center justify-center gap-0.5 rounded-2xl bg-notice text-[10px] font-semibold text-muted duration-200 hover:text-foreground"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  aria-hidden="true"
+                >
+                  <rect x="3" y="4" width="18" height="16" rx="2" />
+                  <path d="M3 10h18M9 10v10M15 10v10" />
+                </svg>
+                Box
+              </button>
+            )}
           </li>
         ))}
       </ul>
@@ -56,7 +82,7 @@ function GameCard({
       aria-pressed={selected}
       aria-label={`${game.awayTeam.abbreviation} ${game.score.away}, ${game.homeTeam.abbreviation} ${game.score.home}, ${status(game)}${selected ? '. Showing only this game; tap to show all' : ''}`}
       className={cn(
-        'relative flex w-[132px] flex-col gap-1 rounded-2xl border bg-surface px-2.5 py-2 transition-colors',
+        'relative flex w-[124px] flex-col gap-0.5 rounded-2xl border bg-surface px-2.5 py-1.5 transition-colors',
         selected
           ? 'border-accent bg-accent-soft'
           : live
@@ -81,11 +107,11 @@ function GameCard({
           <span
             key={side}
             className={cn(
-              'flex items-center gap-1.5 text-[15px] leading-6 tabular-nums',
+              'flex items-center gap-1.5 text-[15px] leading-[22px] tabular-nums',
               leader === side ? 'font-bold' : 'text-foreground/75',
             )}
           >
-            <TeamLogo team={team} size={24} />
+            <TeamLogo team={team} size={22} />
             <span className="flex-1 text-[13px] font-semibold">
               {team.abbreviation}
             </span>

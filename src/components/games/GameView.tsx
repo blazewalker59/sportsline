@@ -1,8 +1,7 @@
 /**
  * One Game inside the Timeline (design direction "Watch Party"). Selecting
- * a Game only filters the feed; this adds a slim row with its score and
- * status, and a sheet for its box score, so it never feels like a new
- * screen.
+ * a Game only filters the feed; its box score opens as a sheet over it,
+ * so it never feels like a new screen.
  */
 
 import { useEffect, useRef } from 'react'
@@ -10,71 +9,7 @@ import type { GameSummary } from '@/lib/model/timeline'
 import type { GameBox } from '@/lib/model/types'
 import { TeamLogo, TeamMark } from '@/components/brand/TeamMark'
 import { FollowButton } from '@/components/follows/FollowButton'
-import { startTime } from '@/components/timeline/format'
-import { typingFor } from '@/lib/timeline/chat'
 import { cn } from '@/lib/utils'
-
-function statusText(game: GameSummary): string {
-  const live = game.status === 'live' || game.status === 'delayed'
-  if (live)
-    return typingFor(game)?.text ?? game.situation?.segmentLabel ?? 'Live'
-  if (game.status === 'final') return 'Final'
-  if (game.status === 'postponed') return 'Postponed'
-  return startTime(game.startsAt)
-}
-
-/**
- * The selected Game's row under the score cards. Always rendered so it can
- * open and close smoothly (grid rows 0fr ↔ 1fr) instead of popping in.
- */
-export function GameFocusBar({
-  game,
-  onBox,
-}: {
-  game: GameSummary | null
-  onBox: () => void
-}) {
-  const live = game && (game.status === 'live' || game.status === 'delayed')
-  return (
-    <div
-      className={cn(
-        'grid transition-[grid-template-rows,opacity] duration-300 ease-out',
-        game ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
-      )}
-      aria-hidden={!game}
-    >
-      <div className="overflow-hidden">
-        {game && (
-          <div className="mt-2 flex items-center gap-3 rounded-2xl bg-notice py-1.5 pr-1.5 pl-3">
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="flex items-center gap-1.5 text-sm font-bold tabular-nums">
-                <TeamLogo team={game.awayTeam} size={18} />
-                {game.awayTeam.abbreviation} {game.score.away} –{' '}
-                {game.score.home} {game.homeTeam.abbreviation}
-                <TeamLogo team={game.homeTeam} size={18} />
-              </span>
-              <span
-                className={cn(
-                  'truncate text-xs font-semibold',
-                  live ? 'text-live' : 'text-muted',
-                )}
-              >
-                {statusText(game)}
-              </span>
-            </span>
-            <button
-              type="button"
-              onClick={onBox}
-              className="min-h-11 shrink-0 rounded-full bg-surface px-4 text-[13px] font-semibold"
-            >
-              Box score
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
 
 /** The box score over the feed, so closing it lands exactly where you were. */
 export function BoxSheet({

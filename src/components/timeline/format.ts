@@ -16,7 +16,12 @@ export function timeAgo(iso: string, now: number): string {
   const minutes = Math.round(seconds / 60)
   if (minutes < 60) return `${minutes}m`
   const hours = Math.floor(minutes / 60)
-  return `${hours}h`
+  // Past about half a day, "117h" means nothing: show the clock time.
+  if (hours < 12) return `${hours}h`
+  return new Date(iso).toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }
 
 export function startTime(iso: string): string {

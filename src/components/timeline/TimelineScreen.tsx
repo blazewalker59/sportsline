@@ -1,15 +1,17 @@
 import { Link } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { timeAgo, useNow } from './format'
+import { DayButton } from './DayButton'
 import { DayStrip } from './DayStrip'
 import { GameStrip } from './GameStrip'
 import type { FeedEntry, Typing } from '@/lib/timeline/chat'
 import type { Follow, GameSummary } from '@/lib/model/timeline'
 import type { Connection } from '@/lib/timeline/useLiveTimeline'
+import { useHideOnScroll } from '@/lib/useHideOnScroll'
 import { withViewTransition } from '@/lib/viewTransition'
 import { gameSearch, vtName } from '@/lib/timeline/gameLink'
 import { useLiveGame } from '@/lib/games/useLiveGame'
-import { BoxSheet, GameFocusBar } from '@/components/games/GameView'
+import { BoxSheet } from '@/components/games/GameView'
 import {
   BubbleStack,
   LeagueAvatar,
@@ -103,6 +105,9 @@ function Timeline({
   const now = useNow()
   const game = useLiveGame(gameId)
   const [boxOpen, setBoxOpen] = useState(false)
+  const [dayOpen, setDayOpen] = useState(false)
+  useEffect(() => setDayOpen(false), [sportsDay])
+  const cardsHidden = useHideOnScroll()
   useEffect(() => setBoxOpen(false), [gameId])
 
   // Selecting a Game only filters this same feed (newest first, same
@@ -152,28 +157,51 @@ function Timeline({
     <div className="mx-auto max-w-xl px-4 pb-16">
       {/* Pinned: everything above the conversation stays put while it scrolls. */}
       <div
-        className="sticky top-0 z-10 -mx-4 mb-3 border-b border-border bg-background/95 px-4 pb-3 backdrop-blur"
+        className="sticky top-0 z-10 -mx-4 mb-3 border-b border-border bg-background/95 px-4 pb-2 backdrop-blur"
         style={{ viewTransitionName: 'pinned' }}
       >
-        <AppHeader pinned={false}>
+        <AppHeader
+          pinned={false}
+          title={
+            <DayButton
+              sportsDay={sportsDay}
+              today={today}
+              open={dayOpen}
+              onToggle={() => setDayOpen((v) => !v)}
+            />
+          }
+          right={
+            <HighlightsButton
+              on={highlights}
+              onChange={(value) =>
+                withViewTransition(() => setHighlights(value))
+              }
+            />
+          }
+        >
           <ConnectionDot connection={timeline.connection} />
         </AppHeader>
-        <DayStrip sportsDay={sportsDay} today={today} />
-        <div className={cn('transition-opacity', dimmed && 'opacity-50')}>
-          <GameStrip
-            games={
-              dimmed && timeline.previousGames.length
-                ? timeline.previousGames
-                : timeline.games
-            }
-            selected={gameId ?? undefined}
+        <Collapse open={dayOpen}>
+          <DayStrip
+            sportsDay={sportsDay}
+            today={today}
+            onPick={() => setDayOpen(false)}
           />
-        </div>
-        <PlaysToggle
-          highlights={highlights}
-          onChange={(value) => withViewTransition(() => setHighlights(value))}
-        />
-        <GameFocusBar game={selectedGame} onBox={() => setBoxOpen(true)} />
+        </Collapse>
+        {/* Score cards tuck away while reading down and return on the way up. */}
+        <Collapse open={dayOpen || !cardsHidden}>
+          <div className={cn('transition-opacity', dimmed && 'opacity-50')}>
+            <GameStrip
+              games={
+                dimmed && timeline.previousGames.length
+                  ? timeline.previousGames
+                  : timeline.games
+              }
+              selected={gameId ?? undefined}
+              onBox={() => setBoxOpen(true)}
+            />
+          </div>
+        </Collapse>
       </div>
 
       {viewer && !followed?.length && !gameId && (
@@ -390,38 +418,56 @@ function TypingRow({
   )
 }
 
-/** All plays vs Highlights (Scoring and Notable only), under the score cards. */
-function PlaysToggle({
-  highlights,
+/** Highlights on/off (Scoring and Notable only); a compact pill in the header. */
+function HighlightsButton({
+  on,
   onChange,
 }: {
-  highlights: boolean
-  onChange: (highlights: boolean) => void
+  on: boolean
+  onChange: (on: boolean) => void
 }) {
-  const option = (value: boolean, label: string) => (
+  return (
     <button
       type="button"
-      role="radio"
-      aria-checked={highlights === value}
-      onClick={() => onChange(value)}
+      onClick={() => onChange(!on)}
+      aria-pressed={on}
       className={cn(
-        'min-h-9 flex-1 rounded-full text-[13px] font-semibold transition-colors',
-        highlights === value
-          ? 'bg-surface text-foreground shadow-sm'
-          : 'text-muted',
+        'flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold transition-colors',
+        on ? 'bg-foreground text-background' : 'bg-notice text-muted',
       )}
     >
-      {label}
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        aria-hidden="true"
+      >
+        <path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z" />
+      </svg>
+      Highlights
     </button>
   )
+}
+
+/** Height-animated show/hide (grid rows 0fr ↔ 1fr), so rows slide instead of popping. */
+function Collapse({
+  open,
+  children,
+}: {
+  open: boolean
+  children: React.ReactNode
+}) {
   return (
     <div
-      role="radiogroup"
-      aria-label="Which plays to show"
-      className="mt-2 flex gap-1 rounded-full bg-notice p-1"
+      className={cn(
+        'grid transition-[grid-template-rows,opacity] duration-250 ease-out',
+        open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
+      )}
+      aria-hidden={!open}
+      inert={!open}
     >
-      {option(false, 'All plays')}
-      {option(true, 'Highlights')}
+      <div className="min-h-0 overflow-hidden">{children}</div>
     </div>
   )
 }
@@ -434,8 +480,10 @@ function ConnectionDot({ connection }: { connection: Connection }) {
   }[connection]
   return (
     <span
-      className="flex items-center gap-1.5 text-xs text-muted"
-      aria-live="polite"
+      role="status"
+      aria-label={label}
+      title={label}
+      className="flex size-6 items-center justify-center"
     >
       <span
         className={cn(
@@ -443,7 +491,6 @@ function ConnectionDot({ connection }: { connection: Connection }) {
           connection === 'live' ? 'animate-pulse bg-live' : 'bg-muted',
         )}
       />
-      {label}
     </span>
   )
 }

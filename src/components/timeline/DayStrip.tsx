@@ -29,9 +29,12 @@ function chip(
 export function DayStrip({
   sportsDay,
   today,
+  onPick,
 }: {
   sportsDay: string
   today: string
+  /** Called when a day is chosen (the header's day picker closes). */
+  onPick?: () => void
 }) {
   const days = Array.from({ length: BACKFILL_DAYS + 1 }, (_, i) =>
     shiftSportsDay(today, i - BACKFILL_DAYS),
@@ -47,7 +50,7 @@ export function DayStrip({
   return (
     <nav
       aria-label="Sports Day"
-      className="-mx-4 mb-2 overflow-x-auto px-4 [scrollbar-width:none]"
+      className="-mx-4 overflow-x-auto px-4 pt-1 pb-2 [scrollbar-width:none]"
     >
       <ol className="flex w-max gap-1">
         {days.map((day) => {
@@ -61,6 +64,7 @@ export function DayStrip({
                 search={day === today ? {} : { day }}
                 viewTransition
                 resetScroll={false}
+                onClick={onPick}
                 aria-current={isSelected ? 'date' : undefined}
                 aria-label={new Date(`${day}T12:00:00Z`).toLocaleDateString(
                   undefined,
