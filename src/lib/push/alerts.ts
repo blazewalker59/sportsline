@@ -24,6 +24,9 @@ export function isAlertable(item: TimelineItem, now: number): boolean {
   const news = now - Date.parse(item.occurredAt) < STALE_MS
   if (item.kind === 'overturn') return news
   if (item.kind === 'milestone') return item.milestone === 'final' && news
+  // Basketball scores ~80 times a game: until NBA Scoring is narrowed (lead
+  // changes, Clutch), only its Finals Alert.
+  if (item.league === 'nba') return false
   return item.significance === 'scoring' && news && item.status === 'active'
 }
 

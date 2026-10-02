@@ -141,8 +141,14 @@ export function scoringHeadline(item: TimelineItem): string {
       if (strength === 'empty net') return 'Empty-net goal'
       return 'Goal'
     }
-    case 'nba':
-      return 'Score'
+    case 'nba': {
+      const points = (detailOf(item) as { points?: number }).points ?? 0
+      if (/Free Throw/i.test(type)) return 'Free throw'
+      if (points === 3) return 'Three-pointer'
+      if (/Dunk/i.test(type)) return 'Dunk'
+      if (/Layup|Finger Roll/i.test(type)) return 'Layup'
+      return 'Bucket'
+    }
   }
 }
 
@@ -178,8 +184,16 @@ export function notableLead(item: TimelineItem): string | null {
       if (type === 'fight') return 'Fight'
       if (type === 'penalty') return 'Penalty'
       return null
-    case 'nba':
+    case 'nba': {
+      const text = item.description
+      if (/\bblocks\b/.test(text)) return 'Block'
+      if (/\bsteals\)/.test(text)) return 'Steal'
+      if (/flagrant/i.test(type)) return 'Flagrant'
+      if (/technical/i.test(type)) return 'Technical'
+      if (/challenge|review/i.test(type)) return 'Review'
+      if (/jump ?ball/i.test(type)) return 'Jump ball'
       return null
+    }
   }
 }
 

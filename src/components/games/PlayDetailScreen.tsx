@@ -128,6 +128,9 @@ function NhlContext({
 }
 
 const ROLE_LABELS: Record<string, string> = {
+  steal: 'Steal',
+  'sub in': 'Checked in',
+  'sub out': 'Checked out',
   scorer: 'Goal',
   assist: 'Assist',
   goalie: 'Goalie',

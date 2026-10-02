@@ -57,13 +57,22 @@ const RESULTS: Record<League, Array<RegExp>> = {
     /\bsaved by\b/g,
     /\bis stopped\b/g,
   ],
-  nba: [/\b(?:makes|misses|blocks|steals)\b/g],
+  nba: [
+    /\b(?:makes|misses|blocks)\b/g,
+    /\b(?:defensive|offensive)(?: team)? rebound\b/g,
+    /\b(?:bad pass|lost ball|traveling|shot clock|out of bounds)?\s?turnover\b/g,
+    /\benters the game for\b/g,
+  ],
 }
 
 const FLAGS: Array<RegExp> = [
   /\bPENALTY on [A-Z]{2,3}\b/g,
   /^Penalty\b/g,
   /\bPenalty\b/g,
+  // Basketball fouls and violations.
+  /\b(?:flagrant foul type [12]|technical foul)\b/g,
+  /\b(?:shooting|personal|offensive|loose ball|personal take|transition take|take|away from play|clear path) foul\b/g,
+  /\b(?:defensive )?goaltending\b/g,
 ]
 
 const PLACES: Record<League, Array<RegExp>> = {

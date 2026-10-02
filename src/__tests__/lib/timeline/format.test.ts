@@ -166,3 +166,31 @@ describe('nameForms', () => {
     ])
   })
 })
+
+describe('segmentDescription — NBA', () => {
+  it('styles shooter, result and the assist aside', () => {
+    const segs = segmentDescription(
+      'Devin Vassell makes 24-foot three point jumper (Stephon Castle assists)',
+      'nba',
+      [{ name: 'Devin Vassell' }, { name: 'Stephon Castle' }],
+    )
+    expect(styled(segs)).toEqual([
+      ['player', 'Devin Vassell', false],
+      ['result', 'makes', false],
+      ['player', 'Stephon Castle', true],
+    ])
+  })
+
+  it('flags fouls', () => {
+    expect(
+      styled(
+        segmentDescription('Stephon Castle shooting foul', 'nba', [
+          { name: 'Stephon Castle' },
+        ]),
+      ),
+    ).toEqual([
+      ['player', 'Stephon Castle', false],
+      ['flag', 'shooting foul', false],
+    ])
+  })
+})
