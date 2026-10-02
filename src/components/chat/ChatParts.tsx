@@ -22,6 +22,7 @@ import {
 } from '@/lib/timeline/chat'
 import { gameSearch, vtName } from '@/lib/timeline/gameLink'
 import { markPlayOpened } from '@/lib/timeline/playSheet'
+import { scoringSummary } from '@/lib/timeline/sides'
 import { cn } from '@/lib/utils'
 
 export type Align = 'left' | 'right'
@@ -125,6 +126,8 @@ export function PlayBubble({
     const team = actingTeam(item)
     const fill =
       item.kind === 'overturn' ? null : (team.colors?.primary ?? null)
+    // T4: the headline word, a short "who did what", the full sentence small.
+    const summary = scoringSummary(item)
     return (
       <Link
         to="/"
@@ -147,11 +150,33 @@ export function PlayBubble({
         >
           {scoringHeadline(item)}
         </span>
-        <span
-          className={cn('text-[15px] leading-snug', struck && 'line-through')}
-        >
-          <PlayText item={item} onFill={Boolean(fill)} />
-        </span>
+        {summary ? (
+          <>
+            <span
+              className={cn(
+                'text-base leading-snug font-bold',
+                struck && 'line-through',
+              )}
+            >
+              {summary}
+            </span>
+            <span
+              className={cn(
+                'text-[12.5px] leading-snug',
+                fill ? 'opacity-75' : 'text-muted',
+                struck && 'line-through',
+              )}
+            >
+              {cleanDescription(item)}
+            </span>
+          </>
+        ) : (
+          <span
+            className={cn('text-[15px] leading-snug', struck && 'line-through')}
+          >
+            <PlayText item={item} onFill={Boolean(fill)} />
+          </span>
+        )}
         {!compact && (
           <span className="flex items-center gap-2 text-sm font-bold tabular-nums">
             <TeamLogo team={item.awayTeam} size={18} />
@@ -393,4 +418,15 @@ export function ReadDivider({ count }: { count: number }) {
       <span className="h-px flex-1 bg-accent/60" />
     </div>
   )
+}
+
+/** The Play's sentence as a caption: segmented (so noise is dropped), joined. */
+function cleanDescription(item: TimelineItem): string {
+  const description =
+    item.kind === 'overturn'
+      ? item.description.replace(/^Overturned: /, '')
+      : item.description
+  return segmentDescription(description, item.league, [])
+    .map((seg) => seg.text)
+    .join('')
 }

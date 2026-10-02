@@ -119,12 +119,12 @@ body {
 .team-tint {
   background-color: color-mix(
     in srgb,
-    var(--tint-light, var(--bubble)) 10%,
+    var(--tint-light, var(--bubble)) 15%,
     var(--bubble)
   );
   border-color: color-mix(
     in srgb,
-    var(--tint-light, var(--bubble-border)) 24%,
+    var(--tint-light, var(--bubble-border)) 36%,
     var(--bubble-border)
   );
 }
@@ -132,12 +132,25 @@ body {
 .dark .team-tint {
   background-color: color-mix(
     in srgb,
-    var(--tint-dark, var(--bubble)) 16%,
+    var(--tint-dark, var(--bubble)) 24%,
     var(--bubble)
   );
   border-color: color-mix(
     in srgb,
-    var(--tint-dark, var(--bubble-border)) 30%,
+    var(--tint-dark, var(--bubble-border)) 40%,
     var(--bubble)
   );
+}
+
+/*
+  Player names in their team's color (PlayText). Team colors are brand
+  colors, not text colors, so they are pulled toward the text color for
+  contrast: darkened on light, lightened on dark.
+*/
+.team-name {
+  color: color-mix(in srgb, var(--name-light, var(--foreground)) 72%, #000);
+}
+
+.dark .team-name {
+  color: color-mix(in srgb, var(--name-dark, var(--foreground)) 68%, #fff);
 }

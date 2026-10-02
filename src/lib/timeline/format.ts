@@ -11,7 +11,7 @@
  */
 
 import type { TimelinePlayer } from '@/lib/model/timeline'
-import type { League } from '@/lib/model/types'
+import type { League, Side } from '@/lib/model/types'
 
 export type SegmentKind =
   'plain' | 'player' | 'result' | 'flag' | 'place' | 'aside'
@@ -21,6 +21,8 @@ export interface Segment {
   kind: SegmentKind
   /** Inside a parenthesised aside (e.g. the tackler): de-emphasized. */
   muted: boolean
+  /** For a player: which team they're on, when known. */
+  side?: Side | null
 }
 
 const RESULTS: Record<League, Array<RegExp>> = {
@@ -120,11 +122,12 @@ export function nameForms(name: string): Array<string> {
 export function segmentDescription(
   description: string,
   league: League,
-  players: ReadonlyArray<Pick<TimelinePlayer, 'name'>>,
+  players: ReadonlyArray<Pick<TimelinePlayer, 'name'> & { side?: Side | null }>,
 ): Array<Segment> {
   const text = clean(description, league)
   const kind: Array<SegmentKind | null> = new Array(text.length).fill(null)
   const muted: Array<boolean> = new Array(text.length).fill(false)
+  const side: Array<Side | null> = new Array(text.length).fill(null)
 
   for (const m of text.matchAll(/\([^()]*\)/g)) {
     for (let i = m.index; i < m.index + m[0].length; i++) muted[i] = true
@@ -136,17 +139,25 @@ export function segmentDescription(
     }
   }
 
+  // Each player's name forms, longest first across everyone, so "Ha-Seong
+  // Kim" wins over a shorter overlapping name and its team is known.
   const forms = players
-    .flatMap((p) => nameForms(p.name))
-    .sort((a, b) => b.length - a.length)
-  if (forms.length > 0) {
-    claim(
-      new RegExp(
-        `(?<![\\p{L}.])(?:${forms.map(escape).join('|')})(?![\\p{L}])`,
-        'gu',
-      ),
-      'player',
+    .flatMap((p) =>
+      nameForms(p.name).map((form) => ({ form, side: p.side ?? null })),
     )
+    .sort((a, b) => b.form.length - a.form.length)
+  for (const { form, side: team } of forms) {
+    const pattern = new RegExp(
+      `(?<![\\p{L}.])${escape(form)}(?![\\p{L}])`,
+      'gu',
+    )
+    for (const m of text.matchAll(pattern)) {
+      if (kind[m.index] !== null) continue
+      for (let i = m.index; i < m.index + m[0].length; i++) {
+        kind[i] = 'player'
+        side[i] = team
+      }
+    }
   }
   for (const p of FLAGS) claim(p, 'flag')
   for (const p of RESULTS[league]) claim(p, 'result')
@@ -156,8 +167,21 @@ export function segmentDescription(
   for (let i = 0; i < text.length; i++) {
     const k: SegmentKind = kind[i] ?? (muted[i] ? 'aside' : 'plain')
     const last = segments.at(-1)
-    if (last && last.kind === k && last.muted === muted[i]) last.text += text[i]
-    else segments.push({ text: text[i], kind: k, muted: muted[i] })
+    if (
+      last &&
+      last.kind === k &&
+      last.muted === muted[i] &&
+      (last.side ?? null) === side[i]
+    ) {
+      last.text += text[i]
+    } else {
+      segments.push({
+        text: text[i],
+        kind: k,
+        muted: muted[i],
+        ...(k === 'player' ? { side: side[i] } : {}),
+      })
+    }
   }
   return segments
 }
