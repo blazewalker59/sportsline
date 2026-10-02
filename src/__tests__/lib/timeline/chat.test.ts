@@ -3,6 +3,7 @@ import type { GameSummary, TimelineItem } from '@/lib/model/timeline'
 import {
   bubbleTints,
   buildChat,
+  nameColors,
   notableLead,
   scoringHeadline,
   textOn,
@@ -194,16 +195,27 @@ describe('textOn', () => {
 })
 
 describe('bubbleTints', () => {
+  it("uses the team's primary in both themes, like a Scoring fill", () => {
+    // Browns: brown primary, orange secondary.
+    expect(bubbleTints({ primary: '#311d00', secondary: '#ff3c00' })).toEqual({
+      light: '#311d00',
+      dark: '#311d00',
+    })
+    expect(bubbleTints(null)).toBeNull()
+  })
+})
+
+describe('nameColors', () => {
   it('uses the primary color on light and the brighter color on dark', () => {
     // Steelers: black primary, gold secondary.
-    expect(bubbleTints({ primary: '#000000', secondary: '#ffb612' })).toEqual({
+    expect(nameColors({ primary: '#000000', secondary: '#ffb612' })).toEqual({
       light: '#000000',
       dark: '#ffb612',
     })
     // Oilers: navy primary, orange secondary.
-    expect(
-      bubbleTints({ primary: '#041e42', secondary: '#ff4c00' })?.dark,
-    ).toBe('#ff4c00')
-    expect(bubbleTints(null)).toBeNull()
+    expect(nameColors({ primary: '#041e42', secondary: '#ff4c00' })?.dark).toBe(
+      '#ff4c00',
+    )
+    expect(nameColors(null)).toBeNull()
   })
 })

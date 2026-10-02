@@ -9,17 +9,7 @@ import type { TimelineItem, TimelinePlayer } from '@/lib/model/timeline'
 import type { League, Side } from '@/lib/model/types'
 
 /** Roles played by the side opposite the Play's acting team, per League. */
-const OPPONENT_ROLES: Record<League, ReadonlySet<string>> = {
-  nfl: new Set([
-    'tackler',
-    'sackedBy',
-    'sacker',
-    'interceptor',
-    'defender',
-    'forcedBy',
-    'returner',
-    'blocker',
-  ]),
+const OPPONENT_ROLES: Record<Exclude<League, 'nfl'>, ReadonlySet<string>> = {
   mlb: new Set(['pitcher', 'fielder']),
   // NHL records a blocked shot under the blocking team: there the shooter
   // is the opponent (see playerSide).
@@ -27,12 +17,63 @@ const OPPONENT_ROLES: Record<League, ReadonlySet<string>> = {
   nba: new Set(['blocker', 'steal']),
 }
 
+/** NFL roles played by the team that snapped (or kicked) the ball. */
+const NFL_OFFENSE = new Set([
+  'passer',
+  'receiver',
+  'rusher',
+  'kicker',
+  'punter',
+  'holder',
+  'snapper',
+  'fumbler',
+  'patPasser',
+  'patScorer',
+  'patRusher',
+])
+
+/** NFL roles played by the team on defense (or receiving the kick). */
+const NFL_DEFENSE = new Set([
+  'tackler',
+  'assistedBy',
+  'sackedBy',
+  'sacker',
+  'passDefender',
+  'defender',
+  'interceptor',
+  'returner',
+  'recoverer',
+  'forcedBy',
+  'blocker',
+])
+
+/**
+ * NFL plays where the ball changes hands. The Source credits these to the
+ * team that ends up with the ball, while the sentence (and the roles) are
+ * written from the snapping or kicking team's side.
+ */
+const POSSESSION_CHANGE =
+  /interception|fumble recovery \(opponent\)|fumble return|kickoff|punt|blocked/i
+
 export function playerSide(
   item: TimelineItem,
   player: Pick<TimelinePlayer, 'role'>,
 ): Side | null {
   if (!item.side) return null
   const other: Side = item.side === 'home' ? 'away' : 'home'
+  if (item.league === 'nfl') {
+    const flipped = POSSESSION_CHANGE.test(item.playType ?? '')
+    const offense = flipped ? other : item.side
+    const defense = flipped ? item.side : other
+    // On a return, the snapping team makes the tackle.
+    if (flipped && (player.role === 'tackler' || player.role === 'assistedBy'))
+      return offense
+    if (NFL_OFFENSE.has(player.role)) return offense
+    if (NFL_DEFENSE.has(player.role)) return defense
+    // A return touchdown's scorer is the returner; otherwise the offense.
+    if (player.role === 'scorer') return flipped ? defense : offense
+    return null
+  }
   if (item.league === 'nhl' && item.playType === 'blocked-shot') {
     return player.role === 'shooter' ? other : item.side
   }

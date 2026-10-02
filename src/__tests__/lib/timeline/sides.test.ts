@@ -30,6 +30,24 @@ function item(overrides: Partial<TimelineItem>): TimelineItem {
 }
 
 describe('playerSide', () => {
+  it('reads NFL roles from the snapping team on a change of possession', () => {
+    // CLE (home) intercepts PIT: the play is credited to CLE.
+    const pick = item({ side: 'home', playType: 'Pass Interception Return' })
+    expect(playerSide(pick, { role: 'passer' })).toBe('away')
+    expect(playerSide(pick, { role: 'receiver' })).toBe('away')
+    expect(playerSide(pick, { role: 'returner' })).toBe('home')
+    expect(playerSide(pick, { role: 'tackler' })).toBe('away')
+    // A CLE sack of nothing special: CLE offense, PIT sacker.
+    const sack = item({ side: 'home', playType: 'Sack' })
+    expect(playerSide(sack, { role: 'passer' })).toBe('home')
+    expect(playerSide(sack, { role: 'sackedBy' })).toBe('away')
+    // Kickoffs are credited to the receiving team.
+    const kick = item({ side: 'home', playType: 'Kickoff' })
+    expect(playerSide(kick, { role: 'kicker' })).toBe('away')
+    expect(playerSide(kick, { role: 'returner' })).toBe('home')
+    expect(playerSide(kick, { role: 'penalized' })).toBeNull()
+  })
+
   it('puts defenders on the other side', () => {
     const it1 = item({ side: 'home' })
     expect(playerSide(it1, { role: 'passer' })).toBe('home')

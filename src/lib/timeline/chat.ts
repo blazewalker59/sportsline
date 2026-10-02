@@ -292,11 +292,24 @@ export function textOn(hex: string): string {
 }
 
 /**
- * The colors a team's bubbles are washed with: its primary on a light
- * ground; on a dark ground whichever of its two colors is brighter, since
- * navy, black and brown primaries vanish there.
+ * A team's bubble color: its primary, in both themes, so every one of the
+ * team's bubbles (tinted or a full Scoring fill) reads as the same team.
  */
 export function bubbleTints(
+  colors: { primary: string; secondary: string } | null | undefined,
+): {
+  light: string
+  dark: string
+} | null {
+  if (!colors) return null
+  return { light: colors.primary, dark: colors.primary }
+}
+
+/**
+ * Colors for a team's player names: the primary on light, and on dark the
+ * brighter of its two colors (a navy or black name would vanish there).
+ */
+export function nameColors(
   colors: { primary: string; secondary: string } | null | undefined,
 ): {
   light: string

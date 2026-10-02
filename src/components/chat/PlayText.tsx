@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { Segment } from '@/lib/timeline/format'
 import type { TimelineItem } from '@/lib/model/timeline'
-import { bubbleTints } from '@/lib/timeline/chat'
+import { nameColors } from '@/lib/timeline/chat'
 import { segmentDescription } from '@/lib/timeline/format'
 import { playerSide } from '@/lib/timeline/sides'
 import { cn } from '@/lib/utils'
@@ -53,7 +53,7 @@ function nameColor(
 ): React.CSSProperties | undefined {
   if (s.kind !== 'player' || !s.side) return undefined
   const team = s.side === 'home' ? item.homeTeam : item.awayTeam
-  const tints = bubbleTints(team.colors)
+  const tints = nameColors(team.colors)
   if (!tints) return undefined
   return {
     '--name-light': tints.light,

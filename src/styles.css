@@ -132,12 +132,12 @@ body {
 .dark .team-tint {
   background-color: color-mix(
     in srgb,
-    var(--tint-dark, var(--bubble)) 24%,
+    var(--tint-dark, var(--bubble)) 50%,
     var(--bubble)
   );
   border-color: color-mix(
     in srgb,
-    var(--tint-dark, var(--bubble-border)) 40%,
+    var(--tint-dark, var(--bubble-border)) 70%,
     var(--bubble)
   );
 }
