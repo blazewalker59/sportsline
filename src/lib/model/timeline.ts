@@ -53,6 +53,8 @@ export type Follow =
 
 export interface TimelineFilter {
   follows: Array<Follow>
+  /** Narrow to one Game (CONTEXT.md: pinning a Game is a filter, not a Follow). */
+  gameId?: string
   /** Show Routine Plays even for League Follows. */
   includeRoutine?: boolean
 }
@@ -87,6 +89,7 @@ export function matchesFilter(
   item: TimelineItem,
   filter: TimelineFilter,
 ): boolean {
+  if (filter.gameId) return item.gameId === filter.gameId
   return filter.follows.some((follow) => {
     switch (follow.kind) {
       case 'team':

@@ -16,6 +16,7 @@ function play(key: string, overrides: Partial<SourcePlay> = {}): SourcePlay {
     significance: 'routine',
     side: 'away',
     involved: [],
+    credits: [],
     detail: null,
     ...overrides,
   }

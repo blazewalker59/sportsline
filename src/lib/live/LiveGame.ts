@@ -17,7 +17,12 @@ import type { SeenItem } from './diff'
 import type { ItemRow, TrackedGame } from './rows'
 import type { CloudflareEnv } from '@/lib/db'
 import type { TimelineEvent } from '@/lib/model/timeline'
-import type { GameSnapshot, SourceItem } from '@/lib/model/types'
+import type {
+  GameBox,
+  GameSnapshot,
+  SourceBox,
+  SourceItem,
+} from '@/lib/model/types'
 import { sourceFor } from '@/lib/sources'
 import { games, itemPlayers, timelineItems } from '@/lib/db/schema'
 import { dbFromD1 } from '@/lib/db'
@@ -43,6 +48,8 @@ export function itemId(gameId: string, key: string): string {
 
 export class LiveGame extends DurableObject<CloudflareEnv> {
   private seen: Map<string, SeenItem> | null = null
+  /** Source → Sportsline player ids already resolved, so box scores don't re-query. */
+  private knownPlayers = new Map<string, string>()
 
   /** Start (or keep) tracking this Game. Idempotent; the cron calls it every minute. */
   async track(game: TrackRequest): Promise<void> {
@@ -102,13 +109,22 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
     const touched = changes.flatMap((c) =>
       c.type === 'removed' ? [] : [c.item],
     )
+    const boxPlayers =
+      snapshot.box?.tables.flatMap((t) => t.rows.map((r) => r.player)) ?? []
     const playerIds = await resolve(
       db,
       'player',
       sourceFor(game.league).source,
       game.league,
-      touched.flatMap((i) => (i.kind === 'play' ? i.involved : [])),
+      [
+        ...touched.flatMap((i) =>
+          i.kind === 'play' ? [...i.involved, ...i.credits] : [],
+        ),
+        ...boxPlayers.filter((p) => !this.knownPlayers.has(p.sourceId)),
+      ],
     )
+    for (const [sourceId, id] of playerIds) this.knownPlayers.set(sourceId, id)
+    const box = storedBox(snapshot.box, this.knownPlayers)
 
     const upserts: Array<ItemRow> = []
     const removedIds: Array<string> = []
@@ -167,6 +183,7 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
           awayScore: snapshot.score.away,
           homeScore: snapshot.score.home,
           situation: snapshot.situation,
+          box,
           updatedAt: now,
         })
         .where(eq(games.id, game.gameId)),
@@ -280,6 +297,23 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
     ]
     const hub = this.env.LIVE_HUB.get(this.env.LIVE_HUB.idFromName('global'))
     await hub.publish(events)
+  }
+}
+
+function storedBox(
+  box: SourceBox | null,
+  ids: ReadonlyMap<string, string>,
+): GameBox | null {
+  if (!box) return null
+  return {
+    linescore: box.linescore,
+    tables: box.tables.map((t) => ({
+      ...t,
+      rows: t.rows.map((r) => ({
+        ...r,
+        player: { id: ids.get(r.player.sourceId) ?? null, name: r.player.name },
+      })),
+    })),
   }
 }
 

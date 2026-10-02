@@ -90,3 +90,15 @@ describe('follows param', () => {
     expect(followsFromParam('league:xfl,team:nope,player:,junk')).toEqual([])
   })
 })
+
+describe('Game filter', () => {
+  it('covers every item in that Game regardless of Follows or Significance', () => {
+    expect(matchesFilter(item(), { follows: [], gameId: 'g1' })).toBe(true)
+    expect(
+      matchesFilter(item({ gameId: 'g2' }), {
+        follows: [{ kind: 'league', league: 'mlb' }],
+        gameId: 'g1',
+      }),
+    ).toBe(false)
+  })
+})

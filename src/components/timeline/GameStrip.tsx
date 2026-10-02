@@ -1,5 +1,7 @@
+import { Link } from '@tanstack/react-router'
 import { startTime } from './format'
 import type { GameSummary } from '@/lib/model/timeline'
+import { Bases, Outs } from '@/components/mlb/Bases'
 import { cn } from '@/lib/utils'
 
 interface MlbSituation {
@@ -17,7 +19,13 @@ export function GameStrip({ games }: { games: Array<GameSummary> }) {
       <ul className="flex gap-2">
         {games.map((game) => (
           <li key={game.id}>
-            <GameChip game={game} />
+            <Link
+              to="/games/$gameId"
+              params={{ gameId: game.id }}
+              className="block"
+            >
+              <GameChip game={game} />
+            </Link>
           </li>
         ))}
       </ul>
@@ -98,7 +106,6 @@ function StatusLabel({ game }: { game: GameSummary }) {
 }
 
 function MlbSituationLine({ detail }: { detail: MlbSituation }) {
-  const outs = detail.outs ?? 0
   return (
     <div className="mt-1.5 flex items-center gap-2 text-[11px] text-muted">
       <Bases
@@ -106,51 +113,7 @@ function MlbSituationLine({ detail }: { detail: MlbSituation }) {
         second={detail.onSecond}
         third={detail.onThird}
       />
-      <span className="flex gap-0.5" aria-label={`${outs} out`}>
-        {[0, 1, 2].map((i) => (
-          <span
-            key={i}
-            className={cn(
-              'size-1.5 rounded-full',
-              i < outs ? 'bg-foreground/80' : 'bg-border',
-            )}
-          />
-        ))}
-      </span>
+      <Outs outs={detail.outs ?? 0} />
     </div>
-  )
-}
-
-function Bases({
-  first,
-  second,
-  third,
-}: {
-  first?: boolean
-  second?: boolean
-  third?: boolean
-}) {
-  const base = (on: boolean | undefined, x: number, y: number) => (
-    <rect
-      x={x}
-      y={y}
-      width="5"
-      height="5"
-      transform={`rotate(45 ${x + 2.5} ${y + 2.5})`}
-      className={on ? 'fill-scoring' : 'fill-none stroke-muted'}
-      strokeWidth="1"
-    />
-  )
-  return (
-    <svg
-      width="18"
-      height="13"
-      viewBox="0 0 18 13"
-      aria-label="Runners on base"
-    >
-      {base(third, 2, 6)}
-      {base(second, 6.5, 1.5)}
-      {base(first, 11, 6)}
-    </svg>
   )
 }

@@ -31,6 +31,7 @@ export class LiveHub extends DurableObject<CloudflareEnv> {
     const filter: TimelineFilter = {
       follows: followsFromParam(url.searchParams.get('follows')),
       includeRoutine: url.searchParams.get('routine') === '1',
+      gameId: url.searchParams.get('game') ?? undefined,
     }
     const { 0: client, 1: server } = new WebSocketPair()
     this.ctx.acceptWebSocket(server)
@@ -43,8 +44,11 @@ export class LiveHub extends DurableObject<CloudflareEnv> {
     for (const ws of this.ctx.getWebSockets()) {
       const filter = ws.deserializeAttachment() as TimelineFilter | null
       if (!filter) continue
-      const visible = events.filter(
-        (e) => e.type !== 'upsert' || matchesFilter(e.item, filter),
+      const visible = events.filter((e) =>
+        e.type === 'upsert'
+          ? matchesFilter(e.item, filter)
+          : !filter.gameId ||
+            (e.type === 'game' ? e.game.id : e.gameId) === filter.gameId,
       )
       if (visible.length === 0) continue
       try {

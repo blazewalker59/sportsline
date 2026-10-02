@@ -17,6 +17,7 @@ import {
   unique,
 } from 'drizzle-orm/sqlite-core'
 import type {
+  GameBox,
   Json,
   League,
   MilestoneKind,
@@ -169,6 +170,7 @@ export const games = sqliteTable(
     awayScore: integer('away_score').notNull().default(0),
     homeScore: integer('home_score').notNull().default(0),
     situation: text('situation', { mode: 'json' }).$type<Situation | null>(),
+    box: text('box', { mode: 'json' }).$type<GameBox | null>(),
     updatedAt: text('updated_at').notNull(),
   },
   (table) => [index('games_sports_day_idx').on(table.sportsDay)],

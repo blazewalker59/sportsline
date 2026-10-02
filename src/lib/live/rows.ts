@@ -9,7 +9,7 @@ import type {
   TimelineItem,
   TimelinePlayer,
 } from '@/lib/model/timeline'
-import type { League, SourceItem } from '@/lib/model/types'
+import type { Json, League, SourceItem, SourcePlay } from '@/lib/model/types'
 
 export type ItemRow = typeof timelineItems.$inferSelect
 type GameRow = typeof games.$inferSelect
@@ -60,8 +60,27 @@ export function itemRow(
     revisedAt: null,
     overturnOf: null,
     players,
-    detail: item.kind === 'play' ? (item.detail ?? null) : null,
+    detail:
+      item.kind === 'play'
+        ? withCredits(item.detail, item.credits, playerIds)
+        : null,
   }
+}
+
+/** Store credits in the Play Detail payload, in Sportsline ids. */
+function withCredits(
+  detail: Json,
+  credits: SourcePlay['credits'],
+  playerIds: ReadonlyMap<string, string>,
+): Json {
+  const resolved = credits.flatMap((c) => {
+    const id = playerIds.get(c.sourceId)
+    return id ? [{ id, credit: c.credit }] : []
+  })
+  if (resolved.length === 0) return detail ?? null
+  const base =
+    detail && typeof detail === 'object' && !Array.isArray(detail) ? detail : {}
+  return { ...base, credits: resolved }
 }
 
 export function toTimelineItem(

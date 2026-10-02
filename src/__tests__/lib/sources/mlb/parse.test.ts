@@ -145,3 +145,53 @@ describe('MLB parseRoster', () => {
     expect(judge.position).toBe('RF')
   })
 })
+
+describe('MLB parseFeed — box score and base runners', () => {
+  it('builds a linescore whose totals match the final score', () => {
+    const ls = final.box!.linescore
+    expect(ls.segments).toHaveLength(9)
+    expect(ls.home.at(-1)).toBeNull() // NYY didn't bat in the bottom of the 9th
+    expect(ls.awayTotals).toEqual([2, 4, 1])
+    expect(ls.homeTotals).toEqual([9, 14, 0])
+    expect(ls.home.reduce<number>((a, r) => a + (r ?? 0), 0)).toBe(9)
+  })
+
+  it('lists batters in batting order, flagging substitutes', () => {
+    const batting = final.box!.tables.find((t) => t.title === 'BOS Batting')!
+    expect(batting.columns).toEqual(['AB', 'R', 'H', 'RBI', 'BB', 'K'])
+    expect(batting.rows[0].player.name).toBe('Jahmai Jones')
+    const duran = batting.rows.find((r) => r.player.name === 'Jarren Duran')!
+    expect(duran.sub).toBe(true)
+  })
+
+  it('lists every pitcher with a pitching line', () => {
+    const pitching = final.box!.tables.find((t) => t.title === 'NYY Pitching')!
+    expect(pitching.rows.length).toBeGreaterThan(0)
+    expect(pitching.rows[0].sub).toBe(false)
+    expect(pitching.columns[0]).toBe('IP')
+  })
+
+  it('records runners before and after each plate appearance', () => {
+    const hr = plays(final).find((p) => p.key === 'pa:50')!
+    const detail = hr.detail as {
+      basesBefore: Record<string, string | null>
+      basesAfter: Record<string, string | null>
+    }
+    expect(detail.basesBefore).toEqual({
+      first: 'Ben Rice',
+      second: 'Trent Grisham',
+      third: null,
+    })
+    expect(detail.basesAfter).toEqual({
+      first: null,
+      second: null,
+      third: null,
+    })
+    const leadoff = plays(final).find((p) => p.key === 'pa:0')!
+    expect((leadoff.detail as typeof detail).basesBefore).toEqual({
+      first: null,
+      second: null,
+      third: null,
+    })
+  })
+})

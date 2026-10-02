@@ -54,6 +54,8 @@ export interface MlbRunner {
   details?: {
     runner?: PersonRef
     playIndex?: number
+    responsiblePitcher?: PersonRef | null
+    earned?: boolean
   }
   credits?: Array<{ player?: PersonRef; credit?: string }>
 }
@@ -85,6 +87,9 @@ export interface MlbPlay {
     batSide?: { code?: string }
     pitchHand?: { code?: string }
     splits?: { menOnBase?: string }
+    postOnFirst?: PersonRef
+    postOnSecond?: PersonRef
+    postOnThird?: PersonRef
   }
   runners?: Array<MlbRunner>
   playEvents?: Array<MlbPlayEvent>
@@ -115,6 +120,9 @@ export interface MlbFeed {
   }
   liveData: {
     plays: { allPlays: Array<MlbPlay> }
+    boxscore?: {
+      teams?: { away?: MlbBoxTeam; home?: MlbBoxTeam }
+    }
     linescore?: {
       currentInning?: number
       inningHalf?: string
@@ -123,9 +131,14 @@ export interface MlbFeed {
       balls?: number
       strikes?: number
       teams?: {
-        away?: { runs?: number }
-        home?: { runs?: number }
+        away?: { runs?: number; hits?: number; errors?: number }
+        home?: { runs?: number; hits?: number; errors?: number }
       }
+      innings?: Array<{
+        num: number
+        away?: { runs?: number | null }
+        home?: { runs?: number | null }
+      }>
       offense?: {
         batter?: PersonRef
         first?: PersonRef
@@ -164,4 +177,34 @@ export interface MlbPeople {
     currentTeam?: { id: number }
     primaryPosition?: { abbreviation?: string }
   }>
+}
+
+export interface MlbBoxPlayer {
+  person: PersonRef
+  position?: { abbreviation?: string }
+  battingOrder?: string | null
+  gameStatus?: { isSubstitute?: boolean }
+  stats?: {
+    batting?: Partial<
+      Record<
+        'atBats' | 'runs' | 'hits' | 'rbi' | 'baseOnBalls' | 'strikeOuts',
+        number | null
+      >
+    >
+    pitching?: {
+      inningsPitched?: string
+      hits?: number
+      runs?: number
+      earnedRuns?: number
+      baseOnBalls?: number
+      strikeOuts?: number
+      numberOfPitches?: number
+    }
+  }
+}
+
+export interface MlbBoxTeam {
+  batters?: Array<number>
+  pitchers?: Array<number>
+  players?: Record<string, MlbBoxPlayer | undefined>
 }

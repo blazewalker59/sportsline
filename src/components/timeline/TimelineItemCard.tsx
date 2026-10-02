@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { timeAgo } from './format'
 import type { TimelineItem } from '@/lib/model/timeline'
 import { cn } from '@/lib/utils'
@@ -31,36 +32,38 @@ export function TimelineItemCard({
         : 'border-l-border'
 
   return (
-    <article
-      className={cn(
-        'rounded-xl border border-border border-l-4 bg-surface px-4 py-3',
-        accent,
-        struck && 'opacity-60',
-      )}
-    >
-      <header className="mb-1 flex items-center gap-2 text-xs text-muted">
-        <span className="rounded bg-background px-1.5 py-0.5 font-medium uppercase tracking-wide">
-          {item.league}
-        </span>
-        <Matchup item={item} />
-        <span>·</span>
-        <span>{item.segmentLabel}</span>
-        <span className="ml-auto tabular-nums">
-          {timeAgo(item.occurredAt, now)}
-        </span>
-      </header>
-      {overturn && (
-        <p className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-live">
-          Overturned
+    <Link to="/plays/$playId" params={{ playId: item.id }} className="block">
+      <article
+        className={cn(
+          'rounded-xl border border-border border-l-4 bg-surface px-4 py-3 transition-colors hover:border-foreground/30',
+          accent,
+          struck && 'opacity-60',
+        )}
+      >
+        <header className="mb-1 flex items-center gap-2 text-xs text-muted">
+          <span className="rounded bg-background px-1.5 py-0.5 font-medium uppercase tracking-wide">
+            {item.league}
+          </span>
+          <Matchup item={item} />
+          <span>·</span>
+          <span>{item.segmentLabel}</span>
+          <span className="ml-auto tabular-nums">
+            {timeAgo(item.occurredAt, now)}
+          </span>
+        </header>
+        {overturn && (
+          <p className="mb-0.5 text-xs font-semibold uppercase tracking-wide text-live">
+            Overturned
+          </p>
+        )}
+        <p className={cn('leading-snug', struck && 'line-through')}>
+          {overturn
+            ? item.description.replace(/^Overturned: /, '')
+            : item.description}
         </p>
-      )}
-      <p className={cn('leading-snug', struck && 'line-through')}>
-        {overturn
-          ? item.description.replace(/^Overturned: /, '')
-          : item.description}
-      </p>
-      <Footer item={item} />
-    </article>
+        <Footer item={item} />
+      </article>
+    </Link>
   )
 }
 
@@ -101,7 +104,11 @@ function Footer({ item }: { item: TimelineItem }) {
 function MilestoneRow({ item, now }: { item: TimelineItem; now: number }) {
   const strong = item.milestone === 'final' || item.milestone === 'start'
   return (
-    <div className="flex items-center gap-3 py-1 text-xs text-muted">
+    <Link
+      to="/games/$gameId"
+      params={{ gameId: item.gameId }}
+      className="flex items-center gap-3 py-1 text-xs text-muted hover:text-foreground"
+    >
       <span className="h-px flex-1 bg-border" />
       <span
         className={cn(
@@ -113,6 +120,6 @@ function MilestoneRow({ item, now }: { item: TimelineItem; now: number }) {
       </span>
       <span className="tabular-nums">{timeAgo(item.occurredAt, now)}</span>
       <span className="h-px flex-1 bg-border" />
-    </div>
+    </Link>
   )
 }

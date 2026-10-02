@@ -8,6 +8,7 @@
  */
 
 import type {
+  MlbBoxTeam,
   MlbFeed,
   MlbPeople,
   MlbPlay,
@@ -24,7 +25,9 @@ import type {
   InvolvedPlayer,
   ScheduledGame,
   Score,
+  Side,
   Significance,
+  SourceBox,
   SourceItem,
   SourceMilestone,
   SourcePlay,
@@ -152,9 +155,22 @@ export function parseFeed(feed: MlbFeed): GameSnapshot {
   const allPlays = liveData.plays.allPlays
   const plays: Array<SourcePlay> = []
 
+  // Runners on base before each plate appearance: whoever the previous one
+  // in the same half-inning left on (a new half starts empty).
+  let bases: Bases = EMPTY_BASES
+  let half = ''
   for (const pa of allPlays) {
+    const thisHalf = `${pa.about?.inning}:${pa.about?.halfInning}`
+    if (thisHalf !== half) {
+      bases = EMPTY_BASES
+      half = thisHalf
+    }
     plays.push(...actionPlays(pa, nameOf))
-    if (pa.about?.isComplete) plays.push(plateAppearance(pa, nameOf))
+    if (pa.about?.isComplete) {
+      const after = basesAfter(pa, nameOf)
+      plays.push(plateAppearance(pa, nameOf, bases, after))
+      bases = after
+    }
   }
 
   plays.sort((a, b) => a.sequence - b.sequence)
@@ -189,13 +205,38 @@ export function parseFeed(feed: MlbFeed): GameSnapshot {
     situation:
       status === 'live' || status === 'delayed' ? situation(feed) : null,
     items,
+    box: box(feed, away, home),
     pollHintSeconds: feed.metaData?.wait,
+  }
+}
+
+interface Bases {
+  first: string | null
+  second: string | null
+  third: string | null
+}
+const EMPTY_BASES: Bases = { first: null, second: null, third: null }
+
+function basesAfter(
+  pa: MlbPlay,
+  nameOf: (id: number, fallback?: string) => string,
+): Bases {
+  // Three outs end the half: nobody is left on.
+  if ((pa.count?.outs ?? 0) >= 3) return EMPTY_BASES
+  const on = (p: { id: number; fullName?: string } | undefined) =>
+    p ? nameOf(p.id, p.fullName) : null
+  return {
+    first: on(pa.matchup?.postOnFirst),
+    second: on(pa.matchup?.postOnSecond),
+    third: on(pa.matchup?.postOnThird),
   }
 }
 
 function plateAppearance(
   pa: MlbPlay,
   nameOf: (id: number, fallback?: string) => string,
+  before: Bases,
+  after: Bases,
 ): SourcePlay {
   const playType = pa.result?.eventType ?? 'unknown'
   const events = pa.playEvents ?? []
@@ -219,6 +260,13 @@ function plateAppearance(
     addRunner(involved, runner, nameOf)
   }
 
+  const credits = runCredits(
+    (pa.runners ?? []).filter(
+      (r) => !actionIndexes.has(r.details?.playIndex ?? -1),
+    ),
+    pitcher,
+    nameOf,
+  )
   const pitches = events.filter((e) => e.isPitch).map(pitch)
   const hit = events.find((e) => e.hitData)?.hitData
 
@@ -235,6 +283,7 @@ function plateAppearance(
     significance: baseSignificance(playType),
     side: pa.about?.halfInning === 'bottom' ? 'home' : 'away',
     involved: involved.list(),
+    credits,
     detail: {
       event: pa.result?.event ?? null,
       rbi: pa.result?.rbi ?? 0,
@@ -243,6 +292,8 @@ function plateAppearance(
       pitchHand: pa.matchup?.pitchHand?.code ?? null,
       menOnBase: pa.matchup?.splits?.menOnBase ?? null,
       reviewed: pa.about?.hasReview ?? false,
+      basesBefore: { ...before },
+      basesAfter: { ...after },
       pitches,
       hit: hit
         ? {
@@ -298,10 +349,36 @@ function actionPlays(
           ? 'home'
           : 'away',
       involved: involved.list(),
+      credits: runCredits(
+        (pa.runners ?? []).filter((r) => r.details?.playIndex === event.index),
+        pa.matchup?.pitcher,
+        nameOf,
+      ),
       detail: { event: event.details?.event ?? null },
     })
   }
   return result
+}
+
+/** A charged run (and earned run) for each runner who scored. */
+function runCredits(
+  runners: ReadonlyArray<MlbRunner>,
+  pitcher: { id: number; fullName?: string } | undefined,
+  nameOf: (id: number, fallback?: string) => string,
+): SourcePlay['credits'] {
+  const credits: SourcePlay['credits'] = []
+  for (const r of runners) {
+    if (r.movement?.end !== 'score') continue
+    const responsible = r.details?.responsiblePitcher ?? pitcher
+    if (!responsible) continue
+    const ref = {
+      sourceId: String(responsible.id),
+      name: nameOf(responsible.id),
+    }
+    credits.push({ ...ref, credit: 'run_charged' })
+    if (r.details?.earned) credits.push({ ...ref, credit: 'earned_run' })
+  }
+  return credits
 }
 
 function addRunner(
@@ -516,5 +593,100 @@ export function parseRoster(teams: MlbTeams, people: MlbPeople): SourceRoster {
         teamSourceId: p.currentTeam ? String(p.currentTeam.id) : null,
         position: p.primaryPosition?.abbreviation ?? null,
       })),
+  }
+}
+
+const BATTING_COLUMNS = ['AB', 'R', 'H', 'RBI', 'BB', 'K']
+const PITCHING_COLUMNS = ['IP', 'H', 'R', 'ER', 'BB', 'K', 'NP']
+
+function box(
+  feed: MlbFeed,
+  away: SourceTeam,
+  home: SourceTeam,
+): SourceBox | null {
+  const ls = feed.liveData.linescore
+  const teams = feed.liveData.boxscore?.teams
+  if (!ls?.innings?.length && !teams) return null
+  const innings = ls?.innings ?? []
+  const totals = (side: Side) => {
+    const t = ls?.teams?.[side]
+    return [t?.runs ?? 0, t?.hits ?? 0, t?.errors ?? 0]
+  }
+  const sides: Array<[Side, MlbBoxTeam | undefined]> = [
+    ['away', teams?.away],
+    ['home', teams?.home],
+  ]
+  const tables: SourceBox['tables'] = []
+  for (const [side, t] of sides) {
+    if (!t) continue
+    const abbreviation = side === 'away' ? away.abbreviation : home.abbreviation
+    const player = (id: number) => t.players?.[`ID${id}`]
+    const batters = (t.batters ?? [])
+      .map(player)
+      .filter((p): p is NonNullable<typeof p> => Boolean(p?.battingOrder))
+      .sort((a, b) => Number(a.battingOrder) - Number(b.battingOrder))
+    tables.push({
+      side,
+      title: `${abbreviation} Batting`,
+      columns: BATTING_COLUMNS,
+      rows: batters.map((p) => {
+        const b = p.stats?.batting ?? {}
+        return {
+          player: {
+            sourceId: String(p.person.id),
+            name: p.person.fullName ?? `#${p.person.id}`,
+          },
+          note: p.position?.abbreviation ?? null,
+          sub: Number(p.battingOrder) % 100 !== 0,
+          values: [
+            b.atBats,
+            b.runs,
+            b.hits,
+            b.rbi,
+            b.baseOnBalls,
+            b.strikeOuts,
+          ].map((v) => v ?? 0),
+        }
+      }),
+    })
+    const pitchers = (t.pitchers ?? [])
+      .map(player)
+      .filter((p): p is NonNullable<typeof p> => Boolean(p))
+    tables.push({
+      side,
+      title: `${abbreviation} Pitching`,
+      columns: PITCHING_COLUMNS,
+      rows: pitchers.map((p, i) => {
+        const s = p.stats?.pitching ?? {}
+        return {
+          player: {
+            sourceId: String(p.person.id),
+            name: p.person.fullName ?? `#${p.person.id}`,
+          },
+          note: null,
+          sub: i > 0,
+          values: [
+            s.inningsPitched ?? '0.0',
+            s.hits ?? 0,
+            s.runs ?? 0,
+            s.earnedRuns ?? 0,
+            s.baseOnBalls ?? 0,
+            s.strikeOuts ?? 0,
+            s.numberOfPitches ?? 0,
+          ],
+        }
+      }),
+    })
+  }
+  return {
+    linescore: {
+      segments: innings.map((i) => String(i.num)),
+      away: innings.map((i) => i.away?.runs ?? null),
+      home: innings.map((i) => i.home?.runs ?? null),
+      totalColumns: ['R', 'H', 'E'],
+      awayTotals: totals('away'),
+      homeTotals: totals('home'),
+    },
+    tables,
   }
 }

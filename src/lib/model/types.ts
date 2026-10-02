@@ -65,6 +65,12 @@ export interface SourcePlay extends ItemBase {
   /** The side whose action this Play is (batting team in MLB). */
   side: Side | null
   involved: Array<InvolvedPlayer>
+  /**
+   * Players credited with a stat by this Play without being named in it
+   * (e.g. the pitcher charged with an inherited runner's run). Not Involved
+   * Players, so they never match a Player Follow.
+   */
+  credits: Array<SourceRef & { credit: string }>
   /** League-specific Play Detail payload (Pitches, hit data…). */
   detail: Json
 }
@@ -84,6 +90,41 @@ export interface Situation {
   detail: Json
 }
 
+/**
+ * A Game's box score in a League-agnostic table shape: a linescore by
+ * segment plus stat tables per side. `TPlayer` is how a row names its player: a
+ * SourceRef from the adapter, a Sportsline id once stored.
+ */
+export interface Box<TPlayer> {
+  linescore: {
+    segments: Array<string>
+    away: Array<number | null>
+    home: Array<number | null>
+    totalColumns: Array<string>
+    awayTotals: Array<number>
+    homeTotals: Array<number>
+  }
+  tables: Array<BoxTable<TPlayer>>
+}
+
+export interface BoxTable<TPlayer> {
+  side: Side
+  title: string
+  columns: Array<string>
+  rows: Array<{
+    player: TPlayer
+    /** e.g. position. */
+    note: string | null
+    /** Entered the Game as a substitute. */
+    sub: boolean
+    values: Array<string | number>
+  }>
+}
+
+export type SourceBox = Box<SourceRef>
+/** A box score as stored: players by Sportsline id (null if never resolved). */
+export type GameBox = Box<{ id: string | null; name: string }>
+
 /** Everything an adapter knows about one Game at one moment. */
 export interface GameSnapshot {
   league: League
@@ -98,6 +139,7 @@ export interface GameSnapshot {
   situation: Situation | null
   /** Every completed Play and Game Milestone so far, in any order. */
   items: Array<SourceItem>
+  box: SourceBox | null
   /** Source's suggested seconds before the next poll, if it gives one. */
   pollHintSeconds?: number
 }
