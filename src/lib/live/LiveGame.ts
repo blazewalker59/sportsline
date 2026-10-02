@@ -15,8 +15,8 @@ import { itemRow, toTimelineItem } from './rows'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { SeenItem } from './diff'
 import type { ItemRow, TrackedGame } from './rows'
-import type { CloudflareEnv } from '@/lib/db'
-import type { TimelineEvent } from '@/lib/model/timeline'
+import type { CloudflareEnv, Database } from '@/lib/db'
+import type { TimelineEvent, TimelineItem } from '@/lib/model/timeline'
 import type {
   GameBox,
   GameSnapshot,
@@ -27,11 +27,16 @@ import { sourceFor } from '@/lib/sources'
 import { games, itemPlayers, players, timelineItems } from '@/lib/db/schema'
 import { teamColors } from '@/lib/brand/teamColors'
 import { dbFromD1 } from '@/lib/db'
+import { isAlertable } from '@/lib/push/alerts'
+import { deliverAlerts, vapidKeys } from '@/lib/push/deliver'
 
 const GAME_KEY = 'game'
 const SEEN_PREFIX = 'seen:'
 const ERRORS_KEY = 'errors'
 const POLLED_KEY = 'polled'
+const ALERT_LOG_KEY = 'alertLog'
+const ALERT_WINDOW_MS = 15 * 60_000
+const ALERTS_PER_WINDOW = 6
 const RETRY_MS = 30_000
 /** Give up after this many consecutive failed polls; the cron re-wakes live Games. */
 const MAX_CONSECUTIVE_ERRORS = 20
@@ -175,6 +180,8 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
     // .timeEstimated). An item first seen on a live poll happened about now;
     // only a Game's history, backfilled on the first poll, keeps the estimate.
     const backfilling = !(await this.ctx.storage.get<boolean>(POLLED_KEY))
+    /** Items this poll is the first to record: candidates for Alerts. */
+    const freshIds = new Set<string>()
 
     for (const change of changes) {
       switch (change.type) {
@@ -191,6 +198,7 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
           }
           if (stampedAt) row.occurredAt = stampedAt
           upserts.push(row)
+          if (change.type === 'added') freshIds.add(id)
           remember(change.item, id, stampedAt)
           break
         }
@@ -210,6 +218,7 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
           news.significance = 'scoring'
           news.description = `Overturned: ${change.seen.description}`
           news.overturnOf = original
+          freshIds.add(news.id)
           upserts.push(news)
           remember(change.item, original, change.seen.stampedAt)
           break
@@ -349,6 +358,56 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
     ]
     const hub = this.env.LIVE_HUB.get(this.env.LIVE_HUB.idFromName('global'))
     await hub.publish(events)
+
+    // Alerts (CONTEXT.md): only news, never backfilled history; a failure
+    // here must never stop the Game being tracked.
+    if (!backfilling) {
+      const fresh = events.flatMap((e) =>
+        e.type === 'upsert' &&
+        freshIds.has(e.item.id) &&
+        isAlertable(e.item, Date.now())
+          ? [e.item]
+          : [],
+      )
+      if (fresh.length > 0) {
+        await this.sendAlerts(db, fresh).catch((error: unknown) =>
+          console.error('Alerts failed', {
+            gameId: game.gameId,
+            error: String(error),
+          }),
+        )
+      }
+    }
+  }
+
+  /**
+   * Deliver Alerts for this Game, at most ALERTS_PER_WINDOW per Viewer per
+   * ALERT_WINDOW_MS so a blowout can't buzz anyone endlessly; Finals always
+   * go through.
+   */
+  private async sendAlerts(
+    db: Database,
+    items: Array<TimelineItem>,
+  ): Promise<void> {
+    const keys = vapidKeys(this.env)
+    if (!keys) return
+    const log =
+      (await this.ctx.storage.get<Record<string, Array<number>>>(
+        ALERT_LOG_KEY,
+      )) ?? {}
+    const now = Date.now()
+    const allow = (viewerId: string, final: boolean) => {
+      const recent = (log[viewerId] ?? []).filter(
+        (t) => now - t < ALERT_WINDOW_MS,
+      )
+      if (!final && recent.length >= ALERTS_PER_WINDOW)
+        return Promise.resolve(false)
+      log[viewerId] = [...recent, now]
+      return Promise.resolve(true)
+    }
+    const result = await deliverAlerts(db, keys, items, allow)
+    await this.ctx.storage.put(ALERT_LOG_KEY, log)
+    if (result.sent > 0 || result.pruned > 0) console.log('Alerts sent', result)
   }
 }
 

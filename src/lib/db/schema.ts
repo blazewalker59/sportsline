@@ -259,3 +259,18 @@ export const readMarkers = sqliteTable('read_markers', {
   readAt: text('read_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 })
+
+/** A Viewer's device that receives Alerts (CONTEXT.md, "Alert"): one Web Push subscription. */
+export const pushSubscriptions = sqliteTable(
+  'push_subscriptions',
+  {
+    endpoint: text('endpoint').primaryKey(),
+    viewerId: text('viewer_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    p256dh: text('p256dh').notNull(),
+    auth: text('auth').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [index('push_subscriptions_viewer_idx').on(table.viewerId)],
+)

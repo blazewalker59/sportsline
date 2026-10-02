@@ -102,6 +102,10 @@ _Avoid_: date, game day
 A Viewer's position on the Timeline when they last stopped reading, shown as a "you were here" divider when they return.
 _Avoid_: bookmark, last seen
 
+**Alert**:
+A push notification to a Viewer's device for a Scoring Play, an Overturn of a score, or a Final, in a Game their Team or Player Follows cover. League Follows never Alert. Never sent for history a LiveGame backfills.
+_Avoid_: notification, push, ping
+
 **Viewer**:
 A person signed in to Sportsline, who owns a set of Follows. Signed-out visitors see a default Timeline and have no Follows.
 _Avoid_: user, account, member

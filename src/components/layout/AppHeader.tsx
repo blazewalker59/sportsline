@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { AlertsItem } from './AlertsItem'
 import { ThemeButton } from './ThemeButton'
 import { signIn, signOutClient } from '@/lib/auth/client'
 import { VIEWER_KEY, useViewer } from '@/lib/viewer/useViewer'
@@ -86,7 +87,7 @@ function AccountButton() {
         )}
       </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-44 rounded-xl border border-border bg-surface p-1 text-sm shadow-lg">
+        <div className="absolute right-0 mt-2 w-64 rounded-xl border border-border bg-surface p-1 text-sm shadow-lg">
           <p className="truncate px-3 py-2 text-muted">{viewer.name}</p>
           <Link
             to="/follows"
@@ -95,6 +96,7 @@ function AccountButton() {
           >
             Follows
           </Link>
+          <AlertsItem />
           <button
             type="button"
             onClick={() =>

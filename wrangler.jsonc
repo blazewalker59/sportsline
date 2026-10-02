@@ -69,6 +69,10 @@
       // Requests on any other host (www, workers.dev) redirect here.
       "vars": {
         "CANONICAL_HOST": "sportsline.dev",
+        // Web Push (Alerts): the public half of the VAPID key pair; the
+        // private half is the VAPID_PRIVATE_JWK secret.
+        "VAPID_PUBLIC_KEY": "BC0pDiE5foLBri7xunT8n5DgXHTk657Xi4tf1lcw6f5ZO2DO7Vz1Lm1JzBPltfQ8cuykUX2Nb-83g-qiNd1tVXs",
+        "VAPID_SUBJECT": "https://sportsline.dev",
       },
       "observability": {
         "logs": {

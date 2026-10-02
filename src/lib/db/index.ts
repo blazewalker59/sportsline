@@ -25,6 +25,11 @@ export interface CloudflareEnv {
   BETTER_AUTH_URL?: string
   GOOGLE_CLIENT_ID?: string
   GOOGLE_CLIENT_SECRET?: string
+  /** Web Push (Alerts): public key (also sent to browsers) and private JWK. */
+  VAPID_PUBLIC_KEY?: string
+  VAPID_PRIVATE_JWK?: string
+  /** Contact for push services, an https: or mailto: URL. */
+  VAPID_SUBJECT?: string
   /** Production's one host; every other host redirects to it. Unset locally. */
   CANONICAL_HOST?: string
 }
