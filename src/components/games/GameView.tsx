@@ -1,198 +1,141 @@
 /**
- * One Game inside the Timeline (design direction "Watch Party"): tapping a
- * game filters the group chat to that Game. The top part (scoreboard and
- * tabs) stays pinned with the rest of the Timeline's top section; the
- * thread or box score scrolls beneath it.
+ * One Game inside the Timeline (design direction "Watch Party"). Selecting
+ * a Game only filters the feed; this adds a slim row with its score and
+ * status, and a sheet for its box score, so it never feels like a new
+ * screen.
  */
 
-import { useEffect, useMemo, useRef } from 'react'
-import type { GameSummary, TimelineItem } from '@/lib/model/timeline'
+import { useEffect, useRef } from 'react'
+import type { GameSummary } from '@/lib/model/timeline'
 import type { GameBox } from '@/lib/model/types'
 import { TeamLogo, TeamMark } from '@/components/brand/TeamMark'
-import {
-  BubbleStack,
-  LeagueAvatar,
-  Notice,
-  TeamAvatar,
-  TypingDots,
-} from '@/components/chat/ChatParts'
 import { FollowButton } from '@/components/follows/FollowButton'
-import { startTime, useNow } from '@/components/timeline/format'
-import { buildChat, typingFor } from '@/lib/timeline/chat'
+import { startTime } from '@/components/timeline/format'
+import { typingFor } from '@/lib/timeline/chat'
 import { cn } from '@/lib/utils'
 
-export type GameTab = 'plays' | 'box'
-
-/** Pinned: the Game's score and status, and the Plays / Box score tabs. */
-export function GameTop({
-  game,
-  tab,
-  onTab,
-}: {
-  game: GameSummary
-  tab: GameTab
-  onTab: (tab: GameTab) => void
-}) {
+function statusText(game: GameSummary): string {
   const live = game.status === 'live' || game.status === 'delayed'
-  const started = live || game.status === 'final'
-  const typing = typingFor(game)
-  const status = live
-    ? (typing?.text ?? game.situation?.segmentLabel ?? 'Live')
-    : game.status === 'final'
-      ? 'Final'
-      : game.status === 'postponed'
-        ? 'Postponed'
-        : startTime(game.startsAt)
-  return (
-    <div className="flex flex-col gap-2 pt-2">
-      <div className="flex items-center justify-center gap-3">
-        <TeamMark team={game.awayTeam} size={28} bold />
-        <span className="text-[28px] leading-none font-extrabold tracking-tight tabular-nums">
-          {started ? `${game.score.away}–${game.score.home}` : '@'}
-        </span>
-        <span className="inline-flex flex-row-reverse items-center gap-1.5">
-          <TeamLogo team={game.homeTeam} size={28} />
-          <span className="font-semibold">{game.homeTeam.abbreviation}</span>
-        </span>
-      </div>
-      <p
-        className={cn(
-          'truncate text-center text-xs font-semibold',
-          live ? 'text-live' : 'text-muted',
-        )}
-      >
-        {status}
-      </p>
-      <div
-        role="tablist"
-        className="flex gap-1 rounded-full bg-notice p-1 text-sm"
-      >
-        {(['plays', 'box'] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            role="tab"
-            aria-selected={tab === t}
-            onClick={() => onTab(t)}
-            className={cn(
-              'min-h-10 flex-1 rounded-full font-semibold',
-              tab === t ? 'bg-surface text-foreground shadow-sm' : 'text-muted',
-            )}
-          >
-            {t === 'plays' ? 'Plays' : 'Box score'}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
+  if (live)
+    return typingFor(game)?.text ?? game.situation?.segmentLabel ?? 'Live'
+  if (game.status === 'final') return 'Final'
+  if (game.status === 'postponed') return 'Postponed'
+  return startTime(game.startsAt)
 }
 
-/** Scrolls: the Game's thread or its box score. */
-export function GameBody({
-  tab,
+/**
+ * The selected Game's row under the score cards. Always rendered so it can
+ * open and close smoothly (grid rows 0fr ↔ 1fr) instead of popping in.
+ */
+export function GameFocusBar({
   game,
-  items,
-  box,
+  onBox,
 }: {
-  tab: GameTab
-  game: GameSummary
-  items: Array<TimelineItem>
-  box: GameBox | null
+  game: GameSummary | null
+  onBox: () => void
 }) {
-  if (tab === 'plays') return <Thread items={items} game={game} />
+  const live = game && (game.status === 'live' || game.status === 'delayed')
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex justify-between gap-2">
-        {[game.awayTeam, game.homeTeam].map((team) => (
-          <div key={team.id} className="flex items-center gap-2">
-            <TeamMark team={team} size={20} bold />
-            <FollowButton follow={{ kind: 'team', teamId: team.id }} />
-          </div>
-        ))}
-      </div>
-      {box && <Linescore box={box} game={game} />}
-      <BoxTables box={box} game={game} />
-    </div>
-  )
-}
-
-function Thread({
-  items,
-  game,
-}: {
-  items: Array<TimelineItem>
-  game: GameSummary
-}) {
-  const now = useNow()
-  const entries = useMemo(() => buildChat(items, { fold: false }), [items])
-  const typing = typingFor(game)
-  const end = useRef<HTMLDivElement>(null)
-  // Open at the latest Play, the way a chat thread does.
-  const scrolled = useRef(false)
-  useEffect(() => {
-    if (scrolled.current || items.length === 0) return
-    scrolled.current = true
-    end.current?.scrollIntoView({ block: 'end' })
-  }, [items.length])
-
-  if (items.length === 0 && !typing) {
-    return <p className="mt-10 text-center text-sm text-muted">No plays yet.</p>
-  }
-  return (
-    <div className="flex flex-col gap-3">
-      <p className="text-center text-[11px] text-muted">
-        {game.awayTeam.abbreviation} on the left · {game.homeTeam.abbreviation}{' '}
-        on the right
-      </p>
-      {entries.map((entry) => {
-        if (entry.type === 'notice')
-          return <Notice key={entry.item.id} item={entry.item} now={now} />
-        const align = entry.side === 'home' ? 'right' : 'left'
-        const team = entry.side === 'home' ? game.homeTeam : game.awayTeam
-        const first = entry.bubbles[0]
-        const lead = first.type === 'fold' ? first.items[0] : first.item
-        return (
-          <div
-            key={entry.id}
-            className={cn(
-              'flex items-end gap-2',
-              align === 'right' && 'flex-row-reverse',
-            )}
-          >
-            <TeamAvatar team={team} size={28} />
-            <div
-              className={cn(
-                'flex min-w-0 flex-col gap-1',
-                align === 'right' && 'items-end',
-              )}
-            >
-              <BubbleStack bubbles={entry.bubbles} align={align} compact />
-              <span className="px-1 text-[11px] text-muted tabular-nums">
-                {lead.segmentLabel} · {lead.score.away}–{lead.score.home}
-              </span>
-            </div>
-          </div>
-        )
-      })}
-      {typing && (
-        <div
-          className={cn(
-            'flex items-end gap-2',
-            typing.side === 'home' && 'flex-row-reverse',
-          )}
-        >
-          {typing.side ? (
-            <TeamAvatar
-              team={typing.side === 'home' ? game.homeTeam : game.awayTeam}
-              size={28}
-            />
-          ) : (
-            <LeagueAvatar league={game.league} size={28} />
-          )}
-          <TypingDots align={typing.side === 'home' ? 'right' : 'left'} />
-        </div>
+    <div
+      className={cn(
+        'grid transition-[grid-template-rows,opacity] duration-300 ease-out',
+        game ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
       )}
-      <div ref={end} />
+      aria-hidden={!game}
+    >
+      <div className="overflow-hidden">
+        {game && (
+          <div className="mt-2 flex items-center gap-3 rounded-2xl bg-notice py-1.5 pr-1.5 pl-3">
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="flex items-center gap-1.5 text-sm font-bold tabular-nums">
+                <TeamLogo team={game.awayTeam} size={18} />
+                {game.awayTeam.abbreviation} {game.score.away} –{' '}
+                {game.score.home} {game.homeTeam.abbreviation}
+                <TeamLogo team={game.homeTeam} size={18} />
+              </span>
+              <span
+                className={cn(
+                  'truncate text-xs font-semibold',
+                  live ? 'text-live' : 'text-muted',
+                )}
+              >
+                {statusText(game)}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={onBox}
+              className="min-h-11 shrink-0 rounded-full bg-surface px-4 text-[13px] font-semibold"
+            >
+              Box score
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** The box score over the feed, so closing it lands exactly where you were. */
+export function BoxSheet({
+  game,
+  box,
+  onClose,
+}: {
+  game: GameSummary
+  box: GameBox | null
+  onClose: () => void
+}) {
+  const close = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    close.current?.focus()
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = overflow
+    }
+  }, [onClose])
+  return (
+    <div
+      className="fixed inset-0 z-30 flex flex-col justify-end"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Box score"
+    >
+      <button
+        type="button"
+        aria-label="Close box score"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/40"
+      />
+      <div className="animate-in slide-in-from-bottom relative mx-auto flex max-h-[85dvh] w-full max-w-xl flex-col rounded-t-3xl bg-background pb-[env(safe-area-inset-bottom)] shadow-2xl duration-300">
+        <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+          <span className="flex-1 text-base font-bold">Box score</span>
+          <button
+            ref={close}
+            type="button"
+            onClick={onClose}
+            className="min-h-11 rounded-full bg-notice px-4 text-[13px] font-semibold"
+          >
+            Done
+          </button>
+        </div>
+        <div className="flex flex-col gap-4 overflow-y-auto px-4 py-4">
+          <div className="flex justify-between gap-2">
+            {[game.awayTeam, game.homeTeam].map((team) => (
+              <div key={team.id} className="flex items-center gap-2">
+                <TeamMark team={team} size={20} bold />
+                <FollowButton follow={{ kind: 'team', teamId: team.id }} />
+              </div>
+            ))}
+          </div>
+          {box && <Linescore box={box} game={game} />}
+          <BoxTables box={box} game={game} />
+        </div>
+      </div>
     </div>
   )
 }

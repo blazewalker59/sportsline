@@ -5,8 +5,10 @@ import { TeamLogo } from '@/components/brand/TeamMark'
 import { cn } from '@/lib/utils'
 
 /**
- * Today's Games as small score cards, live first. Tapping one filters the
- * Timeline to that Game; tapping it again (or "All") shows everything.
+ * The Sports Day's Games as small score cards, live first. Tapping one
+ * filters the Timeline to that Game (a View Transition, so the feed just
+ * loses the other Games' messages); tapping it again shows everything.
+ * Selecting never changes the strip's layout.
  */
 export function GameStrip({
   games,
@@ -18,30 +20,7 @@ export function GameStrip({
   if (games.length === 0) return null
   return (
     <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none]">
-      <ul className="flex gap-2 pb-1">
-        {selected && (
-          <li className="shrink-0">
-            <Link
-              to="/"
-              search={(prev) => ({ ...prev, game: undefined })}
-              className="flex h-full min-h-14 items-center gap-1.5 rounded-2xl bg-foreground px-3 text-[13px] font-semibold text-background"
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                aria-hidden="true"
-              >
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
-              All
-            </Link>
-          </li>
-        )}
+      <ul className="flex gap-2 pt-1.5 pb-1">
         {games.map((game) => (
           <li key={game.id} className="shrink-0">
             <GameCard game={game} selected={game.id === selected} />
@@ -71,12 +50,14 @@ function GameCard({
     <Link
       to="/"
       search={(prev) => ({ ...prev, game: selected ? undefined : game.id })}
+      viewTransition
+      resetScroll={false}
       aria-pressed={selected}
-      aria-label={`${game.awayTeam.abbreviation} ${game.score.away}, ${game.homeTeam.abbreviation} ${game.score.home}, ${status(game)}`}
+      aria-label={`${game.awayTeam.abbreviation} ${game.score.away}, ${game.homeTeam.abbreviation} ${game.score.home}, ${status(game)}${selected ? '. Showing only this game; tap to show all' : ''}`}
       className={cn(
-        'flex min-h-14 items-center gap-3 rounded-2xl border bg-surface py-1.5 pr-3 pl-2.5',
+        'relative flex min-h-14 items-center gap-3 rounded-2xl border bg-surface py-1.5 pr-3 pl-2.5 transition-colors',
         selected
-          ? 'border-accent ring-2 ring-accent/30'
+          ? 'border-accent bg-accent-soft'
           : live
             ? 'border-live/50'
             : 'border-border',
@@ -109,6 +90,24 @@ function GameCard({
       >
         {status(game)}
       </span>
+      {selected && (
+        <span
+          aria-hidden="true"
+          className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-accent text-background"
+        >
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+          >
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </span>
+      )}
     </Link>
   )
 }

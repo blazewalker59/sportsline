@@ -13,7 +13,7 @@ import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { timeAgo } from '@/components/timeline/format'
 import { notableLead, scoringHeadline, textOn } from '@/lib/timeline/chat'
-import { gameSearch } from '@/lib/timeline/gameLink'
+import { gameSearch, vtName } from '@/lib/timeline/gameLink'
 import { cn } from '@/lib/utils'
 
 export type Align = 'left' | 'right'
@@ -226,30 +226,41 @@ export function BubbleStack({
     >
       {flat.map((b, i) =>
         b.type === 'fold' ? (
-          <FoldBubble
-            key={b.id}
-            items={b.items}
-            align={align}
-            renderOpen={(items) =>
-              items.map((item, j) => (
-                <PlayBubble
-                  key={item.id}
-                  item={item}
-                  align={align}
-                  position={positionOf(j, items.length)}
-                  compact={compact}
-                />
-              ))
-            }
-          />
+          <div key={b.id} style={{ viewTransitionName: vtName(b.id) }}>
+            <FoldBubble
+              items={b.items}
+              align={align}
+              renderOpen={(items) =>
+                items.map((item, j) => (
+                  <div
+                    key={item.id}
+                    className="flex flex-col"
+                    style={{ viewTransitionName: vtName(item.id) }}
+                  >
+                    <PlayBubble
+                      item={item}
+                      align={align}
+                      position={positionOf(j, items.length)}
+                      compact={compact}
+                    />
+                  </div>
+                ))
+              }
+            />
+          </div>
         ) : (
-          <PlayBubble
+          <div
             key={b.item.id}
-            item={b.item}
-            align={align}
-            position={positionOf(i, flat.length)}
-            compact={compact}
-          />
+            className="flex flex-col"
+            style={{ viewTransitionName: vtName(b.item.id) }}
+          >
+            <PlayBubble
+              item={b.item}
+              align={align}
+              position={positionOf(i, flat.length)}
+              compact={compact}
+            />
+          </div>
         ),
       )}
     </div>

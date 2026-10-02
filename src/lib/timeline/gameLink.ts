@@ -12,3 +12,8 @@ export function gameSearch(
     ? { game: gameId, day: sportsDay }
     : { game: gameId }
 }
+
+/** A valid, unique view-transition-name for a Timeline element. */
+export function vtName(id: string): string {
+  return `m-${id.replace(/[^a-zA-Z0-9_-]/g, '_')}`
+}

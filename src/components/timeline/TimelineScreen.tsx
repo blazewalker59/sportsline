@@ -3,13 +3,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { timeAgo, useNow } from './format'
 import { DayBar } from './DayBar'
 import { GameStrip } from './GameStrip'
-import type { GameTab } from '@/components/games/GameView'
 import type { FeedEntry, Typing } from '@/lib/timeline/chat'
 import type { Follow, GameSummary } from '@/lib/model/timeline'
 import type { Connection } from '@/lib/timeline/useLiveTimeline'
-import { gameSearch } from '@/lib/timeline/gameLink'
+import { gameSearch, vtName } from '@/lib/timeline/gameLink'
 import { useLiveGame } from '@/lib/games/useLiveGame'
-import { GameBody, GameTop } from '@/components/games/GameView'
+import { BoxSheet, GameFocusBar } from '@/components/games/GameView'
 import {
   BubbleStack,
   LeagueAvatar,
@@ -92,137 +91,147 @@ function Timeline({
   const [includeRoutine, setIncludeRoutine] = useState(false)
   const timeline = useLiveTimeline(follows, includeRoutine, sportsDay)
   // Only today's Timeline moves the Read Marker; browsing history must not.
-  useReadMarkerWriter(timeline.items, viewer !== null && isToday)
+  useReadMarkerWriter(timeline.items, viewer !== null && isToday && !gameId)
   const backfill = usePastDay(sportsDay, isToday, timeline.reload)
   const now = useNow()
   const game = useLiveGame(gameId)
-  const [tab, setTab] = useState<GameTab>('plays')
-  useEffect(() => setTab('plays'), [gameId])
+  const [boxOpen, setBoxOpen] = useState(false)
+  useEffect(() => setBoxOpen(false), [gameId])
 
-  const entries = useMemo(
-    () => buildChat(timeline.items, { fold: true }),
-    [timeline.items],
-  )
+  // Selecting a Game only filters this same feed (newest first, same
+  // bubbles). Until the Game's full history loads, filter what is here.
+  const items = useMemo(() => {
+    if (!gameId) return timeline.items
+    if (game.data) return [...game.data.items].reverse()
+    return timeline.items.filter((i) => i.gameId === gameId)
+  }, [gameId, game.data, timeline.items])
+  const selectedGame =
+    (gameId &&
+      (game.data?.game ?? timeline.games.find((g) => g.id === gameId))) ||
+    null
+
+  const entries = useMemo(() => buildChat(items, { fold: true }), [items])
   const typing = useMemo(
     () =>
       (isToday ? timeline.games : [])
-        .filter((g) => followsGame(g, follows))
+        .filter((g) => (gameId ? g.id === gameId : followsGame(g, follows)))
         .flatMap((g) => {
           const t = typingFor(g)
           return t ? [{ typing: t, game: g }] : []
         }),
-    [timeline.games, follows, isToday],
+    [timeline.games, follows, isToday, gameId],
   )
-  const showMarker = isToday && readAt !== null
+  const showMarker = isToday && readAt !== null && !gameId
   const newCount =
-    showMarker && readAt
-      ? timeline.items.filter((i) => i.occurredAt > readAt).length
-      : 0
+    showMarker && readAt ? items.filter((i) => i.occurredAt > readAt).length : 0
   const dividerAt =
     showMarker && readAt ? entries.findIndex((e) => entryTime(e) <= readAt) : -1
-
-  const allPlays = (
-    <button
-      type="button"
-      onClick={() => setIncludeRoutine((v) => !v)}
-      aria-pressed={includeRoutine}
-      className={cn(
-        'min-h-11 rounded-full px-4 text-[13px] font-semibold transition-colors',
-        includeRoutine
-          ? 'bg-foreground text-background'
-          : 'bg-accent-soft text-accent',
-      )}
-    >
-      All plays
-    </button>
-  )
 
   return (
     <div className="mx-auto max-w-xl px-4 pb-16">
       {/* Pinned: everything above the conversation stays put while it scrolls. */}
-      <div className="sticky top-0 z-10 -mx-4 mb-3 border-b border-border bg-background/95 px-4 pb-3 backdrop-blur">
-        <AppHeader pinned={false} right={gameId ? null : allPlays}>
-          <ConnectionDot
-            connection={gameId ? game.connection : timeline.connection}
-          />
-        </AppHeader>
-        {!gameId && <DayBar sportsDay={sportsDay} today={today} />}
-        <GameStrip games={timeline.games} selected={gameId ?? undefined} />
-        {gameId && game.data && (
-          <GameTop game={game.data.game} tab={tab} onTab={setTab} />
-        )}
-      </div>
-
-      {gameId ? (
-        game.isPending ? null : game.data ? (
-          <GameBody
-            tab={tab}
-            game={game.data.game}
-            items={game.data.items}
-            box={game.data.box}
-          />
-        ) : (
-          <p className="mt-16 text-center text-sm text-muted">
-            Game not found.
-          </p>
-        )
-      ) : (
-        <>
-          {viewer && !followed?.length && (
-            <Link
-              to="/follows"
-              className="mb-3 block rounded-2xl border border-border bg-surface px-4 py-3 text-sm"
-            >
-              You’re seeing every League.{' '}
-              <span className="font-semibold text-accent">
-                Follow Teams and Players
-              </span>{' '}
-              to make this Timeline yours.
-            </Link>
-          )}
-
-          <ol className="flex flex-col gap-3">
-            {typing.map(({ typing: t, game: g }) => (
-              <li key={`typing:${g.id}`}>
-                <TypingRow typing={t} game={g} />
-              </li>
-            ))}
-            {entries.map((entry, i) => (
-              <li
-                key={entry.type === 'notice' ? entry.item.id : entry.id}
-                className="flex flex-col gap-3"
-              >
-                {i === dividerAt && i > 0 && <ReadDivider count={newCount} />}
-                {entry.type === 'notice' ? (
-                  <Notice item={entry.item} now={now} showLeague />
-                ) : (
-                  <Cluster entry={entry} now={now} />
-                )}
-              </li>
-            ))}
-          </ol>
-
-          {timeline.items.length === 0 && typing.length === 0 && (
-            <p className="mt-16 text-center text-sm text-muted">
-              {backfill === 'loading'
-                ? 'Loading this day’s games…'
-                : isToday
-                  ? 'No plays yet today.'
-                  : 'No plays on this day.'}
-            </p>
-          )}
-
-          {timeline.hasMore && (
+      <div
+        className="sticky top-0 z-10 -mx-4 mb-3 border-b border-border bg-background/95 px-4 pb-3 backdrop-blur"
+        style={{ viewTransitionName: 'pinned' }}
+      >
+        <AppHeader
+          pinned={false}
+          right={
             <button
               type="button"
-              onClick={() => void timeline.loadMore()}
-              disabled={timeline.loadingMore}
-              className="mx-auto mt-6 block min-h-11 rounded-full bg-accent-soft px-5 text-sm font-semibold text-accent"
+              onClick={() => setIncludeRoutine((v) => !v)}
+              aria-pressed={includeRoutine}
+              className={cn(
+                'min-h-11 rounded-full px-4 text-[13px] font-semibold transition-colors',
+                includeRoutine
+                  ? 'bg-foreground text-background'
+                  : 'bg-accent-soft text-accent',
+              )}
             >
-              {timeline.loadingMore ? 'Loading…' : 'Earlier plays'}
+              All plays
             </button>
-          )}
-        </>
+          }
+        >
+          <ConnectionDot connection={timeline.connection} />
+        </AppHeader>
+        <DayBar sportsDay={sportsDay} today={today} />
+        <GameStrip games={timeline.games} selected={gameId ?? undefined} />
+        <GameFocusBar game={selectedGame} onBox={() => setBoxOpen(true)} />
+      </div>
+
+      {viewer && !followed?.length && !gameId && (
+        <Link
+          to="/follows"
+          className="mb-3 block rounded-2xl border border-border bg-surface px-4 py-3 text-sm"
+        >
+          You’re seeing every League.{' '}
+          <span className="font-semibold text-accent">
+            Follow Teams and Players
+          </span>{' '}
+          to make this Timeline yours.
+        </Link>
+      )}
+
+      <ol className="flex flex-col gap-3">
+        {typing.map(({ typing: t, game: g }) => (
+          <li
+            key={`typing:${g.id}`}
+            style={{ viewTransitionName: vtName(`typing:${g.id}`) }}
+          >
+            <TypingRow typing={t} game={g} focused={g.id === gameId} />
+          </li>
+        ))}
+        {entries.map((entry, i) => (
+          <li
+            key={entry.type === 'notice' ? entry.item.id : entry.id}
+            className="flex flex-col gap-3"
+          >
+            {i === dividerAt && i > 0 && <ReadDivider count={newCount} />}
+            {entry.type === 'notice' ? (
+              <div
+                className="flex flex-col"
+                style={{ viewTransitionName: vtName(entry.item.id) }}
+              >
+                <Notice item={entry.item} now={now} showLeague={!gameId} />
+              </div>
+            ) : (
+              <Cluster entry={entry} now={now} focused={Boolean(gameId)} />
+            )}
+          </li>
+        ))}
+      </ol>
+
+      {items.length === 0 && typing.length === 0 && (
+        <p className="mt-16 text-center text-sm text-muted">
+          {gameId
+            ? game.isPending
+              ? 'Loading…'
+              : 'No plays in this game yet.'
+            : backfill === 'loading'
+              ? 'Loading this day’s games…'
+              : isToday
+                ? 'No plays yet today.'
+                : 'No plays on this day.'}
+        </p>
+      )}
+
+      {!gameId && timeline.hasMore && (
+        <button
+          type="button"
+          onClick={() => void timeline.loadMore()}
+          disabled={timeline.loadingMore}
+          className="mx-auto mt-6 block min-h-11 rounded-full bg-accent-soft px-5 text-sm font-semibold text-accent"
+        >
+          {timeline.loadingMore ? 'Loading…' : 'Earlier plays'}
+        </button>
+      )}
+
+      {boxOpen && selectedGame && (
+        <BoxSheet
+          game={selectedGame}
+          box={game.data?.box ?? null}
+          onClose={() => setBoxOpen(false)}
+        />
       )}
     </div>
   )
@@ -269,55 +278,82 @@ function entryTime(entry: FeedEntry): string {
 function Cluster({
   entry,
   now,
+  focused,
 }: {
   entry: Extract<FeedEntry, { type: 'cluster' }>
   now: number
+  /** One Game is selected: the home team answers from the right, like a thread. */
+  focused: boolean
 }) {
   const first = entry.bubbles[0]
   const lead = first.type === 'fold' ? first.items[0] : first.item
   const team = entry.side === 'home' ? lead.homeTeam : lead.awayTeam
+  const align = focused && entry.side === 'home' ? 'right' : 'left'
   return (
-    <div className="flex items-end gap-2">
+    <div
+      className={cn(
+        'flex items-end gap-2',
+        align === 'right' && 'flex-row-reverse',
+      )}
+    >
       <Link
         to="/"
         search={gameSearch(entry.gameId, lead.sportsDay)}
-        aria-label={`${team.abbreviation} game`}
+        viewTransition
+        resetScroll={false}
+        aria-label={`Show only the ${team.abbreviation} game`}
       >
         <TeamAvatar team={team} />
       </Link>
-      <div className="flex min-w-0 flex-col gap-1">
-        <span className="pl-1 text-[11px] text-muted">
+      <div
+        className={cn(
+          'flex min-w-0 flex-col gap-1',
+          align === 'right' && 'items-end',
+        )}
+      >
+        <span className="px-1 text-[11px] text-muted">
           <span className="font-semibold text-foreground/80">
             {team.abbreviation}
           </span>{' '}
           · {lead.segmentLabel} · {timeAgo(lead.occurredAt, now)}
         </span>
-        <BubbleStack bubbles={entry.bubbles} align="left" />
+        <BubbleStack bubbles={entry.bubbles} align={align} />
       </div>
     </div>
   )
 }
 
-function TypingRow({ typing, game }: { typing: Typing; game: GameSummary }) {
+function TypingRow({
+  typing,
+  game,
+  focused,
+}: {
+  typing: Typing
+  game: GameSummary
+  focused: boolean
+}) {
   const team =
     typing.side === 'home'
       ? game.homeTeam
       : typing.side === 'away'
         ? game.awayTeam
         : null
+  const right = focused && typing.side === 'home'
   return (
     <Link
       to="/"
       search={gameSearch(game.id, game.sportsDay)}
-      className="flex items-end gap-2"
+      viewTransition
+      resetScroll={false}
+      className={cn('flex items-end gap-2', right && 'flex-row-reverse')}
     >
       {team ? (
         <TeamAvatar team={team} />
       ) : (
         <LeagueAvatar league={game.league} />
       )}
-      <div className="flex min-w-0 flex-col gap-1">
-        <span className="truncate pl-1 text-[11px] text-muted">
+      <div className={cn('flex min-w-0 flex-col gap-1', right && 'items-end')}>
+        <span className="truncate px-1 text-[11px] text-muted">
           <span className="font-semibold text-foreground/80">
             {team
               ? team.abbreviation
@@ -325,7 +361,7 @@ function TypingRow({ typing, game }: { typing: Typing; game: GameSummary }) {
           </span>{' '}
           · {typing.text}
         </span>
-        <TypingDots align="left" />
+        <TypingDots align={right ? 'right' : 'left'} />
       </div>
     </Link>
   )
