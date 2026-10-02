@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import fixture from '../../../fixtures/nba/final-401859964.json'
 import type { NbaSummary } from '@/lib/sources/nba/feed'
 import type { SourceMilestone, SourcePlay } from '@/lib/model/types'
-import { parseGame, roleOf } from '@/lib/sources/nba/parse'
+import { parseGame, roleOf, takesLead } from '@/lib/sources/nba/parse'
 
 const game = parseGame(fixture as unknown as NbaSummary)
 const plays = game.items.filter((i): i is SourcePlay => i.kind === 'play')
@@ -41,14 +41,26 @@ describe('NBA parseGame — 2026 Finals Game 2 (NY @ SA)', () => {
     )
   })
 
-  it('marks made baskets Scoring and their total matches the final score', () => {
-    const scoring = plays.filter((p) => p.significance === 'scoring')
-    const points = scoring.reduce(
-      (n, p) => n + ((p.detail as { points: number }).points ?? 0),
-      0,
+  it('counts every basket toward the score, but only go-ahead baskets as Scoring', () => {
+    const baskets = plays.filter(
+      (p) => (p.detail as { points: number }).points > 0,
     )
-    expect(points).toBe(105 + 104)
-    expect(scoring.at(-1)!.score).toEqual({ away: 105, home: 104 })
+    expect(
+      baskets.reduce((n, p) => n + (p.detail as { points: number }).points, 0),
+    ).toBe(105 + 104)
+    const scoring = plays.filter((p) => p.significance === 'scoring')
+    expect(scoring).toHaveLength(8)
+    // Each one leaves its team ahead.
+    for (const p of scoring) {
+      expect(
+        p.side === 'away'
+          ? p.score.away > p.score.home
+          : p.score.home > p.score.away,
+      ).toBe(true)
+    }
+    expect(
+      baskets.filter((p) => p.significance === 'routine').length,
+    ).toBeGreaterThan(80)
   })
 
   it('marks blocks, steals, technicals and reviews Notable', () => {
@@ -102,5 +114,18 @@ describe('roleOf', () => {
     const text = "De'Aaron Fox blocks Jalen Brunson 's 6-foot pullup jump shot"
     expect(roleOf(text, "De'Aaron Fox", 0, true)).toBe('blocker')
     expect(roleOf(text, 'Jalen Brunson', 1, true)).toBe('shooter')
+  })
+})
+
+describe('takesLead', () => {
+  it('is a go-ahead score from behind or from a tie, not padding a lead or tying', () => {
+    expect(takesLead({ away: 50, home: 51 }, { away: 52, home: 51 })).toBe(true)
+    expect(takesLead({ away: 51, home: 51 }, { away: 51, home: 53 })).toBe(true)
+    expect(takesLead({ away: 52, home: 51 }, { away: 54, home: 51 })).toBe(
+      false,
+    )
+    expect(takesLead({ away: 49, home: 51 }, { away: 51, home: 51 })).toBe(
+      false,
+    )
   })
 })

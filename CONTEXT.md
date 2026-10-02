@@ -24,7 +24,7 @@ _Avoid_: event, action, update
 A player named in a Play (batter, pitcher, shooter, rebounder, passer, tackler, etc.). Merely being on the field or ice does not make a player involved.
 
 **Significance**:
-How much a Play matters, assigned per League: Scoring (changes the score), Notable (momentum or game-state moments that don't score, such as turnovers, ejections, lead changes), or Routine (everything else).
+How much a Play matters, assigned per League: Scoring (changes the score; in the NBA, where baskets come constantly, only a go-ahead basket that gives a team the lead), Notable (momentum or game-state moments that don't score, such as turnovers, ejections, lead changes), or Routine (everything else).
 _Avoid_: priority, importance, weight
 
 **Clutch**:

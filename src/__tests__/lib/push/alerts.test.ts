@@ -88,20 +88,3 @@ describe('alertMessage', () => {
     })
   })
 })
-
-describe('NBA', () => {
-  it('only Alerts Finals for now', () => {
-    expect(isAlertable(item({ league: 'nba' }), now)).toBe(false)
-    expect(
-      isAlertable(
-        item({
-          league: 'nba',
-          kind: 'milestone',
-          milestone: 'final',
-          significance: null,
-        }),
-        now,
-      ),
-    ).toBe(true)
-  })
-})

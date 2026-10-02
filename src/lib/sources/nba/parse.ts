@@ -152,6 +152,9 @@ export function parseGame(summary: NbaSummary): GameSnapshot {
     })
 
     const scored = score.away > previous.away || score.home > previous.home
+    // Baskets come ~100 a game, so in the NBA only a go-ahead one (giving a
+    // team the lead, from behind or from a tie) is Scoring (CONTEXT.md).
+    const goAhead = scored && takesLead(previous, score)
     previous = score
     plays.push({
       kind: 'play',
@@ -163,7 +166,7 @@ export function parseGame(summary: NbaSummary): GameSnapshot {
       score,
       description: text,
       playType: type,
-      significance: significance(scored, type, text),
+      significance: significance(goAhead, type, text),
       side: sideOf(row.team?.id),
       involved,
       credits: [],
@@ -244,12 +247,22 @@ export function parseGame(summary: NbaSummary): GameSnapshot {
   }
 }
 
+/** Does this score change give a team the lead it didn't have? */
+export function takesLead(before: Score, after: Score): boolean {
+  const awayNow = after.away > after.home
+  const homeNow = after.home > after.away
+  return (
+    (awayNow && !(before.away > before.home)) ||
+    (homeNow && !(before.home > before.away))
+  )
+}
+
 function significance(
-  scored: boolean,
+  goAhead: boolean,
   type: string,
   text: string,
 ): Significance {
-  if (scored) return 'scoring'
+  if (goAhead) return 'scoring'
   if (NOTABLE.test(type) || NOTABLE.test(text)) return 'notable'
   return 'routine'
 }
