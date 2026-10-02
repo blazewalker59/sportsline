@@ -24,7 +24,7 @@ export function AppHeader({
     <header
       className={
         pinned
-          ? 'sticky top-0 z-10 -mx-4 mb-3 bg-background/90 px-4 pt-[max(env(safe-area-inset-top),0.75rem)] pb-3 backdrop-blur'
+          ? 'sticky top-0 z-10 -mx-4 mb-3 bg-background px-4 pt-[max(env(safe-area-inset-top),0.75rem)] pb-3'
           : 'pt-[max(env(safe-area-inset-top),0.5rem)] pb-1'
       }
     >

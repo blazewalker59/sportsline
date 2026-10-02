@@ -235,7 +235,7 @@ function Timeline({
         <div className="mx-auto max-w-xl">
           <div
             className={cn(
-              'pointer-events-auto relative z-20 bg-background/95 px-4 backdrop-blur transition-[border-color]',
+              'pointer-events-auto relative z-20 bg-background px-4 transition-[border-color]',
               'border-b',
               panelHidden ? 'border-border' : 'border-transparent',
             )}
@@ -272,7 +272,7 @@ function Timeline({
           {/* Scope chips and score cards tuck away while reading down, return on the way up. */}
           <div
             className={cn(
-              'pointer-events-auto relative z-10 border-b border-border bg-background/95 px-4 pb-2 backdrop-blur transition-transform duration-300 ease-out',
+              'pointer-events-auto relative z-10 border-b border-border bg-background px-4 pb-2 transition-transform duration-300 ease-out',
               panelHidden && '-translate-y-full',
             )}
             inert={panelHidden}
