@@ -9,12 +9,21 @@ import { VIEWER_KEY, useViewer } from '@/lib/viewer/useViewer'
 export function AppHeader({
   children,
   right,
+  pinned = true,
 }: {
   children?: React.ReactNode
   right?: React.ReactNode
+  /** False when a parent pins a larger top section that includes this bar. */
+  pinned?: boolean
 }) {
   return (
-    <header className="sticky top-0 z-10 -mx-4 mb-3 bg-background/90 px-4 pt-[max(env(safe-area-inset-top),0.75rem)] pb-3 backdrop-blur">
+    <header
+      className={
+        pinned
+          ? 'sticky top-0 z-10 -mx-4 mb-3 bg-background/90 px-4 pt-[max(env(safe-area-inset-top),0.75rem)] pb-3 backdrop-blur'
+          : 'pt-[max(env(safe-area-inset-top),0.75rem)] pb-2'
+      }
+    >
       <div className="flex items-center gap-3">
         <Link to="/" className="text-lg font-bold tracking-tight">
           Sportsline

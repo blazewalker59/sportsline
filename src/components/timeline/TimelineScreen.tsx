@@ -3,9 +3,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { timeAgo, useNow } from './format'
 import { DayBar } from './DayBar'
 import { GameStrip } from './GameStrip'
+import type { GameTab } from '@/components/games/GameView'
 import type { FeedEntry, Typing } from '@/lib/timeline/chat'
 import type { Follow, GameSummary } from '@/lib/model/timeline'
 import type { Connection } from '@/lib/timeline/useLiveTimeline'
+import { gameSearch } from '@/lib/timeline/gameLink'
+import { useLiveGame } from '@/lib/games/useLiveGame'
+import { GameBody, GameTop } from '@/components/games/GameView'
 import {
   BubbleStack,
   LeagueAvatar,
@@ -23,7 +27,13 @@ import { useLiveTimeline } from '@/lib/timeline/useLiveTimeline'
 import { cn } from '@/lib/utils'
 import { useReadMarkerWriter, useViewer } from '@/lib/viewer/useViewer'
 
-export function TimelineScreen({ day }: { day?: string }) {
+export function TimelineScreen({
+  day,
+  gameId,
+}: {
+  day?: string
+  gameId?: string
+}) {
   const viewerState = useViewer()
   const [today] = useState(() => sportsDayOf(new Date()))
   const sportsDay = day && day < today ? day : today
@@ -40,6 +50,7 @@ export function TimelineScreen({ day }: { day?: string }) {
       key={`${viewerState.data?.viewer?.id ?? 'guest'}:${sportsDay}`}
       sportsDay={sportsDay}
       today={today}
+      gameId={gameId ?? null}
     />
   )
 }
@@ -58,7 +69,15 @@ function followsGame(
   )
 }
 
-function Timeline({ sportsDay, today }: { sportsDay: string; today: string }) {
+function Timeline({
+  sportsDay,
+  today,
+  gameId,
+}: {
+  sportsDay: string
+  today: string
+  gameId: string | null
+}) {
   const isToday = sportsDay === today
   const { data } = useViewer()
   const viewer = data?.viewer ?? null
@@ -76,6 +95,9 @@ function Timeline({ sportsDay, today }: { sportsDay: string; today: string }) {
   useReadMarkerWriter(timeline.items, viewer !== null && isToday)
   const backfill = usePastDay(sportsDay, isToday, timeline.reload)
   const now = useNow()
+  const game = useLiveGame(gameId)
+  const [tab, setTab] = useState<GameTab>('plays')
+  useEffect(() => setTab('plays'), [gameId])
 
   const entries = useMemo(
     () => buildChat(timeline.items, { fold: true }),
@@ -99,85 +121,108 @@ function Timeline({ sportsDay, today }: { sportsDay: string; today: string }) {
   const dividerAt =
     showMarker && readAt ? entries.findIndex((e) => entryTime(e) <= readAt) : -1
 
+  const allPlays = (
+    <button
+      type="button"
+      onClick={() => setIncludeRoutine((v) => !v)}
+      aria-pressed={includeRoutine}
+      className={cn(
+        'min-h-11 rounded-full px-4 text-[13px] font-semibold transition-colors',
+        includeRoutine
+          ? 'bg-foreground text-background'
+          : 'bg-accent-soft text-accent',
+      )}
+    >
+      All plays
+    </button>
+  )
+
   return (
     <div className="mx-auto max-w-xl px-4 pb-16">
-      <AppHeader
-        right={
-          <button
-            type="button"
-            onClick={() => setIncludeRoutine((v) => !v)}
-            aria-pressed={includeRoutine}
-            className={cn(
-              'min-h-11 rounded-full px-4 text-[13px] font-semibold transition-colors',
-              includeRoutine
-                ? 'bg-foreground text-background'
-                : 'bg-accent-soft text-accent',
-            )}
-          >
-            All plays
-          </button>
-        }
-      >
-        <ConnectionDot connection={timeline.connection} />
-      </AppHeader>
+      {/* Pinned: everything above the conversation stays put while it scrolls. */}
+      <div className="sticky top-0 z-10 -mx-4 mb-3 border-b border-border bg-background/95 px-4 pb-3 backdrop-blur">
+        <AppHeader pinned={false} right={gameId ? null : allPlays}>
+          <ConnectionDot
+            connection={gameId ? game.connection : timeline.connection}
+          />
+        </AppHeader>
+        {!gameId && <DayBar sportsDay={sportsDay} today={today} />}
+        <GameStrip games={timeline.games} selected={gameId ?? undefined} />
+        {gameId && game.data && (
+          <GameTop game={game.data.game} tab={tab} onTab={setTab} />
+        )}
+      </div>
 
-      {viewer && !followed?.length && (
-        <Link
-          to="/follows"
-          className="mb-3 block rounded-2xl border border-border bg-surface px-4 py-3 text-sm"
-        >
-          You’re seeing every League.{' '}
-          <span className="font-semibold text-accent">
-            Follow Teams and Players
-          </span>{' '}
-          to make this Timeline yours.
-        </Link>
-      )}
+      {gameId ? (
+        game.isPending ? null : game.data ? (
+          <GameBody
+            tab={tab}
+            game={game.data.game}
+            items={game.data.items}
+            box={game.data.box}
+          />
+        ) : (
+          <p className="mt-16 text-center text-sm text-muted">
+            Game not found.
+          </p>
+        )
+      ) : (
+        <>
+          {viewer && !followed?.length && (
+            <Link
+              to="/follows"
+              className="mb-3 block rounded-2xl border border-border bg-surface px-4 py-3 text-sm"
+            >
+              You’re seeing every League.{' '}
+              <span className="font-semibold text-accent">
+                Follow Teams and Players
+              </span>{' '}
+              to make this Timeline yours.
+            </Link>
+          )}
 
-      <DayBar sportsDay={sportsDay} today={today} />
+          <ol className="flex flex-col gap-3">
+            {typing.map(({ typing: t, game: g }) => (
+              <li key={`typing:${g.id}`}>
+                <TypingRow typing={t} game={g} />
+              </li>
+            ))}
+            {entries.map((entry, i) => (
+              <li
+                key={entry.type === 'notice' ? entry.item.id : entry.id}
+                className="flex flex-col gap-3"
+              >
+                {i === dividerAt && i > 0 && <ReadDivider count={newCount} />}
+                {entry.type === 'notice' ? (
+                  <Notice item={entry.item} now={now} showLeague />
+                ) : (
+                  <Cluster entry={entry} now={now} />
+                )}
+              </li>
+            ))}
+          </ol>
 
-      <GameStrip games={timeline.games} />
+          {timeline.items.length === 0 && typing.length === 0 && (
+            <p className="mt-16 text-center text-sm text-muted">
+              {backfill === 'loading'
+                ? 'Loading this day’s games…'
+                : isToday
+                  ? 'No plays yet today.'
+                  : 'No plays on this day.'}
+            </p>
+          )}
 
-      <ol className="mt-4 flex flex-col gap-3">
-        {typing.map(({ typing: t, game }) => (
-          <li key={`typing:${game.id}`}>
-            <TypingRow typing={t} game={game} />
-          </li>
-        ))}
-        {entries.map((entry, i) => (
-          <li
-            key={entry.type === 'notice' ? entry.item.id : entry.id}
-            className="flex flex-col gap-3"
-          >
-            {i === dividerAt && i > 0 && <ReadDivider count={newCount} />}
-            {entry.type === 'notice' ? (
-              <Notice item={entry.item} now={now} showLeague />
-            ) : (
-              <Cluster entry={entry} now={now} />
-            )}
-          </li>
-        ))}
-      </ol>
-
-      {timeline.items.length === 0 && typing.length === 0 && (
-        <p className="mt-16 text-center text-sm text-muted">
-          {backfill === 'loading'
-            ? 'Loading this day’s games…'
-            : isToday
-              ? 'No plays yet today.'
-              : 'No plays on this day.'}
-        </p>
-      )}
-
-      {timeline.hasMore && (
-        <button
-          type="button"
-          onClick={() => void timeline.loadMore()}
-          disabled={timeline.loadingMore}
-          className="mx-auto mt-6 block min-h-11 rounded-full bg-accent-soft px-5 text-sm font-semibold text-accent"
-        >
-          {timeline.loadingMore ? 'Loading…' : 'Earlier plays'}
-        </button>
+          {timeline.hasMore && (
+            <button
+              type="button"
+              onClick={() => void timeline.loadMore()}
+              disabled={timeline.loadingMore}
+              className="mx-auto mt-6 block min-h-11 rounded-full bg-accent-soft px-5 text-sm font-semibold text-accent"
+            >
+              {timeline.loadingMore ? 'Loading…' : 'Earlier plays'}
+            </button>
+          )}
+        </>
       )}
     </div>
   )
@@ -234,8 +279,8 @@ function Cluster({
   return (
     <div className="flex items-end gap-2">
       <Link
-        to="/games/$gameId"
-        params={{ gameId: entry.gameId }}
+        to="/"
+        search={gameSearch(entry.gameId, lead.sportsDay)}
         aria-label={`${team.abbreviation} game`}
       >
         <TeamAvatar team={team} />
@@ -262,8 +307,8 @@ function TypingRow({ typing, game }: { typing: Typing; game: GameSummary }) {
         : null
   return (
     <Link
-      to="/games/$gameId"
-      params={{ gameId: game.id }}
+      to="/"
+      search={gameSearch(game.id, game.sportsDay)}
       className="flex items-end gap-2"
     >
       {team ? (

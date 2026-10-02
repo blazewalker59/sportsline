@@ -13,8 +13,8 @@ const PING_MS = 25_000
 const MAX_BACKOFF_MS = 30_000
 
 export function useHubSocket(
-  /** LiveHub query string: `follows`, `routine`, `game`. */
-  query: string,
+  /** LiveHub query string: `follows`, `routine`, `game`; null = no socket. */
+  query: string | null,
   onEvents: (events: Array<TimelineEvent>) => void,
   onReconnect: () => void,
 ): Connection {
@@ -23,6 +23,7 @@ export function useHubSocket(
   handlers.current = { onEvents, onReconnect }
 
   useEffect(() => {
+    if (query === null) return
     let socket: WebSocket | null = null
     let ping: ReturnType<typeof setInterval> | undefined
     let retry: ReturnType<typeof setTimeout> | undefined

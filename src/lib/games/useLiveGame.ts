@@ -33,19 +33,21 @@ export function applyGameEvents(
   }
 }
 
-export function useLiveGame(gameId: string) {
+/** One Game live, or nothing while `gameId` is null. */
+export function useLiveGame(gameId: string | null) {
   const queryClient = useQueryClient()
-  const key = gameKey(gameId)
+  const key = gameKey(gameId ?? '')
   const detail = useQuery({
     queryKey: key,
-    queryFn: () => getGameDetail({ data: { gameId } }),
+    queryFn: () => getGameDetail({ data: { gameId: gameId! } }),
+    enabled: gameId !== null,
     refetchInterval: (q) => {
       const status = q.state.data?.game.status
       return status === 'live' || status === 'delayed' ? BOX_REFRESH_MS : false
     },
   })
   const connection = useHubSocket(
-    new URLSearchParams({ game: gameId }).toString(),
+    gameId ? new URLSearchParams({ game: gameId }).toString() : null,
     (events) =>
       queryClient.setQueryData<GameDetail | null>(key, (old) =>
         old ? applyGameEvents(old, events) : old,

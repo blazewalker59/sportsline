@@ -10,6 +10,7 @@ import { Bases } from '@/components/mlb/Bases'
 import { StrikeZone, pitchColor } from '@/components/mlb/StrikeZone'
 import { Rink } from '@/components/nhl/Rink'
 import { getPlayDetail } from '@/lib/games/server'
+import { gameSearch } from '@/lib/timeline/gameLink'
 import { cn } from '@/lib/utils'
 
 interface MlbPitch extends ZonePitch {
@@ -173,8 +174,8 @@ function Play({ detail }: { detail: PlayDetail }) {
   return (
     <article className="flex flex-col gap-4">
       <Link
-        to="/games/$gameId"
-        params={{ gameId: game.id }}
+        to="/"
+        search={gameSearch(game.id, game.sportsDay)}
         className="flex items-center justify-between rounded-xl border border-border bg-surface px-4 py-2.5 text-sm"
       >
         <span className="flex items-center gap-2 tabular-nums">

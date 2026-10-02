@@ -13,6 +13,7 @@ import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { timeAgo } from '@/components/timeline/format'
 import { notableLead, scoringHeadline, textOn } from '@/lib/timeline/chat'
+import { gameSearch } from '@/lib/timeline/gameLink'
 import { cn } from '@/lib/utils'
 
 export type Align = 'left' | 'right'
@@ -264,14 +265,35 @@ export function Notice({
   now: number
   showLeague?: boolean
 }) {
+  const className = cn(
+    'flex max-w-[320px] items-center gap-1.5 self-center rounded-full bg-notice px-3 py-1 text-xs font-semibold text-muted hover:text-foreground',
+    item.milestone === 'final' && 'text-foreground',
+  )
+  const body = (
+    <>
+      {showLeague && <LeagueLogo league={item.league} size={16} />}
+      <span className="truncate">{item.description}</span>
+      <span className="shrink-0 font-normal tabular-nums">
+        · {timeAgo(item.occurredAt, now)}
+      </span>
+    </>
+  )
+  // A Milestone opens its Game inside the Timeline; a side-less Play its Play Detail.
+  if (item.kind === 'milestone') {
+    return (
+      <Link
+        to="/"
+        search={gameSearch(item.gameId, item.sportsDay)}
+        className={className}
+      >
+        {body}
+      </Link>
+    )
+  }
   return (
     <Link
-      to={item.kind === 'milestone' ? '/games/$gameId' : '/plays/$playId'}
-      params={
-        item.kind === 'milestone'
-          ? { gameId: item.gameId }
-          : { playId: item.id }
-      }
+      to="/plays/$playId"
+      params={{ playId: item.id }}
       className={cn(
         'flex max-w-[320px] items-center gap-1.5 self-center rounded-full bg-notice px-3 py-1 text-xs font-semibold text-muted hover:text-foreground',
         item.milestone === 'final' && 'text-foreground',
