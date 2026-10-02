@@ -25,6 +25,8 @@ export interface CloudflareEnv {
   BETTER_AUTH_URL?: string
   GOOGLE_CLIENT_ID?: string
   GOOGLE_CLIENT_SECRET?: string
+  /** Production's one host; every other host redirects to it. Unset locally. */
+  CANONICAL_HOST?: string
 }
 
 export type Database = DrizzleD1Database<typeof schema>

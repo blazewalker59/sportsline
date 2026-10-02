@@ -53,15 +53,23 @@
     "production": {
       "name": "sportsline",
       // Production is sportsline.dev (a Custom Domain, declared here so every
-      // deploy keeps it, as dreamteam does). workers.dev stays on as a
-      // fallback.
+      // deploy keeps it, as dreamteam does). www and workers.dev stay on but
+      // redirect to it (src/server.ts, CANONICAL_HOST).
       "workers_dev": true,
       "routes": [
         {
           "pattern": "sportsline.dev",
           "custom_domain": true,
         },
+        {
+          "pattern": "www.sportsline.dev",
+          "custom_domain": true,
+        },
       ],
+      // Requests on any other host (www, workers.dev) redirect here.
+      "vars": {
+        "CANONICAL_HOST": "sportsline.dev",
+      },
       "observability": {
         "logs": {
           "enabled": true,

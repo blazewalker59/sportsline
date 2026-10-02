@@ -15,6 +15,7 @@ import {
 } from '@tanstack/react-start/server'
 import type { CloudflareEnv } from '@/lib/db'
 import { getAuth } from '@/lib/auth/server'
+import { canonicalRedirect } from '@/lib/canonical'
 import { serverRequestContext } from '@/lib/db'
 import { LIVE_PATH } from '@/lib/live/LiveHub'
 
@@ -48,6 +49,11 @@ export default {
     ctx: ExecutionContext,
   ): Promise<Response> {
     const url = new URL(request.url)
+
+    // One canonical address (one sign-in, one cache): www and workers.dev
+    // permanently redirect to the same path on CANONICAL_HOST.
+    const redirect = canonicalRedirect(url, request.method, env.CANONICAL_HOST)
+    if (redirect) return redirect
 
     // The deploy smoke check hits /health, which starts the loop right away.
     if (url.pathname === '/health') {
