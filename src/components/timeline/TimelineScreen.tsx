@@ -1,11 +1,12 @@
 import { Link } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { timeAgo, useNow } from './format'
-import { DayBar } from './DayBar'
+import { DayStrip } from './DayStrip'
 import { GameStrip } from './GameStrip'
 import type { FeedEntry, Typing } from '@/lib/timeline/chat'
 import type { Follow, GameSummary } from '@/lib/model/timeline'
 import type { Connection } from '@/lib/timeline/useLiveTimeline'
+import { withViewTransition } from '@/lib/viewTransition'
 import { gameSearch, vtName } from '@/lib/timeline/gameLink'
 import { useLiveGame } from '@/lib/games/useLiveGame'
 import { BoxSheet, GameFocusBar } from '@/components/games/GameView'
@@ -46,7 +47,9 @@ export function TimelineScreen({
   }
   return (
     <Timeline
-      key={`${viewerState.data?.viewer?.id ?? 'guest'}:${sportsDay}`}
+      // Not keyed by day: moving between days keeps this Timeline (and its
+      // cache) so the switch is a transition, not a rebuild.
+      key={viewerState.data?.viewer?.id ?? 'guest'}
       sportsDay={sportsDay}
       today={today}
       gameId={gameId ?? null}
@@ -91,7 +94,9 @@ function Timeline({
   // Highlights = Scoring and Notable Plays only. It starts on when the
   // Viewer sees every League (the default Follows), off for their own Follows.
   const [highlights, setHighlights] = useState(() => !followed?.length)
-  const timeline = useLiveTimeline(follows, !highlights, sportsDay)
+  const timeline = useLiveTimeline(follows, sportsDay, today)
+  // While a day loads, keep the previous one on screen, dimmed.
+  const dimmed = timeline.loading && timeline.previousItems.length > 0
   // Only today's Timeline moves the Read Marker; browsing history must not.
   useReadMarkerWriter(timeline.items, viewer !== null && isToday && !gameId)
   const backfill = usePastDay(sportsDay, isToday, timeline.reload)
@@ -104,14 +109,23 @@ function Timeline({
   // bubbles). Until the Game's full history loads, filter what is here.
   const items = useMemo(() => {
     const source = !gameId
-      ? timeline.items
+      ? dimmed
+        ? timeline.previousItems
+        : timeline.items
       : game.data
         ? [...game.data.items].reverse()
         : timeline.items.filter((i) => i.gameId === gameId)
     return highlights
       ? source.filter((i) => i.kind !== 'play' || i.significance !== 'routine')
       : source
-  }, [gameId, game.data, timeline.items, highlights])
+  }, [
+    gameId,
+    game.data,
+    timeline.items,
+    timeline.previousItems,
+    dimmed,
+    highlights,
+  ])
   const selectedGame =
     (gameId &&
       (game.data?.game ?? timeline.games.find((g) => g.id === gameId))) ||
@@ -144,9 +158,21 @@ function Timeline({
         <AppHeader pinned={false}>
           <ConnectionDot connection={timeline.connection} />
         </AppHeader>
-        <DayBar sportsDay={sportsDay} today={today} />
-        <GameStrip games={timeline.games} selected={gameId ?? undefined} />
-        <PlaysToggle highlights={highlights} onChange={setHighlights} />
+        <DayStrip sportsDay={sportsDay} today={today} />
+        <div className={cn('transition-opacity', dimmed && 'opacity-50')}>
+          <GameStrip
+            games={
+              dimmed && timeline.previousGames.length
+                ? timeline.previousGames
+                : timeline.games
+            }
+            selected={gameId ?? undefined}
+          />
+        </div>
+        <PlaysToggle
+          highlights={highlights}
+          onChange={(value) => withViewTransition(() => setHighlights(value))}
+        />
         <GameFocusBar game={selectedGame} onBox={() => setBoxOpen(true)} />
       </div>
 
@@ -163,7 +189,13 @@ function Timeline({
         </Link>
       )}
 
-      <ol className="flex flex-col gap-3">
+      <ol
+        className={cn(
+          'flex flex-col gap-3 transition-opacity',
+          dimmed && 'opacity-50',
+        )}
+        aria-busy={timeline.loading}
+      >
         {typing.map(({ typing: t, game: g }) => (
           <li
             key={`typing:${g.id}`}
@@ -198,7 +230,7 @@ function Timeline({
             ? game.isPending
               ? 'Loading…'
               : 'No plays in this game yet.'
-            : backfill === 'loading'
+            : backfill === 'loading' || timeline.loading
               ? 'Loading this day’s games…'
               : isToday
                 ? 'No plays yet today.'

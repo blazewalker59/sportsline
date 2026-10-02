@@ -102,3 +102,33 @@ export function readMarkerIndex(
   const index = items.findIndex((item) => item.occurredAt <= readAt)
   return index > 0 ? index : null
 }
+
+/** Apply live events to cached Timeline pages (newest page first). */
+export function applyEventsToPages<
+  TPage extends { items: Array<TimelineItem> },
+>(
+  pages: ReadonlyArray<TPage>,
+  events: ReadonlyArray<TimelineEvent>,
+): Array<TPage> {
+  let next = pages.map((p) => ({ ...p, items: [...p.items] }))
+  for (const event of events) {
+    if (event.type === 'upsert') {
+      let replaced = false
+      next = next.map((p) => ({
+        ...p,
+        items: p.items.map((i) => {
+          if (i.id !== event.item.id) return i
+          replaced = true
+          return event.item
+        }),
+      }))
+      if (!replaced && next.length > 0) next[0].items.unshift(event.item)
+    } else if (event.type === 'remove') {
+      next = next.map((p) => ({
+        ...p,
+        items: p.items.filter((i) => i.id !== event.id),
+      }))
+    }
+  }
+  return next
+}

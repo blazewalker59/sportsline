@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { GameSummary, TimelineItem } from '@/lib/model/timeline'
 import {
   applyEvents,
+  applyEventsToPages,
   emptyState,
   orderedGames,
   orderedItems,
@@ -132,5 +133,25 @@ describe('readMarkerIndex', () => {
     expect(readMarkerIndex(items, '2026-10-01T23:30:00Z')).toBeNull()
     expect(readMarkerIndex(items, '2026-10-01T22:00:00Z')).toBeNull()
     expect(readMarkerIndex(items, null)).toBeNull()
+  })
+})
+
+describe('applyEventsToPages', () => {
+  it('replaces an item wherever it is cached, adds new ones to the newest page, and removes', () => {
+    const pages = [
+      { items: [item('b', '2026-10-01T23:20:00Z')], nextBefore: 'x' },
+      { items: [item('a', '2026-10-01T23:10:00Z')], nextBefore: null },
+    ]
+    const next = applyEventsToPages(pages, [
+      {
+        type: 'upsert',
+        item: item('a', '2026-10-01T23:10:00Z', 0, { description: 'E6' }),
+      },
+      { type: 'upsert', item: item('c', '2026-10-01T23:30:00Z') },
+      { type: 'remove', id: 'b', gameId: 'g1' },
+    ])
+    expect(next[0].items.map((i) => i.id)).toEqual(['c'])
+    expect(next[1].items[0].description).toBe('E6')
+    expect(pages[1].items[0].description).toBe('a') // inputs untouched
   })
 })

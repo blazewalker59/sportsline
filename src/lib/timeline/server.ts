@@ -28,7 +28,7 @@ import { syncDay } from '@/lib/live/schedule'
 import { followsFromParam } from '@/lib/model/timeline'
 import { toGameSummary, toTimelineItem } from '@/lib/live/rows'
 
-const PAGE_SIZE = 50
+const PAGE_SIZE = 100
 const SPORTS_DAY = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 
 const timelineInput = z.object({
