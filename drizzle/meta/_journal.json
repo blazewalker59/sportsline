@@ -22,6 +22,13 @@
       "when": 1790909664084,
       "tag": "0002_game_box",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1790911455948,
+      "tag": "0003_team_logos",
+      "breakpoints": true
     }
   ]
 }

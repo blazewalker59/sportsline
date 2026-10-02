@@ -300,14 +300,8 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
             .from(timelineItems)
             .where(inArray(timelineItems.id, overturnedIds))
         : []
-    const away = {
-      id: game.awayTeam.id,
-      abbreviation: game.awayTeam.abbreviation,
-    }
-    const home = {
-      id: game.homeTeam.id,
-      abbreviation: game.homeTeam.abbreviation,
-    }
+    const away = game.awayTeam
+    const home = game.homeTeam
     const events: Array<TimelineEvent> = [
       {
         type: 'game',

@@ -32,8 +32,9 @@ export class Scheduler extends DurableObject<CloudflareEnv> {
   async alarm(): Promise<void> {
     const now = Date.now()
     await this.ctx.storage.setAlarm(nextMinute(now))
-    // Rosters first, so the schedule sync and LiveGames find Teams and
-    // Players already named.
+    // Schedules first: they are what makes Games go live, and a slow roster
+    // sync (dozens of Source calls) must never hold them up.
+    await syncSchedules(this.env, new Date(now))
     for (const league of ACTIVE_LEAGUES) {
       const key = `${ROSTER_DUE_KEY}:${league}`
       const dueAt = (await this.ctx.storage.get<number>(key)) ?? 0
@@ -45,6 +46,5 @@ export class Scheduler extends DurableObject<CloudflareEnv> {
         await this.ctx.storage.put(key, now + ROSTER_EVERY_MS)
       }
     }
-    await syncSchedules(this.env, new Date(now))
   }
 }

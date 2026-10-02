@@ -2,6 +2,8 @@ import { Link } from '@tanstack/react-router'
 import { startTime } from './format'
 import type { GameSummary } from '@/lib/model/timeline'
 import { Bases, Outs } from '@/components/mlb/Bases'
+import { LeagueLogo } from '@/components/brand/LeagueLogo'
+import { TeamMark } from '@/components/brand/TeamMark'
 import { cn } from '@/lib/utils'
 
 interface MlbSituation {
@@ -50,7 +52,7 @@ function GameChip({ game }: { game: GameSummary }) {
       )}
     >
       <div className="mb-1 flex items-center justify-between text-[11px] uppercase tracking-wide text-muted">
-        <span>{game.league}</span>
+        <LeagueLogo league={game.league} size={16} />
         <StatusLabel game={game} />
       </div>
       {(['away', 'home'] as const).map((side) => (
@@ -58,15 +60,11 @@ function GameChip({ game }: { game: GameSummary }) {
           key={side}
           className="flex items-center justify-between tabular-nums"
         >
-          <span
-            className={cn(
-              leader === side ? 'font-semibold' : 'text-foreground/80',
-            )}
-          >
-            {side === 'away'
-              ? game.awayTeam.abbreviation
-              : game.homeTeam.abbreviation}
-          </span>
+          <TeamMark
+            team={side === 'away' ? game.awayTeam : game.homeTeam}
+            bold={leader === side}
+            className={leader === side ? undefined : 'text-foreground/80'}
+          />
           {started && (
             <span
               className={cn(

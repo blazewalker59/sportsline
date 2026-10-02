@@ -29,6 +29,8 @@ export interface FollowEntry {
   label: string
   detail: string | null
   league: League
+  /** The Team's logo, or a Player's current Team's. */
+  logoUrl: string | null
 }
 
 export interface ViewerState {
@@ -75,12 +77,16 @@ async function followEntries(
       target: follows.target,
       teamName: teams.name,
       teamLeague: teams.league,
+      teamLogo: teams.logoUrl,
       playerName: players.name,
       playerLeague: players.league,
       playerPosition: players.position,
       playerTeam: sql<
         string | null
       >`(select abbreviation from teams t where t.id = ${players.teamId})`,
+      playerTeamLogo: sql<
+        string | null
+      >`(select logo_url from teams t where t.id = ${players.teamId})`,
     })
     .from(follows)
     .leftJoin(
@@ -105,6 +111,7 @@ async function followEntries(
             label: LEAGUE_LABELS[league],
             detail: null,
             league,
+            logoUrl: null,
           },
         ]
       }
@@ -116,6 +123,7 @@ async function followEntries(
             label: r.teamName,
             detail: null,
             league: r.teamLeague,
+            logoUrl: r.teamLogo,
           },
         ]
       case 'player':
@@ -128,6 +136,7 @@ async function followEntries(
               [r.playerTeam, r.playerPosition].filter(Boolean).join(' · ') ||
               null,
             league: r.playerLeague,
+            logoUrl: r.playerTeamLogo,
           },
         ]
     }
@@ -215,12 +224,7 @@ export const markRead = createServerFn({ method: 'POST' })
     }),
   )
 
-export interface Followable {
-  follow: Follow
-  label: string
-  detail: string | null
-  league: League
-}
+export type Followable = FollowEntry
 
 /** Teams and Players whose name matches, for the Follows search box. */
 export const searchFollowables = createServerFn({ method: 'GET' })
@@ -237,6 +241,7 @@ export const searchFollowables = createServerFn({ method: 'GET' })
           name: teams.name,
           abbreviation: teams.abbreviation,
           league: teams.league,
+          logoUrl: teams.logoUrl,
         })
         .from(teams)
         .where(or(like(teams.name, pattern), like(teams.abbreviation, pattern)))
@@ -250,6 +255,9 @@ export const searchFollowables = createServerFn({ method: 'GET' })
           team: sql<
             string | null
           >`(select abbreviation from teams t where t.id = ${players.teamId})`,
+          teamLogo: sql<
+            string | null
+          >`(select logo_url from teams t where t.id = ${players.teamId})`,
         })
         .from(players)
         .where(like(players.name, pattern))
@@ -262,12 +270,14 @@ export const searchFollowables = createServerFn({ method: 'GET' })
         label: t.name,
         detail: t.abbreviation,
         league: t.league,
+        logoUrl: t.logoUrl,
       })),
       ...playerRows.map((p) => ({
         follow: { kind: 'player' as const, playerId: p.id },
         label: p.name,
         detail: [p.team, p.position].filter(Boolean).join(' · ') || null,
         league: p.league,
+        logoUrl: p.teamLogo,
       })),
     ]
   })

@@ -2,6 +2,8 @@ import { Link } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 import type { GameSummary, TimelineItem } from '@/lib/model/timeline'
 import type { GameBox } from '@/lib/model/types'
+import { LeagueLogo } from '@/components/brand/LeagueLogo'
+import { TeamLogo, TeamMark } from '@/components/brand/TeamMark'
 import { FollowButton } from '@/components/follows/FollowButton'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Bases, Outs } from '@/components/mlb/Bases'
@@ -68,7 +70,7 @@ export function GameDetailScreen({ gameId }: { gameId: string }) {
           {tab === 'plays' ? (
             <PlayList items={data.items} />
           ) : (
-            <BoxTables box={data.box} />
+            <BoxTables box={data.box} game={data.game} />
           )}
         </>
       )}
@@ -91,11 +93,12 @@ function Scoreboard({ game }: { game: GameSummary }) {
     <section className="rounded-2xl border border-border bg-surface p-4">
       <p
         className={cn(
-          'mb-3 text-center text-xs uppercase tracking-wide',
+          'mb-3 flex items-center justify-center gap-2 text-xs uppercase tracking-wide',
           live ? 'text-live' : 'text-muted',
         )}
       >
-        {game.league} · {status}
+        <LeagueLogo league={game.league} size={18} />
+        {status}
       </p>
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
         <TeamColumn team={game.awayTeam} />
@@ -148,6 +151,7 @@ function Scoreboard({ game }: { game: GameSummary }) {
 function TeamColumn({ team }: { team: GameSummary['awayTeam'] }) {
   return (
     <div className="flex flex-col items-center gap-2 text-center">
+      <TeamLogo team={team} size={48} />
       <span className="text-lg font-semibold">{team.abbreviation}</span>
       <span className="text-xs text-muted">{team.name}</span>
       <FollowButton follow={{ kind: 'team', teamId: team.id }} />
@@ -159,12 +163,14 @@ function Linescore({ box, game }: { box: GameBox; game: GameSummary }) {
   const ls = box.linescore
   if (ls.segments.length === 0) return null
   const row = (
-    abbr: string,
+    team: GameSummary['awayTeam'],
     runs: Array<number | null>,
     totals: Array<number>,
   ) => (
     <tr>
-      <th className="py-1 pr-3 text-left font-semibold">{abbr}</th>
+      <th className="py-1 pr-3 text-left font-semibold">
+        <TeamMark team={team} size={16} />
+      </th>
       {runs.map((r, i) => (
         <td key={i} className="px-1.5 text-center text-muted">
           {r ?? '–'}
@@ -208,8 +214,8 @@ function Linescore({ box, game }: { box: GameBox; game: GameSummary }) {
           </tr>
         </thead>
         <tbody>
-          {row(game.awayTeam.abbreviation, ls.away, ls.awayTotals)}
-          {row(game.homeTeam.abbreviation, ls.home, ls.homeTotals)}
+          {row(game.awayTeam, ls.away, ls.awayTotals)}
+          {row(game.homeTeam, ls.home, ls.homeTotals)}
         </tbody>
       </table>
     </div>
@@ -308,7 +314,7 @@ function PlayRow({
   )
 }
 
-function BoxTables({ box }: { box: GameBox | null }) {
+function BoxTables({ box, game }: { box: GameBox | null; game: GameSummary }) {
   if (!box || box.tables.length === 0) {
     return (
       <p className="mt-10 text-center text-sm text-muted">No box score yet.</p>
@@ -325,7 +331,13 @@ function BoxTables({ box }: { box: GameBox | null }) {
             <thead>
               <tr className="border-b border-border text-muted">
                 <th className="px-3 py-2 text-left font-semibold text-foreground">
-                  {t.title}
+                  <span className="inline-flex items-center gap-1.5">
+                    <TeamLogo
+                      team={t.side === 'away' ? game.awayTeam : game.homeTeam}
+                      size={16}
+                    />
+                    {t.title}
+                  </span>
                 </th>
                 {t.columns.map((c) => (
                   <th key={c} className="px-2 py-2 text-right font-normal">

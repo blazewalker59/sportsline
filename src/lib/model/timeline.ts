@@ -19,6 +19,13 @@ export interface TimelinePlayer {
   role: string
 }
 
+/** How a Team is shown wherever it appears: logo plus abbreviation. */
+export interface TeamRef {
+  id: string
+  abbreviation: string
+  logoUrl: string | null
+}
+
 export interface TimelineItem {
   id: string
   gameId: string
@@ -30,8 +37,8 @@ export interface TimelineItem {
   occurredAt: string
   segmentLabel: string
   score: { away: number; home: number }
-  awayTeam: { id: string; abbreviation: string }
-  homeTeam: { id: string; abbreviation: string }
+  awayTeam: TeamRef
+  homeTeam: TeamRef
   description: string
   playType: string | null
   significance: Significance | null
@@ -71,8 +78,8 @@ export interface GameSummary {
   sportsDay: string
   status: string
   startsAt: string
-  awayTeam: { id: string; abbreviation: string; name: string }
-  homeTeam: { id: string; abbreviation: string; name: string }
+  awayTeam: TeamRef & { name: string }
+  homeTeam: TeamRef & { name: string }
   score: { away: number; home: number }
   situation: Situation | null
 }

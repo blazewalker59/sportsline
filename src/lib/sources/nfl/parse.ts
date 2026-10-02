@@ -80,11 +80,22 @@ export function quarterLabel(period: number): string {
   return period <= 4 ? `Q${period}` : period === 5 ? 'OT' : `${period - 4}OT`
 }
 
+/** ESPN's dark-background logo, resized: the originals are ~100 KB PNGs. */
+export function espnLogo(path: string): string {
+  return `https://a.espncdn.com/combiner/i?img=${path}&w=80&h=80`
+}
+
+function nflLogo(abbreviation: string): string {
+  return espnLogo(`/i/teamlogos/nfl/500-dark/${abbreviation.toLowerCase()}.png`)
+}
+
 function team(c: EspnCompetitor): SourceTeam {
+  const abbreviation = c.team.abbreviation ?? c.team.id
   return {
     sourceId: c.team.id,
     name: c.team.displayName ?? c.team.name ?? c.team.id,
-    abbreviation: c.team.abbreviation ?? c.team.id,
+    abbreviation,
+    logoUrl: nflLogo(abbreviation),
   }
 }
 
@@ -418,6 +429,7 @@ export function parseRoster(
       sourceId: t.id,
       name: t.displayName ?? t.id,
       abbreviation: t.abbreviation ?? t.id,
+      logoUrl: nflLogo(t.abbreviation ?? t.id),
     })),
     players: rosters.flatMap(({ teamId, roster }) =>
       (roster.athletes ?? []).flatMap((group) =>

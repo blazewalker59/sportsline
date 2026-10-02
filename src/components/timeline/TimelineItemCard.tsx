@@ -1,6 +1,8 @@
 import { Link } from '@tanstack/react-router'
 import { timeAgo } from './format'
 import type { TimelineItem } from '@/lib/model/timeline'
+import { LeagueLogo } from '@/components/brand/LeagueLogo'
+import { TeamLogo } from '@/components/brand/TeamMark'
 import { cn } from '@/lib/utils'
 
 interface MlbPlayDetail {
@@ -41,9 +43,7 @@ export function TimelineItemCard({
         )}
       >
         <header className="mb-1 flex items-center gap-2 text-xs text-muted">
-          <span className="rounded bg-background px-1.5 py-0.5 font-medium uppercase tracking-wide">
-            {item.league}
-          </span>
+          <LeagueLogo league={item.league} size={16} />
           <Matchup item={item} />
           <span>·</span>
           <span>{item.segmentLabel}</span>
@@ -69,10 +69,12 @@ export function TimelineItemCard({
 
 function Matchup({ item }: { item: TimelineItem }) {
   return (
-    <span className="tabular-nums text-foreground/90">
+    <span className="inline-flex items-center gap-1 tabular-nums text-foreground/90">
+      <TeamLogo team={item.awayTeam} size={16} />
       {item.awayTeam.abbreviation} {item.score.away}
-      <span className="text-muted"> – </span>
+      <span className="text-muted">–</span>
       {item.score.home} {item.homeTeam.abbreviation}
+      <TeamLogo team={item.homeTeam} size={16} />
     </span>
   )
 }
@@ -116,7 +118,10 @@ function MilestoneRow({ item, now }: { item: TimelineItem; now: number }) {
           strong && 'font-semibold text-foreground/90',
         )}
       >
-        <span className="uppercase">{item.league}</span> · {item.description}
+        <span className="inline-flex items-center gap-1.5">
+          <LeagueLogo league={item.league} size={14} />
+          {item.description}
+        </span>
       </span>
       <span className="tabular-nums">{timeAgo(item.occurredAt, now)}</span>
       <span className="h-px flex-1 bg-border" />

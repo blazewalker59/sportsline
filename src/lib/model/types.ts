@@ -33,6 +33,8 @@ export interface SourceRef {
 
 export interface SourceTeam extends SourceRef {
   abbreviation: string
+  /** A logo that reads on a dark background, from the Source's CDN. */
+  logoUrl: string | null
 }
 
 export interface InvolvedPlayer extends SourceRef {

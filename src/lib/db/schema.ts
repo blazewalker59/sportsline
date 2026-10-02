@@ -121,6 +121,7 @@ export const teams = sqliteTable('teams', {
   league: text('league').$type<League>().notNull(),
   name: text('name').notNull(),
   abbreviation: text('abbreviation').notNull(),
+  logoUrl: text('logo_url'),
 })
 
 export const players = sqliteTable(

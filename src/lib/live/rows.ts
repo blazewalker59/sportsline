@@ -6,6 +6,7 @@
 import type { games, teams, timelineItems } from '@/lib/db/schema'
 import type {
   GameSummary,
+  TeamRef,
   TimelineItem,
   TimelinePlayer,
 } from '@/lib/model/timeline'
@@ -21,8 +22,8 @@ export interface TrackedGame {
   league: League
   sourceGameId: string
   sportsDay: string
-  awayTeam: { id: string; abbreviation: string }
-  homeTeam: { id: string; abbreviation: string }
+  awayTeam: TeamRef
+  homeTeam: TeamRef
 }
 
 export function itemRow(
@@ -85,8 +86,8 @@ function withCredits(
 
 export function toTimelineItem(
   row: ItemRow,
-  away: { id: string; abbreviation: string },
-  home: { id: string; abbreviation: string },
+  away: TeamRef,
+  home: TeamRef,
 ): TimelineItem {
   return {
     id: row.id,
@@ -123,9 +124,18 @@ export function toGameSummary(
     sportsDay: row.sportsDay,
     status: row.status,
     startsAt: row.startsAt,
-    awayTeam: { id: away.id, abbreviation: away.abbreviation, name: away.name },
-    homeTeam: { id: home.id, abbreviation: home.abbreviation, name: home.name },
+    awayTeam: teamRef(away),
+    homeTeam: teamRef(home),
     score: { away: row.awayScore, home: row.homeScore },
     situation: row.situation ?? null,
+  }
+}
+
+function teamRef(t: TeamRow): TeamRef & { name: string } {
+  return {
+    id: t.id,
+    abbreviation: t.abbreviation,
+    logoUrl: t.logoUrl ?? null,
+    name: t.name,
   }
 }

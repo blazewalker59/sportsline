@@ -84,6 +84,10 @@ export function periodLabel(period: {
   return ['1st', '2nd', '3rd'][period.number - 1] ?? `P${period.number}`
 }
 
+export function nhlLogo(abbreviation: string): string {
+  return `https://assets.nhle.com/logos/nhl/svg/${abbreviation}_dark.svg`
+}
+
 function team(t: NhlTeam): SourceTeam {
   const name = [t.placeName?.default, t.commonName?.default]
     .filter(Boolean)
@@ -92,6 +96,7 @@ function team(t: NhlTeam): SourceTeam {
     sourceId: String(t.id),
     name: name || t.abbrev,
     abbreviation: t.abbrev,
+    logoUrl: nhlLogo(t.abbrev),
   }
 }
 
@@ -603,15 +608,25 @@ export function parseRoster(
       s.teamAbbrev?.default ? [s.teamAbbrev.default] : [],
     ),
   )
-  const list = (teams.data ?? []).filter(
-    (t) => t.triCode && current.has(t.triCode),
-  )
+  // The stats API keeps retired franchises and can list a code twice (Utah's
+  // 2024 club and the Mammoth); the current one has the highest id.
+  const byCode = new Map<
+    string,
+    { id: number; fullName?: string; triCode?: string }
+  >()
+  for (const t of teams.data ?? []) {
+    if (!t.triCode || !current.has(t.triCode)) continue
+    const seen = byCode.get(t.triCode)
+    if (!seen || t.id > seen.id) byCode.set(t.triCode, t)
+  }
+  const list = [...byCode.values()]
   const idByAbbrev = new Map(list.map((t) => [t.triCode!, String(t.id)]))
   return {
     teams: list.map((t) => ({
       sourceId: String(t.id),
       name: t.fullName ?? t.triCode!,
       abbreviation: t.triCode!,
+      logoUrl: nhlLogo(t.triCode!),
     })),
     players: rosters.flatMap(({ abbrev, roster }) =>
       [

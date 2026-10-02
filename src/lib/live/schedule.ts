@@ -4,15 +4,15 @@
  * Game that is live, about to start, or finished without being tracked.
  */
 
-import { and, eq, inArray, notInArray } from 'drizzle-orm'
-import { resolve } from './identity'
+import { and, eq, inArray, notInArray, sql } from 'drizzle-orm'
+import { chunk, resolve } from './identity'
 import { WARMUP_MINUTES } from './pacing'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { CloudflareEnv } from '@/lib/db'
 import type { League, ScheduledGame } from '@/lib/model/types'
 import { ACTIVE_LEAGUES, sourceFor } from '@/lib/sources'
 import { sportsDayOf } from '@/lib/model/sportsDay'
-import { games } from '@/lib/db/schema'
+import { games, teams } from '@/lib/db/schema'
 import { dbFromD1 } from '@/lib/db'
 
 /** Should a LiveGame be polling this Game right now? */
@@ -123,6 +123,31 @@ async function syncLeague(
         ]
       : [db.insert(games).values(row).onConflictDoNothing()]
   })
+  // Keep each Team's name and logo current between nightly roster syncs.
+  const scheduledTeams = [
+    ...new Map(
+      scheduled.flatMap((g) => [g.away, g.home]).map((t) => [t.sourceId, t]),
+    ).values(),
+  ]
+  for (const part of chunk(scheduledTeams, 20)) {
+    writes.push(
+      db
+        .insert(teams)
+        .values(
+          part.map((t) => ({
+            id: teamIds.get(t.sourceId)!,
+            league,
+            name: t.name,
+            abbreviation: t.abbreviation,
+            logoUrl: t.logoUrl,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: teams.id,
+          set: { logoUrl: sql`excluded.logo_url` },
+        }),
+    )
+  }
   const [first, ...rest] = writes
   await db.batch([first, ...rest])
 
@@ -141,11 +166,13 @@ async function syncLeague(
         awayTeam: {
           id: teamIds.get(g.away.sourceId)!,
           abbreviation: g.away.abbreviation,
+          logoUrl: g.away.logoUrl,
           name: g.away.name,
         },
         homeTeam: {
           id: teamIds.get(g.home.sourceId)!,
           abbreviation: g.home.abbreviation,
+          logoUrl: g.home.logoUrl,
           name: g.home.name,
         },
       })

@@ -3,6 +3,8 @@ import { Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { FollowButton } from './FollowButton'
 import type { FollowEntry } from '@/lib/viewer/server'
+import { LeagueLogo } from '@/components/brand/LeagueLogo'
+import { TeamLogo } from '@/components/brand/TeamMark'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { LEAGUES } from '@/lib/model/types'
 import { searchFollowables } from '@/lib/viewer/server'
@@ -35,7 +37,7 @@ export function FollowsScreen() {
                 key={league}
                 className="flex items-center gap-2 rounded-full border border-border py-1 pr-1 pl-3"
               >
-                <span className="text-sm uppercase">{league}</span>
+                <LeagueLogo league={league} size={24} />
                 <FollowButton follow={{ kind: 'league', league }} />
               </div>
             ))}
@@ -91,16 +93,16 @@ export function FollowsScreen() {
   )
 }
 
-function EntryRow({
-  entry,
-}: {
-  entry: Pick<FollowEntry, 'follow' | 'label' | 'detail' | 'league'>
-}) {
+function EntryRow({ entry }: { entry: FollowEntry }) {
   return (
     <li className="flex items-center gap-3 px-4 py-2.5">
-      <span className="rounded bg-background px-1.5 py-0.5 text-[11px] font-medium uppercase text-muted">
-        {entry.league}
-      </span>
+      <LeagueLogo league={entry.league} size={18} />
+      {entry.logoUrl && (
+        <TeamLogo
+          team={{ abbreviation: entry.label, logoUrl: entry.logoUrl }}
+          size={24}
+        />
+      )}
       <span className="min-w-0 flex-1">
         <span className="block truncate">{entry.label}</span>
         {entry.detail && (

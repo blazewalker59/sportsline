@@ -130,6 +130,7 @@ function team(t: MlbTeam): SourceTeam {
     sourceId: String(t.id),
     name: t.name,
     abbreviation: t.abbreviation ?? t.teamName ?? t.name,
+    logoUrl: `https://www.mlbstatic.com/team-logos/team-cap-on-dark/${t.id}.svg`,
   }
 }
 

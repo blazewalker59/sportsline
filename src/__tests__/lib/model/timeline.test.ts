@@ -17,8 +17,8 @@ function item(overrides: Partial<TimelineItem> = {}): TimelineItem {
     occurredAt: '2026-10-01T23:00:00Z',
     segmentLabel: 'Top 1st',
     score: { away: 0, home: 0 },
-    awayTeam: { id: 'tm_phi', abbreviation: 'PHI' },
-    homeTeam: { id: 'tm_atl', abbreviation: 'ATL' },
+    awayTeam: { id: 'tm_phi', abbreviation: 'PHI', logoUrl: null },
+    homeTeam: { id: 'tm_atl', abbreviation: 'ATL', logoUrl: null },
     description: 'Groundout',
     playType: 'field_out',
     significance: 'routine',
@@ -42,9 +42,14 @@ describe('matchesFilter', () => {
       }),
     ).toBe(true)
     expect(
-      matchesFilter(item({ homeTeam: { id: 'tm_nyy', abbreviation: 'NYY' } }), {
-        follows,
-      }),
+      matchesFilter(
+        item({
+          homeTeam: { id: 'tm_nyy', abbreviation: 'NYY', logoUrl: null },
+        }),
+        {
+          follows,
+        },
+      ),
     ).toBe(false)
   })
 

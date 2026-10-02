@@ -63,6 +63,7 @@ async function syncLeagueRoster(
             league,
             name: t.name,
             abbreviation: t.abbreviation,
+            logoUrl: t.logoUrl,
           })),
         )
         .onConflictDoUpdate({
@@ -70,6 +71,7 @@ async function syncLeagueRoster(
           set: {
             name: sql`excluded.name`,
             abbreviation: sql`excluded.abbreviation`,
+            logoUrl: sql`excluded.logo_url`,
           },
         }),
     )

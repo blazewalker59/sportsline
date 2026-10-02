@@ -92,6 +92,7 @@ export async function resolve(
             league,
             name: ref.name,
             abbreviation: 'abbreviation' in ref ? ref.abbreviation : ref.name,
+            logoUrl: 'logoUrl' in ref ? ref.logoUrl : null,
           })),
         ),
       )

@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import type { ZonePitch } from '@/components/mlb/StrikeZone'
 import type { PlayDetail } from '@/lib/games/server'
+import { LeagueLogo } from '@/components/brand/LeagueLogo'
+import { TeamMark } from '@/components/brand/TeamMark'
 import { FollowButton } from '@/components/follows/FollowButton'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Bases } from '@/components/mlb/Bases'
@@ -175,12 +177,11 @@ function Play({ detail }: { detail: PlayDetail }) {
         params={{ gameId: game.id }}
         className="flex items-center justify-between rounded-xl border border-border bg-surface px-4 py-2.5 text-sm"
       >
-        <span>
-          <span className="mr-2 text-xs uppercase text-muted">
-            {item.league}
-          </span>
-          {game.awayTeam.abbreviation} {item.score.away} – {item.score.home}{' '}
-          {game.homeTeam.abbreviation}
+        <span className="flex items-center gap-2 tabular-nums">
+          <LeagueLogo league={item.league} size={18} />
+          <TeamMark team={game.awayTeam} />
+          {item.score.away} – {item.score.home}
+          <TeamMark team={game.homeTeam} />
         </span>
         <span className="text-xs text-muted">{item.segmentLabel} · Game →</span>
       </Link>

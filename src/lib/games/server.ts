@@ -52,11 +52,7 @@ async function loadGame(db: Database, gameId: string) {
 }
 
 function asItem(row: ItemRow, game: GameSummary): TimelineItem {
-  return toTimelineItem(
-    row,
-    { id: game.awayTeam.id, abbreviation: game.awayTeam.abbreviation },
-    { id: game.homeTeam.id, abbreviation: game.homeTeam.abbreviation },
-  )
+  return toTimelineItem(row, game.awayTeam, game.homeTeam)
 }
 
 const ID = z.string().min(1).max(200)

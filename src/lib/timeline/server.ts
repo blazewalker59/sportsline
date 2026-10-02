@@ -89,8 +89,16 @@ export const getTimeline = createServerFn({ method: 'GET' })
     const rows = await db
       .select({
         item: t,
-        away: { id: away.id, abbreviation: away.abbreviation },
-        home: { id: home.id, abbreviation: home.abbreviation },
+        away: {
+          id: away.id,
+          abbreviation: away.abbreviation,
+          logoUrl: away.logoUrl,
+        },
+        home: {
+          id: home.id,
+          abbreviation: home.abbreviation,
+          logoUrl: home.logoUrl,
+        },
       })
       .from(t)
       .innerJoin(away, eq(away.id, t.awayTeamId))
