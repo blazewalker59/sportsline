@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouter } from '@tanstack/react-router'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { timeAgo, useNow } from './format'
 import { DayButton } from './DayButton'
 import { DayStrip } from './DayStrip'
@@ -148,6 +148,18 @@ function Timeline({
   const [dayOpen, setDayOpen] = useState(false)
   useEffect(() => setDayOpen(false), [sportsDay])
   const cardsHidden = useHideOnScroll()
+  const panelHidden = cardsHidden && !dayOpen
+  // The spacer under the fixed top section follows its full height.
+  const topRef = useRef<HTMLDivElement>(null)
+  const [topHeight, setTopHeight] = useState(0)
+  useEffect(() => {
+    const el = topRef.current
+    if (!el) return
+    const observer = new ResizeObserver(() => setTopHeight(el.offsetHeight))
+    observer.observe(el)
+    setTopHeight(el.offsetHeight)
+    return () => observer.disconnect()
+  }, [])
   const navigate = useNavigate()
   const router = useRouter()
   const closePlay = useCallback(() => {
@@ -210,54 +222,79 @@ function Timeline({
 
   return (
     <div className="mx-auto max-w-xl px-4 pb-16">
-      {/* Pinned: everything above the conversation stays put while it scrolls. */}
+      {/*
+        Pinned over the content rather than in its flow: hiding the score
+        cards slides them up behind the header without changing the page's
+        height, so scrolling never feeds back into the hide/show.
+      */}
       <div
-        className="sticky top-0 z-10 -mx-4 mb-3 border-b border-border bg-background/95 px-4 pb-2 backdrop-blur"
+        ref={topRef}
+        className="pointer-events-none fixed inset-x-0 top-0 z-10"
         style={{ viewTransitionName: 'pinned' }}
       >
-        <AppHeader
-          pinned={false}
-          title={
-            <DayButton
-              sportsDay={sportsDay}
-              today={today}
-              open={dayOpen}
-              onToggle={() => setDayOpen((v) => !v)}
-            />
-          }
-          right={null}
-        >
-          <ConnectionDot connection={timeline.connection} />
-        </AppHeader>
-        <Collapse open={dayOpen}>
-          <DayStrip
-            sportsDay={sportsDay}
-            today={today}
-            onPick={() => setDayOpen(false)}
-          />
-        </Collapse>
-        {/* Score cards tuck away while reading down and return on the way up. */}
-        <Collapse open={dayOpen || !cardsHidden}>
-          <ScopeBar
-            scope={scope}
-            canFollow={viewerFollows.length > 0}
-            highlights={highlights}
-            onHighlights={(value) =>
-              withViewTransition(() => setHighlights(value))
-            }
-          />
-          <div className={cn('transition-opacity', dimmed && 'opacity-50')}>
-            <GameStrip
-              games={(dimmed && timeline.previousGames.length
-                ? timeline.previousGames
-                : timeline.games
-              ).filter((g) => inScope(g, scope, viewerFollows, timeline.items))}
-              selected={gameId ?? undefined}
-              onBox={() => setBoxOpen(true)}
-            />
+        <div className="mx-auto max-w-xl">
+          <div
+            className={cn(
+              'pointer-events-auto relative z-20 bg-background/95 px-4 backdrop-blur transition-[border-color]',
+              'border-b',
+              panelHidden ? 'border-border' : 'border-transparent',
+            )}
+          >
+            <AppHeader
+              pinned={false}
+              title={
+                <DayButton
+                  sportsDay={sportsDay}
+                  today={today}
+                  open={dayOpen}
+                  onToggle={() => setDayOpen((v) => !v)}
+                />
+              }
+              right={
+                <HighlightsButton
+                  on={highlights}
+                  onChange={(value) =>
+                    withViewTransition(() => setHighlights(value))
+                  }
+                />
+              }
+            >
+              <ConnectionDot connection={timeline.connection} />
+            </AppHeader>
+            <Collapse open={dayOpen}>
+              <DayStrip
+                sportsDay={sportsDay}
+                today={today}
+                onPick={() => setDayOpen(false)}
+              />
+            </Collapse>
           </div>
-        </Collapse>
+          {/* Scope chips and score cards tuck away while reading down, return on the way up. */}
+          <div
+            className={cn(
+              'pointer-events-auto relative z-10 border-b border-border bg-background/95 px-4 pb-2 backdrop-blur transition-transform duration-300 ease-out',
+              panelHidden && '-translate-y-full',
+            )}
+            inert={panelHidden}
+            aria-hidden={panelHidden}
+          >
+            <ScopeBar scope={scope} canFollow={viewerFollows.length > 0} />
+            <div className={cn('transition-opacity', dimmed && 'opacity-50')}>
+              <GameStrip
+                games={(dimmed && timeline.previousGames.length
+                  ? timeline.previousGames
+                  : timeline.games
+                ).filter((g) =>
+                  inScope(g, scope, viewerFollows, timeline.items),
+                )}
+                selected={gameId ?? undefined}
+                onBox={() => setBoxOpen(true)}
+              />
+            </div>
+          </div>
+        </div>
       </div>
+      <div aria-hidden="true" className="mb-3" style={{ height: topHeight }} />
 
       {viewer && !followed?.length && !gameId && (
         <Link
@@ -480,6 +517,40 @@ function TypingRow({
         <TypingDots align={right ? 'right' : 'left'} />
       </div>
     </Link>
+  )
+}
+
+/** Highlights on/off (Scoring and Notable only): a labeled pill in the header. */
+function HighlightsButton({
+  on,
+  onChange,
+}: {
+  on: boolean
+  onChange: (on: boolean) => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!on)}
+      aria-pressed={on}
+      className={cn(
+        'flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold transition-colors',
+        on
+          ? 'bg-accent text-background'
+          : 'bg-notice text-muted hover:text-foreground',
+      )}
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        aria-hidden="true"
+      >
+        <path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z" />
+      </svg>
+      Highlights
+    </button>
   )
 }
 

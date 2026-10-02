@@ -1,8 +1,15 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+/** Drag further than this (px), or flick faster than FLICK, to dismiss. */
+const DISMISS_PX = 110
+const FLICK_PX_PER_MS = 0.6
+const EXIT_MS = 220
 
 /**
  * A bottom sheet over the Timeline (box score, Play Detail), so drilling
  * in never leaves the conversation: closing lands exactly where you were.
+ * Swipe it down (from the handle or header, or from the content when it is
+ * scrolled to the top) to dismiss, like a native sheet.
  */
 export function Sheet({
   title,
@@ -14,9 +21,23 @@ export function Sheet({
   children: React.ReactNode
 }) {
   const close = useRef<HTMLButtonElement>(null)
+  const body = useRef<HTMLDivElement>(null)
+  const [drag, setDrag] = useState(0)
+  const [leaving, setLeaving] = useState(false)
+  const gesture = useRef<{
+    startY: number
+    startT: number
+    active: boolean
+  } | null>(null)
+
+  const dismiss = useCallback(() => {
+    setLeaving(true)
+    setTimeout(onClose, EXIT_MS)
+  }, [onClose])
+
   useEffect(() => {
     close.current?.focus({ preventScroll: true })
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && dismiss()
     window.addEventListener('keydown', onKey)
     const overflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -24,7 +45,37 @@ export function Sheet({
       window.removeEventListener('keydown', onKey)
       document.body.style.overflow = overflow
     }
-  }, [onClose])
+  }, [dismiss])
+
+  const onTouchStart = (e: React.TouchEvent, fromContent: boolean) => {
+    // From the content, only when it can't scroll up any further.
+    if (fromContent && (body.current?.scrollTop ?? 0) > 0) return
+    gesture.current = {
+      startY: e.touches[0].clientY,
+      startT: performance.now(),
+      active: true,
+    }
+  }
+  const onTouchMove = (e: React.TouchEvent) => {
+    const g = gesture.current
+    if (!g?.active) return
+    const dy = e.touches[0].clientY - g.startY
+    if (dy <= 0) {
+      setDrag(0)
+      return
+    }
+    setDrag(dy)
+  }
+  const onTouchEnd = () => {
+    const g = gesture.current
+    gesture.current = null
+    if (!g?.active) return
+    const velocity = drag / Math.max(1, performance.now() - g.startT)
+    if (drag > DISMISS_PX || velocity > FLICK_PX_PER_MS) dismiss()
+    else setDrag(0)
+  }
+
+  const dragging = gesture.current?.active && drag > 0
   return (
     <div
       className="fixed inset-0 z-30 flex flex-col justify-end"
@@ -35,22 +86,49 @@ export function Sheet({
       <button
         type="button"
         aria-label={`Close ${title.toLowerCase()}`}
-        onClick={onClose}
-        className="animate-in fade-in absolute inset-0 bg-black/40 duration-200"
+        onClick={dismiss}
+        className="animate-in fade-in absolute inset-0 bg-black/40 transition-opacity duration-200"
+        style={{ opacity: leaving ? 0 : Math.max(0.2, 1 - drag / 400) }}
       />
-      <div className="animate-in slide-in-from-bottom relative mx-auto flex max-h-[calc(100dvh-max(env(safe-area-inset-top),1.5rem))] w-full max-w-xl flex-col rounded-t-3xl bg-background pb-[env(safe-area-inset-bottom)] shadow-2xl duration-300">
-        <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-          <span className="flex-1 text-base font-bold">{title}</span>
-          <button
-            ref={close}
-            type="button"
-            onClick={onClose}
-            className="min-h-11 rounded-full bg-notice px-4 text-[13px] font-semibold"
-          >
-            Done
-          </button>
+      <div
+        className="animate-in slide-in-from-bottom relative mx-auto flex max-h-[calc(100dvh-max(env(safe-area-inset-top),1.5rem))] w-full max-w-xl flex-col rounded-t-3xl bg-background pb-[env(safe-area-inset-bottom)] shadow-2xl duration-300"
+        style={{
+          transform: leaving ? 'translateY(100%)' : `translateY(${drag}px)`,
+          transition: dragging
+            ? 'none'
+            : `transform ${EXIT_MS}ms cubic-bezier(0.2, 0.8, 0.2, 1)`,
+        }}
+      >
+        <div
+          className="touch-none"
+          onTouchStart={(e) => onTouchStart(e, false)}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          onTouchCancel={onTouchEnd}
+        >
+          <div className="flex justify-center pt-2 pb-1" aria-hidden="true">
+            <span className="h-1.5 w-10 rounded-full bg-muted/40" />
+          </div>
+          <div className="flex items-center gap-3 border-b border-border px-4 pb-3">
+            <span className="flex-1 text-base font-bold">{title}</span>
+            <button
+              ref={close}
+              type="button"
+              onClick={dismiss}
+              className="min-h-11 rounded-full bg-notice px-4 text-[13px] font-semibold"
+            >
+              Done
+            </button>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 overflow-y-auto overscroll-contain px-4 py-4 [&>*]:shrink-0">
+        <div
+          ref={body}
+          className="flex flex-col gap-4 overflow-y-auto overscroll-contain px-4 py-4 [&>*]:shrink-0"
+          onTouchStart={(e) => onTouchStart(e, true)}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          onTouchCancel={onTouchEnd}
+        >
           {children}
         </div>
       </div>
