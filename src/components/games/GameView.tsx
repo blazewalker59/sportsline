@@ -111,7 +111,7 @@ export function BoxSheet({
         onClick={onClose}
         className="absolute inset-0 bg-black/40"
       />
-      <div className="animate-in slide-in-from-bottom relative mx-auto flex max-h-[85dvh] w-full max-w-xl flex-col rounded-t-3xl bg-background pb-[env(safe-area-inset-bottom)] shadow-2xl duration-300">
+      <div className="animate-in slide-in-from-bottom relative mx-auto flex max-h-[calc(100dvh-max(env(safe-area-inset-top),1.5rem))] w-full max-w-xl flex-col rounded-t-3xl bg-background pb-[env(safe-area-inset-bottom)] shadow-2xl duration-300">
         <div className="flex items-center gap-3 border-b border-border px-4 py-3">
           <span className="flex-1 text-base font-bold">Box score</span>
           <button
@@ -140,58 +140,68 @@ export function BoxSheet({
   )
 }
 
+/**
+ * Score by segment. With 9+ innings it is wider than a phone, so the team
+ * column and the totals stay pinned and only the segments scroll.
+ */
 function Linescore({ box, game }: { box: GameBox; game: GameSummary }) {
   const ls = box.linescore
   if (ls.segments.length === 0) return null
+  const pinnedLeft = 'sticky left-0 z-[1] bg-surface'
+  const pinnedRight = 'sticky right-0 z-[1] bg-surface'
   const row = (
     team: GameSummary['awayTeam'],
     runs: Array<number | null>,
     totals: Array<number>,
   ) => (
     <tr>
-      <th className="py-1 pr-3 text-left font-semibold">
-        <TeamMark team={team} size={16} />
+      <th
+        className={cn(pinnedLeft, 'py-1.5 pr-2 pl-3 text-left font-semibold')}
+      >
+        <TeamMark team={team} size={18} />
       </th>
       {runs.map((r, i) => (
-        <td key={i} className="px-1.5 text-center text-muted">
+        <td key={i} className="min-w-6 px-1 text-center text-muted">
           {r ?? '–'}
         </td>
       ))}
-      {totals.map((t, i) => (
-        <td
-          key={`t${i}`}
-          className={cn(
-            'px-1.5 text-center font-semibold',
-            i === 0 && 'border-l border-border pl-2',
-          )}
-        >
-          {t}
-        </td>
-      ))}
+      <td className={cn(pinnedRight, 'pr-3 pl-2')}>
+        <span className="flex gap-3 border-l border-border pl-2.5">
+          {totals.map((t, i) => (
+            <span
+              key={i}
+              className={cn(
+                'min-w-5 text-center',
+                i === 0 ? 'font-extrabold' : 'font-semibold',
+              )}
+            >
+              {t}
+            </span>
+          ))}
+        </span>
+      </td>
     </tr>
   )
   return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-surface px-3 py-2">
-      <table className="w-full text-xs tabular-nums">
+    <div className="overflow-x-auto rounded-xl border border-border bg-surface py-1.5">
+      <table className="w-full border-separate border-spacing-0 text-[13px] tabular-nums">
         <thead>
-          <tr className="text-muted">
-            <th />
-            {ls.segments.map((s) => (
-              <th key={s} className="px-1.5 font-normal">
-                {s}
+          <tr className="text-[11px] text-muted">
+            <th className={pinnedLeft} />
+            {ls.segments.map((seg) => (
+              <th key={seg} className="min-w-6 px-1 font-normal">
+                {seg}
               </th>
             ))}
-            {ls.totalColumns.map((c, i) => (
-              <th
-                key={c}
-                className={cn(
-                  'px-1.5 font-normal',
-                  i === 0 && 'border-l border-border pl-2',
-                )}
-              >
-                {c}
-              </th>
-            ))}
+            <th className={cn(pinnedRight, 'pr-3 pl-2 font-normal')}>
+              <span className="flex gap-3 border-l border-border pl-2.5">
+                {ls.totalColumns.map((c) => (
+                  <span key={c} className="min-w-5 text-center">
+                    {c}
+                  </span>
+                ))}
+              </span>
+            </th>
           </tr>
         </thead>
         <tbody>

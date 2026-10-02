@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { startTime } from './format'
 import type { GameSummary } from '@/lib/model/timeline'
+import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { cn } from '@/lib/utils'
 
@@ -55,7 +56,7 @@ function GameCard({
       aria-pressed={selected}
       aria-label={`${game.awayTeam.abbreviation} ${game.score.away}, ${game.homeTeam.abbreviation} ${game.score.home}, ${status(game)}${selected ? '. Showing only this game; tap to show all' : ''}`}
       className={cn(
-        'relative flex min-h-14 items-center gap-3 rounded-2xl border bg-surface py-1.5 pr-3 pl-2.5 transition-colors',
+        'relative flex w-[132px] flex-col gap-1 rounded-2xl border bg-surface px-2.5 py-2 transition-colors',
         selected
           ? 'border-accent bg-accent-soft'
           : live
@@ -63,33 +64,35 @@ function GameCard({
             : 'border-border',
       )}
     >
-      <span className="flex flex-col gap-0.5">
-        {(['away', 'home'] as const).map((side) => (
+      <span className="flex items-center gap-1.5">
+        <LeagueLogo league={game.league} size={16} />
+        <span
+          className={cn(
+            'truncate text-[11px] leading-tight font-semibold',
+            live ? 'text-live' : 'text-muted',
+          )}
+        >
+          {status(game)}
+        </span>
+      </span>
+      {(['away', 'home'] as const).map((side) => {
+        const team = side === 'away' ? game.awayTeam : game.homeTeam
+        return (
           <span
             key={side}
             className={cn(
-              'flex items-center gap-1.5 text-[15px] leading-5 tabular-nums',
+              'flex items-center gap-1.5 text-[15px] leading-6 tabular-nums',
               leader === side ? 'font-bold' : 'text-foreground/75',
             )}
           >
-            <TeamLogo
-              team={side === 'away' ? game.awayTeam : game.homeTeam}
-              size={18}
-            />
-            <span className="w-5 text-right">
-              {started ? game.score[side] : ''}
+            <TeamLogo team={team} size={24} />
+            <span className="flex-1 text-[13px] font-semibold">
+              {team.abbreviation}
             </span>
+            <span>{started ? game.score[side] : ''}</span>
           </span>
-        ))}
-      </span>
-      <span
-        className={cn(
-          'max-w-16 text-[11px] leading-tight font-semibold',
-          live ? 'text-live' : 'text-muted',
-        )}
-      >
-        {status(game)}
-      </span>
+        )
+      })}
       {selected && (
         <span
           aria-hidden="true"

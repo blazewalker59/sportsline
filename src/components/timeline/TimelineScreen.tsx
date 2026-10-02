@@ -88,8 +88,10 @@ function Timeline({
   // The divider marks where the Viewer stopped last time, so it is fixed at
   // load while the stored marker keeps moving.
   const [readAt] = useState(() => data?.readAt ?? null)
-  const [includeRoutine, setIncludeRoutine] = useState(false)
-  const timeline = useLiveTimeline(follows, includeRoutine, sportsDay)
+  // Highlights = Scoring and Notable Plays only. It starts on when the
+  // Viewer sees every League (the default Follows), off for their own Follows.
+  const [highlights, setHighlights] = useState(() => !followed?.length)
+  const timeline = useLiveTimeline(follows, !highlights, sportsDay)
   // Only today's Timeline moves the Read Marker; browsing history must not.
   useReadMarkerWriter(timeline.items, viewer !== null && isToday && !gameId)
   const backfill = usePastDay(sportsDay, isToday, timeline.reload)
@@ -101,10 +103,15 @@ function Timeline({
   // Selecting a Game only filters this same feed (newest first, same
   // bubbles). Until the Game's full history loads, filter what is here.
   const items = useMemo(() => {
-    if (!gameId) return timeline.items
-    if (game.data) return [...game.data.items].reverse()
-    return timeline.items.filter((i) => i.gameId === gameId)
-  }, [gameId, game.data, timeline.items])
+    const source = !gameId
+      ? timeline.items
+      : game.data
+        ? [...game.data.items].reverse()
+        : timeline.items.filter((i) => i.gameId === gameId)
+    return highlights
+      ? source.filter((i) => i.kind !== 'play' || i.significance !== 'routine')
+      : source
+  }, [gameId, game.data, timeline.items, highlights])
   const selectedGame =
     (gameId &&
       (game.data?.game ?? timeline.games.find((g) => g.id === gameId))) ||
@@ -134,28 +141,12 @@ function Timeline({
         className="sticky top-0 z-10 -mx-4 mb-3 border-b border-border bg-background/95 px-4 pb-3 backdrop-blur"
         style={{ viewTransitionName: 'pinned' }}
       >
-        <AppHeader
-          pinned={false}
-          right={
-            <button
-              type="button"
-              onClick={() => setIncludeRoutine((v) => !v)}
-              aria-pressed={includeRoutine}
-              className={cn(
-                'min-h-11 rounded-full px-4 text-[13px] font-semibold transition-colors',
-                includeRoutine
-                  ? 'bg-foreground text-background'
-                  : 'bg-accent-soft text-accent',
-              )}
-            >
-              All plays
-            </button>
-          }
-        >
+        <AppHeader pinned={false}>
           <ConnectionDot connection={timeline.connection} />
         </AppHeader>
         <DayBar sportsDay={sportsDay} today={today} />
         <GameStrip games={timeline.games} selected={gameId ?? undefined} />
+        <PlaysToggle highlights={highlights} onChange={setHighlights} />
         <GameFocusBar game={selectedGame} onBox={() => setBoxOpen(true)} />
       </div>
 
@@ -364,6 +355,42 @@ function TypingRow({
         <TypingDots align={right ? 'right' : 'left'} />
       </div>
     </Link>
+  )
+}
+
+/** All plays vs Highlights (Scoring and Notable only), under the score cards. */
+function PlaysToggle({
+  highlights,
+  onChange,
+}: {
+  highlights: boolean
+  onChange: (highlights: boolean) => void
+}) {
+  const option = (value: boolean, label: string) => (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={highlights === value}
+      onClick={() => onChange(value)}
+      className={cn(
+        'min-h-9 flex-1 rounded-full text-[13px] font-semibold transition-colors',
+        highlights === value
+          ? 'bg-surface text-foreground shadow-sm'
+          : 'text-muted',
+      )}
+    >
+      {label}
+    </button>
+  )
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Which plays to show"
+      className="mt-2 flex gap-1 rounded-full bg-notice p-1"
+    >
+      {option(false, 'All plays')}
+      {option(true, 'Highlights')}
+    </div>
   )
 }
 
