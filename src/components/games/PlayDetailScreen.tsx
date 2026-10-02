@@ -4,6 +4,7 @@ import type { ZonePitch } from '@/components/mlb/StrikeZone'
 import type { PlayDetail } from '@/lib/games/server'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamMark } from '@/components/brand/TeamMark'
+import { PlayText } from '@/components/chat/PlayText'
 import { FollowButton } from '@/components/follows/FollowButton'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Bases } from '@/components/mlb/Bases'
@@ -228,9 +229,7 @@ function Play({ detail }: { detail: PlayDetail }) {
             item.status === 'overturned' && 'line-through',
           )}
         >
-          {overturn
-            ? item.description.replace(/^Overturned: /, '')
-            : item.description}
+          <PlayText item={item} />
         </h1>
         <p className="mt-1 text-xs text-muted">
           {new Date(item.occurredAt).toLocaleTimeString([], {

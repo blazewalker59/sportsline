@@ -6,12 +6,14 @@
 
 import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
+import { PlayText } from './PlayText'
 import type { Bubble } from '@/lib/timeline/chat'
 import type { TeamRef, TimelineItem } from '@/lib/model/timeline'
 import type { League } from '@/lib/model/types'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { timeAgo } from '@/components/timeline/format'
+import { segmentDescription } from '@/lib/timeline/format'
 import {
   bubbleTints,
   notableLead,
@@ -145,9 +147,7 @@ export function PlayBubble({
         <span
           className={cn('text-[15px] leading-snug', struck && 'line-through')}
         >
-          {item.kind === 'overturn'
-            ? item.description.replace(/^Overturned: /, '')
-            : item.description}
+          <PlayText item={item} onFill={Boolean(fill)} />
         </span>
         {!compact && (
           <span className="flex items-center gap-2 text-sm font-bold tabular-nums">
@@ -182,7 +182,7 @@ export function PlayBubble({
       }
     >
       {lead && <span className="mr-1 font-bold text-notable">{lead}.</span>}
-      {item.description}
+      <PlayText item={item} />
       {item.revisedAt && item.status === 'active' && (
         <span className="ml-1.5 align-middle text-[11px] font-semibold text-muted">
           · updated
@@ -224,7 +224,15 @@ export function FoldBubble({
       <span className="shrink-0 font-semibold text-foreground">
         +{items.length} plays
       </span>
-      <span className="truncate">{items[0].description}</span>
+      <span className="truncate">
+        {segmentDescription(
+          items[0].description,
+          items[0].league,
+          items[0].players,
+        )
+          .map((seg) => seg.text)
+          .join('')}
+      </span>
     </button>
   )
 }
