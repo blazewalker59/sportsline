@@ -60,6 +60,19 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
     if (alarm === null) await this.ctx.storage.setAlarm(Date.now())
   }
 
+  /**
+   * Poll the Source once more, outside the alarm loop: e.g. to fill in the
+   * box score of a Game that finished before box scores were stored.
+   * False if this LiveGame never tracked the Game.
+   */
+  async refresh(): Promise<boolean> {
+    const game = await this.ctx.storage.get<TrackRequest>(GAME_KEY)
+    if (!game) return false
+    const snapshot = await sourceFor(game.league).snapshot(game.sourceGameId)
+    await this.apply(game, snapshot)
+    return true
+  }
+
   async alarm(): Promise<void> {
     const game = await this.ctx.storage.get<TrackRequest>(GAME_KEY)
     if (!game) return

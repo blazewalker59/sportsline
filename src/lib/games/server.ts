@@ -18,7 +18,7 @@ import type { GameBox } from '@/lib/model/types'
 import { toGameSummary, toTimelineItem } from '@/lib/live/rows'
 import { formatLine, mlbLinesAsOf } from '@/lib/leagues/mlb/stats'
 import { games, teams, timelineItems } from '@/lib/db/schema'
-import { getDb } from '@/lib/db'
+import { getCloudflareEnv, getDb } from '@/lib/db'
 
 export interface GameDetail {
   game: GameSummary
@@ -61,8 +61,19 @@ export const getGameDetail = createServerFn({ method: 'GET' })
   .validator((data: { gameId: string }) => z.object({ gameId: ID }).parse(data))
   .handler(async ({ data }): Promise<GameDetail | null> => {
     const db = getDb()
-    const game = await loadGame(db, data.gameId)
+    let game = await loadGame(db, data.gameId)
     if (!game) return null
+    // A finished Game with no box score (it ended before box scores were
+    // stored, or its Source omitted it): ask its LiveGame to read it once.
+    if (!game.box && game.summary.status === 'final') {
+      const env = getCloudflareEnv()
+      const refreshed = await env.LIVE_GAME.get(
+        env.LIVE_GAME.idFromName(data.gameId),
+      )
+        .refresh()
+        .catch(() => false)
+      if (refreshed) game = (await loadGame(db, data.gameId)) ?? game
+    }
     const rows = await db
       .select()
       .from(timelineItems)
