@@ -11,9 +11,10 @@
 
 import { DurableObject } from 'cloudflare:workers'
 import { nextMinute } from './pacing'
-import { syncRosters } from './roster'
+import { syncRoster } from './roster'
 import { syncSchedules } from './schedule'
 import type { CloudflareEnv } from '@/lib/db'
+import { ACTIVE_LEAGUES } from '@/lib/sources'
 
 const ROSTER_DUE_KEY = 'rosterDueAt'
 /** Rosters refresh daily; the first run after a deploy syncs straight away. */
@@ -33,14 +34,15 @@ export class Scheduler extends DurableObject<CloudflareEnv> {
     await this.ctx.storage.setAlarm(nextMinute(now))
     // Rosters first, so the schedule sync and LiveGames find Teams and
     // Players already named.
-    const rosterDueAt =
-      (await this.ctx.storage.get<number>(ROSTER_DUE_KEY)) ?? 0
-    if (now >= rosterDueAt) {
+    for (const league of ACTIVE_LEAGUES) {
+      const key = `${ROSTER_DUE_KEY}:${league}`
+      const dueAt = (await this.ctx.storage.get<number>(key)) ?? 0
+      if (now < dueAt) continue
       // Push the next attempt out first so a slow or failing sync is not
       // retried every minute; only a success waits a full day.
-      await this.ctx.storage.put(ROSTER_DUE_KEY, now + ROSTER_RETRY_MS)
-      if (await syncRosters(this.env, new Date(now))) {
-        await this.ctx.storage.put(ROSTER_DUE_KEY, now + ROSTER_EVERY_MS)
+      await this.ctx.storage.put(key, now + ROSTER_RETRY_MS)
+      if (await syncRoster(this.env, league, new Date(now))) {
+        await this.ctx.storage.put(key, now + ROSTER_EVERY_MS)
       }
     }
     await syncSchedules(this.env, new Date(now))

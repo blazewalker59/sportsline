@@ -81,6 +81,9 @@ function GameChip({ game }: { game: GameSummary }) {
       {live && game.league === 'mlb' && game.situation && (
         <MlbSituationLine detail={game.situation.detail as MlbSituation} />
       )}
+      {live && game.league === 'nfl' && game.situation && (
+        <NflSituationLine detail={game.situation.detail as NflSituation} />
+      )}
     </div>
   )
 }
@@ -103,6 +106,25 @@ function StatusLabel({ game }: { game: GameSummary }) {
     default:
       return <span>{startTime(game.startsAt)}</span>
   }
+}
+
+interface NflSituation {
+  downDistance?: string | null
+  possession?: string | null
+}
+
+function NflSituationLine({ detail }: { detail: NflSituation }) {
+  if (!detail.downDistance) return null
+  return (
+    <div className="mt-1.5 truncate text-[11px] text-muted">
+      {detail.possession && (
+        <span className="mr-1 font-semibold text-foreground/80">
+          {detail.possession}
+        </span>
+      )}
+      {detail.downDistance}
+    </div>
+  )
 }
 
 function MlbSituationLine({ detail }: { detail: MlbSituation }) {

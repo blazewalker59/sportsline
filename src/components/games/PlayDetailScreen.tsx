@@ -40,7 +40,48 @@ interface MlbDetail {
   } | null
 }
 
+interface NflDetail {
+  yards?: number | null
+  before?: string | null
+  after?: string | null
+  drive?: {
+    number: number
+    description: string | null
+    result: string | null
+  } | null
+}
+
+function NflContext({ detail }: { detail: NflDetail }) {
+  return (
+    <>
+      <section className="grid grid-cols-3 gap-2 text-center">
+        <Stat label="Before" value={detail.before ?? '–'} />
+        <Stat
+          label="Yards"
+          value={detail.yards != null ? String(detail.yards) : '–'}
+        />
+        <Stat label="After" value={detail.after ?? '–'} />
+      </section>
+      {detail.drive && (
+        <p className="rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-muted">
+          Drive {detail.drive.number}
+          {detail.drive.description && ` · ${detail.drive.description}`}
+          {detail.drive.result && ` · ${detail.drive.result}`}
+        </p>
+      )}
+    </>
+  )
+}
+
 const ROLE_LABELS: Record<string, string> = {
+  passer: 'Passer',
+  receiver: 'Receiver',
+  rusher: 'Rusher',
+  tackler: 'Tackler',
+  penalized: 'Penalized',
+  kicker: 'Kicker',
+  punter: 'Punter',
+  returner: 'Returner',
   batter: 'Batter',
   pitcher: 'Pitcher',
   runner: 'Runner',
@@ -140,6 +181,9 @@ function Play({ detail }: { detail: PlayDetail }) {
       </header>
 
       {mlb && <MlbContext detail={mlb} />}
+      {item.league === 'nfl' && item.detail && (
+        <NflContext detail={item.detail as NflDetail} />
+      )}
 
       {detail.players.length > 0 && (
         <section>

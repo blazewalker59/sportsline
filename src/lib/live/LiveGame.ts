@@ -24,7 +24,7 @@ import type {
   SourceItem,
 } from '@/lib/model/types'
 import { sourceFor } from '@/lib/sources'
-import { games, itemPlayers, timelineItems } from '@/lib/db/schema'
+import { games, itemPlayers, players, timelineItems } from '@/lib/db/schema'
 import { dbFromD1 } from '@/lib/db'
 
 const GAME_KEY = 'game'
@@ -124,6 +124,27 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
       ],
     )
     for (const [sourceId, id] of playerIds) this.knownPlayers.set(sourceId, id)
+    // Sources sometimes give only an id (`#123`); the roster sync knows the name.
+    const unnamed = touched.flatMap((i) =>
+      i.kind === 'play' ? i.involved.filter((p) => p.name.startsWith('#')) : [],
+    )
+    if (unnamed.length > 0) {
+      const ids = [
+        ...new Set(unnamed.flatMap((p) => playerIds.get(p.sourceId) ?? [])),
+      ]
+      const known = new Map(
+        (
+          await db
+            .select({ id: players.id, name: players.name })
+            .from(players)
+            .where(inArray(players.id, ids.slice(0, 90)))
+        ).map((r) => [r.id, r.name]),
+      )
+      for (const p of unnamed) {
+        const name = known.get(playerIds.get(p.sourceId) ?? '')
+        if (name && !name.startsWith('#')) p.name = name
+      }
+    }
     const box = storedBox(snapshot.box, this.knownPlayers)
 
     const upserts: Array<ItemRow> = []

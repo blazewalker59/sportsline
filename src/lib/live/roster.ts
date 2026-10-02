@@ -9,28 +9,26 @@ import { chunk, resolve } from './identity'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { CloudflareEnv } from '@/lib/db'
 import type { League } from '@/lib/model/types'
-import { ACTIVE_LEAGUES, sourceFor } from '@/lib/sources'
+import { sourceFor } from '@/lib/sources'
 import { players, teams } from '@/lib/db/schema'
 import { dbFromD1 } from '@/lib/db'
 
-/** Sync every League's roster; true only if every League succeeded. */
-export async function syncRosters(
+/** Sync one League's roster; false (and logged) if the Source failed. */
+export async function syncRoster(
   env: CloudflareEnv,
+  league: League,
   now: Date,
 ): Promise<boolean> {
-  const results = await Promise.allSettled(
-    ACTIVE_LEAGUES.map((league) =>
-      syncRoster(env, league, now.getUTCFullYear()),
-    ),
-  )
-  for (const r of results) {
-    if (r.status === 'rejected')
-      console.error('Roster sync failed', String(r.reason))
+  try {
+    await syncLeagueRoster(env, league, now.getUTCFullYear())
+    return true
+  } catch (error) {
+    console.error('Roster sync failed', { league, error: String(error) })
+    return false
   }
-  return results.every((r) => r.status === 'fulfilled')
 }
 
-async function syncRoster(
+async function syncLeagueRoster(
   env: CloudflareEnv,
   league: League,
   season: number,

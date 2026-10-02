@@ -5,10 +5,12 @@
  */
 
 import { mlbAdapter } from './mlb'
+import { nflAdapter } from './nfl'
 import type { League, SourceAdapter } from '@/lib/model/types'
 
 const ADAPTERS: Partial<Record<League, SourceAdapter>> = {
   mlb: mlbAdapter,
+  nfl: nflAdapter,
 }
 
 /** Leagues with a Source wired up. */

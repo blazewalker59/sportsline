@@ -20,6 +20,11 @@ interface MlbSituation {
   pitcher?: string | null
 }
 
+interface NflSituation {
+  downDistance?: string | null
+  possession?: string | null
+}
+
 export function GameDetailScreen({ gameId }: { gameId: string }) {
   const { data, isPending } = useLiveGame(gameId)
   const [tab, setTab] = useState<'plays' | 'box'>('plays')
@@ -92,6 +97,18 @@ function Scoreboard({ game }: { game: GameSummary }) {
         </p>
         <TeamColumn team={game.homeTeam} />
       </div>
+      {live &&
+        game.league === 'nfl' &&
+        (game.situation?.detail as NflSituation | undefined)?.downDistance && (
+          <p className="mt-4 border-t border-border pt-3 text-center text-xs text-muted">
+            {(game.situation?.detail as NflSituation).possession && (
+              <span className="mr-1.5 font-semibold text-foreground">
+                {(game.situation?.detail as NflSituation).possession} ball
+              </span>
+            )}
+            {(game.situation?.detail as NflSituation).downDistance}
+          </p>
+        )}
       {live && game.league === 'mlb' && situation && (
         <div className="mt-4 flex items-center justify-center gap-4 border-t border-border pt-3 text-xs text-muted">
           <Bases
