@@ -13,6 +13,11 @@ export function currentTheme(): Theme {
   return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
 }
 
+const THEME_COLORS: Record<Theme, string> = {
+  light: '#f3f4f8',
+  dark: '#0e1015',
+}
+
 export function setTheme(theme: Theme): void {
   try {
     localStorage.setItem(THEME_KEY, theme)
@@ -22,8 +27,14 @@ export function setTheme(theme: Theme): void {
   document.documentElement.classList.toggle('dark', theme === 'dark')
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute('content', theme === 'dark' ? '#0e1015' : '#f3f4f8')
+    ?.setAttribute('content', THEME_COLORS[theme])
 }
 
 /** Runs inline in <head> before first paint. */
 export const THEME_BOOT = `(function(){try{var t=localStorage.getItem('${THEME_KEY}');var d=t==='dark'||(t!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.classList.add('dark')}catch(e){}})();`
+
+/**
+ * Runs inline right after the head's meta tags: match theme-color (which
+ * colors the iOS status bar and browser chrome) to the theme already set.
+ */
+export const THEME_COLOR_BOOT = `(function(){try{var m=document.querySelector('meta[name="theme-color"]');if(m&&document.documentElement.classList.contains('dark'))m.setAttribute('content','${THEME_COLORS.dark}')}catch(e){}})();`

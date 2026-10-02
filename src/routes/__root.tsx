@@ -9,7 +9,7 @@ import { TanStackDevtools } from '@tanstack/react-devtools'
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
 import appCss from '../styles.css?url'
-import { THEME_BOOT } from '../lib/theme'
+import { THEME_BOOT, THEME_COLOR_BOOT } from '../lib/theme'
 
 import type { QueryClient } from '@tanstack/react-query'
 
@@ -30,7 +30,9 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       { name: 'apple-mobile-web-app-capable', content: 'yes' },
       {
         name: 'apple-mobile-web-app-status-bar-style',
-        content: 'black-translucent',
+        // Lay the installed app out below the status bar: anything drawn
+        // under it gets iOS's scroll-edge blur. The bar takes theme-color.
+        content: 'default',
       },
       { name: 'apple-mobile-web-app-title', content: 'Sportsline' },
       { name: 'mobile-web-app-capable', content: 'yes' },
@@ -60,6 +62,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
         <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: THEME_COLOR_BOOT }} />
       </head>
       <body>
         {children}
