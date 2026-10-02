@@ -1,0 +1,37 @@
+@import 'tailwindcss';
+
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: #0b0d12;
+  --surface: #141821;
+  --border: #232a36;
+  --foreground: #e8ebf1;
+  --muted: #8a93a6;
+  --scoring: #f5b83d;
+  --notable: #5b9cff;
+  --live: #ff4d5e;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-scoring: var(--scoring);
+  --color-notable: var(--notable);
+  --color-live: var(--live);
+}
+
+body {
+  @apply m-0 bg-background text-foreground antialiased;
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    sans-serif;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

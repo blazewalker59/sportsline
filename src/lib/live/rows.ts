@@ -1,0 +1,112 @@
+/**
+ * Conversions between the shared model, D1 rows and the TimelineItems
+ * Viewers receive.
+ */
+
+import type { games, teams, timelineItems } from '@/lib/db/schema'
+import type {
+  GameSummary,
+  TimelineItem,
+  TimelinePlayer,
+} from '@/lib/model/timeline'
+import type { League, SourceItem } from '@/lib/model/types'
+
+export type ItemRow = typeof timelineItems.$inferSelect
+type GameRow = typeof games.$inferSelect
+type TeamRow = typeof teams.$inferSelect
+
+/** The Game a LiveGame tracks, in Sportsline ids. */
+export interface TrackedGame {
+  gameId: string
+  league: League
+  sourceGameId: string
+  sportsDay: string
+  awayTeam: { id: string; abbreviation: string }
+  homeTeam: { id: string; abbreviation: string }
+}
+
+export function itemRow(
+  game: TrackedGame,
+  id: string,
+  item: SourceItem,
+  playerIds: ReadonlyMap<string, string>,
+): ItemRow {
+  const players: Array<TimelinePlayer> =
+    item.kind === 'play'
+      ? item.involved.flatMap((p) => {
+          const pid = playerIds.get(p.sourceId)
+          return pid ? [{ id: pid, name: p.name, role: p.role }] : []
+        })
+      : []
+  return {
+    id,
+    gameId: game.gameId,
+    itemKey: item.key,
+    league: game.league,
+    sportsDay: game.sportsDay,
+    awayTeamId: game.awayTeam.id,
+    homeTeamId: game.homeTeam.id,
+    kind: item.kind,
+    sequence: item.sequence,
+    occurredAt: item.occurredAt,
+    segmentLabel: item.segmentLabel,
+    awayScore: item.score.away,
+    homeScore: item.score.home,
+    description: item.description,
+    playType: item.kind === 'play' ? item.playType : null,
+    significance: item.kind === 'play' ? item.significance : null,
+    milestone: item.kind === 'milestone' ? item.milestone : null,
+    status: 'active',
+    revisedAt: null,
+    overturnOf: null,
+    players,
+    detail: item.kind === 'play' ? (item.detail ?? null) : null,
+  }
+}
+
+export function toTimelineItem(
+  row: ItemRow,
+  away: { id: string; abbreviation: string },
+  home: { id: string; abbreviation: string },
+): TimelineItem {
+  return {
+    id: row.id,
+    gameId: row.gameId,
+    league: row.league,
+    sportsDay: row.sportsDay,
+    kind: row.kind,
+    sequence: row.sequence,
+    occurredAt: row.occurredAt,
+    segmentLabel: row.segmentLabel,
+    score: { away: row.awayScore, home: row.homeScore },
+    awayTeam: away,
+    homeTeam: home,
+    description: row.description,
+    playType: row.playType,
+    significance: row.significance,
+    milestone: row.milestone,
+    status: row.status,
+    revisedAt: row.revisedAt,
+    overturnOf: row.overturnOf,
+    players: row.players,
+    detail: row.detail,
+  }
+}
+
+export function toGameSummary(
+  row: GameRow,
+  away: TeamRow,
+  home: TeamRow,
+): GameSummary {
+  return {
+    id: row.id,
+    league: row.league,
+    sportsDay: row.sportsDay,
+    status: row.status,
+    startsAt: row.startsAt,
+    awayTeam: { id: away.id, abbreviation: away.abbreviation, name: away.name },
+    homeTeam: { id: home.id, abbreviation: home.abbreviation, name: home.name },
+    score: { away: row.awayScore, home: row.homeScore },
+    situation: row.situation ?? null,
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "Sportsline",
+  "short_name": "Sportsline",
+  "description": "Live play-by-play across MLB, NBA, NFL and NHL",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#0b0d12",
+  "background_color": "#0b0d12",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }],
+  "categories": ["sports"]
+}
