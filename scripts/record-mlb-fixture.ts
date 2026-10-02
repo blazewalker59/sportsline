@@ -8,7 +8,9 @@
  * only other way to see real Source behaviour).
  */
 
-const [gamePk, name] = process.argv.slice(2)
+import { writeFile } from 'node:fs/promises'
+
+const [gamePk, fixtureName] = process.argv.slice(2)
 if (!gamePk || !/^\d+$/.test(gamePk)) {
   console.error('usage: bun run fixtures:mlb <gamePk> [name]')
   process.exit(1)
@@ -17,6 +19,6 @@ const res = await fetch(
   `https://statsapi.mlb.com/api/v1.1/game/${gamePk}/feed/live`,
 )
 if (!res.ok) throw new Error(`StatsAPI ${res.status}`)
-const out = `src/__tests__/fixtures/mlb/${name ?? gamePk}.json`
-await Bun.write(out, await res.text())
+const out = `src/__tests__/fixtures/mlb/${fixtureName ?? gamePk}.json`
+await writeFile(out, await res.text())
 console.log(`wrote ${out}`)
