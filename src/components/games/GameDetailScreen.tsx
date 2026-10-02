@@ -25,6 +25,13 @@ interface NflSituation {
   possession?: string | null
 }
 
+function nhlStrength(game: GameSummary): string | null {
+  return (
+    (game.situation?.detail as { strength?: string | null } | undefined)
+      ?.strength ?? null
+  )
+}
+
 export function GameDetailScreen({ gameId }: { gameId: string }) {
   const { data, isPending } = useLiveGame(gameId)
   const [tab, setTab] = useState<'plays' | 'box'>('plays')
@@ -97,6 +104,11 @@ function Scoreboard({ game }: { game: GameSummary }) {
         </p>
         <TeamColumn team={game.homeTeam} />
       </div>
+      {live && game.league === 'nhl' && nhlStrength(game) && (
+        <p className="mt-4 border-t border-border pt-3 text-center text-xs text-muted">
+          {nhlStrength(game)}
+        </p>
+      )}
       {live &&
         game.league === 'nfl' &&
         (game.situation?.detail as NflSituation | undefined)?.downDistance && (

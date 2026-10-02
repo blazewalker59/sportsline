@@ -14,6 +14,8 @@ export interface SeenItem {
   hash: string
   scoring: boolean
   score: Score
+  /** When this item was first seen, if that replaced an estimated time. */
+  stampedAt?: string
 }
 
 export type ItemChange =

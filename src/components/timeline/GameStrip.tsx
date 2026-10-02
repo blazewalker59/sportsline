@@ -81,6 +81,14 @@ function GameChip({ game }: { game: GameSummary }) {
       {live && game.league === 'mlb' && game.situation && (
         <MlbSituationLine detail={game.situation.detail as MlbSituation} />
       )}
+      {live &&
+        game.league === 'nhl' &&
+        (game.situation?.detail as { strength?: string | null } | undefined)
+          ?.strength && (
+          <div className="mt-1.5 truncate text-[11px] text-muted">
+            {(game.situation?.detail as { strength: string }).strength}
+          </div>
+        )}
       {live && game.league === 'nfl' && game.situation && (
         <NflSituationLine detail={game.situation.detail as NflSituation} />
       )}

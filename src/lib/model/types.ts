@@ -49,6 +49,12 @@ interface ItemBase {
   /** Order within the Game; later items have larger values. */
   sequence: number
   occurredAt: string
+  /**
+   * The Source gave no wall-clock time, so `occurredAt` is estimated from
+   * the game clock. A LiveGame replaces it with the time it first saw the
+   * item, except while backfilling a Game's earlier history.
+   */
+  timeEstimated?: boolean
   /** e.g. "Top 4th", "Q3 4:12", "2nd 13:05". */
   segmentLabel: string
   /** Score once this item is complete. */

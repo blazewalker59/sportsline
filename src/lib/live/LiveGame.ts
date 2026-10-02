@@ -30,6 +30,7 @@ import { dbFromD1 } from '@/lib/db'
 const GAME_KEY = 'game'
 const SEEN_PREFIX = 'seen:'
 const ERRORS_KEY = 'errors'
+const POLLED_KEY = 'polled'
 const RETRY_MS = 30_000
 /** Give up after this many consecutive failed polls; the cron re-wakes live Games. */
 const MAX_CONSECUTIVE_ERRORS = 20
@@ -150,8 +151,16 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
     const upserts: Array<ItemRow> = []
     const removedIds: Array<string> = []
     const nextSeen = new Map(seen)
-    const remember = (item: SourceItem, id: string) =>
-      nextSeen.set(item.key, { id, ...fingerprint(item) })
+    const remember = (item: SourceItem, id: string, stampedAt?: string) =>
+      nextSeen.set(item.key, {
+        id,
+        ...fingerprint(item),
+        ...(stampedAt ? { stampedAt } : {}),
+      })
+    // Sources without wall-clock times give estimates (SourceItem
+    // .timeEstimated). An item first seen on a live poll happened about now;
+    // only a Game's history, backfilled on the first poll, keeps the estimate.
+    const backfilling = !(await this.ctx.storage.get<boolean>(POLLED_KEY))
 
     for (const change of changes) {
       switch (change.type) {
@@ -159,9 +168,16 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
         case 'revised': {
           const id = itemId(game.gameId, change.item.key)
           const row = itemRow(game, id, change.item, playerIds)
-          if (change.type === 'revised') row.revisedAt = now
+          let stampedAt: string | undefined
+          if (change.type === 'revised') {
+            row.revisedAt = now
+            stampedAt = change.seen.stampedAt
+          } else if (change.item.timeEstimated && !backfilling) {
+            stampedAt = now
+          }
+          if (stampedAt) row.occurredAt = stampedAt
           upserts.push(row)
-          remember(change.item, id)
+          remember(change.item, id, stampedAt)
           break
         }
         case 'overturned': {
@@ -181,7 +197,7 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
           news.description = `Overturned: ${change.seen.description}`
           news.overturnOf = original
           upserts.push(news)
-          remember(change.item, original)
+          remember(change.item, original, change.seen.stampedAt)
           break
         }
         case 'removed':
@@ -274,6 +290,7 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
     )
     if (removedKeys.length > 0) await this.ctx.storage.delete(removedKeys)
     this.seen = nextSeen
+    if (backfilling) await this.ctx.storage.put(POLLED_KEY, true)
 
     // ── Publish (the Hub is a relay, never a store) ─────────────────────
     const overturnedRows =

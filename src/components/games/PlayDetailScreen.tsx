@@ -6,6 +6,7 @@ import { FollowButton } from '@/components/follows/FollowButton'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Bases } from '@/components/mlb/Bases'
 import { StrikeZone, pitchColor } from '@/components/mlb/StrikeZone'
+import { Rink } from '@/components/nhl/Rink'
 import { getPlayDetail } from '@/lib/games/server'
 import { cn } from '@/lib/utils'
 
@@ -73,7 +74,64 @@ function NflContext({ detail }: { detail: NflDetail }) {
   )
 }
 
+interface NhlDetail {
+  shotType?: string | null
+  strength?: string | null
+  reason?: string | null
+  x?: number | null
+  y?: number | null
+  penalty?: { infraction: string; minutes: number | null } | null
+}
+
+function NhlContext({
+  detail,
+  scoring,
+}: {
+  detail: NhlDetail
+  scoring: boolean
+}) {
+  const facts = [
+    detail.strength && ['Strength', detail.strength],
+    detail.shotType && ['Shot', detail.shotType.replaceAll('-', ' ')],
+    detail.reason && ['Result', detail.reason],
+    detail.penalty && [
+      'Penalty',
+      `${detail.penalty.infraction}${detail.penalty.minutes ? ` · ${detail.penalty.minutes} min` : ''}`,
+    ],
+  ].filter(Boolean) as Array<[string, string]>
+  return (
+    <>
+      {facts.length > 0 && (
+        <section className="grid grid-cols-2 gap-2 text-center sm:grid-cols-3">
+          {facts.map(([label, value]) => (
+            <Stat key={label} label={label} value={value} />
+          ))}
+        </section>
+      )}
+      {detail.x != null && detail.y != null && (
+        <section className="rounded-xl border border-border bg-surface p-3">
+          <Rink
+            x={detail.x}
+            y={detail.y}
+            color={scoring ? 'var(--scoring)' : 'var(--notable)'}
+          />
+        </section>
+      )}
+    </>
+  )
+}
+
 const ROLE_LABELS: Record<string, string> = {
+  scorer: 'Goal',
+  assist: 'Assist',
+  goalie: 'Goalie',
+  shooter: 'Shooter',
+  blocker: 'Blocked shot',
+  hitter: 'Hit',
+  hittee: 'Hit by',
+  winner: 'Won faceoff',
+  loser: 'Lost faceoff',
+  'drew penalty': 'Drew penalty',
   passer: 'Passer',
   receiver: 'Receiver',
   rusher: 'Rusher',
@@ -183,6 +241,12 @@ function Play({ detail }: { detail: PlayDetail }) {
       {mlb && <MlbContext detail={mlb} />}
       {item.league === 'nfl' && item.detail && (
         <NflContext detail={item.detail as NflDetail} />
+      )}
+      {item.league === 'nhl' && item.detail && (
+        <NhlContext
+          detail={item.detail as NhlDetail}
+          scoring={item.significance === 'scoring'}
+        />
       )}
 
       {detail.players.length > 0 && (
