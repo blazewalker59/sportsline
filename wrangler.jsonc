@@ -39,6 +39,12 @@
       { "name": "SCHEDULER", "class_name": "Scheduler" },
     ],
   },
+  // No Cron Triggers: the Scheduler Durable Object runs the schedule sync
+  // (docs/adr/0001). Declared empty so deploys remove any registered
+  // trigger; leaving `triggers` out keeps whatever was there.
+  "triggers": {
+    "crons": [],
+  },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["LiveGame", "LiveHub"] },
     { "tag": "v2", "new_sqlite_classes": ["Scheduler"] },
@@ -62,6 +68,9 @@
           "migrations_dir": "drizzle",
         },
       ],
+      "triggers": {
+        "crons": [],
+      },
       "durable_objects": {
         "bindings": [
           { "name": "LIVE_GAME", "class_name": "LiveGame" },
