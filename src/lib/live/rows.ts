@@ -11,6 +11,7 @@ import type {
   TimelinePlayer,
 } from '@/lib/model/timeline'
 import type { Json, League, SourceItem, SourcePlay } from '@/lib/model/types'
+import { teamColors } from '@/lib/brand/teamColors'
 
 export type ItemRow = typeof timelineItems.$inferSelect
 type GameRow = typeof games.$inferSelect
@@ -48,6 +49,7 @@ export function itemRow(
     awayTeamId: game.awayTeam.id,
     homeTeamId: game.homeTeam.id,
     kind: item.kind,
+    side: item.kind === 'play' ? item.side : null,
     sequence: item.sequence,
     occurredAt: item.occurredAt,
     segmentLabel: item.segmentLabel,
@@ -95,6 +97,7 @@ export function toTimelineItem(
     league: row.league,
     sportsDay: row.sportsDay,
     kind: row.kind,
+    side: row.side ?? null,
     sequence: row.sequence,
     occurredAt: row.occurredAt,
     segmentLabel: row.segmentLabel,
@@ -137,5 +140,6 @@ function teamRef(t: TeamRow): TeamRef & { name: string } {
     abbreviation: t.abbreviation,
     logoUrl: t.logoUrl ?? null,
     name: t.name,
+    colors: teamColors(t.league, t.name),
   }
 }

@@ -7,7 +7,9 @@ import { createServerFn } from '@tanstack/react-start'
 import { aliasedTable, and, desc, eq, inArray, lt, ne, or } from 'drizzle-orm'
 import { z } from 'zod'
 import type { SQL } from 'drizzle-orm'
-import type { GameSummary, TimelineItem } from '@/lib/model/timeline'
+import type { GameSummary, TeamRef, TimelineItem } from '@/lib/model/timeline'
+import type { League } from '@/lib/model/types'
+import { teamColors } from '@/lib/brand/teamColors'
 import { getDb } from '@/lib/db'
 import { games, itemPlayers, teams, timelineItems } from '@/lib/db/schema'
 import { sportsDayOf } from '@/lib/model/sportsDay'
@@ -93,11 +95,15 @@ export const getTimeline = createServerFn({ method: 'GET' })
           id: away.id,
           abbreviation: away.abbreviation,
           logoUrl: away.logoUrl,
+          name: away.name,
+          league: away.league,
         },
         home: {
           id: home.id,
           abbreviation: home.abbreviation,
           logoUrl: home.logoUrl,
+          name: home.name,
+          league: home.league,
         },
       })
       .from(t)
@@ -116,7 +122,9 @@ export const getTimeline = createServerFn({ method: 'GET' })
     const page = rows.slice(0, PAGE_SIZE)
     return {
       sportsDay,
-      items: page.map((r) => toTimelineItem(r.item, r.away, r.home)),
+      items: page.map((r) =>
+        toTimelineItem(r.item, withColors(r.away), withColors(r.home)),
+      ),
       nextBefore:
         rows.length > PAGE_SIZE ? (page.at(-1)?.item.occurredAt ?? null) : null,
     }
@@ -140,3 +148,18 @@ export const getGames = createServerFn({ method: 'GET' })
       .orderBy(games.startsAt)
     return rows.map((r) => toGameSummary(r.game, r.away, r.home))
   })
+
+function withColors(t: {
+  id: string
+  abbreviation: string
+  logoUrl: string | null
+  name: string
+  league: League
+}): TeamRef {
+  return {
+    id: t.id,
+    abbreviation: t.abbreviation,
+    logoUrl: t.logoUrl,
+    colors: teamColors(t.league, t.name),
+  }
+}

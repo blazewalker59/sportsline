@@ -5,10 +5,12 @@
  */
 
 import { LEAGUES } from './types'
+import type { TeamColors } from '@/lib/brand/teamColors'
 import type {
   Json,
   League,
   MilestoneKind,
+  Side,
   Significance,
   Situation,
 } from './types'
@@ -24,6 +26,8 @@ export interface TeamRef {
   id: string
   abbreviation: string
   logoUrl: string | null
+  /** Primary/secondary brand colors, when known. */
+  colors?: TeamColors | null
 }
 
 export interface TimelineItem {
@@ -33,6 +37,8 @@ export interface TimelineItem {
   sportsDay: string
   /** `overturn` is the news item surfaced when a Play is Overturned. */
   kind: 'play' | 'milestone' | 'overturn'
+  /** The team whose action this Play is (null for Milestones and neutral Plays). */
+  side: Side | null
   sequence: number
   occurredAt: string
   segmentLabel: string

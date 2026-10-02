@@ -21,6 +21,7 @@ import type {
   Json,
   League,
   MilestoneKind,
+  Side,
   Significance,
   Situation,
 } from '@/lib/model/types'
@@ -191,6 +192,8 @@ export const timelineItems = sqliteTable(
     awayTeamId: text('away_team_id').notNull(),
     homeTeamId: text('home_team_id').notNull(),
     kind: text('kind').$type<'play' | 'milestone' | 'overturn'>().notNull(),
+    /** The team whose action this Play is, if any. */
+    side: text('side').$type<Side>(),
     sequence: integer('sequence').notNull(),
     occurredAt: text('occurred_at').notNull(),
     segmentLabel: text('segment_label').notNull(),

@@ -29,6 +29,13 @@
       "when": 1790911455948,
       "tag": "0003_team_logos",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1790912823095,
+      "tag": "0004_item_side",
+      "breakpoints": true
     }
   ]
 }

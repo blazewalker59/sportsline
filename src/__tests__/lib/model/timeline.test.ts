@@ -13,6 +13,7 @@ function item(overrides: Partial<TimelineItem> = {}): TimelineItem {
     league: 'mlb',
     sportsDay: '2026-10-01',
     kind: 'play',
+    side: 'away',
     sequence: 1,
     occurredAt: '2026-10-01T23:00:00Z',
     segmentLabel: 'Top 1st',

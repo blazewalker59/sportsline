@@ -1,42 +1,29 @@
-import { Link } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { GameSummary, TimelineItem } from '@/lib/model/timeline'
 import type { GameBox } from '@/lib/model/types'
-import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo, TeamMark } from '@/components/brand/TeamMark'
+import {
+  BubbleStack,
+  LeagueAvatar,
+  Notice,
+  TeamAvatar,
+  TypingDots,
+} from '@/components/chat/ChatParts'
 import { FollowButton } from '@/components/follows/FollowButton'
 import { AppHeader } from '@/components/layout/AppHeader'
-import { Bases, Outs } from '@/components/mlb/Bases'
-import { startTime } from '@/components/timeline/format'
+import { startTime, useNow } from '@/components/timeline/format'
 import { useLiveGame } from '@/lib/games/useLiveGame'
+import { buildChat, typingFor } from '@/lib/timeline/chat'
 import { cn } from '@/lib/utils'
 
-interface MlbSituation {
-  outs?: number
-  balls?: number
-  strikes?: number
-  onFirst?: boolean
-  onSecond?: boolean
-  onThird?: boolean
-  batter?: string | null
-  pitcher?: string | null
-}
-
-interface NflSituation {
-  downDistance?: string | null
-  possession?: string | null
-}
-
-function nhlStrength(game: GameSummary): string | null {
-  return (
-    (game.situation?.detail as { strength?: string | null } | undefined)
-      ?.strength ?? null
-  )
-}
-
+/**
+ * Game Detail as a message thread between the two teams (design direction
+ * "Watch Party"): the away team on the left, the home team on the right,
+ * oldest first, with the live Situation as the typing indicator.
+ */
 export function GameDetailScreen({ gameId }: { gameId: string }) {
   const { data, isPending } = useLiveGame(gameId)
-  const [tab, setTab] = useState<'plays' | 'box'>('plays')
+  const [tab, setTab] = useState<'thread' | 'box'>('thread')
 
   return (
     <div className="mx-auto max-w-xl px-4 pb-16">
@@ -45,13 +32,12 @@ export function GameDetailScreen({ gameId }: { gameId: string }) {
         <p className="mt-16 text-center text-sm text-muted">Game not found.</p>
       ) : (
         <>
-          <Scoreboard game={data.game} />
-          {data.box && <Linescore box={data.box} game={data.game} />}
+          <ThreadHeader game={data.game} />
           <div
             role="tablist"
-            className="mt-5 mb-3 flex gap-1 rounded-full border border-border p-1 text-sm"
+            className="my-3 flex gap-1 rounded-full bg-notice p-1 text-sm"
           >
-            {(['plays', 'box'] as const).map((t) => (
+            {(['thread', 'box'] as const).map((t) => (
               <button
                 key={t}
                 type="button"
@@ -59,18 +45,33 @@ export function GameDetailScreen({ gameId }: { gameId: string }) {
                 aria-selected={tab === t}
                 onClick={() => setTab(t)}
                 className={cn(
-                  'flex-1 rounded-full py-1.5 capitalize',
-                  tab === t ? 'bg-foreground text-background' : 'text-muted',
+                  'min-h-10 flex-1 rounded-full font-semibold',
+                  tab === t
+                    ? 'bg-surface text-foreground shadow-sm'
+                    : 'text-muted',
                 )}
               >
-                {t === 'plays' ? 'Plays' : 'Box score'}
+                {t === 'thread' ? 'Plays' : 'Box score'}
               </button>
             ))}
           </div>
-          {tab === 'plays' ? (
-            <PlayList items={data.items} />
+          {tab === 'thread' ? (
+            <Thread items={data.items} game={data.game} />
           ) : (
-            <BoxTables box={data.box} game={data.game} />
+            <>
+              <div className="flex justify-between gap-2">
+                {[data.game.awayTeam, data.game.homeTeam].map((team) => (
+                  <div key={team.id} className="flex items-center gap-2">
+                    <TeamMark team={team} size={20} bold />
+                    <FollowButton follow={{ kind: 'team', teamId: team.id }} />
+                  </div>
+                ))}
+              </div>
+              {data.box && <Linescore box={data.box} game={data.game} />}
+              <div className="mt-4">
+                <BoxTables box={data.box} game={data.game} />
+              </div>
+            </>
           )}
         </>
       )}
@@ -78,83 +79,126 @@ export function GameDetailScreen({ gameId }: { gameId: string }) {
   )
 }
 
-function Scoreboard({ game }: { game: GameSummary }) {
+function ThreadHeader({ game }: { game: GameSummary }) {
   const live = game.status === 'live' || game.status === 'delayed'
   const started = live || game.status === 'final'
-  const situation = game.situation?.detail as MlbSituation | undefined
+  const typing = typingFor(game)
   const status = live
-    ? (game.situation?.segmentLabel ?? 'Live')
+    ? (typing?.text ?? game.situation?.segmentLabel ?? 'Live')
     : game.status === 'final'
       ? 'Final'
       : game.status === 'postponed'
         ? 'Postponed'
         : startTime(game.startsAt)
   return (
-    <section className="rounded-2xl border border-border bg-surface p-4">
-      <p
+    <section className="flex flex-col items-center gap-1.5 rounded-3xl border border-border bg-surface px-4 py-3">
+      <div className="flex items-center gap-4">
+        <TeamColumn team={game.awayTeam} />
+        <span className="text-[34px] font-extrabold tracking-tight tabular-nums">
+          {started ? `${game.score.away} – ${game.score.home}` : '@'}
+        </span>
+        <TeamColumn team={game.homeTeam} />
+      </div>
+      <span
         className={cn(
-          'mb-3 flex items-center justify-center gap-2 text-xs uppercase tracking-wide',
+          'text-center text-xs font-semibold',
           live ? 'text-live' : 'text-muted',
         )}
       >
-        <LeagueLogo league={game.league} size={18} />
         {status}
-      </p>
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-        <TeamColumn team={game.awayTeam} />
-        <p className="text-4xl font-bold tabular-nums">
-          {started ? `${game.score.away} – ${game.score.home}` : '@'}
-        </p>
-        <TeamColumn team={game.homeTeam} />
-      </div>
-      {live && game.league === 'nhl' && nhlStrength(game) && (
-        <p className="mt-4 border-t border-border pt-3 text-center text-xs text-muted">
-          {nhlStrength(game)}
-        </p>
-      )}
-      {live &&
-        game.league === 'nfl' &&
-        (game.situation?.detail as NflSituation | undefined)?.downDistance && (
-          <p className="mt-4 border-t border-border pt-3 text-center text-xs text-muted">
-            {(game.situation?.detail as NflSituation).possession && (
-              <span className="mr-1.5 font-semibold text-foreground">
-                {(game.situation?.detail as NflSituation).possession} ball
-              </span>
-            )}
-            {(game.situation?.detail as NflSituation).downDistance}
-          </p>
-        )}
-      {live && game.league === 'mlb' && situation && (
-        <div className="mt-4 flex items-center justify-center gap-4 border-t border-border pt-3 text-xs text-muted">
-          <Bases
-            first={situation.onFirst}
-            second={situation.onSecond}
-            third={situation.onThird}
-            size={28}
-          />
-          <Outs outs={situation.outs ?? 0} />
-          <span className="tabular-nums">
-            {situation.balls ?? 0}-{situation.strikes ?? 0}
-          </span>
-          {situation.batter && (
-            <span className="truncate">
-              {situation.pitcher} →{' '}
-              <span className="text-foreground">{situation.batter}</span>
-            </span>
-          )}
-        </div>
-      )}
+      </span>
     </section>
   )
 }
 
 function TeamColumn({ team }: { team: GameSummary['awayTeam'] }) {
   return (
-    <div className="flex flex-col items-center gap-2 text-center">
-      <TeamLogo team={team} size={48} />
-      <span className="text-lg font-semibold">{team.abbreviation}</span>
-      <span className="text-xs text-muted">{team.name}</span>
-      <FollowButton follow={{ kind: 'team', teamId: team.id }} />
+    <span className="flex flex-col items-center gap-0.5">
+      <TeamLogo team={team} size={40} />
+      <span className="text-xs font-semibold text-muted">
+        {team.abbreviation}
+      </span>
+    </span>
+  )
+}
+
+function Thread({
+  items,
+  game,
+}: {
+  items: Array<TimelineItem>
+  game: GameSummary
+}) {
+  const now = useNow()
+  const entries = useMemo(() => buildChat(items, { fold: false }), [items])
+  const typing = typingFor(game)
+  const end = useRef<HTMLDivElement>(null)
+  // Open at the latest Play, the way a chat thread does.
+  const scrolled = useRef(false)
+  useEffect(() => {
+    if (scrolled.current || items.length === 0) return
+    scrolled.current = true
+    end.current?.scrollIntoView({ block: 'end' })
+  }, [items.length])
+
+  if (items.length === 0 && !typing) {
+    return <p className="mt-10 text-center text-sm text-muted">No plays yet.</p>
+  }
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-center text-[11px] text-muted">
+        {game.awayTeam.abbreviation} on the left · {game.homeTeam.abbreviation}{' '}
+        on the right
+      </p>
+      {entries.map((entry) => {
+        if (entry.type === 'notice')
+          return <Notice key={entry.item.id} item={entry.item} now={now} />
+        const align = entry.side === 'home' ? 'right' : 'left'
+        const team = entry.side === 'home' ? game.homeTeam : game.awayTeam
+        const first = entry.bubbles[0]
+        const lead = first.type === 'fold' ? first.items[0] : first.item
+        return (
+          <div
+            key={entry.id}
+            className={cn(
+              'flex items-end gap-2',
+              align === 'right' && 'flex-row-reverse',
+            )}
+          >
+            <TeamAvatar team={team} size={28} />
+            <div
+              className={cn(
+                'flex min-w-0 flex-col gap-1',
+                align === 'right' && 'items-end',
+              )}
+            >
+              <BubbleStack bubbles={entry.bubbles} align={align} compact />
+              <span className="px-1 text-[11px] text-muted tabular-nums">
+                {lead.segmentLabel} · {lead.score.away}–{lead.score.home}
+              </span>
+            </div>
+          </div>
+        )
+      })}
+      {typing && (
+        <div
+          className={cn(
+            'flex items-end gap-2',
+            typing.side === 'home' && 'flex-row-reverse',
+          )}
+        >
+          {typing.side ? (
+            <TeamAvatar
+              team={typing.side === 'home' ? game.homeTeam : game.awayTeam}
+              size={28}
+            />
+          ) : (
+            <LeagueAvatar league={game.league} size={28} />
+          )}
+          <TypingDots align={typing.side === 'home' ? 'right' : 'left'} />
+        </div>
+      )}
+      <div ref={end} />
     </div>
   )
 }
@@ -219,98 +263,6 @@ function Linescore({ box, game }: { box: GameBox; game: GameSummary }) {
         </tbody>
       </table>
     </div>
-  )
-}
-
-/** Plays grouped by segment, newest segment first, with a scoring summary on top. */
-function PlayList({ items }: { items: Array<TimelineItem> }) {
-  const plays = useMemo(
-    () => items.filter((i) => i.kind !== 'milestone'),
-    [items],
-  )
-  const groups = useMemo(() => {
-    const out: Array<{ label: string; plays: Array<TimelineItem> }> = []
-    for (const p of plays) {
-      const last = out.at(-1)
-      if (last?.label === p.segmentLabel) last.plays.push(p)
-      else out.push({ label: p.segmentLabel, plays: [p] })
-    }
-    return out.reverse().map((g) => ({ ...g, plays: [...g.plays].reverse() }))
-  }, [plays])
-  const scoring = plays.filter(
-    (p) => p.significance === 'scoring' && p.kind === 'play',
-  )
-
-  if (plays.length === 0)
-    return <p className="mt-10 text-center text-sm text-muted">No plays yet.</p>
-  return (
-    <div className="flex flex-col gap-5">
-      {scoring.length > 0 && (
-        <section>
-          <h2 className="mb-2 text-sm font-semibold text-muted">Scoring</h2>
-          <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
-            {scoring.map((p) => (
-              <PlayRow key={p.id} item={p} showSegment />
-            ))}
-          </ul>
-        </section>
-      )}
-      {groups.map((g, i) => (
-        <section key={`${g.label}-${i}`}>
-          <h2 className="mb-2 text-sm font-semibold text-muted">{g.label}</h2>
-          <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
-            {g.plays.map((p) => (
-              <PlayRow key={p.id} item={p} />
-            ))}
-          </ul>
-        </section>
-      ))}
-    </div>
-  )
-}
-
-function PlayRow({
-  item,
-  showSegment,
-}: {
-  item: TimelineItem
-  showSegment?: boolean
-}) {
-  const accent =
-    item.kind === 'overturn'
-      ? 'bg-live'
-      : item.significance === 'scoring'
-        ? 'bg-scoring'
-        : item.significance === 'notable'
-          ? 'bg-notable'
-          : 'bg-transparent'
-  return (
-    <li>
-      <Link
-        to="/plays/$playId"
-        params={{ playId: item.id }}
-        className="flex items-start gap-3 px-4 py-2.5 hover:bg-background/50"
-      >
-        <span className={cn('mt-1.5 size-1.5 shrink-0 rounded-full', accent)} />
-        <span
-          className={cn(
-            'flex-1 text-sm leading-snug',
-            item.status === 'overturned' && 'line-through opacity-60',
-          )}
-        >
-          {item.kind === 'overturn' && (
-            <span className="mr-1 font-semibold text-live">Overturned:</span>
-          )}
-          {item.kind === 'overturn'
-            ? item.description.replace(/^Overturned: /, '')
-            : item.description}
-        </span>
-        <span className="shrink-0 text-xs tabular-nums text-muted">
-          {showSegment ? `${item.segmentLabel} · ` : ''}
-          {item.score.away}-{item.score.home}
-        </span>
-      </Link>
-    </li>
   )
 }
 

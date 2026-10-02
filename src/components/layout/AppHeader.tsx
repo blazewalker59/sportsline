@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { ThemeButton } from './ThemeButton'
 import { signIn, signOutClient } from '@/lib/auth/client'
 import { VIEWER_KEY, useViewer } from '@/lib/viewer/useViewer'
 
@@ -21,6 +22,7 @@ export function AppHeader({
         {children}
         <div className="ml-auto flex items-center gap-2">
           {right}
+          <ThemeButton />
           <AccountButton />
         </div>
       </div>

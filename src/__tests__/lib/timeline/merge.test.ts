@@ -23,6 +23,7 @@ function item(
     league: 'mlb',
     sportsDay: DAY,
     kind: 'play',
+    side: 'away',
     sequence,
     occurredAt,
     segmentLabel: 'Top 1st',

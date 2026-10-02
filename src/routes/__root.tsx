@@ -9,6 +9,7 @@ import { TanStackDevtools } from '@tanstack/react-devtools'
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
 import appCss from '../styles.css?url'
+import { THEME_BOOT } from '../lib/theme'
 
 import type { QueryClient } from '@tanstack/react-query'
 
@@ -25,7 +26,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         content: 'width=device-width, initial-scale=1, viewport-fit=cover',
       },
       { title: 'Sportsline' },
-      { name: 'theme-color', content: '#0b0d12' },
+      { name: 'theme-color', content: '#f3f4f8' },
       { name: 'apple-mobile-web-app-capable', content: 'yes' },
       {
         name: 'apple-mobile-web-app-status-bar-style',
@@ -52,8 +53,11 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    // The boot script sets the theme class before hydration, so the
+    // server-rendered class differs by design.
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
         <HeadContent />
       </head>
       <body>

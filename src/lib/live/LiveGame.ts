@@ -25,6 +25,7 @@ import type {
 } from '@/lib/model/types'
 import { sourceFor } from '@/lib/sources'
 import { games, itemPlayers, players, timelineItems } from '@/lib/db/schema'
+import { teamColors } from '@/lib/brand/teamColors'
 import { dbFromD1 } from '@/lib/db'
 
 const GAME_KEY = 'game'
@@ -300,8 +301,14 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
             .from(timelineItems)
             .where(inArray(timelineItems.id, overturnedIds))
         : []
-    const away = game.awayTeam
-    const home = game.homeTeam
+    const away = {
+      ...game.awayTeam,
+      colors: teamColors(game.league, game.awayTeam.name),
+    }
+    const home = {
+      ...game.homeTeam,
+      colors: teamColors(game.league, game.homeTeam.name),
+    }
     const events: Array<TimelineEvent> = [
       {
         type: 'game',
@@ -354,6 +361,7 @@ const UPDATABLE_COLUMNS = [
   'sequence',
   'occurred_at',
   'segment_label',
+  'side',
   'away_score',
   'home_score',
   'description',

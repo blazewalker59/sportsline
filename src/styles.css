@@ -1,37 +1,88 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&display=swap');
+
 @import 'tailwindcss';
 
 @import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+  Watch Party design language. Light is the base; `.dark` on <html> (set
+  before paint from the Viewer's choice or the device) switches every
+  token. Team colors come from data, never from here.
+*/
 :root {
-  --background: #0b0d12;
-  --surface: #141821;
-  --border: #232a36;
-  --foreground: #e8ebf1;
-  --muted: #8a93a6;
-  --scoring: #f5b83d;
-  --notable: #5b9cff;
-  --live: #ff4d5e;
+  --background: #f3f4f8;
+  --surface: #ffffff;
+  --bubble: #ffffff;
+  --bubble-border: #e3e5ec;
+  --notice: #e7e9f1;
+  --border: #e3e5ec;
+  --foreground: #15171d;
+  --muted: #5d6170;
+  --accent: #2d3cff;
+  --accent-soft: #eef0ff;
+  --live: #e5372a;
+  --scoring: #c24a00;
+  --notable: #2d3cff;
+}
+
+.dark {
+  --background: #0e1015;
+  --surface: #14171e;
+  --bubble: #232733;
+  --bubble-border: #232733;
+  --notice: #1a1d25;
+  --border: #1f232c;
+  --foreground: #eef0f5;
+  --muted: #8a90a0;
+  --accent: #8fa2ff;
+  --accent-soft: #1a1d25;
+  --live: #ff6b5e;
+  --scoring: #ffb612;
+  --notable: #8fa2ff;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);
+  --color-bubble: var(--bubble);
+  --color-bubble-border: var(--bubble-border);
+  --color-notice: var(--notice);
   --color-border: var(--border);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-live: var(--live);
   --color-scoring: var(--scoring);
   --color-notable: var(--notable);
-  --color-live: var(--live);
+  --font-sans: 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
 }
 
 body {
-  @apply m-0 bg-background text-foreground antialiased;
-  font-family:
-    'Inter',
-    system-ui,
-    -apple-system,
-    sans-serif;
+  @apply m-0 bg-background font-sans text-foreground antialiased;
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@keyframes typing-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.typing-dot {
+  animation: typing-dot 1.4s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typing-dot {
+    animation: none;
+    opacity: 0.6;
+  }
 }
