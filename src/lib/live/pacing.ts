@@ -39,3 +39,10 @@ export function nextPollDelay(
     }
   }
 }
+
+const SCHEDULE_INTERVAL_MS = 60_000
+
+/** The Scheduler's next run: the next whole minute after `now`, epoch ms. */
+export function nextMinute(now: number): number {
+  return (Math.floor(now / SCHEDULE_INTERVAL_MS) + 1) * SCHEDULE_INTERVAL_MS
+}

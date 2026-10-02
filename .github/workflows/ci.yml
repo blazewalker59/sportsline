@@ -96,3 +96,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # Verifies the Worker + D1 and starts the Scheduler loop (docs/adr/0001,
+      # "Scheduling"), so schedules sync without waiting for a visitor.
+      - name: Smoke check /health
+        run: curl -fsS --retry 5 --retry-delay 3 --retry-all-errors https://sportsline.blazewalker59.workers.dev/health

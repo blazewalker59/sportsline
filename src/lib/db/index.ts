@@ -14,11 +14,13 @@ import * as schema from './schema'
 import type { DrizzleD1Database } from 'drizzle-orm/d1'
 import type { LiveGame } from '@/lib/live/LiveGame'
 import type { LiveHub } from '@/lib/live/LiveHub'
+import type { Scheduler } from '@/lib/live/Scheduler'
 
 export interface CloudflareEnv {
   DB: D1Database
   LIVE_GAME: DurableObjectNamespace<LiveGame>
   LIVE_HUB: DurableObjectNamespace<LiveHub>
+  SCHEDULER: DurableObjectNamespace<Scheduler>
   BETTER_AUTH_SECRET?: string
   BETTER_AUTH_URL?: string
   GOOGLE_CLIENT_ID?: string

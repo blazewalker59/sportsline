@@ -30,20 +30,19 @@
     },
   ],
   // One LiveGame per live Game polls its Source and diffs Plays; one LiveHub
-  // relays them to connected Viewers (docs/adr/0001).
+  // relays them to connected Viewers; one Scheduler syncs schedules every
+  // minute on its own alarm, in place of a Cron Trigger (docs/adr/0001).
   "durable_objects": {
     "bindings": [
       { "name": "LIVE_GAME", "class_name": "LiveGame" },
       { "name": "LIVE_HUB", "class_name": "LiveHub" },
+      { "name": "SCHEDULER", "class_name": "Scheduler" },
     ],
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["LiveGame", "LiveHub"] },
+    { "tag": "v2", "new_sqlite_classes": ["Scheduler"] },
   ],
-  // Every minute: sync today's schedule and wake LiveGames as Games go live.
-  "triggers": {
-    "crons": ["* * * * *"],
-  },
   "env": {
     "production": {
       "name": "sportsline",
@@ -67,10 +66,8 @@
         "bindings": [
           { "name": "LIVE_GAME", "class_name": "LiveGame" },
           { "name": "LIVE_HUB", "class_name": "LiveHub" },
+          { "name": "SCHEDULER", "class_name": "Scheduler" },
         ],
-      },
-      "triggers": {
-        "crons": ["* * * * *"],
       },
     },
   },

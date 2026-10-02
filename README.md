@@ -13,8 +13,10 @@ the same setup as dreamteam.
 bun install
 bun run db:migrate:local
 bun run dev                     # http://localhost:3000
-curl "localhost:3000/cdn-cgi/handler/scheduled?cron=*+*+*+*+*"   # run the schedule cron once
 ```
+
+Any request starts the Scheduler, which syncs schedules every minute and
+wakes a LiveGame per live Game.
 
 `bun run ci` runs format, lint, typecheck, tests and the build.
 `bun run fixtures:mlb <gamePk>` records a real StatsAPI feed as a test fixture.

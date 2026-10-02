@@ -1,5 +1,5 @@
 /**
- * The once-a-minute schedule sync (wrangler `triggers.crons`): for each
+ * The once-a-minute schedule sync (run by the Scheduler): for each
  * League with a Source, upsert today's Games and wake a LiveGame for every
  * Game that is live, about to start, or finished without being tracked.
  */
