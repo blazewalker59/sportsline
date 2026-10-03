@@ -27,6 +27,10 @@ A player named in a Play (batter, pitcher, shooter, rebounder, passer, tackler, 
 How much a Play matters, assigned per League: Scoring (changes the score; in the NBA, where baskets come constantly, only a go-ahead basket that gives a team the lead), Notable (momentum or game-state moments that don't score, such as turnovers, ejections, lead changes), or Routine (everything else).
 _Avoid_: priority, importance, weight
 
+**Retention**:
+How long Plays are kept. Scoring and Notable Plays, Game Milestones and any Play with a Reaction are kept for good; Routine Plays are trimmed once their Sports Day is more than 30 days old. A Game's thread from before then shows only what mattered.
+_Avoid_: archive, expiry, TTL
+
 **Clutch**:
 A close Game in its final stretch (e.g. last minutes of the 4th quarter or 3rd period, 9th inning onward), during which Routine Plays are promoted to Notable. Each League defines its own Clutch threshold.
 _Avoid_: crunch time, late game
