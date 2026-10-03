@@ -548,6 +548,10 @@ function TypingRow({
  * Several Games in progress at once, as one typing bubble: their teams'
  * avatars stacked and a count. Opens the list of what's live.
  */
+/** Stacked avatars: up to three, stepped so the stack fills 32px. */
+const STACK_AVATAR = 24
+const STACK_STEP = 4
+
 function TypingSummary({
   typing,
   onOpen,
@@ -563,7 +567,12 @@ function TypingSummary({
       aria-label={`${typing.length} games in progress. Show them`}
       className="flex items-end gap-2 text-left"
     >
-      <span className="flex shrink-0 items-end">
+      {/*
+        A stack the size of one avatar (32px), so the bubble lines up with
+        every other message: each team's mark sits a few pixels behind the
+        one in front.
+      */}
+      <span className="relative size-8 shrink-0" aria-hidden="true">
         {shown.map(({ typing: t, game: g }, i) => {
           const team =
             t.side === 'home'
@@ -571,19 +580,17 @@ function TypingSummary({
               : t.side === 'away'
                 ? g.awayTeam
                 : null
+          const offset = (shown.length - 1 - i) * STACK_STEP
           return (
             <span
               key={g.id}
-              className={cn(
-                'rounded-full ring-2 ring-background',
-                i > 0 && '-ml-3',
-              )}
-              style={{ zIndex: shown.length - i }}
+              className="absolute rounded-full ring-2 ring-background"
+              style={{ top: offset, left: offset, zIndex: shown.length - i }}
             >
               {team ? (
-                <TeamAvatar team={team} />
+                <TeamAvatar team={team} size={STACK_AVATAR} />
               ) : (
-                <LeagueAvatar league={g.league} />
+                <LeagueAvatar league={g.league} size={STACK_AVATAR} />
               )}
             </span>
           )
