@@ -17,6 +17,7 @@ import { withViewTransition } from '@/lib/viewTransition'
 import { gameSearch, vtName } from '@/lib/timeline/gameLink'
 import { useLiveGame } from '@/lib/games/useLiveGame'
 import { BoxSheet } from '@/components/games/GameView'
+import { Sheet } from '@/components/chat/Sheet'
 import {
   BubbleStack,
   LeagueAvatar,
@@ -204,6 +205,8 @@ function Timeline({
     null
 
   const entries = useMemo(() => buildChat(items, { fold: true }), [items])
+  // Several live Games collapse into one typing bubble; this sheet lists them.
+  const [liveOpen, setLiveOpen] = useState(false)
   const typing = useMemo(
     () =>
       (isToday ? timeline.games : [])
@@ -316,14 +319,20 @@ function Timeline({
         )}
         aria-busy={timeline.loading}
       >
-        {typing.map(({ typing: t, game: g }) => (
-          <li
-            key={`typing:${g.id}`}
-            style={{ viewTransitionName: vtName(`typing:${g.id}`) }}
-          >
-            <TypingRow typing={t} game={g} focused={g.id === gameId} />
+        {typing.length > 1 ? (
+          <li style={{ viewTransitionName: 'typing' }}>
+            <TypingSummary typing={typing} onOpen={() => setLiveOpen(true)} />
           </li>
-        ))}
+        ) : (
+          typing.map(({ typing: t, game: g }) => (
+            <li
+              key={`typing:${g.id}`}
+              style={{ viewTransitionName: vtName(`typing:${g.id}`) }}
+            >
+              <TypingRow typing={t} game={g} focused={g.id === gameId} />
+            </li>
+          ))
+        )}
         {entries.map((entry, i) => (
           <li
             key={entry.type === 'notice' ? entry.item.id : entry.id}
@@ -370,6 +379,21 @@ function Timeline({
       )}
 
       {playId && <PlaySheet playId={playId} onClose={closePlay} />}
+
+      {liveOpen && typing.length > 1 && (
+        <Sheet
+          title={`Live now · ${typing.length}`}
+          onClose={() => setLiveOpen(false)}
+        >
+          <ol className="flex flex-col gap-3">
+            {typing.map(({ typing: t, game: g }) => (
+              <li key={g.id} onClick={() => setLiveOpen(false)}>
+                <TypingRow typing={t} game={g} focused={false} />
+              </li>
+            ))}
+          </ol>
+        </Sheet>
+      )}
 
       {boxOpen && selectedGame && (
         <BoxSheet
@@ -517,6 +541,64 @@ function TypingRow({
         <TypingDots align={right ? 'right' : 'left'} />
       </div>
     </Link>
+  )
+}
+
+/**
+ * Several Games in progress at once, as one typing bubble: their teams'
+ * avatars stacked and a count. Opens the list of what's live.
+ */
+function TypingSummary({
+  typing,
+  onOpen,
+}: {
+  typing: Array<{ typing: Typing; game: GameSummary }>
+  onOpen: () => void
+}) {
+  const shown = typing.slice(0, 3)
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={`${typing.length} games in progress. Show them`}
+      className="flex items-end gap-2 text-left"
+    >
+      <span className="flex shrink-0 items-end">
+        {shown.map(({ typing: t, game: g }, i) => {
+          const team =
+            t.side === 'home'
+              ? g.homeTeam
+              : t.side === 'away'
+                ? g.awayTeam
+                : null
+          return (
+            <span
+              key={g.id}
+              className={cn(
+                'rounded-full ring-2 ring-background',
+                i > 0 && '-ml-3',
+              )}
+              style={{ zIndex: shown.length - i }}
+            >
+              {team ? (
+                <TeamAvatar team={team} />
+              ) : (
+                <LeagueAvatar league={g.league} />
+              )}
+            </span>
+          )
+        })}
+      </span>
+      <span className="flex min-w-0 flex-col gap-1">
+        <span className="truncate px-1 text-[11px] text-muted">
+          <span className="font-semibold text-foreground/80">
+            {typing.length} games live
+          </span>{' '}
+          · tap to see all
+        </span>
+        <TypingDots align="left" />
+      </span>
+    </button>
   )
 }
 
