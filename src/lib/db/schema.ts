@@ -134,6 +134,8 @@ export const players = sqliteTable(
     /** Current Team, from the nightly roster sync; null until synced. */
     teamId: text('team_id'),
     position: text('position'),
+    /** A headshot from the Source's CDN, from the roster sync. */
+    headshotUrl: text('headshot_url'),
   },
   (table) => [index('players_league_name_idx').on(table.league, table.name)],
 )

@@ -28,6 +28,8 @@ export interface FollowEntry {
   league: League
   /** The Team's logo, or a Player's current Team's. */
   logoUrl: string | null
+  /** A Player's headshot, when the roster sync has one. */
+  headshotUrl?: string | null
 }
 
 export interface ViewerState {
@@ -59,6 +61,7 @@ async function followEntries(
       playerName: players.name,
       playerLeague: players.league,
       playerPosition: players.position,
+      playerHeadshot: players.headshotUrl,
       playerTeam: sql<
         string | null
       >`(select abbreviation from teams t where t.id = ${players.teamId})`,
@@ -115,6 +118,7 @@ async function followEntries(
               null,
             league: r.playerLeague,
             logoUrl: r.playerTeamLogo,
+            headshotUrl: r.playerHeadshot,
           },
         ]
     }
@@ -230,6 +234,7 @@ export const searchFollowables = createServerFn({ method: 'GET' })
           name: players.name,
           league: players.league,
           position: players.position,
+          headshotUrl: players.headshotUrl,
           team: sql<
             string | null
           >`(select abbreviation from teams t where t.id = ${players.teamId})`,
@@ -256,6 +261,7 @@ export const searchFollowables = createServerFn({ method: 'GET' })
         detail: [p.team, p.position].filter(Boolean).join(' · ') || null,
         league: p.league,
         logoUrl: p.teamLogo,
+        headshotUrl: p.headshotUrl,
       })),
     ]
   })

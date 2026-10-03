@@ -5,6 +5,7 @@ import { FollowButton } from './FollowButton'
 import type { FollowEntry } from '@/lib/viewer/server'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
+import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { LEAGUES } from '@/lib/model/types'
 import { searchFollowables } from '@/lib/viewer/server'
@@ -94,23 +95,53 @@ export function FollowsScreen() {
 }
 
 function EntryRow({ entry }: { entry: FollowEntry }) {
-  return (
-    <li className="flex items-center gap-3 px-4 py-2.5">
-      <LeagueLogo league={entry.league} size={18} />
-      {entry.logoUrl && (
-        <TeamLogo
-          team={{ abbreviation: entry.label, logoUrl: entry.logoUrl }}
-          size={24}
+  const player = entry.follow.kind === 'player' ? entry.follow : null
+  const body = (
+    <>
+      {player ? (
+        <PlayerAvatar
+          name={entry.label}
+          headshotUrl={entry.headshotUrl}
+          team={
+            entry.logoUrl
+              ? { abbreviation: entry.label, logoUrl: entry.logoUrl }
+              : null
+          }
         />
+      ) : (
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full border border-bubble-border bg-surface">
+          {entry.logoUrl ? (
+            <TeamLogo
+              team={{ abbreviation: entry.label, logoUrl: entry.logoUrl }}
+              size={28}
+            />
+          ) : (
+            <LeagueLogo league={entry.league} size={24} />
+          )}
+        </span>
       )}
       <span className="min-w-0 flex-1">
         <span className="block truncate">{entry.label}</span>
-        {entry.detail && (
-          <span className="block truncate text-xs text-muted">
-            {entry.detail}
-          </span>
-        )}
+        <span className="flex items-center gap-1.5 truncate text-xs text-muted">
+          <LeagueLogo league={entry.league} size={14} />
+          {entry.detail}
+        </span>
       </span>
+    </>
+  )
+  return (
+    <li className="flex items-center gap-3 px-4 py-2.5">
+      {player ? (
+        <Link
+          to="/players/$playerId"
+          params={{ playerId: player.playerId }}
+          className="flex min-w-0 flex-1 items-center gap-3"
+        >
+          {body}
+        </Link>
+      ) : (
+        <span className="flex min-w-0 flex-1 items-center gap-3">{body}</span>
+      )}
       <FollowButton follow={entry.follow} />
     </li>
   )

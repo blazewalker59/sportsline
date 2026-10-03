@@ -1,0 +1,1 @@
+ALTER TABLE `players` ADD `headshot_url` text;

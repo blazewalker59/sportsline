@@ -39,6 +39,13 @@ export function espnLogo(path: string): string {
 }
 
 /** College logos are keyed by team id; the pros' by abbreviation. */
+/** An ESPN headshot (350×254 originals), resized for avatars. */
+export function espnHeadshot(href: string | undefined): string | null {
+  if (!href) return null
+  const path = href.replace(/^https?:\/\/a\.espncdn\.com/, '')
+  return `https://a.espncdn.com/combiner/i?img=${path}&w=128&h=93`
+}
+
 export function teamLogo(
   league: EspnLeague,
   abbreviation: string,

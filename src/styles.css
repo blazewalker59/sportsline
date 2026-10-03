@@ -63,6 +63,21 @@
 body {
   @apply m-0 bg-background font-sans text-foreground antialiased;
   padding-bottom: env(safe-area-inset-bottom, 0px);
+  /*
+    An app, not a document: nothing selects, so a long-press (to react)
+    never makes iOS highlight text, whatever is under the finger when the
+    emoji bar appears. Fields stay editable.
+  */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+input,
+textarea,
+[contenteditable='true'] {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 @keyframes typing-dot {

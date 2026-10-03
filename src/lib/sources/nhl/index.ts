@@ -58,7 +58,7 @@ export const nhlAdapter: SourceAdapter = {
         ),
       ),
     ])
-    return parseRoster(teams, standings, bios)
+    return parseRoster(teams, standings, bios, seasons[0])
   },
 }
 

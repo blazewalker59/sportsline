@@ -8,6 +8,7 @@ import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamMark } from '@/components/brand/TeamMark'
 import { PlayText } from '@/components/chat/PlayText'
 import { FollowButton } from '@/components/follows/FollowButton'
+import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Bases } from '@/components/mlb/Bases'
 import { StrikeZone, pitchColor } from '@/components/mlb/StrikeZone'
@@ -302,18 +303,32 @@ function Play({ detail }: { detail: PlayDetail }) {
         <section>
           <h2 className="mb-2 text-sm font-semibold text-muted">Players</h2>
           <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
-            {detail.players.map(({ player, lines }) => (
+            {detail.players.map(({ player, lines, headshotUrl, team }) => (
               <li
                 key={player.id}
                 className="flex items-center gap-3 px-4 py-2.5"
               >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate">{player.name}</span>
-                  <span className="block truncate text-xs text-muted">
-                    {ROLE_LABELS[player.role] ?? player.role}
-                    {lines.length > 0 && ` · ${lines.join(' · ')}`}
+                <Link
+                  to="/players/$playerId"
+                  params={{ playerId: player.id }}
+                  className="flex min-w-0 flex-1 items-center gap-3"
+                >
+                  <PlayerAvatar
+                    name={player.name}
+                    headshotUrl={headshotUrl}
+                    team={team}
+                    size={44}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">
+                      {player.name}
+                    </span>
+                    <span className="block truncate text-xs text-muted">
+                      {ROLE_LABELS[player.role] ?? player.role}
+                      {lines.length > 0 && ` · ${lines.join(' · ')}`}
+                    </span>
                   </span>
-                </span>
+                </Link>
                 <FollowButton
                   follow={{ kind: 'player', playerId: player.id }}
                 />

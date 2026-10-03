@@ -130,6 +130,7 @@ export interface NflRoster {
       fullName?: string
       displayName?: string
       position?: { abbreviation?: string }
+      headshot?: { href?: string }
     }>
   }>
 }

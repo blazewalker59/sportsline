@@ -11,6 +11,7 @@
 
 import {
   competitorTeam,
+  espnHeadshot,
   mapStatus,
   parseScoreboard as parseEspnScoreboard,
   quarterLabel,
@@ -440,6 +441,7 @@ export function parseRoster(
           name: p.fullName ?? p.displayName ?? `#${p.id}`,
           teamSourceId: teamId,
           position: p.position?.abbreviation ?? null,
+          headshotUrl: espnHeadshot(p.headshot?.href),
         })),
       ),
     ),

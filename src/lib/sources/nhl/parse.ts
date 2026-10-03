@@ -607,6 +607,8 @@ export function parseRoster(
   teams: NhlStatsTeams,
   standings: NhlStandings,
   bios: ReadonlyArray<NhlBios>,
+  /** The current season ("20262027"), for headshot paths. */
+  season?: string,
 ): SourceRoster {
   const current = new Set(
     (standings.standings ?? []).flatMap((s) =>
@@ -647,6 +649,9 @@ export function parseRoster(
               name: p.skaterFullName ?? p.goalieFullName ?? `#${p.playerId}`,
               teamSourceId,
               position: p.positionCode ?? (p.goalieFullName ? 'G' : null),
+              headshotUrl: season
+                ? `https://assets.nhle.com/mugs/nhl/${season}/${p.currentTeamAbbrev}/${p.playerId}.png`
+                : null,
             }
             return [[player.sourceId, player] as const]
           }),

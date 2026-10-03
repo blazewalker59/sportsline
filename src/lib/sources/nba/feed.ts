@@ -62,5 +62,6 @@ export interface NbaRoster {
     fullName?: string
     displayName?: string
     position?: { abbreviation?: string }
+    headshot?: { href?: string }
   }>
 }

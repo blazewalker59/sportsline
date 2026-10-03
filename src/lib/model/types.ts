@@ -171,6 +171,8 @@ export interface SourcePlayer extends SourceRef {
   /** Source id of the Team they currently play for, if any. */
   teamSourceId: string | null
   position: string | null
+  /** A headshot from the Source's CDN, if it has one. */
+  headshotUrl?: string | null
 }
 
 /** A League's Teams and Players, for the nightly roster sync. */

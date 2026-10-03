@@ -583,6 +583,11 @@ export function parseSchedule(schedule: MlbSchedule): Array<ScheduledGame> {
     }))
 }
 
+/** MLB's headshot for a player, with MLB's generic silhouette as a fallback. */
+export function mlbHeadshot(id: number): string {
+  return `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_120,q_auto:best/v1/people/${id}/headshot/67/current`
+}
+
 export function parseRoster(teams: MlbTeams, people: MlbPeople): SourceRoster {
   return {
     teams: (teams.teams ?? []).filter((t) => t.active !== false).map(team),
@@ -593,6 +598,7 @@ export function parseRoster(teams: MlbTeams, people: MlbPeople): SourceRoster {
         name: p.fullName,
         teamSourceId: p.currentTeam ? String(p.currentTeam.id) : null,
         position: p.primaryPosition?.abbreviation ?? null,
+        headshotUrl: mlbHeadshot(p.id),
       })),
   }
 }

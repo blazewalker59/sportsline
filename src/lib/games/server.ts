@@ -11,10 +11,12 @@ import type { ItemRow } from '@/lib/live/rows'
 import type { StatPlay } from '@/lib/leagues/mlb/stats'
 import type {
   GameSummary,
+  TeamRef,
   TimelineItem,
   TimelinePlayer,
 } from '@/lib/model/timeline'
 import type { GameBox } from '@/lib/model/types'
+import { playerCards } from '@/lib/players/cards'
 import { toGameSummary, toTimelineItem } from '@/lib/live/rows'
 import { formatLine, mlbLinesAsOf } from '@/lib/leagues/mlb/stats'
 import { games, teams, timelineItems } from '@/lib/db/schema'
@@ -31,7 +33,13 @@ export interface PlayDetail {
   item: TimelineItem
   game: GameSummary
   /** Each Involved Player's in-Game stat lines as of this Play. */
-  players: Array<{ player: TimelinePlayer; lines: Array<string> }>
+  players: Array<{
+    player: TimelinePlayer
+    lines: Array<string>
+    headshotUrl: string | null
+    /** Their current Team (for the photo's badge), when known. */
+    team: TeamRef | null
+  }>
 }
 
 async function loadGame(db: Database, gameId: string) {
@@ -136,12 +144,18 @@ export const getPlayDetail = createServerFn({ method: 'GET' })
         ]),
       )
     }
+    const cards = await playerCards(
+      db,
+      row.players.map((p) => p.id),
+    )
     return {
       item,
       game: game.summary,
       players: row.players.map((player) => ({
         player,
         lines: lines.get(player.id) ?? [],
+        headshotUrl: cards.get(player.id)?.headshotUrl ?? null,
+        team: cards.get(player.id)?.team ?? null,
       })),
     }
   })

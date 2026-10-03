@@ -52,6 +52,7 @@ describe('NHL parseRoster (season bios)', () => {
         ],
       },
     ],
+    '20262027',
   )
 
   it('lists each current player once, on their current team', () => {
@@ -62,12 +63,14 @@ describe('NHL parseRoster (season bios)', () => {
         name: 'Auston Matthews',
         teamSourceId: '10',
         position: 'C',
+        headshotUrl: 'https://assets.nhle.com/mugs/nhl/20262027/TOR/1.png',
       },
       {
         sourceId: '3',
         name: 'Karel Vejmelka',
         teamSourceId: '68',
         position: 'G',
+        headshotUrl: 'https://assets.nhle.com/mugs/nhl/20262027/UTA/3.png',
       },
     ])
   })

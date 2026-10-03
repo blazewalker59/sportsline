@@ -76,7 +76,8 @@ async function syncLeagueRoster(
         }),
     )
   }
-  for (const part of chunk(roster.players, 19)) {
+  // Six columns a row: 16 rows stay under D1's 100 bound parameters.
+  for (const part of chunk(roster.players, 16)) {
     statements.push(
       db
         .insert(players)
@@ -89,6 +90,7 @@ async function syncLeagueRoster(
               ? (teamIds.get(p.teamSourceId) ?? null)
               : null,
             position: p.position,
+            headshotUrl: p.headshotUrl ?? null,
           })),
         )
         .onConflictDoUpdate({
@@ -97,6 +99,7 @@ async function syncLeagueRoster(
             name: sql`excluded.name`,
             teamId: sql`excluded.team_id`,
             position: sql`excluded.position`,
+            headshotUrl: sql`excluded.headshot_url`,
           },
         }),
     )
