@@ -244,6 +244,13 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
           homeScore: snapshot.score.home,
           situation: snapshot.situation,
           box,
+          // Only a Source that ranks teams (college football) sets these.
+          ...(snapshot.away.rank !== undefined
+            ? {
+                awayRank: snapshot.away.rank,
+                homeRank: snapshot.home.rank ?? null,
+              }
+            : {}),
           updatedAt: now,
         })
         .where(eq(games.id, game.gameId)),
@@ -326,10 +333,12 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
     const away = {
       ...game.awayTeam,
       colors: teamColors(game.league, game.awayTeam.name),
+      rank: snapshot.away.rank ?? null,
     }
     const home = {
       ...game.homeTeam,
       colors: teamColors(game.league, game.homeTeam.name),
+      rank: snapshot.home.rank ?? null,
     }
     const events: Array<TimelineEvent> = [
       {
@@ -340,8 +349,8 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
           sportsDay: game.sportsDay,
           status: snapshot.status,
           startsAt: snapshot.startsAt,
-          awayTeam: game.awayTeam,
-          homeTeam: game.homeTeam,
+          awayTeam: away,
+          homeTeam: home,
           score: snapshot.score,
           situation: snapshot.situation,
         },

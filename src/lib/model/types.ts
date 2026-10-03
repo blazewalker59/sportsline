@@ -35,6 +35,8 @@ export interface SourceTeam extends SourceRef {
   abbreviation: string
   /** A logo that reads on a dark background, from the Source's CDN. */
   logoUrl: string | null
+  /** College football, in a Game: the team's AP Top 25 rank then, if ranked. */
+  rank?: number | null
 }
 
 export interface InvolvedPlayer extends SourceRef {

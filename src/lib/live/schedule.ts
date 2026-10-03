@@ -117,6 +117,8 @@ async function syncLeague(
       homeTeamId: teamIds.get(g.home.sourceId)!,
       awayScore: g.score.away,
       homeScore: g.score.home,
+      awayRank: g.away.rank ?? null,
+      homeRank: g.home.rank ?? null,
       updatedAt: nowIso,
     }
     // Once a LiveGame owns a Game (live or later), it writes the row.
@@ -127,6 +129,8 @@ async function syncLeague(
             .set({
               startsAt: row.startsAt,
               status: row.status,
+              awayRank: row.awayRank,
+              homeRank: row.homeRank,
               updatedAt: nowIso,
             })
             .where(

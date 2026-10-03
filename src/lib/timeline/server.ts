@@ -10,6 +10,7 @@ import {
   desc,
   eq,
   inArray,
+  isNotNull,
   lt,
   ne,
   or,
@@ -78,6 +79,28 @@ export const getTimeline = createServerFn({ method: 'GET' })
             )!,
       )
     }
+    if (follows.some((f) => f.kind === 'top25')) {
+      covered.push(
+        and(
+          eq(t.league, 'cfb'),
+          inArray(
+            t.gameId,
+            db
+              .select({ id: games.id })
+              .from(games)
+              .where(
+                and(
+                  eq(games.sportsDay, sportsDay),
+                  or(isNotNull(games.awayRank), isNotNull(games.homeRank)),
+                ),
+              ),
+          ),
+          data.includeRoutine
+            ? undefined
+            : or(ne(t.kind, 'play'), ne(t.significance, 'routine')),
+        )!,
+      )
+    }
     if (teamIds.length > 0) {
       covered.push(
         or(inArray(t.awayTeamId, teamIds), inArray(t.homeTeamId, teamIds))!,
@@ -103,6 +126,7 @@ export const getTimeline = createServerFn({ method: 'GET' })
     const rows = await db
       .select({
         item: t,
+        ranks: { away: games.awayRank, home: games.homeRank },
         away: {
           id: away.id,
           abbreviation: away.abbreviation,
@@ -119,6 +143,7 @@ export const getTimeline = createServerFn({ method: 'GET' })
         },
       })
       .from(t)
+      .innerJoin(games, eq(games.id, t.gameId))
       .innerJoin(away, eq(away.id, t.awayTeamId))
       .innerJoin(home, eq(home.id, t.homeTeamId))
       .where(
@@ -135,7 +160,11 @@ export const getTimeline = createServerFn({ method: 'GET' })
     return {
       sportsDay,
       items: page.map((r) =>
-        toTimelineItem(r.item, withColors(r.away), withColors(r.home)),
+        toTimelineItem(
+          r.item,
+          { ...withColors(r.away), rank: r.ranks.away },
+          { ...withColors(r.home), rank: r.ranks.home },
+        ),
       ),
       nextBefore:
         rows.length > PAGE_SIZE ? (page.at(-1)?.item.occurredAt ?? null) : null,

@@ -1,10 +1,11 @@
 /**
  * College football Source adapter: ESPN's site and core APIs, the same
  * shapes as the NFL's. Only part of FBS is covered (CONTEXT.md, "League"):
- * games involving a team from a COVERED_CONFERENCES conference or a
- * COVERED_TEAMS independent, whoever the opponent is.
+ * games involving a team from a COVERED_CONFERENCES conference, a
+ * COVERED_TEAMS independent or an AP Top 25 team, whoever the opponent is.
  */
 
+import { top25 } from '../espn/common'
 import { parseGame, parseRoster, parseScoreboard } from '../nfl/parse'
 import { fetchWithRetry, mapPool } from '../pool'
 import type {
@@ -50,6 +51,7 @@ export function isCovered(
 ): boolean {
   return (event.competitions?.[0]?.competitors ?? []).some(
     (c) =>
+      top25(c) !== null ||
       COVERED_TEAMS.has(c.team.id) ||
       (c.team.conferenceId !== undefined &&
         COVERED_CONFERENCES.has(c.team.conferenceId)),

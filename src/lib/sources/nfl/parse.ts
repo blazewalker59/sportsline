@@ -179,11 +179,13 @@ export function parseGame(
       home: row.homeScore ?? previous.home,
     }
     const rose = reported.away > previous.away || reported.home > previous.home
-    // ESPN's own flag decides Scoring: a live row can briefly carry a score
-    // from a later play (a punt reading 0–10 before the touchdown), and a
-    // timeout can share a field goal's sequence number. A score that rises
-    // on a play ESPN says didn't score is that glitch: keep the old one.
-    const score = row.scoringPlay === false && rose ? previous : reported
+    // ESPN's own flag decides Scoring, and only a Scoring play moves the
+    // score: other rows' scores are unreliable mid-game (a punt reading
+    // 0–10 before the touchdown; a penalty on a two-point try dipping back
+    // below the touchdown's score). A two-point conversion is credited when
+    // ESPN updates its touchdown's row, so the points revise the touchdown
+    // instead of landing on the next play.
+    const score = row.scoringPlay === false ? previous : reported
     const occurredAt = wallclock.get(row.id) ?? row.modified ?? competition.date
 
     if (SEGMENT_END_TYPES.has(type) || GAME_END_TYPES.has(type)) {

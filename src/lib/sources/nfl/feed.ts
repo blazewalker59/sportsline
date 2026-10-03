@@ -28,6 +28,9 @@ export interface EspnCompetitor {
     conferenceId?: string
   }
   linescores?: Array<{ displayValue?: string }>
+  /** College football rankings: the summary's `rank`, the scoreboard's curatedRank (99 when unranked). */
+  rank?: number
+  curatedRank?: { current?: number }
 }
 
 export interface EspnDrivePlay {

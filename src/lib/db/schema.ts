@@ -171,6 +171,9 @@ export const games = sqliteTable(
       .references(() => teams.id),
     awayScore: integer('away_score').notNull().default(0),
     homeScore: integer('home_score').notNull().default(0),
+    /** College football: each team's AP Top 25 rank at this Game, if ranked. */
+    awayRank: integer('away_rank'),
+    homeRank: integer('home_rank'),
     situation: text('situation', { mode: 'json' }).$type<Situation | null>(),
     box: text('box', { mode: 'json' }).$type<GameBox | null>(),
     updatedAt: text('updated_at').notNull(),
@@ -248,6 +251,20 @@ export const follows = sqliteTable(
   (table) => [
     primaryKey({ columns: [table.viewerId, table.kind, table.target] }),
   ],
+)
+
+/** A Viewer's Reaction to a Timeline item (CONTEXT.md): one emoji each. */
+export const reactions = sqliteTable(
+  'reactions',
+  {
+    itemId: text('item_id').notNull(),
+    viewerId: text('viewer_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    emoji: text('emoji').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.itemId, table.viewerId] })],
 )
 
 /** Where each Viewer stopped reading the Timeline (CONTEXT.md, "Read Marker"). */

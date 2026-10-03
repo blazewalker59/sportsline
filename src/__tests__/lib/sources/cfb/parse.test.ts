@@ -5,6 +5,7 @@ import type { NflCorePlays, NflSummary } from '@/lib/sources/nfl/feed'
 import type { SourceMilestone, SourcePlay } from '@/lib/model/types'
 import type { TimelineItem } from '@/lib/model/timeline'
 import { isCovered } from '@/lib/sources/cfb'
+import { top25 } from '@/lib/sources/espn/common'
 import { scoringSummary } from '@/lib/timeline/sides'
 import { collegeDescription, parseGame } from '@/lib/sources/nfl/parse'
 
@@ -134,6 +135,28 @@ describe('isCovered', () => {
         ),
       ),
     ).toBe(false)
+  })
+
+  it('also covers any game with an AP Top 25 team', () => {
+    const g5 = event(
+      { id: '2', conferenceId: '151' },
+      { id: '3', conferenceId: '37' },
+    )
+    g5.competitions[0].competitors[1] = {
+      ...g5.competitions[0].competitors[1],
+      curatedRank: { current: 22 },
+    } as (typeof g5.competitions)[0]['competitors'][1]
+    expect(isCovered(g5)).toBe(true)
+  })
+})
+
+describe('top25', () => {
+  it('reads either ranking field and drops the unranked 99', () => {
+    const c = { id: '1', homeAway: 'home' as const, team: { id: '1' } }
+    expect(top25({ ...c, curatedRank: { current: 14 } })).toBe(14)
+    expect(top25({ ...c, rank: 1 })).toBe(1)
+    expect(top25({ ...c, curatedRank: { current: 99 } })).toBeNull()
+    expect(top25(c)).toBeNull()
   })
 })
 

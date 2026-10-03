@@ -10,7 +10,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, eq, like, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import type { Database } from '@/lib/db'
-import type { Follow } from '@/lib/model/timeline'
+import type { ViewerFollow } from '@/lib/model/timeline'
 import type { League } from '@/lib/model/types'
 import { getAuth } from '@/lib/auth/server'
 import { getCloudflareEnv, getDb, serverRequestContext } from '@/lib/db'
@@ -25,7 +25,7 @@ export interface ViewerProfile {
 
 /** A Follow with what the UI needs to show it. */
 export interface FollowEntry {
-  follow: Follow
+  follow: ViewerFollow
   label: string
   detail: string | null
   league: League

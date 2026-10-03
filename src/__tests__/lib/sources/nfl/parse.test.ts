@@ -106,3 +106,47 @@ describe('quarterLabel', () => {
     expect(quarterLabel(6)).toBe('2OT')
   })
 })
+
+describe('two-point conversions', () => {
+  // PIT @ CLE: a two-point try, re-run after a penalty whose row dips back
+  // to the pre-conversion score.
+  const row = (
+    sequenceNumber: string,
+    type: string,
+    score: [number, number],
+    scoringPlay: boolean,
+  ) => ({
+    id: sequenceNumber,
+    sequenceNumber,
+    type: { text: type },
+    text: type,
+    awayScore: score[0],
+    homeScore: score[1],
+    scoringPlay,
+    period: { number: 4 },
+  })
+  const game = parseGame(
+    summaryFixture as unknown as NflSummary,
+    {
+      items: [
+        row('379200', 'Field Goal Good', [16, 24], true),
+        row('435300', 'Passing Touchdown', [24, 24], true),
+        row('437900', 'Penalty', [22, 24], false),
+        row('441200', 'Kickoff', [24, 24], false),
+        row('463600', 'Field Goal Good', [24, 27], true),
+      ],
+    } as unknown as NflCorePlays,
+  )
+  const play = (type: string) =>
+    game.items.find(
+      (i): i is SourcePlay => i.kind === 'play' && i.playType === type,
+    )!
+
+  it('credits the conversion to the touchdown and never dips the score', () => {
+    expect(play('Passing Touchdown').score).toEqual({ away: 24, home: 24 })
+    expect(play('Penalty').score).toEqual({ away: 24, home: 24 })
+    expect(play('Penalty').significance).not.toBe('scoring')
+    expect(play('Kickoff').score).toEqual({ away: 24, home: 24 })
+    expect(play('Kickoff').significance).not.toBe('scoring')
+  })
+})

@@ -28,6 +28,8 @@ export interface TeamRef {
   logoUrl: string | null
   /** Primary/secondary brand colors, when known. */
   colors?: TeamColors | null
+  /** College football: AP Top 25 rank at this Game, if ranked. */
+  rank?: number | null
 }
 
 export interface TimelineItem {
@@ -63,6 +65,14 @@ export type Follow =
   | { kind: 'league'; league: League }
   | { kind: 'team'; teamId: string }
   | { kind: 'player'; playerId: string }
+  /**
+   * College football Games with an AP Top 25 team (the Top 25 Scope).
+   * Coverage only: never stored as a Viewer's Follow.
+   */
+  | { kind: 'top25' }
+
+/** A Follow a Viewer can save (CONTEXT.md, "Follow"). */
+export type ViewerFollow = Exclude<Follow, { kind: 'top25' }>
 
 export interface TimelineFilter {
   follows: Array<Follow>
@@ -122,11 +132,26 @@ export function matchesFilter(
           item.significance !== 'routine' ||
           Boolean(filter.includeRoutine)
         )
+      case 'top25':
+        if (item.league !== 'cfb' || !isRanked(item)) return false
+        return (
+          item.kind !== 'play' ||
+          item.significance !== 'routine' ||
+          Boolean(filter.includeRoutine)
+        )
     }
   })
 }
 
-/** `league:mlb,team:tm_x,player:pl_y` ↔ Follows (URL and socket form). */
+/** Does a Game (or one of its items) have an AP Top 25 team? */
+export function isRanked(game: {
+  awayTeam: Pick<TeamRef, 'rank'>
+  homeTeam: Pick<TeamRef, 'rank'>
+}): boolean {
+  return Boolean(game.awayTeam.rank || game.homeTeam.rank)
+}
+
+/** `league:mlb,team:tm_x,player:pl_y,top25:cfb` ↔ Follows (URL and socket form). */
 export function followsToParam(follows: ReadonlyArray<Follow>): string {
   return follows
     .map((f) =>
@@ -134,7 +159,9 @@ export function followsToParam(follows: ReadonlyArray<Follow>): string {
         ? `league:${f.league}`
         : f.kind === 'team'
           ? `team:${f.teamId}`
-          : `player:${f.playerId}`,
+          : f.kind === 'player'
+            ? `player:${f.playerId}`
+            : 'top25:cfb',
     )
     .join(',')
 }
@@ -156,6 +183,7 @@ export function followsFromParam(
       return [{ kind: 'team', teamId: value }]
     if (kind === 'player' && /^pl_\w+$/.test(value))
       return [{ kind: 'player', playerId: value }]
+    if (kind === 'top25' && value === 'cfb') return [{ kind: 'top25' }]
     return []
   })
 }

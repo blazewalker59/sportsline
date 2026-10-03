@@ -61,7 +61,14 @@ export function competitorTeam(
     name: c.team.displayName ?? c.team.name ?? c.team.id,
     abbreviation,
     logoUrl: teamLogo(league, abbreviation, c.team.id),
+    ...(league === 'cfb' ? { rank: top25(c) } : {}),
   }
+}
+
+/** A college team's AP Top 25 rank, or null when unranked. */
+export function top25(c: EspnCompetitor): number | null {
+  const rank = c.curatedRank?.current ?? c.rank
+  return rank !== undefined && rank >= 1 && rank <= 25 ? rank : null
 }
 
 /** The numeric id at the end of an ESPN `$ref` path segment, e.g. `/athletes/8439`. */

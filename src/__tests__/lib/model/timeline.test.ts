@@ -108,3 +108,35 @@ describe('Game filter', () => {
     ).toBe(false)
   })
 })
+
+describe('Top 25 coverage', () => {
+  const ranked = item({
+    league: 'cfb',
+    significance: 'scoring',
+    awayTeam: { id: 'tm_a', abbreviation: 'TEX', logoUrl: null, rank: 1 },
+  })
+  const unranked = item({ league: 'cfb', significance: 'scoring' })
+
+  it('covers college games with a ranked team, Routine only when asked', () => {
+    const filter = { follows: [{ kind: 'top25' as const }] }
+    expect(matchesFilter(ranked, filter)).toBe(true)
+    expect(matchesFilter(unranked, filter)).toBe(false)
+    expect(matchesFilter({ ...ranked, significance: 'routine' }, filter)).toBe(
+      false,
+    )
+    expect(
+      matchesFilter(
+        { ...ranked, significance: 'routine' },
+        { ...filter, includeRoutine: true },
+      ),
+    ).toBe(true)
+  })
+
+  it('round-trips through the URL form', () => {
+    expect(followsToParam([{ kind: 'top25' }])).toBe('top25:cfb')
+    expect(followsFromParam('league:nfl,top25:cfb')).toEqual([
+      { kind: 'league', league: 'nfl' },
+      { kind: 'top25' },
+    ])
+  })
+})

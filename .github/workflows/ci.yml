@@ -90,7 +90,13 @@ jobs:
           path: dist/
       # Worker secrets (BETTER_AUTH_SECRET, BETTER_AUTH_URL, GOOGLE_CLIENT_ID,
       # GOOGLE_CLIENT_SECRET) are set out-of-band with `wrangler secret put`.
-      # D1 migrations are applied by hand: `bun run db:migrate:remote`.
+      # Migrations go first, so new code never queries columns that don't
+      # exist yet; a failure here stops the deploy.
+      - name: Apply D1 migrations
+        run: bunx wrangler d1 migrations apply sportsline-db --remote --env production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       - name: Deploy
         run: bunx wrangler deploy dist/server/index.js --config wrangler.jsonc --env production
         env:

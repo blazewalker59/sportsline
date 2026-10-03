@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import { getViewerState, markRead, setFollow } from './server'
-import type { Follow, TimelineItem } from '@/lib/model/timeline'
+import type { Follow, TimelineItem, ViewerFollow } from '@/lib/model/timeline'
 import type { FollowEntry, ViewerState } from './server'
 import { followsToParam } from '@/lib/model/timeline'
 
@@ -27,7 +27,7 @@ export function useSetFollow() {
       follow,
       following,
     }: {
-      follow: Follow
+      follow: ViewerFollow
       following: boolean
     }) => {
       const target =

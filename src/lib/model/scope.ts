@@ -1,14 +1,15 @@
-/** A Timeline's Scope (CONTEXT.md): All, Following, or one League. */
+/** A Timeline's Scope (CONTEXT.md): All, Following, one League, or Top 25. */
 
 import { DEFAULT_FOLLOWS } from './timeline'
 import { LEAGUES } from './types'
 import type { Follow } from './timeline'
 import type { League } from './types'
 
-export type Scope = 'all' | 'following' | League
+export type Scope = 'all' | 'following' | 'top25' | League
 
 export function parseScope(value: unknown): Scope | undefined {
-  if (value === 'all' || value === 'following') return value
+  if (value === 'all' || value === 'following' || value === 'top25')
+    return value
   return (LEAGUES as ReadonlyArray<unknown>).includes(value)
     ? (value as League)
     : undefined
@@ -29,6 +30,8 @@ export function scopeFollows(
       return DEFAULT_FOLLOWS
     case 'following':
       return viewerFollows.length > 0 ? viewerFollows : DEFAULT_FOLLOWS
+    case 'top25':
+      return [{ kind: 'top25' }]
     default:
       return [{ kind: 'league', league: scope }]
   }

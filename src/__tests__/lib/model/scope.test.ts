@@ -26,3 +26,10 @@ describe('Scope', () => {
     expect(parseScope('xfl')).toBeUndefined()
   })
 })
+
+describe('Top 25 Scope', () => {
+  it('parses and covers ranked college games', () => {
+    expect(parseScope('top25')).toBe('top25')
+    expect(scopeFollows('top25', [])).toEqual([{ kind: 'top25' }])
+  })
+})

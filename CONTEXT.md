@@ -7,7 +7,7 @@ A live, livestream-style timeline of play-by-play across the sports a viewer car
 ### Leagues & Sources
 
 **League**:
-One of the competitions Sportsline covers: MLB, NBA, NFL, NHL and college football. College football is covered only in part: games involving a team from the ACC, Big 12, Big Ten or SEC, or Notre Dame, whoever the opponent is. Other leagues are out of scope.
+One of the competitions Sportsline covers: MLB, NBA, NFL, NHL and college football. College football is covered only in part: games involving a team from the ACC, Big 12, Big Ten or SEC, Notre Dame, or a Ranked team, whoever the opponent is. Other leagues are out of scope.
 _Avoid_: sport (a sport can span several leagues)
 
 **Source**:
@@ -87,8 +87,12 @@ The live, reverse-chronological stream of Plays and Game Milestones in the Viewe
 _Avoid_: feed, stream, ticker
 
 **Scope**:
-Which Plays a Timeline draws from: All (every League), Following (the Viewer's Follows) or a single League. A Viewer switches Scope freely; it starts on Following when they follow anything, otherwise All.
+Which Plays a Timeline draws from: All (every League), Following (the Viewer's Follows), a single League, or Top 25 (college football Games with a Ranked team). A Viewer switches Scope freely; it starts on Following when they follow anything, otherwise All.
 _Avoid_: view, tab, mode
+
+**Ranked**:
+A college football team in the AP Top 25 when a Game is played. The rank belongs to the Game, not the Team: it is the team's rank that week. Any Game with a Ranked team is covered, whatever the conferences.
+_Avoid_: top team, rated
 
 **Highlights**:
 A Timeline filter that keeps only Scoring and Notable Plays (and Game Milestones).
@@ -101,6 +105,14 @@ _Avoid_: date, game day
 **Read Marker**:
 A Viewer's position on the Timeline when they last stopped reading, shown as a "you were here" divider when they return.
 _Avoid_: bookmark, last seen
+
+**Catch-up**:
+What happened while the Viewer was away, offered at the top of the Timeline when they return past their Read Marker: the Finals and the key Plays since then. Dismissing it does not move the Read Marker.
+_Avoid_: recap, digest, summary
+
+**Reaction**:
+A Viewer's one-emoji response to a Play. Each Viewer has at most one Reaction per Play; reacting again replaces it.
+_Avoid_: like, emote
 
 **Alert**:
 A push notification to a Viewer's device for a Scoring Play, an Overturn of a score, or a Final, in a Game their Team or Player Follows cover. League Follows never Alert. Never sent for history a LiveGame backfills.

@@ -10,6 +10,7 @@ import type { FeedEntry, Typing } from '@/lib/timeline/chat'
 import type { Follow, GameSummary } from '@/lib/model/timeline'
 import type { Connection } from '@/lib/timeline/useLiveTimeline'
 import { defaultScope, scopeFollows } from '@/lib/model/scope'
+import { isRanked } from '@/lib/model/timeline'
 import { takePlayOpened } from '@/lib/timeline/playSheet'
 import { PlaySheet } from '@/components/games/PlayDetailScreen'
 import { useHideOnScroll } from '@/lib/useHideOnScroll'
@@ -96,7 +97,9 @@ function followsGame(
       ? f.league === game.league
       : f.kind === 'team'
         ? f.teamId === game.awayTeam.id || f.teamId === game.homeTeam.id
-        : false,
+        : f.kind === 'top25'
+          ? game.league === 'cfb' && isRanked(game)
+          : false,
   )
 }
 

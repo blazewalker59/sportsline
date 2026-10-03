@@ -113,6 +113,11 @@ function GameCard({
           >
             <TeamLogo team={team} size={22} />
             <span className="flex-1 text-[13px] font-semibold">
+              {team.rank && (
+                <span className="mr-0.5 text-[10px] font-bold text-muted">
+                  {team.rank}
+                </span>
+              )}
               {team.abbreviation}
             </span>
             <span>{started ? game.score[side] : ''}</span>

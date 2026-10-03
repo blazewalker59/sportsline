@@ -1,4 +1,4 @@
-import type { Follow } from '@/lib/model/timeline'
+import type { ViewerFollow } from '@/lib/model/timeline'
 import { cn } from '@/lib/utils'
 import { followKey, useSetFollow, useViewer } from '@/lib/viewer/useViewer'
 
@@ -6,7 +6,7 @@ export function FollowButton({
   follow,
   className,
 }: {
-  follow: Follow
+  follow: ViewerFollow
   className?: string
 }) {
   const { data } = useViewer()
