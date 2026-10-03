@@ -141,15 +141,16 @@ export interface NhlStandings {
   standings?: Array<{ teamAbbrev?: Localized }>
 }
 
-export interface NhlRoster {
-  forwards?: Array<NhlRosterPlayer>
-  defensemen?: Array<NhlRosterPlayer>
-  goalies?: Array<NhlRosterPlayer>
-}
-
-interface NhlRosterPlayer {
-  id: number
-  firstName?: Localized
-  lastName?: Localized
-  positionCode?: string
+/**
+ * The stats API's player bios for a season (`/stats/rest/en/skater/bios`,
+ * `/goalie/bios`): every player who appeared, with their current team.
+ */
+export interface NhlBios {
+  data?: Array<{
+    playerId: number
+    skaterFullName?: string
+    goalieFullName?: string
+    positionCode?: string
+    currentTeamAbbrev?: string | null
+  }>
 }

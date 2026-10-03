@@ -9,10 +9,10 @@
  */
 
 import type {
+  NhlBios,
   NhlBoxscore,
   NhlPlay,
   NhlPlayByPlay,
-  NhlRoster,
   NhlSchedule,
   NhlStandings,
   NhlStatsTeams,
@@ -598,10 +598,15 @@ export function parseSchedule(
   }))
 }
 
+/**
+ * Teams from the stats API and standings; Players from season bios (this
+ * season's and last, so a player yet to appear this season is still
+ * listed). A player without a current team is left out.
+ */
 export function parseRoster(
   teams: NhlStatsTeams,
   standings: NhlStandings,
-  rosters: ReadonlyArray<{ abbrev: string; roster: NhlRoster }>,
+  bios: ReadonlyArray<NhlBios>,
 ): SourceRoster {
   const current = new Set(
     (standings.standings ?? []).flatMap((s) =>
@@ -628,20 +633,24 @@ export function parseRoster(
       abbreviation: t.triCode!,
       logoUrl: nhlLogo(t.triCode!),
     })),
-    players: rosters.flatMap(({ abbrev, roster }) =>
-      [
-        ...(roster.forwards ?? []),
-        ...(roster.defensemen ?? []),
-        ...(roster.goalies ?? []),
-      ].map((p) => ({
-        sourceId: String(p.id),
-        name:
-          [p.firstName?.default, p.lastName?.default]
-            .filter(Boolean)
-            .join(' ') || `#${p.id}`,
-        teamSourceId: idByAbbrev.get(abbrev) ?? null,
-        position: p.positionCode ?? null,
-      })),
-    ),
+    players: [
+      ...new Map(
+        bios
+          .flatMap((b) => b.data ?? [])
+          .flatMap((p) => {
+            const teamSourceId = p.currentTeamAbbrev
+              ? idByAbbrev.get(p.currentTeamAbbrev)
+              : undefined
+            if (!teamSourceId) return []
+            const player = {
+              sourceId: String(p.playerId),
+              name: p.skaterFullName ?? p.goalieFullName ?? `#${p.playerId}`,
+              teamSourceId,
+              position: p.positionCode ?? (p.goalieFullName ? 'G' : null),
+            }
+            return [[player.sourceId, player] as const]
+          }),
+      ).values(),
+    ],
   }
 }
