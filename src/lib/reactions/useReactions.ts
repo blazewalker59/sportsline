@@ -35,7 +35,10 @@ export function useSetReaction(sportsDay: string) {
       )
     },
     onSettled: () =>
-      queryClient.invalidateQueries({ queryKey: key(sportsDay) }),
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: key(sportsDay) }),
+        queryClient.invalidateQueries({ queryKey: ['my-reactions'] }),
+      ]),
   })
 }
 

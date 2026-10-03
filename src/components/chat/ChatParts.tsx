@@ -173,7 +173,7 @@ function PlayBubbleLink({
     const summary = scoringSummary(item)
     return (
       <Link
-        to="/"
+        to="."
         search={(prev) => ({ ...prev, play: item.id })}
         resetScroll={false}
         onClick={markPlayOpened}
@@ -237,7 +237,7 @@ function PlayBubbleLink({
   const tints = bubbleTints(actingTeam(item).colors)
   return (
     <Link
-      to="/"
+      to="."
       search={(prev) => ({ ...prev, play: item.id })}
       resetScroll={false}
       onClick={markPlayOpened}
@@ -413,7 +413,7 @@ export function Notice({
   }
   return (
     <Link
-      to="/"
+      to="."
       search={(prev) => ({ ...prev, play: item.id })}
       resetScroll={false}
       onClick={markPlayOpened}

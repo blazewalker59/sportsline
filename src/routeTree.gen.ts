@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as FollowsRouteImport } from './routes/follows'
+import { Route as ReactionsRouteImport } from './routes/reactions'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
 import { Route as PlaysPlayIdRouteImport } from './routes/plays.$playId'
 
@@ -22,6 +23,11 @@ const IndexRoute = IndexRouteImport.update({
 const FollowsRoute = FollowsRouteImport.update({
   id: '/follows',
   path: '/follows',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReactionsRoute = ReactionsRouteImport.update({
+  id: '/reactions',
+  path: '/reactions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GamesGameIdRoute = GamesGameIdRouteImport.update({
@@ -38,12 +44,14 @@ const PlaysPlayIdRoute = PlaysPlayIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/follows': typeof FollowsRoute
+  '/reactions': typeof ReactionsRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/plays/$playId': typeof PlaysPlayIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/follows': typeof FollowsRoute
+  '/reactions': typeof ReactionsRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/plays/$playId': typeof PlaysPlayIdRoute
 }
@@ -51,20 +59,29 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/follows': typeof FollowsRoute
+  '/reactions': typeof ReactionsRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/plays/$playId': typeof PlaysPlayIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/follows' | '/games/$gameId' | '/plays/$playId'
+  fullPaths:
+    '/' | '/follows' | '/reactions' | '/games/$gameId' | '/plays/$playId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/follows' | '/games/$gameId' | '/plays/$playId'
-  id: '__root__' | '/' | '/follows' | '/games/$gameId' | '/plays/$playId'
+  to: '/' | '/follows' | '/reactions' | '/games/$gameId' | '/plays/$playId'
+  id:
+    | '__root__'
+    | '/'
+    | '/follows'
+    | '/reactions'
+    | '/games/$gameId'
+    | '/plays/$playId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   FollowsRoute: typeof FollowsRoute
+  ReactionsRoute: typeof ReactionsRoute
   GamesGameIdRoute: typeof GamesGameIdRoute
   PlaysPlayIdRoute: typeof PlaysPlayIdRoute
 }
@@ -83,6 +100,13 @@ declare module '@tanstack/react-router' {
       path: '/follows'
       fullPath: '/follows'
       preLoaderRoute: typeof FollowsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reactions': {
+      id: '/reactions'
+      path: '/reactions'
+      fullPath: '/reactions'
+      preLoaderRoute: typeof ReactionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/games/$gameId': {
@@ -105,6 +129,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   FollowsRoute: FollowsRoute,
+  ReactionsRoute: ReactionsRoute,
   GamesGameIdRoute: GamesGameIdRoute,
   PlaysPlayIdRoute: PlaysPlayIdRoute,
 }

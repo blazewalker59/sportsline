@@ -96,6 +96,13 @@ function AccountButton() {
           >
             Follows
           </Link>
+          <Link
+            to="/reactions"
+            onClick={() => setOpen(false)}
+            className="block rounded-lg px-3 py-2 hover:bg-background"
+          >
+            Reactions
+          </Link>
           <AlertsItem />
           <button
             type="button"
