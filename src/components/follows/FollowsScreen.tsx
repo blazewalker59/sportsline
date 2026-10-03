@@ -135,6 +135,14 @@ function EntryRow({ entry }: { entry: FollowEntry }) {
         >
           {body}
         </Link>
+      ) : entry.follow.kind === 'team' ? (
+        <Link
+          to="/teams/$teamId"
+          params={{ teamId: entry.follow.teamId }}
+          className="flex min-w-0 flex-1 items-center gap-3"
+        >
+          {body}
+        </Link>
       ) : (
         <span className="flex min-w-0 flex-1 items-center gap-3">{body}</span>
       )}

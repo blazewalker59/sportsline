@@ -100,6 +100,71 @@ export function refId(ref: string | undefined, kind: string): string | null {
   return ref?.match(new RegExp(`/${kind}/(\\d+)`))?.[1] ?? null
 }
 
+/**
+ * ESPN's team schedule (`/teams/{id}/schedule`): scoreboard-like events,
+ * but scores are objects and the status sits on the competition.
+ */
+export interface EspnTeamSchedule {
+  events?: Array<{
+    id: string
+    date: string
+    competitions?: Array<{
+      status?: EspnStatus
+      competitors?: Array<
+        Omit<EspnCompetitor, 'score'> & {
+          score?: string | { displayValue?: string; value?: number }
+        }
+      >
+    }>
+  }>
+}
+
+export function parseTeamSchedule(
+  schedule: EspnTeamSchedule,
+  league: EspnLeague,
+): Array<ScheduledGame> {
+  return parseScoreboard(
+    {
+      events: (schedule.events ?? []).map((e) => {
+        const c = e.competitions?.[0]
+        return {
+          id: e.id,
+          date: e.date,
+          status: c?.status,
+          competitions: [
+            {
+              competitors: (c?.competitors ?? []).map((t) => ({
+                ...t,
+                score:
+                  typeof t.score === 'object' ? t.score.displayValue : t.score,
+              })),
+            },
+          ],
+        }
+      }),
+    },
+    league,
+  )
+}
+
+/** A Team's regular season and postseason from ESPN, merged. */
+export async function fetchTeamSchedule(
+  site: string,
+  teamId: string,
+  league: EspnLeague,
+  getJson: <T>(url: string) => Promise<T>,
+): Promise<Array<ScheduledGame>> {
+  const seasons = await Promise.all(
+    [2, 3].map((type) =>
+      getJson<EspnTeamSchedule>(
+        `${site}/teams/${encodeURIComponent(teamId)}/schedule?seasontype=${type}`,
+      ).catch(() => ({ events: [] })),
+    ),
+  )
+  const games = seasons.flatMap((s) => parseTeamSchedule(s, league))
+  return [...new Map(games.map((g) => [g.sourceGameId, g])).values()]
+}
+
 export function parseScoreboard(
   scoreboard: NflScoreboard,
   league: EspnLeague,

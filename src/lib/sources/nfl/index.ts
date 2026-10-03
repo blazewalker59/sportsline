@@ -1,6 +1,7 @@
 /** NFL Source adapter: ESPN's public site and core APIs. */
 
 import { fetchWithRetry, mapPool } from '../pool'
+import { fetchTeamSchedule } from '../espn/common'
 import { parseGame, parseRoster, parseScoreboard } from './parse'
 import type {
   NflCorePlays,
@@ -54,5 +55,8 @@ export const nflAdapter: SourceAdapter = {
       roster: await getJson<NflRoster>(`${SITE}/teams/${teamId}/roster`),
     }))
     return parseRoster(teams, rosters)
+  },
+  teamSchedule(team) {
+    return fetchTeamSchedule(SITE, team.sourceId, 'nfl', getJson)
   },
 }

@@ -35,6 +35,7 @@ import {
   Notice,
   ReadDivider,
   TeamAvatar,
+  TeamAvatarLink,
   TypingDots,
 } from '@/components/chat/ChatParts'
 import { AppHeader } from '@/components/layout/AppHeader'
@@ -519,31 +520,31 @@ function Cluster({
         align === 'right' && 'flex-row-reverse',
       )}
     >
-      <Link
-        to="/"
-        search={(prev) => ({
-          ...prev,
-          play: undefined,
-          ...gameSearch(entry.gameId, lead.sportsDay),
-        })}
-        viewTransition
-        resetScroll={false}
-        aria-label={`Show only the ${team.abbreviation} game`}
-      >
-        <TeamAvatar team={team} />
-      </Link>
+      <TeamAvatarLink team={team} />
       <div
         className={cn(
           'flex min-w-0 flex-col gap-1',
           align === 'right' && 'items-end',
         )}
       >
-        <span className="px-1 text-[11px] text-muted">
+        {/* The avatar opens the Team; this line opens just this Game. */}
+        <Link
+          to="/"
+          search={(prev) => ({
+            ...prev,
+            play: undefined,
+            ...gameSearch(entry.gameId, lead.sportsDay),
+          })}
+          viewTransition
+          resetScroll={false}
+          aria-label={`Show only the ${team.abbreviation} game`}
+          className="px-1 text-[11px] text-muted"
+        >
           <span className="font-semibold text-foreground/80">
             {team.abbreviation}
           </span>{' '}
           · {lead.segmentLabel} · {timeAgo(lead.occurredAt, now)}
-        </span>
+        </Link>
         <BubbleStack bubbles={entry.bubbles} align={align} />
       </div>
     </div>

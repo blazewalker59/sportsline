@@ -5,7 +5,7 @@
  * COVERED_TEAMS independent or an AP Top 25 team, whoever the opponent is.
  */
 
-import { top25 } from '../espn/common'
+import { fetchTeamSchedule, top25 } from '../espn/common'
 import { parseGame, parseRoster, parseScoreboard } from '../nfl/parse'
 import { fetchWithRetry, mapPool } from '../pool'
 import type {
@@ -131,5 +131,8 @@ export const cfbAdapter: SourceAdapter = {
       roster: await getJson<NflRoster>(`${SITE}/teams/${teamId}/roster`),
     }))
     return parseRoster(teams, rosters, 'cfb')
+  },
+  teamSchedule(team) {
+    return fetchTeamSchedule(SITE, team.sourceId, 'cfb', getJson)
   },
 }

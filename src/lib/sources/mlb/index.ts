@@ -34,4 +34,13 @@ export const mlbAdapter: SourceAdapter = {
     ])
     return parseRoster(teams, people)
   },
+  async teamSchedule(team) {
+    // A season is a calendar year; before spring training, show the last.
+    const now = new Date()
+    const season = now.getUTCFullYear() - (now.getUTCMonth() < 2 ? 1 : 0)
+    const schedule = await getJson<MlbSchedule>(
+      `${BASE}/v1/schedule?sportId=1&teamId=${encodeURIComponent(team.sourceId)}&season=${season}&gameType=R,F,D,L,W&hydrate=team`,
+    )
+    return parseSchedule(schedule)
+  },
 }

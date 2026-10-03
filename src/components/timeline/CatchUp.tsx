@@ -13,6 +13,7 @@ import {
   Notice,
   PlayBubble,
   TeamAvatar,
+  TeamAvatarLink,
 } from '@/components/chat/ChatParts'
 
 const DISMISSED_KEY = 'sportsline:catchup-dismissed'
@@ -137,7 +138,7 @@ export function CatchUpSheet({
             return (
               <div key={item.id} className="flex items-end gap-2">
                 {item.side ? (
-                  <TeamAvatar team={team} />
+                  <TeamAvatarLink team={team} />
                 ) : (
                   <LeagueAvatar league={item.league} />
                 )}

@@ -49,6 +49,26 @@ export function TeamAvatar({
   )
 }
 
+/** A Team's avatar that opens its Team page. */
+export function TeamAvatarLink({
+  team,
+  size = 32,
+}: {
+  team: TeamRef
+  size?: number
+}) {
+  return (
+    <Link
+      to="/teams/$teamId"
+      params={{ teamId: team.id }}
+      aria-label={`${team.abbreviation} team page`}
+      className="shrink-0 rounded-full transition-transform active:scale-95"
+    >
+      <TeamAvatar team={team} size={size} />
+    </Link>
+  )
+}
+
 export function LeagueAvatar({
   league,
   size = 32,

@@ -66,7 +66,8 @@ export async function syncDay(
   }
 }
 
-async function syncLeague(
+/** One League's schedule for one Sports Day (a Team page opening an old Game). */
+export async function syncLeague(
   env: CloudflareEnv,
   league: League,
   sportsDay: string,

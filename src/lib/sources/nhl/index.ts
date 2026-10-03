@@ -1,10 +1,16 @@
 /** NHL Source adapter: NHL.com (api-web.nhle.com) plus its stats API. */
 
 import { fetchWithRetry } from '../pool'
-import { parseGame, parseRoster, parseSchedule } from './parse'
+import {
+  parseClubSchedule,
+  parseGame,
+  parseRoster,
+  parseSchedule,
+} from './parse'
 import type {
   NhlBios,
   NhlBoxscore,
+  NhlClubSchedule,
   NhlPlayByPlay,
   NhlSchedule,
   NhlStandings,
@@ -59,6 +65,13 @@ export const nhlAdapter: SourceAdapter = {
       ),
     ])
     return parseRoster(teams, standings, bios, seasons[0])
+  },
+  async teamSchedule(team) {
+    return parseClubSchedule(
+      await getJson<NhlClubSchedule>(
+        `${WEB}/club-schedule-season/${encodeURIComponent(team.abbreviation)}/now`,
+      ),
+    )
   },
 }
 

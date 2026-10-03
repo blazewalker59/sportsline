@@ -11,7 +11,7 @@ import { AppHeader } from '@/components/layout/AppHeader'
 import {
   LeagueAvatar,
   PlayBubble,
-  TeamAvatar,
+  TeamAvatarLink,
 } from '@/components/chat/ChatParts'
 import { PlaySheet } from '@/components/games/PlayDetailScreen'
 import { dayLabel } from '@/components/timeline/DayButton'
@@ -107,7 +107,7 @@ function ReactionEntry({
   return (
     <div className="flex items-end gap-2">
       {item.side ? (
-        <TeamAvatar team={team} />
+        <TeamAvatarLink team={team} />
       ) : (
         <LeagueAvatar league={item.league} />
       )}

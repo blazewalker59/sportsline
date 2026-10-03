@@ -1,6 +1,6 @@
 /** NBA Source adapter: ESPN's public site API. */
 
-import { parseScoreboard } from '../espn/common'
+import { fetchTeamSchedule, parseScoreboard } from '../espn/common'
 import { fetchWithRetry, mapPool } from '../pool'
 import { parseGame, parseRoster } from './parse'
 import type { NbaRoster, NbaSummary } from './feed'
@@ -46,5 +46,8 @@ export const nbaAdapter: SourceAdapter = {
       roster: await getJson<NbaRoster>(`${SITE}/teams/${teamId}/roster`),
     }))
     return parseRoster(teams, rosters)
+  },
+  teamSchedule(team) {
+    return fetchTeamSchedule(SITE, team.sourceId, 'nba', getJson)
   },
 }

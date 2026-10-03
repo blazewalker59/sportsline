@@ -11,6 +11,7 @@
 import type {
   NhlBios,
   NhlBoxscore,
+  NhlClubSchedule,
   NhlPlay,
   NhlPlayByPlay,
   NhlSchedule,
@@ -596,6 +597,27 @@ export function parseSchedule(
     home: team(g.homeTeam),
     score: { away: g.awayTeam.score ?? 0, home: g.homeTeam.score ?? 0 },
   }))
+}
+
+/** A club's regular season and playoff Games (preseason left out). */
+export function parseClubSchedule(
+  schedule: NhlClubSchedule,
+): Array<ScheduledGame> {
+  return (schedule.games ?? [])
+    .filter((g) => g.gameType === 2 || g.gameType === 3)
+    .map((g) => ({
+      league: 'nhl' as const,
+      sourceGameId: String(g.id),
+      status: mapStatus(g.gameState, g.gameScheduleState),
+      startsAt: g.startTimeUTC,
+      sportsDay: g.gameDate,
+      away: team(g.awayTeam),
+      home: team(g.homeTeam),
+      score: { away: g.awayTeam.score ?? 0, home: g.homeTeam.score ?? 0 },
+      overtime:
+        g.gameOutcome?.lastPeriodType === 'OT' ||
+        g.gameOutcome?.lastPeriodType === 'SO',
+    }))
 }
 
 /**

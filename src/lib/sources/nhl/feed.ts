@@ -133,6 +133,22 @@ export interface NhlSchedule {
   }>
 }
 
+/** A club's season (`/club-schedule-season/{abbrev}/now`). */
+export interface NhlClubSchedule {
+  games?: Array<{
+    id: number
+    /** 1 preseason, 2 regular season, 3 playoffs. */
+    gameType?: number
+    gameDate: string
+    startTimeUTC: string
+    gameState?: string
+    gameScheduleState?: string
+    awayTeam: NhlTeam
+    homeTeam: NhlTeam
+    gameOutcome?: { lastPeriodType?: string }
+  }>
+}
+
 export interface NhlStatsTeams {
   data?: Array<{ id: number; fullName?: string; triCode?: string }>
 }

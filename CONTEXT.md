@@ -95,6 +95,10 @@ _Avoid_: feed, stream, ticker
 Which Plays a Timeline draws from: All (every League the Viewer hasn't hidden), Following (the Viewer's Follows), a single League, Top 25 (college football Games with a Ranked team), or a Conference. A Viewer switches Scope freely; it starts on Following when they follow anything, otherwise All.
 _Avoid_: view, tab, mode
 
+**Team page**:
+Everything about one Team: its season from the Source (what's next, and results, each opening that Game's thread; an older Game is fetched when opened), its record from those results, and its roster (each opening the Player). Opened from a Team's avatar anywhere.
+_Avoid_: team profile, team hub
+
 **Conference**:
 One of college football's major conferences Sportsline groups by: the SEC, Big Ten, Big 12 and ACC. Like a Ranked team's rank, a team's Conference is recorded per Game. Each Conference, and Top 25, has its own Scope, and sits on the Scope row a Viewer arranges alongside the Leagues.
 _Avoid_: division, league (a Conference is within the college football League)

@@ -5,7 +5,7 @@
  */
 
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { useNavigate, useRouter } from '@tanstack/react-router'
+import { Link, useNavigate, useRouter } from '@tanstack/react-router'
 import { useCallback, useEffect, useState } from 'react'
 import type { TimelineItem } from '@/lib/model/timeline'
 import { AppHeader } from '@/components/layout/AppHeader'
@@ -15,7 +15,7 @@ import { TeamLogo } from '@/components/brand/TeamMark'
 import {
   LeagueAvatar,
   PlayBubble,
-  TeamAvatar,
+  TeamAvatarLink,
 } from '@/components/chat/ChatParts'
 import { FollowButton } from '@/components/follows/FollowButton'
 import { PlaySheet } from '@/components/games/PlayDetailScreen'
@@ -86,10 +86,14 @@ export function PlayerScreen({
               <span className="flex items-center gap-1.5 text-sm text-muted">
                 <LeagueLogo league={first.player.league} size={16} />
                 {first.player.team ? (
-                  <>
+                  <Link
+                    to="/teams/$teamId"
+                    params={{ teamId: first.player.team.id }}
+                    className="flex items-center gap-1.5 font-medium text-foreground/80 underline-offset-2 hover:underline"
+                  >
                     <TeamLogo team={first.player.team} size={16} />
                     {first.player.team.name}
-                  </>
+                  </Link>
                 ) : (
                   leagueLabel(first.player.league)
                 )}
@@ -145,7 +149,7 @@ function PlayEntry({ item }: { item: TimelineItem }) {
   return (
     <div className="flex items-end gap-2">
       {item.side ? (
-        <TeamAvatar team={team} />
+        <TeamAvatarLink team={team} />
       ) : (
         <LeagueAvatar league={item.league} />
       )}

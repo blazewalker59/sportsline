@@ -168,6 +168,14 @@ export interface ScheduledGame {
   away: SourceTeam
   home: SourceTeam
   score: Score
+  /** A Final decided in overtime or a shootout (for NHL records). */
+  overtime?: boolean
+}
+
+/** A League's Teams and their identity, as a Team page asks a Source. */
+export interface SourceTeamRef {
+  sourceId: string
+  abbreviation: string
 }
 
 /** A Player as a Source's roster lists them. */
@@ -193,4 +201,6 @@ export interface SourceAdapter {
   schedule: (sportsDay: string) => Promise<Array<ScheduledGame>>
   snapshot: (sourceGameId: string) => Promise<GameSnapshot>
   roster: (season: number) => Promise<SourceRoster>
+  /** One Team's season: regular season and postseason Games, past and to come. */
+  teamSchedule: (team: SourceTeamRef) => Promise<Array<ScheduledGame>>
 }
