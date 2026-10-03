@@ -189,6 +189,12 @@ function PlayBubbleLink({
     const team = actingTeam(item)
     const fill =
       item.kind === 'overturn' ? null : (team.colors?.primary ?? null)
+    // Logos on the fill: the dark-background mark on a dark team color.
+    const onFill = fill
+      ? textOn(fill) === '#ffffff'
+        ? ('dark' as const)
+        : ('light' as const)
+      : undefined
     // T4: the headline word, a short "who did what", the full sentence small.
     const summary = scoringSummary(item)
     return (
@@ -243,10 +249,10 @@ function PlayBubbleLink({
         )}
         {!compact && (
           <span className="flex items-center gap-2 text-sm font-bold tabular-nums">
-            <TeamLogo team={item.awayTeam} size={18} />
+            <TeamLogo team={item.awayTeam} size={18} surface={onFill} />
             {item.awayTeam.abbreviation} {item.score.away} – {item.score.home}{' '}
             {item.homeTeam.abbreviation}
-            <TeamLogo team={item.homeTeam} size={18} />
+            <TeamLogo team={item.homeTeam} size={18} surface={onFill} />
           </span>
         )}
       </Link>

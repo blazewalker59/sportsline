@@ -1,32 +1,53 @@
 import { useState } from 'react'
 import type { TeamRef } from '@/lib/model/timeline'
+import { lightLogo } from '@/lib/brand/logos'
 import { cn } from '@/lib/utils'
 
-/** A Team's logo; renders nothing if there is none or it fails to load. */
+/**
+ * A Team's logo; renders nothing if there is none or it fails to load.
+ * Shows the Source's light-background mark in light mode and its
+ * dark-background mark in dark mode, unless `surface` fixes which one
+ * (a logo on a team-color fill).
+ */
 export function TeamLogo({
   team,
   size = 18,
   className,
+  surface,
 }: {
   team: Pick<TeamRef, 'abbreviation' | 'logoUrl'>
   size?: number
   className?: string
+  /** The background is light or dark whatever the theme. */
+  surface?: 'light' | 'dark'
 }) {
   const [failed, setFailed] = useState(false)
+  const [lightFailed, setLightFailed] = useState(false)
   if (!team.logoUrl || failed) return null
-  return (
+  const light = lightFailed ? null : lightLogo(team.logoUrl)
+  const img = (src: string, extra: string, onError: () => void) => (
     <img
-      src={team.logoUrl}
+      key={src}
+      src={src}
       alt=""
       aria-hidden="true"
       width={size}
       height={size}
       loading="lazy"
       decoding="async"
-      onError={() => setFailed(true)}
-      className={cn('shrink-0 object-contain', className)}
+      onError={onError}
+      className={cn('shrink-0 object-contain', extra, className)}
       style={{ width: size, height: size }}
     />
+  )
+  const dark = () => setFailed(true)
+  if (!light || surface === 'dark') return img(team.logoUrl, '', dark)
+  if (surface === 'light') return img(light, '', () => setLightFailed(true))
+  return (
+    <>
+      {img(light, 'dark:hidden', () => setLightFailed(true))}
+      {img(team.logoUrl, 'hidden dark:block', dark)}
+    </>
   )
 }
 

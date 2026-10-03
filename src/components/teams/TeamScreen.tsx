@@ -128,6 +128,7 @@ function TeamHeader({
             </span>
           )}
         </span>
+        <RecentForm page={page} />
         {canFollow && (
           <div className="mt-1">
             <FollowButton follow={{ kind: 'team', teamId: team.id }} />
@@ -151,8 +152,13 @@ function Schedule({ page }: { page: TeamPage }) {
   const live = page.games.filter(
     (g) => g.status === 'live' || g.status === 'delayed',
   )
+  // A postponed Game whose date has passed is played as another Game, if
+  // at all: it isn't "up next".
+  const now = Date.now()
   const upcoming = page.games.filter(
-    (g) => g.status === 'scheduled' || g.status === 'postponed',
+    (g) =>
+      g.status === 'scheduled' ||
+      (g.status === 'postponed' && Date.parse(g.startsAt) > now),
   )
   const results = page.games.filter((g) => g.status === 'final').reverse()
   return (
@@ -326,24 +332,84 @@ function Outcome({ game }: { game: TeamGame }) {
   if (game.status === 'postponed')
     return <span className="text-muted">Postponed</span>
   const live = game.status === 'live' || game.status === 'delayed'
+  // Fixed-width columns, so results line up down the list whatever the
+  // scores (4–3 or 112–108).
   return (
-    <span className="flex items-center gap-1.5">
-      {live ? (
-        <span className="rounded-full bg-live/15 px-1.5 text-[11px] font-bold text-live">
-          LIVE
-        </span>
-      ) : (
-        <span
-          className={cn(
-            'w-7 text-center text-[13px] font-bold',
-            game.result === 'W' ? 'text-scoring' : 'text-muted',
-          )}
-        >
-          {game.result}
-        </span>
-      )}
-      <span className="font-semibold">
+    <span className="flex items-center gap-1">
+      <span className="flex w-10 justify-center">
+        {live ? (
+          <span className="rounded-full bg-live/15 px-1.5 text-[11px] font-bold text-live">
+            LIVE
+          </span>
+        ) : (
+          <ResultMark result={game.result} />
+        )}
+      </span>
+      <span className="w-[4.5rem] text-right font-semibold">
         {game.score.team}–{game.score.opponent}
+      </span>
+    </span>
+  )
+}
+
+function ResultMark({ result }: { result: TeamGame['result'] }) {
+  return (
+    <span
+      className={cn(
+        'text-[13px] font-bold',
+        result === 'W' ? 'text-scoring' : 'text-muted',
+      )}
+    >
+      {result}
+    </span>
+  )
+}
+
+/** Football looks back 5 Games; everything else, 10. */
+function recentCount(league: TeamPage['team']['league']): number {
+  return league === 'nfl' || league === 'cfb' ? 5 : 10
+}
+
+/**
+ * "Last 5 · 3–2" with the results as chips, oldest to newest. NHL records
+ * keep overtime losses apart, as the season record does.
+ */
+function RecentForm({ page }: { page: TeamPage }) {
+  const n = recentCount(page.team.league)
+  const recent = page.games.filter((g) => g.status === 'final').slice(-n)
+  if (recent.length === 0) return null
+  const count = (r: TeamGame['result']) =>
+    recent.filter((g) => g.result === r).length
+  const [w, l, t, otl] = [count('W'), count('L'), count('T'), count('OTL')]
+  const record =
+    page.team.league === 'nhl'
+      ? `${w}–${l}–${otl}`
+      : t > 0
+        ? `${w}–${l + otl}–${t}`
+        : `${w}–${l + otl}`
+  return (
+    <span className="flex flex-col gap-1 text-sm">
+      <span className="whitespace-nowrap text-muted">
+        Last {recent.length}{' '}
+        <span className="font-semibold text-foreground/80 tabular-nums">
+          {record}
+        </span>
+      </span>
+      <span className="flex flex-wrap gap-0.5" aria-hidden="true">
+        {recent.map((g) => (
+          <span
+            key={g.sourceGameId}
+            title={`${g.result} ${g.score.team}–${g.score.opponent} ${g.home ? 'vs' : '@'} ${g.opponent.abbreviation}`}
+            className={cn(
+              'flex h-5 min-w-5 items-center justify-center rounded px-0.5 text-[10px] font-bold',
+              g.result === 'W'
+                ? 'bg-scoring/15 text-scoring'
+                : 'bg-notice text-muted',
+            )}
+          >
+            {g.result}
+          </span>
+        ))}
       </span>
     </span>
   )
