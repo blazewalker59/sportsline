@@ -48,8 +48,8 @@ export async function copyImage(image: Promise<Blob>): Promise<boolean> {
         new ClipboardItem({ 'image/png': blob }),
       ])
       return true
-    } catch (error) {
-      console.warn('Copying the share image failed', error)
+    } catch (retryError) {
+      console.warn('Copying the share image failed', retryError)
       return false
     }
   }
