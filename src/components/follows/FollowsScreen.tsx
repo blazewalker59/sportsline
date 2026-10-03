@@ -2,12 +2,12 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { FollowButton } from './FollowButton'
+import { LeagueList } from './LeagueList'
 import type { FollowEntry } from '@/lib/viewer/server'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
 import { AppHeader } from '@/components/layout/AppHeader'
-import { LEAGUES } from '@/lib/model/types'
 import { searchFollowables } from '@/lib/viewer/server'
 import { useViewer } from '@/lib/viewer/useViewer'
 
@@ -31,17 +31,13 @@ export function FollowsScreen() {
         </p>
       ) : (
         <>
-          <h2 className="mb-2 text-sm font-semibold text-muted">Leagues</h2>
-          <div className="mb-6 flex flex-wrap gap-2">
-            {LEAGUES.map((league) => (
-              <div
-                key={league}
-                className="flex items-center gap-2 rounded-full border border-border py-1 pr-1 pl-3"
-              >
-                <LeagueLogo league={league} size={24} />
-                <FollowButton follow={{ kind: 'league', league }} />
-              </div>
-            ))}
+          <h2 className="mb-1 text-sm font-semibold text-muted">Leagues</h2>
+          <p className="mb-2 text-xs text-muted">
+            Drag to set their order on the main screen. Hidden Leagues leave the
+            row and All.
+          </p>
+          <div className="mb-6">
+            <LeagueList />
           </div>
 
           <label

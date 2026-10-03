@@ -1,8 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
-import { getViewerState, markRead, setFollow } from './server'
+import {
+  getViewerState,
+  markRead,
+  setFollow,
+  setLeagueSettings,
+} from './server'
 import type { Follow, TimelineItem, ViewerFollow } from '@/lib/model/timeline'
 import type { FollowEntry, ViewerState } from './server'
+import type { LeagueSettings } from '@/lib/model/leagues'
 import { followsToParam } from '@/lib/model/timeline'
 
 export const VIEWER_KEY = ['viewer'] as const
@@ -41,6 +47,32 @@ export function useSetFollow() {
     onSuccess: (entries: Array<FollowEntry>) => {
       queryClient.setQueryData<ViewerState>(VIEWER_KEY, (old) =>
         old ? { ...old, follows: entries } : old,
+      )
+    },
+  })
+}
+
+/** Reorder or hide Leagues; the row updates before the server answers. */
+export function useSetLeagueSettings() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (settings: LeagueSettings) =>
+      setLeagueSettings({ data: settings }),
+    onMutate: async (settings) => {
+      await queryClient.cancelQueries({ queryKey: VIEWER_KEY })
+      const previous = queryClient.getQueryData<ViewerState>(VIEWER_KEY)
+      queryClient.setQueryData<ViewerState>(VIEWER_KEY, (old) =>
+        old ? { ...old, leagues: settings } : old,
+      )
+      return { previous }
+    },
+    onError: (_error, _settings, context) => {
+      if (context?.previous)
+        queryClient.setQueryData(VIEWER_KEY, context.previous)
+    },
+    onSuccess: (leagues) => {
+      queryClient.setQueryData<ViewerState>(VIEWER_KEY, (old) =>
+        old ? { ...old, leagues } : old,
       )
     },
   })

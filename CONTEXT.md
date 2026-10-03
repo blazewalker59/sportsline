@@ -8,6 +8,7 @@ A live, livestream-style timeline of play-by-play across the sports a viewer car
 
 **League**:
 One of the competitions Sportsline covers: MLB, NBA, NFL, NHL and college football. College football is covered only in part: games involving a team from the ACC, Big 12, Big Ten or SEC, Notre Dame, or a Ranked team, whoever the opponent is. Other leagues are out of scope.
+Each Viewer arranges the Leagues: the order they appear in, and which are hidden. A hidden League is left out of All and the Scope row, but its Follows still count.
 _Avoid_: sport (a sport can span several leagues)
 
 **Source**:

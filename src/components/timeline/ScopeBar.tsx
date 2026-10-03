@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import type { Scope } from '@/lib/model/scope'
+import type { League } from '@/lib/model/types'
 import { LeagueLogo, leagueLabel } from '@/components/brand/LeagueLogo'
-import { LEAGUES } from '@/lib/model/types'
 import { cn } from '@/lib/utils'
 
 /**
@@ -10,9 +10,12 @@ import { cn } from '@/lib/utils'
  */
 export function ScopeBar({
   scope,
+  leagues,
   canFollow,
 }: {
   scope: Scope
+  /** The Viewer's visible Leagues, in their order. */
+  leagues: ReadonlyArray<League>
   /** The Viewer follows something, so "Following" is offered. */
   canFollow: boolean
 }) {
@@ -50,7 +53,7 @@ export function ScopeBar({
         <ol className="flex w-max gap-1.5" aria-label="Scope">
           {chip('all', 'All', 'All Leagues')}
           {canFollow && chip('following', 'Following', 'Following')}
-          {LEAGUES.flatMap((league) => [
+          {leagues.flatMap((league) => [
             chip(
               league,
               <LeagueLogo league={league} size={20} />,

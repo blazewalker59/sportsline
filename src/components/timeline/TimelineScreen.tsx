@@ -10,9 +10,11 @@ import type { Scope } from '@/lib/model/scope'
 import type { FeedEntry, Typing } from '@/lib/timeline/chat'
 import type { Follow, GameSummary } from '@/lib/model/timeline'
 import type { Connection } from '@/lib/timeline/useLiveTimeline'
+import type { League } from '@/lib/model/types'
 import { ReactionsProvider } from '@/components/chat/Reactions'
 import { defaultScope, scopeFollows } from '@/lib/model/scope'
 import { isRanked } from '@/lib/model/timeline'
+import { DEFAULT_LEAGUE_SETTINGS, visibleLeagues } from '@/lib/model/leagues'
 import { takePlayOpened } from '@/lib/timeline/playSheet'
 import { PlaySheet } from '@/components/games/PlayDetailScreen'
 import { useHideOnScroll } from '@/lib/useHideOnScroll'
@@ -82,8 +84,10 @@ function inScope(
   scope: Scope,
   viewerFollows: ReadonlyArray<Follow>,
   items: ReadonlyArray<{ gameId: string }>,
+  leagues: ReadonlyArray<League>,
 ): boolean {
-  if (scope === 'all') return true
+  if (scope === 'all') return leagues.includes(game.league)
+  if (scope === 'top25') return game.league === 'cfb' && isRanked(game)
   if (scope !== 'following') return game.league === scope
   // Player Follows can't be judged from the Game alone: include any Game
   // that has Plays on this Timeline.
@@ -135,9 +139,14 @@ function Timeline({
     requestedScope === 'following' && viewerFollows.length === 0
       ? 'all'
       : (requestedScope ?? defaultScope(viewerFollows))
+  // The Viewer's Leagues in their order, hidden ones left out.
+  const leagues = useMemo(
+    () => visibleLeagues(data?.leagues ?? DEFAULT_LEAGUE_SETTINGS),
+    [data?.leagues],
+  )
   const follows = useMemo(
-    () => scopeFollows(scope, viewerFollows),
-    [scope, viewerFollows],
+    () => scopeFollows(scope, viewerFollows, leagues),
+    [scope, viewerFollows, leagues],
   )
   // The divider marks where the Viewer stopped last time, so it is fixed at
   // load while the stored marker keeps moving.
@@ -296,14 +305,18 @@ function Timeline({
             inert={panelHidden}
             aria-hidden={panelHidden}
           >
-            <ScopeBar scope={scope} canFollow={viewerFollows.length > 0} />
+            <ScopeBar
+              scope={scope}
+              leagues={leagues}
+              canFollow={viewerFollows.length > 0}
+            />
             <div className={cn('transition-opacity', dimmed && 'opacity-50')}>
               <GameStrip
                 games={(dimmed && timeline.previousGames.length
                   ? timeline.previousGames
                   : timeline.games
                 ).filter((g) =>
-                  inScope(g, scope, viewerFollows, timeline.items),
+                  inScope(g, scope, viewerFollows, timeline.items, leagues),
                 )}
                 selected={gameId ?? undefined}
                 onBox={() => setBoxOpen(true)}

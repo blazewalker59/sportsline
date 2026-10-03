@@ -269,6 +269,20 @@ export const reactions = sqliteTable(
   (table) => [primaryKey({ columns: [table.itemId, table.viewerId] })],
 )
 
+/** How a Viewer arranges Leagues: their order on the Scope row, and which are hidden. */
+export const leagueSettings = sqliteTable('league_settings', {
+  viewerId: text('viewer_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  order: text('league_order', { mode: 'json' })
+    .$type<Array<League>>()
+    .notNull(),
+  hidden: text('hidden_leagues', { mode: 'json' })
+    .$type<Array<League>>()
+    .notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
+
 /** Where each Viewer stopped reading the Timeline (CONTEXT.md, "Read Marker"). */
 export const readMarkers = sqliteTable('read_markers', {
   viewerId: text('viewer_id')

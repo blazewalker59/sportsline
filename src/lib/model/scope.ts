@@ -24,12 +24,17 @@ export function defaultScope(viewerFollows: ReadonlyArray<Follow>): Scope {
 export function scopeFollows(
   scope: Scope,
   viewerFollows: ReadonlyArray<Follow>,
+  /** The Viewer's visible Leagues: All leaves hidden ones out. */
+  leagues?: ReadonlyArray<League>,
 ): ReadonlyArray<Follow> {
+  const all = leagues
+    ? leagues.map((league) => ({ kind: 'league' as const, league }))
+    : DEFAULT_FOLLOWS
   switch (scope) {
     case 'all':
-      return DEFAULT_FOLLOWS
+      return all
     case 'following':
-      return viewerFollows.length > 0 ? viewerFollows : DEFAULT_FOLLOWS
+      return viewerFollows.length > 0 ? viewerFollows : all
     case 'top25':
       return [{ kind: 'top25' }]
     default:

@@ -57,6 +57,13 @@
       "when": 1790994318454,
       "tag": "0007_player_headshots",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1790996001050,
+      "tag": "0008_league_settings",
+      "breakpoints": true
     }
   ]
 }

@@ -14,9 +14,20 @@ import type { ViewerProfile } from './session'
 import type { Database } from '@/lib/db'
 import type { ViewerFollow } from '@/lib/model/timeline'
 import type { League } from '@/lib/model/types'
+import type { LeagueSettings } from '@/lib/model/leagues'
 import { getDb } from '@/lib/db'
-import { follows, players, readMarkers, teams } from '@/lib/db/schema'
+import {
+  follows,
+  leagueSettings,
+  players,
+  readMarkers,
+  teams,
+} from '@/lib/db/schema'
 import { LEAGUES } from '@/lib/model/types'
+import {
+  DEFAULT_LEAGUE_SETTINGS,
+  normalizeLeagueSettings,
+} from '@/lib/model/leagues'
 
 export type { ViewerProfile } from './session'
 
@@ -37,6 +48,8 @@ export interface ViewerState {
   follows: Array<FollowEntry>
   /** occurredAt of the newest item the Viewer had seen, if any. */
   readAt: string | null
+  /** League order on the Scope row, and which Leagues are hidden. */
+  leagues: LeagueSettings
 }
 
 const LEAGUE_LABELS: Record<League, string> = {
@@ -128,19 +141,62 @@ async function followEntries(
 export const getViewerState = createServerFn({ method: 'GET' }).handler(
   async (): Promise<ViewerState> => {
     const viewer = await sessionViewer()
-    if (!viewer) return { viewer: null, follows: [], readAt: null }
+    if (!viewer)
+      return {
+        viewer: null,
+        follows: [],
+        readAt: null,
+        leagues: DEFAULT_LEAGUE_SETTINGS,
+      }
     const db = getDb()
-    const [entries, marker] = await Promise.all([
+    const [entries, marker, arrangement] = await Promise.all([
       followEntries(db, viewer.id),
       db
         .select({ readAt: readMarkers.readAt })
         .from(readMarkers)
         .where(eq(readMarkers.viewerId, viewer.id))
         .get(),
+      db
+        .select({ order: leagueSettings.order, hidden: leagueSettings.hidden })
+        .from(leagueSettings)
+        .where(eq(leagueSettings.viewerId, viewer.id))
+        .get(),
     ])
-    return { viewer, follows: entries, readAt: marker?.readAt ?? null }
+    return {
+      viewer,
+      follows: entries,
+      readAt: marker?.readAt ?? null,
+      leagues: normalizeLeagueSettings(arrangement),
+    }
   },
 )
+
+const leagueEnum = z.enum(LEAGUES)
+
+/** Save how the Viewer arranges Leagues; returns the normalized settings. */
+export const setLeagueSettings = createServerFn({ method: 'POST' })
+  .validator((data: { order: Array<string>; hidden: Array<string> }) =>
+    z
+      .object({
+        order: z.array(leagueEnum).max(LEAGUES.length * 2),
+        hidden: z.array(leagueEnum).max(LEAGUES.length * 2),
+      })
+      .parse(data),
+  )
+  .handler(({ data }) =>
+    withViewer(async ({ db, viewerId }): Promise<LeagueSettings> => {
+      const settings = normalizeLeagueSettings(data)
+      const now = new Date().toISOString()
+      await db
+        .insert(leagueSettings)
+        .values({ viewerId, ...settings, updatedAt: now })
+        .onConflictDoUpdate({
+          target: leagueSettings.viewerId,
+          set: { ...settings, updatedAt: now },
+        })
+      return settings
+    }),
+  )
 
 const followInput = z.object({
   kind: z.enum(['league', 'team', 'player']),
