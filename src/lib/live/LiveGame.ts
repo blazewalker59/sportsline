@@ -249,6 +249,8 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
             ? {
                 awayRank: snapshot.away.rank,
                 homeRank: snapshot.home.rank ?? null,
+                awayConference: snapshot.away.conference ?? null,
+                homeConference: snapshot.home.conference ?? null,
               }
             : {}),
           updatedAt: now,
@@ -334,11 +336,13 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
       ...game.awayTeam,
       colors: teamColors(game.league, game.awayTeam.name),
       rank: snapshot.away.rank ?? null,
+      conference: snapshot.away.conference ?? null,
     }
     const home = {
       ...game.homeTeam,
       colors: teamColors(game.league, game.homeTeam.name),
       rank: snapshot.home.rank ?? null,
+      conference: snapshot.home.conference ?? null,
     }
     const events: Array<TimelineEvent> = [
       {

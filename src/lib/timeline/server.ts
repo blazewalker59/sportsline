@@ -101,6 +101,34 @@ export const getTimeline = createServerFn({ method: 'GET' })
         )!,
       )
     }
+    const conferences = follows.flatMap((f) =>
+      f.kind === 'conference' ? [f.conference] : [],
+    )
+    if (conferences.length > 0) {
+      covered.push(
+        and(
+          eq(t.league, 'cfb'),
+          inArray(
+            t.gameId,
+            db
+              .select({ id: games.id })
+              .from(games)
+              .where(
+                and(
+                  eq(games.sportsDay, sportsDay),
+                  or(
+                    inArray(games.awayConference, conferences),
+                    inArray(games.homeConference, conferences),
+                  ),
+                ),
+              ),
+          ),
+          data.includeRoutine
+            ? undefined
+            : or(ne(t.kind, 'play'), ne(t.significance, 'routine')),
+        )!,
+      )
+    }
     if (teamIds.length > 0) {
       covered.push(
         or(inArray(t.awayTeamId, teamIds), inArray(t.homeTeamId, teamIds))!,
@@ -127,6 +155,7 @@ export const getTimeline = createServerFn({ method: 'GET' })
       .select({
         item: t,
         ranks: { away: games.awayRank, home: games.homeRank },
+        conferences: { away: games.awayConference, home: games.homeConference },
         away: {
           id: away.id,
           abbreviation: away.abbreviation,
@@ -162,8 +191,16 @@ export const getTimeline = createServerFn({ method: 'GET' })
       items: page.map((r) =>
         toTimelineItem(
           r.item,
-          { ...withColors(r.away), rank: r.ranks.away },
-          { ...withColors(r.home), rank: r.ranks.home },
+          {
+            ...withColors(r.away),
+            rank: r.ranks.away,
+            conference: r.conferences.away,
+          },
+          {
+            ...withColors(r.home),
+            rank: r.ranks.home,
+            conference: r.conferences.home,
+          },
         ),
       ),
       nextBefore:

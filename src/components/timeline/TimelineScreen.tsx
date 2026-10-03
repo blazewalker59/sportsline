@@ -13,8 +13,13 @@ import type { Connection } from '@/lib/timeline/useLiveTimeline'
 import type { League } from '@/lib/model/types'
 import { ReactionsProvider } from '@/components/chat/Reactions'
 import { defaultScope, scopeFollows } from '@/lib/model/scope'
-import { isRanked } from '@/lib/model/timeline'
-import { DEFAULT_LEAGUE_SETTINGS, visibleLeagues } from '@/lib/model/leagues'
+import { inConference, isRanked } from '@/lib/model/timeline'
+import {
+  DEFAULT_LEAGUE_SETTINGS,
+  isConference,
+  visibleLeagues,
+  visibleRowItems,
+} from '@/lib/model/leagues'
 import { takePlayOpened } from '@/lib/timeline/playSheet'
 import { PlaySheet } from '@/components/games/PlayDetailScreen'
 import { useHideOnScroll } from '@/lib/useHideOnScroll'
@@ -88,6 +93,8 @@ function inScope(
 ): boolean {
   if (scope === 'all') return leagues.includes(game.league)
   if (scope === 'top25') return game.league === 'cfb' && isRanked(game)
+  if (isConference(scope))
+    return game.league === 'cfb' && inConference(game, scope)
   if (scope !== 'following') return game.league === scope
   // Player Follows can't be judged from the Game alone: include any Game
   // that has Plays on this Timeline.
@@ -108,7 +115,9 @@ function followsGame(
         ? f.teamId === game.awayTeam.id || f.teamId === game.homeTeam.id
         : f.kind === 'top25'
           ? game.league === 'cfb' && isRanked(game)
-          : false,
+          : f.kind === 'conference'
+            ? game.league === 'cfb' && inConference(game, f.conference)
+            : false,
   )
 }
 
@@ -139,11 +148,11 @@ function Timeline({
     requestedScope === 'following' && viewerFollows.length === 0
       ? 'all'
       : (requestedScope ?? defaultScope(viewerFollows))
-  // The Viewer's Leagues in their order, hidden ones left out.
-  const leagues = useMemo(
-    () => visibleLeagues(data?.leagues ?? DEFAULT_LEAGUE_SETTINGS),
-    [data?.leagues],
-  )
+  // The Viewer's row in their order, hidden items left out; All covers
+  // the visible Leagues.
+  const settings = data?.leagues ?? DEFAULT_LEAGUE_SETTINGS
+  const rowItems = useMemo(() => visibleRowItems(settings), [settings])
+  const leagues = useMemo(() => visibleLeagues(settings), [settings])
   const follows = useMemo(
     () => scopeFollows(scope, viewerFollows, leagues),
     [scope, viewerFollows, leagues],
@@ -307,7 +316,7 @@ function Timeline({
           >
             <ScopeBar
               scope={scope}
-              leagues={leagues}
+              items={rowItems}
               canFollow={viewerFollows.length > 0}
             />
             <div className={cn('transition-opacity', dimmed && 'opacity-50')}>

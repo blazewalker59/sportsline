@@ -1,21 +1,25 @@
 /**
- * The Viewer's Leagues on the Follows screen: drag the handle (or use the
- * arrow keys on it) to reorder the Scope row, Hide/Show to drop a League
- * from the row and from All, and Follow as before.
+ * The Viewer's Scope row on the Follows screen: Leagues and college
+ * football's groups. Drag the handle (or use the arrow keys on it) to
+ * reorder, Hide/Show to drop an item from the row (a League also from
+ * All), and Follow Leagues as before.
  */
 
 import { useRef, useState } from 'react'
 import { FollowButton } from './FollowButton'
-import type { League } from '@/lib/model/types'
-import { LeagueLogo, leagueLabel } from '@/components/brand/LeagueLogo'
-import { DEFAULT_LEAGUE_SETTINGS, moveLeague } from '@/lib/model/leagues'
+import type { RowItem } from '@/lib/model/leagues'
+import { RowItemMark, rowItemName } from '@/components/brand/RowItemMark'
+import {
+  DEFAULT_LEAGUE_SETTINGS,
+  isLeague,
+  moveLeague,
+  visibleLeagues,
+} from '@/lib/model/leagues'
 import { useSetLeagueSettings, useViewer } from '@/lib/viewer/useViewer'
 import { cn } from '@/lib/utils'
 
-const NAMES: Partial<Record<League, string>> = { cfb: 'College Football' }
-
 interface Drag {
-  league: League
+  league: RowItem
   from: number
   startY: number
   dy: number
@@ -49,14 +53,15 @@ export function LeagueList() {
       return drag.rowHeight
     return 0
   }
-  const visibleCount = settings.order.length - settings.hidden.length
+  // All needs a League to show: the last visible one can't be hidden.
+  const lastLeague = visibleLeagues(settings).length <= 1
 
-  const reorder = (league: League, to: number) => {
+  const reorder = (league: RowItem, to: number) => {
     const next = moveLeague(settings.order, league, to)
     if (next.join() !== settings.order.join())
       save.mutate({ ...settings, order: next })
   }
-  const toggle = (league: League) => {
+  const toggle = (league: RowItem) => {
     const hidden = settings.hidden.includes(league)
       ? settings.hidden.filter((l) => l !== league)
       : [...settings.hidden, league]
@@ -87,7 +92,7 @@ export function LeagueList() {
           >
             <button
               type="button"
-              aria-label={`Move ${leagueLabel(league)}. Use the arrow keys to reorder.`}
+              aria-label={`Move ${rowItemName(league)}. Use the arrow keys to reorder.`}
               className="flex h-full w-10 shrink-0 cursor-grab touch-none items-center justify-center text-muted active:cursor-grabbing"
               onPointerDown={(e) => {
                 e.currentTarget.setPointerCapture(e.pointerId)
@@ -139,15 +144,24 @@ export function LeagueList() {
                 hidden && 'opacity-45',
               )}
             >
-              <LeagueLogo league={league} size={26} />
-              <span className="truncate font-medium">
-                {NAMES[league] ?? leagueLabel(league)}
+              <span className="flex w-[30px] shrink-0 justify-center">
+                <RowItemMark item={league} size={26} />
+              </span>
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate font-medium">
+                  {rowItemName(league)}
+                </span>
+                {!isLeague(league) && (
+                  <span className="truncate text-xs text-muted">
+                    College Football
+                  </span>
+                )}
               </span>
             </span>
             <button
               type="button"
               onClick={() => toggle(league)}
-              disabled={!hidden && visibleCount <= 1}
+              disabled={!hidden && isLeague(league) && lastLeague}
               aria-pressed={!hidden}
               className={cn(
                 'min-h-9 rounded-full px-3 text-[13px] font-semibold disabled:opacity-40',
@@ -158,7 +172,9 @@ export function LeagueList() {
             >
               {hidden ? 'Show' : 'Hide'}
             </button>
-            <FollowButton follow={{ kind: 'league', league }} />
+            {isLeague(league) && (
+              <FollowButton follow={{ kind: 'league', league }} />
+            )}
           </li>
         )
       })}

@@ -26,6 +26,7 @@ import {
 import { LEAGUES } from '@/lib/model/types'
 import {
   DEFAULT_LEAGUE_SETTINGS,
+  ROW_ITEMS,
   normalizeLeagueSettings,
 } from '@/lib/model/leagues'
 
@@ -171,15 +172,14 @@ export const getViewerState = createServerFn({ method: 'GET' }).handler(
   },
 )
 
-const leagueEnum = z.enum(LEAGUES)
-
 /** Save how the Viewer arranges Leagues; returns the normalized settings. */
 export const setLeagueSettings = createServerFn({ method: 'POST' })
   .validator((data: { order: Array<string>; hidden: Array<string> }) =>
     z
       .object({
-        order: z.array(leagueEnum).max(LEAGUES.length * 2),
-        hidden: z.array(leagueEnum).max(LEAGUES.length * 2),
+        // Unknown items are dropped by normalizeLeagueSettings.
+        order: z.array(z.string().max(16)).max(ROW_ITEMS.length * 2),
+        hidden: z.array(z.string().max(16)).max(ROW_ITEMS.length * 2),
       })
       .parse(data),
   )

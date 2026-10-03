@@ -127,8 +127,16 @@ export function toGameSummary(
     sportsDay: row.sportsDay,
     status: row.status,
     startsAt: row.startsAt,
-    awayTeam: { ...teamRef(away), rank: row.awayRank ?? null },
-    homeTeam: { ...teamRef(home), rank: row.homeRank ?? null },
+    awayTeam: {
+      ...teamRef(away),
+      rank: row.awayRank ?? null,
+      conference: row.awayConference ?? null,
+    },
+    homeTeam: {
+      ...teamRef(home),
+      rank: row.homeRank ?? null,
+      conference: row.homeConference ?? null,
+    },
     score: { away: row.awayScore, home: row.homeScore },
     situation: row.situation ?? null,
   }

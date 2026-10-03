@@ -1,28 +1,51 @@
 /**
- * A Viewer's League arrangement (CONTEXT.md, "League"): the order Leagues
- * appear on the Scope row, and which are hidden (left off the row and out
- * of All). Pure.
+ * How a Viewer arranges the Scope row (CONTEXT.md, "League"): the order of
+ * Leagues and college football's groups (Top 25 and the major
+ * conferences), and which are hidden. A hidden League is also left out of
+ * All. Pure.
  */
 
 import { LEAGUES } from './types'
 import type { League } from './types'
 
+/** College football's major conferences (CONTEXT.md, "Conference"). */
+export const CONFERENCES = ['sec', 'big10', 'big12', 'acc'] as const
+export type Conference = (typeof CONFERENCES)[number]
+
+/** College football groupings with their own Scope. */
+export const CFB_GROUPS = ['top25', ...CONFERENCES] as const
+export type CfbGroup = (typeof CFB_GROUPS)[number]
+
+/** Anything with a place on the Scope row. */
+export type RowItem = League | CfbGroup
+
+/** The default row: college football's groups follow its League. */
+export const ROW_ITEMS: ReadonlyArray<RowItem> = LEAGUES.flatMap(
+  (league): Array<RowItem> =>
+    league === 'cfb' ? [league, ...CFB_GROUPS] : [league],
+)
+
 export interface LeagueSettings {
-  order: Array<League>
-  hidden: Array<League>
+  order: Array<RowItem>
+  hidden: Array<RowItem>
 }
 
 export const DEFAULT_LEAGUE_SETTINGS: LeagueSettings = {
-  order: [...LEAGUES],
+  order: [...ROW_ITEMS],
   hidden: [],
 }
 
-const isLeague = (v: unknown): v is League =>
+export const isLeague = (v: unknown): v is League =>
   (LEAGUES as ReadonlyArray<unknown>).includes(v)
+export const isConference = (v: unknown): v is Conference =>
+  (CONFERENCES as ReadonlyArray<unknown>).includes(v)
+export const isRowItem = (v: unknown): v is RowItem =>
+  (ROW_ITEMS as ReadonlyArray<unknown>).includes(v)
 
 /**
- * Stored settings made whole: unknown Leagues dropped, duplicates removed,
- * and any League added since appended in its default place at the end.
+ * Stored settings made whole: unknown items dropped, duplicates removed,
+ * and anything added since placed after its neighbour in the default row
+ * (so new college groups land beside College Football).
  */
 export function normalizeLeagueSettings(
   stored:
@@ -30,24 +53,40 @@ export function normalizeLeagueSettings(
     | null
     | undefined,
 ): LeagueSettings {
-  const order = [...new Set((stored?.order ?? []).filter(isLeague))]
-  for (const league of LEAGUES) if (!order.includes(league)) order.push(league)
-  const hidden = [...new Set((stored?.hidden ?? []).filter(isLeague))]
+  const order = [...new Set((stored?.order ?? []).filter(isRowItem))]
+  ROW_ITEMS.forEach((item, i) => {
+    if (order.includes(item)) return
+    let at = 0
+    for (let j = i - 1; j >= 0; j--) {
+      const k = order.indexOf(ROW_ITEMS[j])
+      if (k >= 0) {
+        at = k + 1
+        break
+      }
+    }
+    order.splice(at, 0, item)
+  })
+  const hidden = [...new Set((stored?.hidden ?? []).filter(isRowItem))]
   return { order, hidden }
 }
 
-/** The Leagues to show, in the Viewer's order. */
-export function visibleLeagues(settings: LeagueSettings): Array<League> {
-  return settings.order.filter((l) => !settings.hidden.includes(l))
+/** The row's items to show, in the Viewer's order. */
+export function visibleRowItems(settings: LeagueSettings): Array<RowItem> {
+  return settings.order.filter((x) => !settings.hidden.includes(x))
 }
 
-/** Move one League to a new position (clamped). */
-export function moveLeague(
-  order: ReadonlyArray<League>,
-  league: League,
+/** The Leagues All covers: the visible ones. */
+export function visibleLeagues(settings: LeagueSettings): Array<League> {
+  return visibleRowItems(settings).filter(isLeague)
+}
+
+/** Move one item to a new position (clamped). */
+export function moveLeague<T extends RowItem>(
+  order: ReadonlyArray<T>,
+  item: T,
   to: number,
-): Array<League> {
-  const rest = order.filter((l) => l !== league)
+): Array<T> {
+  const rest = order.filter((l) => l !== item)
   const at = Math.max(0, Math.min(rest.length, to))
-  return [...rest.slice(0, at), league, ...rest.slice(at)]
+  return [...rest.slice(0, at), item, ...rest.slice(at)]
 }

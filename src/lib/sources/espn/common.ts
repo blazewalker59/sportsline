@@ -11,6 +11,7 @@ import type {
   ScheduledGame,
   SourceTeam,
 } from '@/lib/model/types'
+import type { Conference } from '@/lib/model/leagues'
 import { sportsDayOf } from '@/lib/model/sportsDay'
 
 export type EspnLeague = Extract<League, 'nfl' | 'cfb' | 'nba'>
@@ -68,8 +69,24 @@ export function competitorTeam(
     name: c.team.displayName ?? c.team.name ?? c.team.id,
     abbreviation,
     logoUrl: teamLogo(league, abbreviation, c.team.id),
-    ...(league === 'cfb' ? { rank: top25(c) } : {}),
+    ...(league === 'cfb'
+      ? { rank: top25(c), conference: conferenceOf(c) }
+      : {}),
   }
+}
+
+/** ESPN's group ids for the major conferences. */
+const CONFERENCE_IDS: Record<string, Conference> = {
+  '8': 'sec',
+  '5': 'big10',
+  '4': 'big12',
+  '1': 'acc',
+}
+
+/** A college team's major conference, or null for any other. */
+export function conferenceOf(c: EspnCompetitor): Conference | null {
+  const id = c.team.conferenceId ?? c.team.groups?.id
+  return (id && CONFERENCE_IDS[id]) || null
 }
 
 /** A college team's AP Top 25 rank, or null when unranked. */

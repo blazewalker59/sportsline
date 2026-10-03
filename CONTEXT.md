@@ -92,8 +92,12 @@ The live, reverse-chronological stream of Plays and Game Milestones in the Viewe
 _Avoid_: feed, stream, ticker
 
 **Scope**:
-Which Plays a Timeline draws from: All (every League), Following (the Viewer's Follows), a single League, or Top 25 (college football Games with a Ranked team). A Viewer switches Scope freely; it starts on Following when they follow anything, otherwise All.
+Which Plays a Timeline draws from: All (every League the Viewer hasn't hidden), Following (the Viewer's Follows), a single League, Top 25 (college football Games with a Ranked team), or a Conference. A Viewer switches Scope freely; it starts on Following when they follow anything, otherwise All.
 _Avoid_: view, tab, mode
+
+**Conference**:
+One of college football's major conferences Sportsline groups by: the SEC, Big Ten, Big 12 and ACC. Like a Ranked team's rank, a team's Conference is recorded per Game. Each Conference, and Top 25, has its own Scope, and sits on the Scope row a Viewer arranges alongside the Leagues.
+_Avoid_: division, league (a Conference is within the college football League)
 
 **Ranked**:
 A college football team in the AP Top 25 when a Game is played. The rank belongs to the Game, not the Team: it is the team's rank that week. Any Game with a Ranked team is covered, whatever the conferences.

@@ -64,6 +64,13 @@
       "when": 1790996001050,
       "tag": "0008_league_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1790996569959,
+      "tag": "0009_game_conferences",
+      "breakpoints": true
     }
   ]
 }

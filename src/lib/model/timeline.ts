@@ -5,7 +5,9 @@
  */
 
 import { LEAGUES } from './types'
+import { isConference } from './leagues'
 import type { TeamColors } from '@/lib/brand/teamColors'
+import type { Conference } from './leagues'
 import type {
   Json,
   League,
@@ -30,6 +32,8 @@ export interface TeamRef {
   colors?: TeamColors | null
   /** College football: AP Top 25 rank at this Game, if ranked. */
   rank?: number | null
+  /** College football: major conference at this Game, if any. */
+  conference?: Conference | null
 }
 
 export interface TimelineItem {
@@ -70,9 +74,14 @@ export type Follow =
    * Coverage only: never stored as a Viewer's Follow.
    */
   | { kind: 'top25' }
+  /** College football Games involving a major Conference's team (its Scope). */
+  | { kind: 'conference'; conference: Conference }
 
 /** A Follow a Viewer can save (CONTEXT.md, "Follow"). */
-export type ViewerFollow = Exclude<Follow, { kind: 'top25' }>
+export type ViewerFollow = Exclude<
+  Follow,
+  { kind: 'top25' } | { kind: 'conference' }
+>
 
 export interface TimelineFilter {
   follows: Array<Follow>
@@ -139,6 +148,14 @@ export function matchesFilter(
           item.significance !== 'routine' ||
           Boolean(filter.includeRoutine)
         )
+      case 'conference':
+        if (item.league !== 'cfb' || !inConference(item, follow.conference))
+          return false
+        return (
+          item.kind !== 'play' ||
+          item.significance !== 'routine' ||
+          Boolean(filter.includeRoutine)
+        )
     }
   })
 }
@@ -151,7 +168,21 @@ export function isRanked(game: {
   return Boolean(game.awayTeam.rank || game.homeTeam.rank)
 }
 
-/** `league:mlb,team:tm_x,player:pl_y,top25:cfb` ↔ Follows (URL and socket form). */
+/** Does a Game (or one of its items) involve a team from this Conference? */
+export function inConference(
+  game: {
+    awayTeam: Pick<TeamRef, 'conference'>
+    homeTeam: Pick<TeamRef, 'conference'>
+  },
+  conference: Conference,
+): boolean {
+  return (
+    game.awayTeam.conference === conference ||
+    game.homeTeam.conference === conference
+  )
+}
+
+/** `league:mlb,team:tm_x,player:pl_y,top25:cfb,conference:sec` ↔ Follows (URL and socket form). */
 export function followsToParam(follows: ReadonlyArray<Follow>): string {
   return follows
     .map((f) =>
@@ -161,7 +192,9 @@ export function followsToParam(follows: ReadonlyArray<Follow>): string {
           ? `team:${f.teamId}`
           : f.kind === 'player'
             ? `player:${f.playerId}`
-            : 'top25:cfb',
+            : f.kind === 'conference'
+              ? `conference:${f.conference}`
+              : 'top25:cfb',
     )
     .join(',')
 }
@@ -184,6 +217,8 @@ export function followsFromParam(
     if (kind === 'player' && /^pl_\w+$/.test(value))
       return [{ kind: 'player', playerId: value }]
     if (kind === 'top25' && value === 'cfb') return [{ kind: 'top25' }]
+    if (kind === 'conference' && isConference(value))
+      return [{ kind: 'conference', conference: value }]
     return []
   })
 }

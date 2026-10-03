@@ -24,8 +24,10 @@ export interface EspnCompetitor {
     abbreviation?: string
     displayName?: string
     name?: string
-    /** College football only: the team's conference. */
+    /** College football only: the team's conference (scoreboard)… */
     conferenceId?: string
+    /** …or its group (game summary). */
+    groups?: { id?: string }
   }
   linescores?: Array<{ displayValue?: string }>
   /** College football rankings: the summary's `rank`, the scoreboard's curatedRank (99 when unranked). */

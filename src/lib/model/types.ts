@@ -5,6 +5,8 @@
  * (docs/adr/0002).
  */
 
+import type { Conference } from './leagues'
+
 export const LEAGUES = ['mlb', 'nba', 'nfl', 'cfb', 'nhl'] as const
 export type League = (typeof LEAGUES)[number]
 
@@ -37,6 +39,8 @@ export interface SourceTeam extends SourceRef {
   logoUrl: string | null
   /** College football, in a Game: the team's AP Top 25 rank then, if ranked. */
   rank?: number | null
+  /** College football, in a Game: the team's major conference then, if any. */
+  conference?: Conference | null
 }
 
 export interface InvolvedPlayer extends SourceRef {

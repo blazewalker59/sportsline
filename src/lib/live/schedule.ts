@@ -119,6 +119,8 @@ async function syncLeague(
       homeScore: g.score.home,
       awayRank: g.away.rank ?? null,
       homeRank: g.home.rank ?? null,
+      awayConference: g.away.conference ?? null,
+      homeConference: g.home.conference ?? null,
       updatedAt: nowIso,
     }
     // Once a LiveGame owns a Game (live or later), it writes the row.
@@ -131,6 +133,8 @@ async function syncLeague(
               status: row.status,
               awayRank: row.awayRank,
               homeRank: row.homeRank,
+              awayConference: row.awayConference,
+              homeConference: row.homeConference,
               updatedAt: nowIso,
             })
             .where(

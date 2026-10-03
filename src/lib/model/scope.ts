@@ -1,18 +1,19 @@
-/** A Timeline's Scope (CONTEXT.md): All, Following, one League, or Top 25. */
+/**
+ * A Timeline's Scope (CONTEXT.md): All, Following, one League, or one of
+ * college football's groups (Top 25, a major Conference).
+ */
 
 import { DEFAULT_FOLLOWS } from './timeline'
-import { LEAGUES } from './types'
+import { isConference, isRowItem } from './leagues'
 import type { Follow } from './timeline'
+import type { RowItem } from './leagues'
 import type { League } from './types'
 
-export type Scope = 'all' | 'following' | 'top25' | League
+export type Scope = 'all' | 'following' | RowItem
 
 export function parseScope(value: unknown): Scope | undefined {
-  if (value === 'all' || value === 'following' || value === 'top25')
-    return value
-  return (LEAGUES as ReadonlyArray<unknown>).includes(value)
-    ? (value as League)
-    : undefined
+  if (value === 'all' || value === 'following') return value
+  return isRowItem(value) ? value : undefined
 }
 
 /** The Scope a Viewer starts on: their Follows if they have any. */
@@ -38,6 +39,8 @@ export function scopeFollows(
     case 'top25':
       return [{ kind: 'top25' }]
     default:
-      return [{ kind: 'league', league: scope }]
+      return isConference(scope)
+        ? [{ kind: 'conference', conference: scope }]
+        : [{ kind: 'league', league: scope }]
   }
 }

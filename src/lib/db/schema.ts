@@ -16,6 +16,7 @@ import {
   text,
   unique,
 } from 'drizzle-orm/sqlite-core'
+import type { Conference, RowItem } from '@/lib/model/leagues'
 import type {
   GameBox,
   Json,
@@ -176,6 +177,9 @@ export const games = sqliteTable(
     /** College football: each team's AP Top 25 rank at this Game, if ranked. */
     awayRank: integer('away_rank'),
     homeRank: integer('home_rank'),
+    /** College football: each team's major conference at this Game, if any. */
+    awayConference: text('away_conference').$type<Conference>(),
+    homeConference: text('home_conference').$type<Conference>(),
     situation: text('situation', { mode: 'json' }).$type<Situation | null>(),
     box: text('box', { mode: 'json' }).$type<GameBox | null>(),
     updatedAt: text('updated_at').notNull(),
@@ -275,10 +279,10 @@ export const leagueSettings = sqliteTable('league_settings', {
     .primaryKey()
     .references(() => user.id, { onDelete: 'cascade' }),
   order: text('league_order', { mode: 'json' })
-    .$type<Array<League>>()
+    .$type<Array<RowItem>>()
     .notNull(),
   hidden: text('hidden_leagues', { mode: 'json' })
-    .$type<Array<League>>()
+    .$type<Array<RowItem>>()
     .notNull(),
   updatedAt: text('updated_at').notNull(),
 })
