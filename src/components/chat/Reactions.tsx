@@ -71,7 +71,11 @@ export function ReactionsProvider({
   const api = useMemo<ReactionsApi>(
     () => ({
       get: (itemId) => tallies?.[itemId],
-      open: (item, anchor) => setPicker({ item, anchor }),
+      open: (item, anchor) => {
+        // Drop any selection the long-press started before the bar appears.
+        window.getSelection()?.removeAllRanges()
+        setPicker({ item, anchor })
+      },
     }),
     [tallies],
   )

@@ -237,7 +237,9 @@ function Timeline({
   const [recapOpen, setRecapOpen] = useState(false)
 
   return (
-    <div className="mx-auto max-w-xl px-4 pb-16">
+    // A chat feed, not a document: nothing selects, so long-pressing a
+    // bubble to react never makes iOS highlight the page around it.
+    <div className="mx-auto max-w-xl px-4 pb-16 select-none [-webkit-touch-callout:none]">
       {/*
         Pinned over the content rather than in its flow: hiding the score
         cards slides them up behind the header without changing the page's
