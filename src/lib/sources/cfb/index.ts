@@ -6,6 +6,7 @@
  */
 
 import { parseGame, parseRoster, parseScoreboard } from '../nfl/parse'
+import { fetchWithRetry, mapPool } from '../pool'
 import type {
   NflCorePlays,
   NflRoster,
@@ -32,8 +33,13 @@ export const COVERED_TEAMS: ReadonlySet<string> = new Set(['87'])
 /** ESPN's FBS group, for the scoreboard. */
 const FBS = '80'
 
+/** Roster calls in flight at once: a burst of every team gets rate-limited. */
+const ROSTER_CONCURRENCY = 6
+
 async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { headers: { accept: 'application/json' } })
+  const res = await fetchWithRetry(url, {
+    headers: { accept: 'application/json' },
+  })
   if (!res.ok) throw new Error(`ESPN ${res.status} for ${url}`)
   return (await res.json()) as T
 }
@@ -118,12 +124,10 @@ export const cfbAdapter: SourceAdapter = {
         },
       ],
     }
-    const rosters = await Promise.all(
-      ids.map(async (teamId) => ({
-        teamId,
-        roster: await getJson<NflRoster>(`${SITE}/teams/${teamId}/roster`),
-      })),
-    )
+    const rosters = await mapPool(ids, ROSTER_CONCURRENCY, async (teamId) => ({
+      teamId,
+      roster: await getJson<NflRoster>(`${SITE}/teams/${teamId}/roster`),
+    }))
     return parseRoster(teams, rosters, 'cfb')
   },
 }

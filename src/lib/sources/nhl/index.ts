@@ -1,5 +1,6 @@
 /** NHL Source adapter: NHL.com (api-web.nhle.com) plus its stats API. */
 
+import { fetchWithRetry, mapPool } from '../pool'
 import { parseGame, parseRoster, parseSchedule } from './parse'
 import type {
   NhlBoxscore,
@@ -13,9 +14,13 @@ import type { SourceAdapter } from '@/lib/model/types'
 
 const WEB = 'https://api-web.nhle.com/v1'
 const STATS = 'https://api.nhle.com/stats/rest/en'
+/** NHL.com rate-limits a burst of 32 roster calls. */
+const ROSTER_CONCURRENCY = 4
 
 async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { headers: { accept: 'application/json' } })
+  const res = await fetchWithRetry(url, {
+    headers: { accept: 'application/json' },
+  })
   if (!res.ok) throw new Error(`NHL ${res.status} for ${url}`)
   return (await res.json()) as T
 }
@@ -48,11 +53,13 @@ export const nhlAdapter: SourceAdapter = {
     const abbrevs = (standings.standings ?? []).flatMap((s) =>
       s.teamAbbrev?.default ? [s.teamAbbrev.default] : [],
     )
-    const rosters = await Promise.all(
-      abbrevs.map(async (abbrev) => ({
+    const rosters = await mapPool(
+      abbrevs,
+      ROSTER_CONCURRENCY,
+      async (abbrev) => ({
         abbrev,
         roster: await getJson<NhlRoster>(`${WEB}/roster/${abbrev}/current`),
-      })),
+      }),
     )
     return parseRoster(teams, standings, rosters)
   },

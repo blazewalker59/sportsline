@@ -1,5 +1,6 @@
 /** NFL Source adapter: ESPN's public site and core APIs. */
 
+import { fetchWithRetry, mapPool } from '../pool'
 import { parseGame, parseRoster, parseScoreboard } from './parse'
 import type {
   NflCorePlays,
@@ -13,8 +14,13 @@ import type { SourceAdapter } from '@/lib/model/types'
 const SITE = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl'
 const CORE = 'https://sports.core.api.espn.com/v2/sports/football/leagues/nfl'
 
+/** Roster calls in flight at once: a burst of every team gets rate-limited. */
+const ROSTER_CONCURRENCY = 6
+
 async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { headers: { accept: 'application/json' } })
+  const res = await fetchWithRetry(url, {
+    headers: { accept: 'application/json' },
+  })
   if (!res.ok) throw new Error(`ESPN ${res.status} for ${url}`)
   return (await res.json()) as T
 }
@@ -43,12 +49,10 @@ export const nflAdapter: SourceAdapter = {
     const ids = (teams.sports?.[0]?.leagues?.[0]?.teams ?? []).map(
       (t) => t.team.id,
     )
-    const rosters = await Promise.all(
-      ids.map(async (teamId) => ({
-        teamId,
-        roster: await getJson<NflRoster>(`${SITE}/teams/${teamId}/roster`),
-      })),
-    )
+    const rosters = await mapPool(ids, ROSTER_CONCURRENCY, async (teamId) => ({
+      teamId,
+      roster: await getJson<NflRoster>(`${SITE}/teams/${teamId}/roster`),
+    }))
     return parseRoster(teams, rosters)
   },
 }
