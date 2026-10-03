@@ -7,6 +7,7 @@
 import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { PlayText } from './PlayText'
+import { ReactionPills, useItemReactions, useLongPress } from './Reactions'
 import type { Bubble } from '@/lib/timeline/chat'
 import type { TeamRef, TimelineItem } from '@/lib/model/timeline'
 import type { League } from '@/lib/model/types'
@@ -111,12 +112,54 @@ export function PlayBubble({
   align,
   position,
   compact,
+  reactable = true,
 }: {
   item: TimelineItem
   align: Align
   position: 'single' | 'first' | 'middle' | 'last'
   /** Thread view: less chrome, no score line on Scoring bubbles' header. */
   compact?: boolean
+  /** Long-press to react, with Reaction counts under it (off in a share image). */
+  reactable?: boolean
+}) {
+  const press = useLongPress(item)
+  const reactions = useItemReactions()
+  if (!reactable) {
+    return (
+      <PlayBubbleLink
+        item={item}
+        align={align}
+        position={position}
+        compact={compact}
+      />
+    )
+  }
+  return (
+    <>
+      <PlayBubbleLink
+        item={item}
+        align={align}
+        position={position}
+        compact={compact}
+        press={press}
+      />
+      <ReactionPills reactions={reactions?.get(item.id)} align={align} />
+    </>
+  )
+}
+
+function PlayBubbleLink({
+  item,
+  align,
+  position,
+  compact,
+  press,
+}: {
+  item: TimelineItem
+  align: Align
+  position: 'single' | 'first' | 'middle' | 'last'
+  compact?: boolean
+  press?: ReturnType<typeof useLongPress>
 }) {
   const shape = corner(align, position)
   const struck = item.status === 'overturned'
@@ -134,8 +177,9 @@ export function PlayBubble({
         search={(prev) => ({ ...prev, play: item.id })}
         resetScroll={false}
         onClick={markPlayOpened}
+        {...press}
         className={cn(
-          'flex max-w-[300px] flex-col gap-1.5 px-4 py-3 transition-transform active:scale-[0.99]',
+          'flex max-w-[300px] flex-col gap-1.5 px-4 py-3 transition-transform select-none [-webkit-touch-callout:none] active:scale-[0.99]',
           shape,
           !fill && 'border-2 border-live bg-bubble',
           struck && 'opacity-60',
@@ -197,8 +241,9 @@ export function PlayBubble({
       search={(prev) => ({ ...prev, play: item.id })}
       resetScroll={false}
       onClick={markPlayOpened}
+      {...press}
       className={cn(
-        'team-tint block max-w-[300px] border px-3.5 py-2.5 text-[15px] leading-snug transition-colors hover:brightness-[0.97] dark:hover:brightness-110',
+        'team-tint block max-w-[300px] border px-3.5 py-2.5 text-[15px] leading-snug transition-colors select-none [-webkit-touch-callout:none] hover:brightness-[0.97] dark:hover:brightness-110',
         shape,
         struck && 'line-through opacity-60',
       )}

@@ -9,19 +9,16 @@
 import { createServerFn } from '@tanstack/react-start'
 import { and, eq, like, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
+import { sessionViewer, withViewer } from './session'
+import type { ViewerProfile } from './session'
 import type { Database } from '@/lib/db'
 import type { ViewerFollow } from '@/lib/model/timeline'
 import type { League } from '@/lib/model/types'
-import { getAuth } from '@/lib/auth/server'
-import { getCloudflareEnv, getDb, serverRequestContext } from '@/lib/db'
+import { getDb } from '@/lib/db'
 import { follows, players, readMarkers, teams } from '@/lib/db/schema'
 import { LEAGUES } from '@/lib/model/types'
 
-export interface ViewerProfile {
-  id: string
-  name: string
-  image: string | null
-}
+export type { ViewerProfile } from './session'
 
 /** A Follow with what the UI needs to show it. */
 export interface FollowEntry {
@@ -38,26 +35,6 @@ export interface ViewerState {
   follows: Array<FollowEntry>
   /** occurredAt of the newest item the Viewer had seen, if any. */
   readAt: string | null
-}
-
-async function sessionViewer(): Promise<ViewerProfile | null> {
-  const headers = serverRequestContext.getStore()?.headers
-  if (!headers) return null
-  const session = await getAuth(getCloudflareEnv()).api.getSession({ headers })
-  if (!session?.user) return null
-  return {
-    id: session.user.id,
-    name: session.user.name,
-    image: session.user.image ?? null,
-  }
-}
-
-async function withViewer<T>(
-  fn: (scope: { db: Database; viewerId: string }) => Promise<T>,
-): Promise<T> {
-  const viewer = await sessionViewer()
-  if (!viewer) throw new Error('Sign in required')
-  return fn({ db: getDb(), viewerId: viewer.id })
 }
 
 const LEAGUE_LABELS: Record<League, string> = {

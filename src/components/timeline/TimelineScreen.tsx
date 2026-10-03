@@ -5,10 +5,12 @@ import { DayButton } from './DayButton'
 import { DayStrip } from './DayStrip'
 import { ScopeBar } from './ScopeBar'
 import { GameStrip } from './GameStrip'
+import { CatchUpCard, CatchUpSheet } from './CatchUp'
 import type { Scope } from '@/lib/model/scope'
 import type { FeedEntry, Typing } from '@/lib/timeline/chat'
 import type { Follow, GameSummary } from '@/lib/model/timeline'
 import type { Connection } from '@/lib/timeline/useLiveTimeline'
+import { ReactionsProvider } from '@/components/chat/Reactions'
 import { defaultScope, scopeFollows } from '@/lib/model/scope'
 import { isRanked } from '@/lib/model/timeline'
 import { takePlayOpened } from '@/lib/timeline/playSheet'
@@ -19,6 +21,7 @@ import { gameSearch, vtName } from '@/lib/timeline/gameLink'
 import { useLiveGame } from '@/lib/games/useLiveGame'
 import { BoxSheet } from '@/components/games/GameView'
 import { Sheet } from '@/components/chat/Sheet'
+import { catchUp } from '@/lib/timeline/catchup'
 import {
   BubbleStack,
   LeagueAvatar,
@@ -58,16 +61,18 @@ export function TimelineScreen({
     )
   }
   return (
-    <Timeline
-      // Not keyed by day: moving between days keeps this Timeline (and its
-      // cache) so the switch is a transition, not a rebuild.
-      key={viewerState.data?.viewer?.id ?? 'guest'}
-      sportsDay={sportsDay}
-      today={today}
-      gameId={gameId ?? null}
-      scope={scope}
-      playId={playId ?? null}
-    />
+    <ReactionsProvider sportsDay={sportsDay}>
+      <Timeline
+        // Not keyed by day: moving between days keeps this Timeline (and its
+        // cache) so the switch is a transition, not a rebuild.
+        key={viewerState.data?.viewer?.id ?? 'guest'}
+        sportsDay={sportsDay}
+        today={today}
+        gameId={gameId ?? null}
+        scope={scope}
+        playId={playId ?? null}
+      />
+    </ReactionsProvider>
   )
 }
 
@@ -225,6 +230,11 @@ function Timeline({
     showMarker && readAt ? items.filter((i) => i.occurredAt > readAt).length : 0
   const dividerAt =
     showMarker && readAt ? entries.findIndex((e) => entryTime(e) <= readAt) : -1
+  const recap = useMemo(
+    () => (showMarker && readAt ? catchUp(items, readAt) : null),
+    [showMarker, readAt, items],
+  )
+  const [recapOpen, setRecapOpen] = useState(false)
 
   return (
     <div className="mx-auto max-w-xl px-4 pb-16">
@@ -322,6 +332,15 @@ function Timeline({
         )}
         aria-busy={timeline.loading}
       >
+        {recap && readAt && (
+          <li style={{ viewTransitionName: 'catchup' }}>
+            <CatchUpCard
+              catchUp={recap}
+              readAt={readAt}
+              onOpen={() => setRecapOpen(true)}
+            />
+          </li>
+        )}
         {typing.length > 1 ? (
           <li style={{ viewTransitionName: 'typing' }}>
             <TypingSummary typing={typing} onOpen={() => setLiveOpen(true)} />
@@ -382,6 +401,14 @@ function Timeline({
       )}
 
       {playId && <PlaySheet playId={playId} onClose={closePlay} />}
+
+      {recapOpen && recap && (
+        <CatchUpSheet
+          catchUp={recap}
+          now={now}
+          onClose={() => setRecapOpen(false)}
+        />
+      )}
 
       {liveOpen && typing.length > 1 && (
         <Sheet

@@ -2,8 +2,8 @@
 /**
  * Custom Cloudflare Worker entry (same shape as dreamteam).
  *
- * Serves Better Auth (`/api/auth/*`), the health check and the LiveHub
- * WebSocket (`/live`) directly; everything else falls through to TanStack
+ * Serves Better Auth (`/api/auth/*`), the health check, logo copies
+ * (`/logo`) and the LiveHub WebSocket (`/live`) directly; everything else falls through to TanStack
  * Start inside a per-request context carrying the env. Also exports the
  * Durable Object classes, and keeps the Scheduler loop running
  * (docs/adr/0001, "Scheduling").
@@ -18,6 +18,7 @@ import { getAuth } from '@/lib/auth/server'
 import { canonicalRedirect } from '@/lib/canonical'
 import { serverRequestContext } from '@/lib/db'
 import { LIVE_PATH } from '@/lib/live/LiveHub'
+import { LOGO_PATH, serveLogo } from '@/lib/logoProxy'
 
 export { LiveGame } from '@/lib/live/LiveGame'
 export { LiveHub } from '@/lib/live/LiveHub'
@@ -67,6 +68,10 @@ export default {
       } catch {
         return Response.json({ ok: false }, { status: 503 })
       }
+    }
+
+    if (url.pathname === LOGO_PATH && request.method === 'GET') {
+      return serveLogo(url)
     }
 
     if (Date.now() - lastKick > KICK_EVERY_MS) {
