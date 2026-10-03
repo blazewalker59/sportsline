@@ -126,6 +126,7 @@ export function scoringHeadline(item: TimelineItem): string {
   const type = item.playType ?? ''
   switch (item.league) {
     case 'nfl':
+    case 'cfb':
       if (type === 'Interception Return Touchdown') return 'Pick six'
       if (type.includes('Touchdown')) return 'Touchdown'
       if (type === 'Field Goal Good') return 'Field goal'
@@ -159,6 +160,7 @@ export function notableLead(item: TimelineItem): string | null {
   const d = detailOf(item)
   switch (item.league) {
     case 'nfl':
+    case 'cfb':
       if (type === 'Sack') return 'Sack'
       if (type === 'Pass Interception Return') return 'Interception'
       if (type.startsWith('Fumble')) return 'Fumble'
@@ -247,7 +249,8 @@ export function typingFor(game: GameSummary): Typing | null {
       ]
       return { gameId: game.id, side, text: parts.filter(Boolean).join(' · ') }
     }
-    case 'nfl': {
+    case 'nfl':
+    case 'cfb': {
       const side: Side | null =
         detail.possession === game.homeTeam.abbreviation
           ? 'home'

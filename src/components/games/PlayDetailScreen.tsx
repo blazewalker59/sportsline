@@ -288,7 +288,7 @@ function Play({ detail }: { detail: PlayDetail }) {
       </header>
 
       {mlb && <MlbContext detail={mlb} />}
-      {item.league === 'nfl' && item.detail && (
+      {(item.league === 'nfl' || item.league === 'cfb') && item.detail && (
         <NflContext detail={item.detail as NflDetail} />
       )}
       {item.league === 'nhl' && item.detail && (

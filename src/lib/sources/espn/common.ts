@@ -1,6 +1,6 @@
 /**
- * What ESPN's site API looks like the same across Leagues (NFL and NBA
- * both use it): game status, quarter labels, team identity and logos, and
+ * What ESPN's site API looks like the same across Leagues (NFL, college
+ * football and NBA all use it): game status, quarter labels, team identity and logos, and
  * the daily scoreboard.
  */
 
@@ -13,7 +13,7 @@ import type {
 } from '@/lib/model/types'
 import { sportsDayOf } from '@/lib/model/sportsDay'
 
-export type EspnLeague = Extract<League, 'nfl' | 'nba'>
+export type EspnLeague = Extract<League, 'nfl' | 'cfb' | 'nba'>
 
 export function mapStatus(status: EspnStatus | undefined): GameStatus {
   const name = status?.type?.name ?? ''
@@ -38,7 +38,14 @@ export function espnLogo(path: string): string {
   return `https://a.espncdn.com/combiner/i?img=${path}&w=80&h=80`
 }
 
-export function teamLogo(league: EspnLeague, abbreviation: string): string {
+/** College logos are keyed by team id; the pros' by abbreviation. */
+export function teamLogo(
+  league: EspnLeague,
+  abbreviation: string,
+  teamId: string,
+): string {
+  if (league === 'cfb')
+    return espnLogo(`/i/teamlogos/ncaa/500-dark/${teamId}.png`)
   return espnLogo(
     `/i/teamlogos/${league}/500-dark/${abbreviation.toLowerCase()}.png`,
   )
@@ -53,7 +60,7 @@ export function competitorTeam(
     sourceId: c.team.id,
     name: c.team.displayName ?? c.team.name ?? c.team.id,
     abbreviation,
-    logoUrl: teamLogo(league, abbreviation),
+    logoUrl: teamLogo(league, abbreviation, c.team.id),
   }
 }
 

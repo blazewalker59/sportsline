@@ -5,7 +5,7 @@
  * (docs/adr/0002).
  */
 
-export const LEAGUES = ['mlb', 'nba', 'nfl', 'nhl'] as const
+export const LEAGUES = ['mlb', 'nba', 'nfl', 'cfb', 'nhl'] as const
 export type League = (typeof LEAGUES)[number]
 
 export const SIGNIFICANCES = ['scoring', 'notable', 'routine'] as const

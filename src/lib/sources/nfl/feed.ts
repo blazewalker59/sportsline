@@ -24,6 +24,8 @@ export interface EspnCompetitor {
     abbreviation?: string
     displayName?: string
     name?: string
+    /** College football only: the team's conference. */
+    conferenceId?: string
   }
   linescores?: Array<{ displayValue?: string }>
 }

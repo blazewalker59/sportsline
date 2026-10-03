@@ -7,7 +7,7 @@ A live, livestream-style timeline of play-by-play across the sports a viewer car
 ### Leagues & Sources
 
 **League**:
-One of the professional competitions Sportsline covers: MLB, NBA, NFL, NHL. College and other leagues are out of scope.
+One of the competitions Sportsline covers: MLB, NBA, NFL, NHL and college football. College football is covered only in part: games involving a team from the ACC, Big 12, Big Ten or SEC, or Notre Dame, whoever the opponent is. Other leagues are out of scope.
 _Avoid_: sport (a sport can span several leagues)
 
 **Source**:

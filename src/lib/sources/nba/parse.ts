@@ -334,7 +334,7 @@ export function parseRoster(
       sourceId: t.id,
       name: t.displayName ?? t.id,
       abbreviation: t.abbreviation ?? t.id,
-      logoUrl: teamLogo('nba', t.abbreviation ?? t.id),
+      logoUrl: teamLogo('nba', t.abbreviation ?? t.id, t.id),
     })),
     players: rosters.flatMap(({ teamId, roster }) =>
       (roster.athletes ?? []).map((p) => ({

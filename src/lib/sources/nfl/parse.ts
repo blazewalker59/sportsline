@@ -1,9 +1,12 @@
 /**
- * ESPN NFL → shared model. Pure: no fetching, no clock.
+ * ESPN football (NFL and college) → shared model. Pure: no fetching, no
+ * clock.
  *
- * An NFL Play is a snap, including penalties and team timeouts (CONTEXT.md,
- * "Play"). Quarter and half ends become Game Milestones; TV timeouts, the
- * coin toss and the two-minute warning are dropped as noise.
+ * A football Play is a snap, including penalties and team timeouts
+ * (CONTEXT.md, "Play"). Quarter and half ends become Game Milestones; TV
+ * timeouts, the coin toss and the two-minute warning are dropped as noise.
+ * College descriptions are normalized to read like the NFL's
+ * (collegeDescription).
  */
 
 import {
@@ -14,6 +17,7 @@ import {
   refId,
   teamLogo,
 } from '../espn/common'
+import type { EspnLeague } from '../espn/common'
 import type {
   EspnCompetitor,
   NflCorePlay,
@@ -70,12 +74,49 @@ const NO_FOURTH_DOWN_ATTEMPT = new Set([
 ])
 const FINAL_SEQUENCE = 1_000_000_000
 
-const team = (c: EspnCompetitor): SourceTeam => competitorTeam('nfl', c)
+export type FootballLeague = Extract<EspnLeague, 'nfl' | 'cfb'>
+
+/**
+ * A college play as the NFL writes one: no clock prefix, formation tags,
+ * jersey numbers, holder/snapper credits or trailing clock, and yard lines
+ * spaced ("TEXAS33" → "TEXAS 33", a team's 0 → the end zone). A review's
+ * restated original play becomes just its outcome.
+ */
+export function collegeDescription(text: string): string {
+  return (
+    text
+      .replace(
+        /\.?\s*The previous play is under (?:automatic )?review[^]*?CALL (UPHELD|OVERTURNED|STANDS|CONFIRMED)[^]*$/i,
+        (_, call: string) => `. Call ${call.toLowerCase()}.`,
+      )
+      .replace(/^\(\d{1,2}:\d{2}\)\s*/, '')
+      .replace(
+        /^(?:No Huddle-Shotgun|No Huddle|Shotgun|Under Center|Pistol)\s+/i,
+        '',
+      )
+      .replace(/#\d{1,2}\s+/g, '')
+      .replace(/\s*\((?:H|LS): [^)]*\)/g, '')
+      .replace(/,\s*clock \d{1,2}:\d{2}/g, '')
+      // ESPN sometimes repeats the extra point.
+      .replace(/( \S+ kick attempt [a-z]+)(?:\1)+/g, '$1')
+      .replace(/\bthe ([A-Z][A-Z&]+)00\b/g, 'the end zone')
+      .replace(
+        /\b([A-Z][A-Z&]+)(\d{2})\b/g,
+        (_, t: string, yd: string) => `${t} ${Number(yd)}`,
+      )
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+  )
+}
 
 export function parseGame(
   summary: NflSummary,
   core: NflCorePlays,
+  league: FootballLeague = 'nfl',
 ): GameSnapshot {
+  const team = (c: EspnCompetitor): SourceTeam => competitorTeam(league, c)
+  const describe = (text: string) =>
+    league === 'cfb' ? collegeDescription(text) : text
   const competition = summary.header.competitions[0]
   const status = mapStatus(competition.status)
   const awayC = competition.competitors.find((c) => c.homeAway === 'away')!
@@ -186,7 +227,7 @@ export function parseGame(
       segmentLabel:
         `${quarterLabel(period)} ${row.clock?.displayValue ?? ''}`.trim(),
       score,
-      description: (row.text ?? type).trim(),
+      description: describe((row.text ?? type).trim()),
       playType: type,
       significance: scored ? 'scoring' : significance(row, type),
       side: sideOf(refId(row.team?.$ref, 'teams')),
@@ -258,7 +299,7 @@ export function parseGame(
   const live = status === 'live' || status === 'delayed'
 
   return {
-    league: 'nfl',
+    league,
     sourceGameId: summary.header.id,
     status,
     startsAt: competition.date,
@@ -366,13 +407,15 @@ function box(
 
 export function parseScoreboard(
   scoreboard: NflScoreboard,
+  league: FootballLeague = 'nfl',
 ): Array<ScheduledGame> {
-  return parseEspnScoreboard(scoreboard, 'nfl')
+  return parseEspnScoreboard(scoreboard, league)
 }
 
 export function parseRoster(
   teams: NflTeams,
   rosters: ReadonlyArray<{ teamId: string; roster: NflRoster }>,
+  league: FootballLeague = 'nfl',
 ): SourceRoster {
   const list = teams.sports?.[0]?.leagues?.[0]?.teams ?? []
   return {
@@ -380,7 +423,7 @@ export function parseRoster(
       sourceId: t.id,
       name: t.displayName ?? t.id,
       abbreviation: t.abbreviation ?? t.id,
-      logoUrl: teamLogo('nfl', t.abbreviation ?? t.id),
+      logoUrl: teamLogo(league, t.abbreviation ?? t.id, t.id),
     })),
     players: rosters.flatMap(({ teamId, roster }) =>
       (roster.athletes ?? []).flatMap((group) =>

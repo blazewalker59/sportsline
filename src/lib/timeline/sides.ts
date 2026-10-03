@@ -9,7 +9,10 @@ import type { TimelineItem, TimelinePlayer } from '@/lib/model/timeline'
 import type { League, Side } from '@/lib/model/types'
 
 /** Roles played by the side opposite the Play's acting team, per League. */
-const OPPONENT_ROLES: Record<Exclude<League, 'nfl'>, ReadonlySet<string>> = {
+const OPPONENT_ROLES: Record<
+  Exclude<League, 'nfl' | 'cfb'>,
+  ReadonlySet<string>
+> = {
   mlb: new Set(['pitcher', 'fielder']),
   // NHL records a blocked shot under the blocking team: there the shooter
   // is the opponent (see playerSide).
@@ -61,7 +64,7 @@ export function playerSide(
 ): Side | null {
   if (!item.side) return null
   const other: Side = item.side === 'home' ? 'away' : 'home'
-  if (item.league === 'nfl') {
+  if (item.league === 'nfl' || item.league === 'cfb') {
     const flipped = POSSESSION_CHANGE.test(item.playType ?? '')
     const offense = flipped ? other : item.side
     const defense = flipped ? item.side : other
@@ -97,7 +100,8 @@ export function scoringSummary(item: TimelineItem): string | null {
   const text = item.description
   const first = (...roles: Array<string>) => byRole(item, ...roles)[0]
   switch (item.league) {
-    case 'nfl': {
+    case 'nfl':
+    case 'cfb': {
       const yards = text.match(/for (-?\d+) yards?/)?.[1]
       const passer = first('passer')
       const receiver = first('receiver')
@@ -107,11 +111,16 @@ export function scoringSummary(item: TimelineItem): string | null {
       if (rusher)
         return `${lastName(rusher.name)}${yards ? ` · ${yards}-yd run` : ''}`
       const kicker = first('kicker')
-      const fg = text.match(/(\d+) yard field goal/)?.[1]
-      if (kicker && fg) return `${lastName(kicker.name)} · ${fg}-yd field goal`
+      const fg = text.match(
+        /(\d+) yard field goal|field goal attempt from (\d+) yards/,
+      )
+      const fgYards = fg?.[1] ?? fg?.[2]
+      if (kicker && fgYards)
+        return `${lastName(kicker.name)} · ${fgYards}-yd field goal`
       const returner = first('interceptor', 'returner')
+      const returned = text.match(/return (\d+) yards?/)?.[1] ?? yards
       if (returner)
-        return `${lastName(returner.name)}${yards ? ` · ${yards}-yd return` : ''}`
+        return `${lastName(returner.name)}${returned ? ` · ${returned}-yd return` : ''}`
       return null
     }
     case 'mlb': {

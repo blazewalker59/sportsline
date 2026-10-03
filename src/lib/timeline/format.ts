@@ -37,6 +37,21 @@ const RESULTS: Record<League, Array<RegExp>> = {
     /\bATTEMPT (?:SUCCEEDS|FAILS)\b/g,
     /\bSAFETY\b/g,
   ],
+  cfb: [
+    /\bfor (?:\d+ yards? (?:gain|loss)|loss of \d+ yards?|no gain)\b/g,
+    /\bfor -?\d+ yards?\b/g,
+    /\breturn (?:for loss of )?\d+ yards?\b/g,
+    /\bTOUCHDOWN\b/g,
+    /\bGOOD\b/g,
+    /\b(?:MISSED|BLOCKED)\b/g,
+    /\bkick attempt (?:good|failed|missed|blocked)\b/g,
+    /\b(?:intercepted|INTERCEPTED)\b/g,
+    /\bfumbled\b/g,
+    /\bsacked\b/g,
+    /\bincomplete\b/g,
+    /\bTouchback\b/g,
+    /\bSAFETY\b/g,
+  ],
   mlb: [
     /\b(?:homers|singles|doubles|triples|scores|walks|intentionally walks)\b/g,
     /\bstrikes out(?: swinging| looking| on a foul tip)?\b/g,
@@ -69,6 +84,9 @@ const RESULTS: Record<League, Array<RegExp>> = {
 
 const FLAGS: Array<RegExp> = [
   /\bPENALTY on [A-Z]{2,3}\b/g,
+  // College: "PENALTY TEXAS Illegal Formation".
+  /\bPENALTY [A-Z][A-Z&]+\b/g,
+  /\bNO PLAY\b/g,
   /^Penalty\b/g,
   /\bPenalty\b/g,
   // Basketball fouls and violations.
@@ -80,6 +98,10 @@ const FLAGS: Array<RegExp> = [
 const PLACES: Record<League, Array<RegExp>> = {
   nfl: [
     /\b(?:ob at|pushed ob at|ran ob at|to|at)\s+(?:[A-Z]{2,3} \d{1,2}|50)\b/g,
+  ],
+  cfb: [
+    /\b(?:to|at) the (?:[A-Z][A-Z&]+ \d{1,2}|end zone|50)\b/g,
+    /\b(?:caught |thrown )?(?:at|to) [A-Z][A-Z&]+ \d{1,2}\b/g,
   ],
   mlb: [
     /\bon an? (?:fly ball|line drive|sharp line drive|soft line drive|ground ball|sharp ground ball|soft ground ball|pop up|bunt)\b[^.]*?(?=\.|$)/g,

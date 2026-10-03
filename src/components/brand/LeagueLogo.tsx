@@ -6,6 +6,7 @@ const LABELS: Record<League, string> = {
   mlb: 'MLB',
   nba: 'NBA',
   nfl: 'NFL',
+  cfb: 'CFB',
   nhl: 'NHL',
 }
 
@@ -14,6 +15,8 @@ const LOGOS: Record<League, string> = {
   mlb: espn('mlb'),
   nba: espn('nba'),
   nfl: espn('nfl'),
+  // ESPN has no college football league mark; the NCAA's reads on dark.
+  cfb: 'https://a.espncdn.com/combiner/i?img=/i/espn/misc_logos/500/ncaa.png&w=80&h=80',
   nhl: espn('nhl'),
 }
 
