@@ -136,3 +136,46 @@ describe('isCovered', () => {
     ).toBe(false)
   })
 })
+
+describe('scoring follows ESPN, not a glitched score', () => {
+  // PSU @ NU live: the punt row briefly carried the next touchdown's score.
+  const row = (
+    sequenceNumber: string,
+    type: string,
+    homeScore: number,
+    scoringPlay: boolean,
+  ) => ({
+    id: sequenceNumber,
+    sequenceNumber,
+    type: { text: type },
+    text: type,
+    awayScore: 0,
+    homeScore,
+    scoringPlay,
+    period: { number: 1 },
+  })
+  const glitched = parseGame(
+    summaryFixture as unknown as NflSummary,
+    {
+      items: [
+        row('12', 'Field Goal Good', 3, true),
+        row('18', 'Punt', 10, false),
+        row('20', 'Rush', 3, false),
+        row('26', 'Rushing Touchdown', 10, true),
+      ],
+    } as unknown as NflCorePlays,
+    'cfb',
+  )
+  const byType = (type: string) =>
+    glitched.items.find(
+      (i): i is SourcePlay => i.kind === 'play' && i.playType === type,
+    )!
+
+  it('does not make the punt a Scoring play or show the future score', () => {
+    expect(byType('Punt').significance).not.toBe('scoring')
+    expect(byType('Punt').score).toEqual({ away: 0, home: 3 })
+    expect(byType('Field Goal Good').significance).toBe('scoring')
+    expect(byType('Rushing Touchdown').significance).toBe('scoring')
+    expect(byType('Rushing Touchdown').score).toEqual({ away: 0, home: 10 })
+  })
+})

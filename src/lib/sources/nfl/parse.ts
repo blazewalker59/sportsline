@@ -174,10 +174,16 @@ export function parseGame(
     if (NOISE_TYPES.has(type)) continue
     const sequence = Number(row.sequenceNumber ?? 0)
     const period = row.period?.number ?? 1
-    const score = {
+    const reported = {
       away: row.awayScore ?? previous.away,
       home: row.homeScore ?? previous.home,
     }
+    const rose = reported.away > previous.away || reported.home > previous.home
+    // ESPN's own flag decides Scoring: a live row can briefly carry a score
+    // from a later play (a punt reading 0–10 before the touchdown), and a
+    // timeout can share a field goal's sequence number. A score that rises
+    // on a play ESPN says didn't score is that glitch: keep the old one.
+    const score = row.scoringPlay === false && rose ? previous : reported
     const occurredAt = wallclock.get(row.id) ?? row.modified ?? competition.date
 
     if (SEGMENT_END_TYPES.has(type) || GAME_END_TYPES.has(type)) {
@@ -216,7 +222,7 @@ export function parseGame(
       })
     }
 
-    const scored = score.away > previous.away || score.home > previous.home
+    const scored = row.scoringPlay ?? rose
     previous = score
     const drive = playDrive.get(row.id) ?? null
     plays.push({
