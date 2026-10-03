@@ -583,9 +583,13 @@ export function parseSchedule(schedule: MlbSchedule): Array<ScheduledGame> {
     }))
 }
 
-/** MLB's headshot for a player, with MLB's generic silhouette as a fallback. */
+/**
+ * MLB's headshot for a player: the square "silo" bust (head and shoulders,
+ * framed like ESPN's), with MLB's generic silhouette as a fallback. The
+ * usual 2:3 portrait crops at the chin in a round avatar.
+ */
 export function mlbHeadshot(id: number): string {
-  return `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_120,q_auto:best/v1/people/${id}/headshot/67/current`
+  return `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:silo:current.png/w_120,q_auto:best/v1/people/${id}/headshot/silo/current`
 }
 
 export function parseRoster(teams: MlbTeams, people: MlbPeople): SourceRoster {

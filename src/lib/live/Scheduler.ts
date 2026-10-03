@@ -19,10 +19,10 @@ import { ACTIVE_LEAGUES } from '@/lib/sources'
 
 /**
  * Bump the version when the roster sync starts storing something new
- * (v2: headshots), so every League resyncs right after the deploy instead
- * of at its next daily run.
+ * (v2: headshots; v3: MLB's square headshots), so every League resyncs
+ * right after the deploy instead of at its next daily run.
  */
-const ROSTER_DUE_KEY = 'rosterDueAt:v2'
+const ROSTER_DUE_KEY = 'rosterDueAt:v3'
 /** Rosters refresh daily; the first run after a deploy syncs straight away. */
 const ROSTER_EVERY_MS = 20 * 3_600_000
 const ROSTER_RETRY_MS = 15 * 60_000
