@@ -9,11 +9,19 @@ import type { Follow } from './timeline'
 import type { RowItem } from './leagues'
 import type { League } from './types'
 
-/** Predictions: the Games the Viewer's open Predictions depend on. */
-export type Scope = 'all' | 'following' | 'predictions' | RowItem
+/**
+ * Predictions: the Games the Viewer's open Predictions depend on. Fantasy:
+ * plays by both sides' Starters in the Viewer's Matchups.
+ */
+export type Scope = 'all' | 'following' | 'predictions' | 'fantasy' | RowItem
 
 export function parseScope(value: unknown): Scope | undefined {
-  if (value === 'all' || value === 'following' || value === 'predictions')
+  if (
+    value === 'all' ||
+    value === 'following' ||
+    value === 'predictions' ||
+    value === 'fantasy'
+  )
     return value
   return isRowItem(value) ? value : undefined
 }
@@ -31,6 +39,8 @@ export function scopeFollows(
   leagues?: ReadonlyArray<League>,
   /** The Games the Viewer's open Predictions depend on. */
   predictionGames: ReadonlyArray<string> = [],
+  /** The Players starting in the Viewer's Fantasy Matchups, either side. */
+  fantasyPlayers: ReadonlyArray<string> = [],
 ): ReadonlyArray<Follow> {
   const all = leagues
     ? leagues.map((league) => ({ kind: 'league' as const, league }))
@@ -44,6 +54,8 @@ export function scopeFollows(
       return [{ kind: 'top25' }]
     case 'predictions':
       return predictionGames.map((gameId) => ({ kind: 'game', gameId }))
+    case 'fantasy':
+      return fantasyPlayers.map((playerId) => ({ kind: 'player', playerId }))
     default:
       return isConference(scope)
         ? [{ kind: 'conference', conference: scope }]

@@ -1,7 +1,7 @@
 /**
  * Delivering Alerts (CONTEXT.md, "Alert"): find the devices whose Viewers'
- * Team or Player Follows cover an item, or whose open Predictions depend on
- * its Game, push to each, and forget dead subscriptions. Called by
+ * Team or Player Follows cover an item, whose open Predictions depend on
+ * its Game, or with a Starter in it in a Fantasy Matchup, push to each, and forget dead subscriptions. Called by
  * LiveGame for news it has just recorded.
  */
 
@@ -12,6 +12,8 @@ import type { CloudflareEnv, Database } from '@/lib/db'
 import type { TimelineItem } from '@/lib/model/timeline'
 import type { VapidKeys } from './webpush'
 import {
+  fantasyLeagues,
+  fantasyPlayers,
   follows,
   itemPlayers,
   kalshiMarkets,
@@ -132,6 +134,72 @@ async function recipients(
 }
 
 /**
+ * Devices of Viewers with a Starter in this play in one of their Matchups
+ * (theirs or their opponent's), with a line about it ("Your Stafford ·
+ * TA 98.4–87.2 TB").
+ */
+async function fantasyRecipients(
+  db: Database,
+  item: TimelineItem,
+): Promise<Array<Recipient>> {
+  const ids = item.players.map((p) => p.id)
+  if (ids.length === 0) return []
+  const rows = await db
+    .select({
+      endpoint: pushSubscriptions.endpoint,
+      viewerId: pushSubscriptions.viewerId,
+      p256dh: pushSubscriptions.p256dh,
+      auth: pushSubscriptions.auth,
+      side: fantasyPlayers.side,
+      playerId: fantasyPlayers.playerId,
+      matchup: fantasyLeagues.matchup,
+    })
+    .from(fantasyPlayers)
+    .innerJoin(
+      fantasyLeagues,
+      and(
+        eq(fantasyLeagues.id, fantasyPlayers.leagueRowId),
+        eq(fantasyLeagues.enabled, true),
+      ),
+    )
+    .innerJoin(
+      pushSubscriptions,
+      eq(pushSubscriptions.viewerId, fantasyLeagues.viewerId),
+    )
+    .where(
+      and(
+        eq(fantasyPlayers.starter, true),
+        inArray(fantasyPlayers.playerId, ids),
+      ),
+    )
+  const byEndpoint = new Map<string, Recipient>()
+  // The Viewer's own Starter wins over their opponent's in one play.
+  for (const r of [...rows].sort((a, b) =>
+    a.side === b.side ? 0 : a.side === 'mine' ? -1 : 1,
+  )) {
+    if (byEndpoint.has(r.endpoint)) continue
+    const m = r.matchup
+    const name =
+      item.players
+        .find((p) => p.id === r.playerId)
+        ?.name.split(' ')
+        .at(-1) ?? 'player'
+    const score =
+      m && m.opponent
+        ? ` · ${m.mine.abbrev} ${m.mine.score}–${m.opponent.score} ${m.opponent.abbrev}`
+        : ''
+    byEndpoint.set(r.endpoint, {
+      endpoint: r.endpoint,
+      viewerId: r.viewerId,
+      p256dh: r.p256dh,
+      auth: r.auth,
+      prediction: `${r.side === 'mine' ? 'Your' : 'Opponent’s'} ${name}${score}`,
+    })
+  }
+  return [...byEndpoint.values()]
+}
+
+/**
  * Push each item to its recipients. `allow` lets the caller cap how often
  * a Viewer hears about one Game (Finals should always be allowed).
  */
@@ -149,9 +217,12 @@ export async function deliverAlerts(
     // Follows Alert on Scoring Plays, Overturns and Finals; Predictions on
     // every Scoring and Notable Play. One push a device, Follows first.
     const targets = new Map<string, Recipient>()
-    if (isPredictionAlertable(item, now))
+    if (isPredictionAlertable(item, now)) {
+      for (const r of await fantasyRecipients(db, item))
+        targets.set(r.endpoint, r)
       for (const r of await predictionRecipients(db, item))
         targets.set(r.endpoint, r)
+    }
     if (isAlertable(item, now))
       for (const r of await recipients(db, item))
         targets.set(r.endpoint, {

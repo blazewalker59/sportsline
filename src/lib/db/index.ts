@@ -34,6 +34,8 @@ export interface CloudflareEnv {
   CANONICAL_HOST?: string
   /** 32 bytes, base64: seals Viewers' Kalshi keys (docs/adr/0003). */
   KALSHI_ENCRYPTION_KEY?: string
+  /** 32 bytes, base64: seals Viewers' ESPN session cookies (docs/adr/0004). */
+  ESPN_ENCRYPTION_KEY?: string
 }
 
 export type Database = DrizzleD1Database<typeof schema>

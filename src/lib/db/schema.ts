@@ -17,6 +17,8 @@ import {
   text,
   unique,
 } from 'drizzle-orm/sqlite-core'
+import type { FantasySport } from '@/lib/fantasy/sports'
+import type { MatchupView } from '@/lib/fantasy/matchup'
 import type { Conference, RowItem } from '@/lib/model/leagues'
 import type {
   GameBox,
@@ -437,3 +439,61 @@ export const kalshiTargets = sqliteTable('kalshi_targets', {
   name: text('name').notNull(),
   league: text('league'),
 })
+
+// ─── ESPN Fantasy (docs/adr/0004) ───────────────────────────────────────────
+
+/** A Viewer's ESPN connection: their session cookies, sealed. */
+export const espnAccounts = sqliteTable('espn_accounts', {
+  viewerId: text('viewer_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  swidCiphertext: text('swid_ciphertext').notNull(),
+  swidIv: text('swid_iv').notNull(),
+  s2Ciphertext: text('s2_ciphertext').notNull(),
+  s2Iv: text('s2_iv').notNull(),
+  status: text('status').$type<'ok' | 'error'>().notNull(),
+  lastError: text('last_error'),
+  connectedAt: text('connected_at').notNull(),
+  syncedAt: text('synced_at'),
+  discoveredAt: text('discovered_at'),
+})
+
+/** A Viewer's Fantasy league, with their latest Matchup (as read). */
+export const fantasyLeagues = sqliteTable(
+  'fantasy_leagues',
+  {
+    id: text('id').primaryKey(),
+    viewerId: text('viewer_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    sport: text('sport').$type<FantasySport>().notNull(),
+    leagueId: text('league_id').notNull(),
+    season: integer('season').notNull(),
+    teamId: integer('team_id'),
+    name: text('name').notNull(),
+    teamName: text('team_name'),
+    enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+    matchup: text('matchup', { mode: 'json' }).$type<MatchupView | null>(),
+    lastError: text('last_error'),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [index('fantasy_leagues_viewer_idx').on(table.viewerId)],
+)
+
+/** Each Matchup's Players, mapped to ours: for the Fantasy feed and Alerts. */
+export const fantasyPlayers = sqliteTable(
+  'fantasy_players',
+  {
+    leagueRowId: text('league_row_id')
+      .notNull()
+      .references(() => fantasyLeagues.id, { onDelete: 'cascade' }),
+    espnId: integer('espn_id').notNull(),
+    side: text('side').$type<'mine' | 'opponent'>().notNull(),
+    playerId: text('player_id'),
+    starter: integer('starter', { mode: 'boolean' }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.leagueRowId, table.espnId, table.side] }),
+    index('fantasy_players_player_idx').on(table.playerId),
+  ],
+)

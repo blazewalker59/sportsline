@@ -92,7 +92,7 @@ The live, reverse-chronological stream of Plays and Game Milestones in the Viewe
 _Avoid_: feed, stream, ticker
 
 **Scope**:
-Which Plays a Timeline draws from: All (every League the Viewer hasn't hidden), Following (the Viewer's Follows), Predictions (the Games their open Predictions depend on, or just one Prediction's: its Players' plays and its other Legs' Games), a single League, Top 25 (college football Games with a Ranked team), or a Conference. A Viewer switches Scope freely; it starts on Following when they follow anything, otherwise All.
+Which Plays a Timeline draws from: All (every League the Viewer hasn't hidden), Following (the Viewer's Follows), Predictions (the Games their open Predictions depend on, or just one Prediction's: its Players' plays and its other Legs' Games), Fantasy (plays by both sides' Starters in their Matchups), a single League, Top 25 (college football Games with a Ranked team), or a Conference. A Viewer switches Scope freely; it starts on Following when they follow anything, otherwise All.
 _Avoid_: view, tab, mode
 
 **Team page**:
@@ -147,12 +147,36 @@ _Avoid_: line, price (the dollar figure behind it)
 Where a stat Leg stands against its line while the Game is played: the count so far from the live box score (a team's or Player's receiving yards, a Player's points) or the score itself (totals), against what it takes to win ("212 of 300").
 _Avoid_: tracker, status
 
+**Fantasy league**:
+A Viewer's ESPN fantasy league (football, basketball or baseball), read through their ESPN connection: the Viewer's own Fantasy team in it, and this scoring period's Matchup.
+_Avoid_: league (that's a sports League), contest
+
+**Fantasy team**:
+A team in a Fantasy league: its manager, and its Lineup of real Players.
+_Avoid_: squad, roster (a Lineup is the roster as set)
+
+**Lineup**:
+A Fantasy team's Players as set for the scoring period, each in a slot: Starters, whose stats count, and the bench.
+_Avoid_: roster, depth chart
+
+**Matchup**:
+The Viewer's Fantasy team against its opponent this scoring period, decided by fantasy points (or categories), live while their Starters play.
+_Avoid_: game (a Game is real), fixture
+
+**Fantasy points**:
+What a Player's real stats are worth under a Fantasy league's scoring, totalled over a Lineup's Starters.
+_Avoid_: score (a Game's), FP
+
+**ESPN connection**:
+A Viewer's link to their ESPN fantasy leagues, through their ESPN session cookies (docs/adr/0004). Read-only by Sportsline's choice, not ESPN's.
+_Avoid_: login, integration
+
 **Kalshi connection**:
 A Viewer's link to their own Kalshi account, through a read-only API key they provide (docs/adr/0003). It lets Sportsline read their Predictions, never trade.
 _Avoid_: login, integration
 
 **Alert**:
-A push notification to a Viewer's device for a Scoring Play, an Overturn of a score, or a Final, in a Game their Team or Player Follows cover; and for every Scoring and Notable Play in a Game one of their open Predictions depends on. League Follows never Alert. Never sent for history a LiveGame backfills.
+A push notification to a Viewer's device for a Scoring Play, an Overturn of a score, or a Final, in a Game their Team or Player Follows cover; for every Scoring and Notable Play in a Game one of their open Predictions depends on; and for every Scoring and Notable Play by a Starter in one of their Matchups, theirs or their opponent's. League Follows never Alert. Never sent for history a LiveGame backfills.
 _Avoid_: notification, push, ping
 
 **Viewer**:

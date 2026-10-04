@@ -12,6 +12,12 @@ import type { Follow, GameSummary } from '@/lib/model/timeline'
 import type { PredictionView } from '@/lib/kalshi/server'
 import type { Connection } from '@/lib/timeline/useLiveTimeline'
 import type { League } from '@/lib/model/types'
+import { useEspnConnection, useFantasy } from '@/lib/fantasy/useFantasy'
+import {
+  FantasyStrip,
+  FantasyTagsProvider,
+  MatchupSheet,
+} from '@/components/fantasy/FantasyParts'
 import {
   useKalshiConnection,
   usePredictions,
@@ -142,6 +148,8 @@ function inScope(
 ): boolean {
   if (scope === 'all') return leagues.includes(game.league)
   if (scope === 'predictions') return predictionGames.includes(game.id)
+  // Fantasy: the Games the Starters' plays came from.
+  if (scope === 'fantasy') return items.some((i) => i.gameId === game.id)
   if (scope === 'top25') return game.league === 'cfb' && isRanked(game)
   if (isConference(scope))
     return game.league === 'cfb' && inConference(game, scope)
@@ -217,6 +225,27 @@ function Timeline({
     [openPredictions],
   )
   const [predictionOpen, setPredictionOpen] = useState<string | null>(null)
+  // Fantasy (CONTEXT.md, "Matchup"): enabled leagues' Matchups, and the
+  // Players starting on either side.
+  const espn = useEspnConnection()
+  const fantasy = useFantasy()
+  const fantasyLeagues = useMemo(
+    () => (fantasy.data ?? []).filter((l) => l.enabled && l.matchup),
+    [fantasy.data],
+  )
+  const fantasyPlayers = useMemo(
+    () => [
+      ...new Set(
+        fantasyLeagues.flatMap((l) =>
+          [...l.matchup!.mine.lineup, ...(l.matchup!.opponent?.lineup ?? [])]
+            .filter((p) => p.starter && p.playerId)
+            .map((p) => p.playerId!),
+        ),
+      ),
+    ],
+    [fantasyLeagues],
+  )
+  const [matchupOpen, setMatchupOpen] = useState<string | null>(null)
   const selectedPrediction = predictionId
     ? (predictionList.data?.find((p) => p.id === predictionId) ?? null)
     : null
@@ -230,7 +259,8 @@ function Timeline({
   const scope: Scope = selectedPrediction
     ? 'predictions'
     : (wanted === 'following' && viewerFollows.length === 0) ||
-        (wanted === 'predictions' && !kalshi.data && !kalshi.isPending)
+        (wanted === 'predictions' && !kalshi.data && !kalshi.isPending) ||
+        (wanted === 'fantasy' && !espn.data && !espn.isPending)
       ? 'all'
       : (wanted ?? defaultScope(viewerFollows))
   // The Viewer's row in their order, hidden items left out; All covers
@@ -242,8 +272,21 @@ function Timeline({
     () =>
       selectedPrediction
         ? predictionFollows(selectedPrediction)
-        : scopeFollows(scope, viewerFollows, leagues, predictionGames),
-    [selectedPrediction, scope, viewerFollows, leagues, predictionGames],
+        : scopeFollows(
+            scope,
+            viewerFollows,
+            leagues,
+            predictionGames,
+            fantasyPlayers,
+          ),
+    [
+      selectedPrediction,
+      scope,
+      viewerFollows,
+      leagues,
+      predictionGames,
+      fantasyPlayers,
+    ],
   )
   const navigate = useNavigate()
   /** Select a Prediction (narrowing the Timeline to it), or clear it. */
@@ -424,9 +467,16 @@ function Timeline({
               items={rowItems}
               canFollow={viewerFollows.length > 0}
               canPredict={Boolean(kalshi.data)}
+              canFantasy={fantasyLeagues.length > 0}
             />
             <div className={cn('transition-opacity', dimmed && 'opacity-50')}>
-              {scope === 'predictions' && !gameId ? (
+              {scope === 'fantasy' && !gameId ? (
+                // Matchups move like scores: their cards replace the Games'.
+                <FantasyStrip
+                  leagues={fantasyLeagues}
+                  onOpen={setMatchupOpen}
+                />
+              ) : scope === 'predictions' && !gameId ? (
                 // Predictions move like scores: their cards replace the Games'.
                 <>
                   <PredictionStrip
@@ -492,55 +542,58 @@ function Timeline({
         </Link>
       )}
 
-      <ol
-        className={cn(
-          'flex flex-col gap-3 transition-opacity',
-          dimmed && 'opacity-50',
-        )}
-        aria-busy={timeline.loading}
-      >
-        {recap && readAt && (
-          <li style={{ viewTransitionName: 'catchup' }}>
-            <CatchUpCard
-              catchUp={recap}
-              readAt={readAt}
-              onOpen={() => setRecapOpen(true)}
-            />
-          </li>
-        )}
-        {typing.length > 1 ? (
-          <li style={{ viewTransitionName: 'typing' }}>
-            <TypingSummary typing={typing} onOpen={() => setLiveOpen(true)} />
-          </li>
-        ) : (
-          typing.map(({ typing: t, game: g }) => (
-            <li
-              key={`typing:${g.id}`}
-              style={{ viewTransitionName: vtName(`typing:${g.id}`) }}
-            >
-              <TypingRow typing={t} game={g} focused={g.id === gameId} />
+      {/* Tags plays by either side's Starters, in the Fantasy view. */}
+      <FantasyTagsProvider leagues={scope === 'fantasy' ? fantasyLeagues : []}>
+        <ol
+          className={cn(
+            'flex flex-col gap-3 transition-opacity',
+            dimmed && 'opacity-50',
+          )}
+          aria-busy={timeline.loading}
+        >
+          {recap && readAt && (
+            <li style={{ viewTransitionName: 'catchup' }}>
+              <CatchUpCard
+                catchUp={recap}
+                readAt={readAt}
+                onOpen={() => setRecapOpen(true)}
+              />
             </li>
-          ))
-        )}
-        {entries.map((entry, i) => (
-          <li
-            key={entry.type === 'notice' ? entry.item.id : entry.id}
-            className="flex flex-col gap-3"
-          >
-            {i === dividerAt && i > 0 && <ReadDivider count={newCount} />}
-            {entry.type === 'notice' ? (
-              <div
-                className="flex flex-col"
-                style={{ viewTransitionName: vtName(entry.item.id) }}
+          )}
+          {typing.length > 1 ? (
+            <li style={{ viewTransitionName: 'typing' }}>
+              <TypingSummary typing={typing} onOpen={() => setLiveOpen(true)} />
+            </li>
+          ) : (
+            typing.map(({ typing: t, game: g }) => (
+              <li
+                key={`typing:${g.id}`}
+                style={{ viewTransitionName: vtName(`typing:${g.id}`) }}
               >
-                <Notice item={entry.item} now={now} showLeague={!gameId} />
-              </div>
-            ) : (
-              <Cluster entry={entry} now={now} focused={Boolean(gameId)} />
-            )}
-          </li>
-        ))}
-      </ol>
+                <TypingRow typing={t} game={g} focused={g.id === gameId} />
+              </li>
+            ))
+          )}
+          {entries.map((entry, i) => (
+            <li
+              key={entry.type === 'notice' ? entry.item.id : entry.id}
+              className="flex flex-col gap-3"
+            >
+              {i === dividerAt && i > 0 && <ReadDivider count={newCount} />}
+              {entry.type === 'notice' ? (
+                <div
+                  className="flex flex-col"
+                  style={{ viewTransitionName: vtName(entry.item.id) }}
+                >
+                  <Notice item={entry.item} now={now} showLeague={!gameId} />
+                </div>
+              ) : (
+                <Cluster entry={entry} now={now} focused={Boolean(gameId)} />
+              )}
+            </li>
+          ))}
+        </ol>
+      </FantasyTagsProvider>
 
       {items.length === 0 && typing.length === 0 && (
         <p className="mt-16 text-center text-sm text-muted">
@@ -568,6 +621,17 @@ function Timeline({
       )}
 
       {playId && <PlaySheet playId={playId} onClose={closePlay} />}
+
+      {matchupOpen &&
+        (() => {
+          const league = fantasyLeagues.find((l) => l.id === matchupOpen)
+          return league ? (
+            <MatchupSheet
+              league={league}
+              onClose={() => setMatchupOpen(null)}
+            />
+          ) : null
+        })()}
 
       {predictionOpen &&
         (() => {

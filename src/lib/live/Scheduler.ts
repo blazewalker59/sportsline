@@ -16,6 +16,10 @@ import { trimRoutinePlays } from './retention'
 import { syncSchedules } from './schedule'
 import type { CloudflareEnv } from '@/lib/db'
 import {
+  accountsDue as fantasyAccountsDue,
+  syncAccount as syncFantasy,
+} from '@/lib/fantasy/sync'
+import {
   accountsDue,
   pruneHistory,
   refreshPrices,
@@ -35,6 +39,9 @@ const ROSTER_RETRY_MS = 15 * 60_000
 const TRIM_DUE_KEY = 'trimDueAt'
 const KALSHI_SYNC_EVERY_MS = 5 * 60_000
 const KALSHI_SYNCS_PER_TICK = 5
+/** Fantasy points move with every play; Matchups refresh this often. */
+const FANTASY_SYNC_EVERY_MS = 2 * 60_000
+const FANTASY_SYNCS_PER_TICK = 5
 const TRIM_EVERY_MS = 24 * 3_600_000
 
 export class Scheduler extends DurableObject<CloudflareEnv> {
@@ -76,6 +83,24 @@ export class Scheduler extends DurableObject<CloudflareEnv> {
       }
     }
     await this.kalshi()
+    await this.fantasy()
+  }
+
+  /** Fantasy (docs/adr/0004): each connected ESPN account's Matchups. */
+  private async fantasy(): Promise<void> {
+    try {
+      for (const viewerId of await fantasyAccountsDue(
+        this.env,
+        FANTASY_SYNC_EVERY_MS,
+        FANTASY_SYNCS_PER_TICK,
+      )) {
+        await syncFantasy(this.env, viewerId).catch((error: unknown) =>
+          console.error('Fantasy sync failed', { error: String(error) }),
+        )
+      }
+    } catch (error) {
+      console.error('Fantasy accounts failed', { error: String(error) })
+    }
   }
 
   /**

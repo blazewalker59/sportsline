@@ -14,6 +14,7 @@ export function ScopeBar({
   items,
   canFollow,
   canPredict,
+  canFantasy,
 }: {
   scope: Scope
   /** The Viewer's visible Leagues and college groups, in their order. */
@@ -22,6 +23,8 @@ export function ScopeBar({
   canFollow: boolean
   /** The Viewer has connected Kalshi, so "Predictions" is offered. */
   canPredict?: boolean
+  /** The Viewer has Fantasy Matchups, so "Fantasy" is offered. */
+  canFantasy?: boolean
 }) {
   const chip = (
     value: Scope,
@@ -64,6 +67,7 @@ export function ScopeBar({
           {chip('all', 'All', 'All Leagues')}
           {canFollow && chip('following', 'Following', 'Following')}
           {canPredict && chip('predictions', 'Predictions', 'Your Predictions')}
+          {canFantasy && chip('fantasy', 'Fantasy', 'Your Fantasy Matchups')}
           {items.map((item) =>
             chip(
               item,

@@ -110,6 +110,13 @@ function AccountButton() {
           >
             Predictions
           </Link>
+          <Link
+            to="/fantasy"
+            onClick={() => setOpen(false)}
+            className="block rounded-lg px-3 py-2 hover:bg-background"
+          >
+            Fantasy
+          </Link>
           <AlertsItem />
           <button
             type="button"

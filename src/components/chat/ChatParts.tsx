@@ -11,6 +11,7 @@ import { ReactionPills, useItemReactions, useLongPress } from './Reactions'
 import type { Bubble } from '@/lib/timeline/chat'
 import type { TeamRef, TimelineItem } from '@/lib/model/timeline'
 import type { League } from '@/lib/model/types'
+import { FantasyTag } from '@/components/fantasy/FantasyParts'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { timeAgo } from '@/components/timeline/format'
@@ -164,6 +165,7 @@ export function PlayBubble({
         press={press}
       />
       <ReactionPills reactions={reactions?.get(item.id)} align={align} />
+      <FantasyTag item={item} align={align} />
     </>
   )
 }
