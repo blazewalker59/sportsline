@@ -180,8 +180,12 @@ A Viewer's link to their own Kalshi account, through a read-only API key they pr
 _Avoid_: login, integration
 
 **Alert**:
-A push notification to a Viewer's device for a Scoring Play, an Overturn of a score, or a Final, in a Game their Team or Player Follows cover; for every Scoring and Notable Play in a Game one of their open Predictions depends on; and for every Scoring and Notable Play by a Starter in one of their Matchups, theirs or their opponent's. League Follows never Alert. Never sent for history a LiveGame backfills.
+A push notification to a Viewer's device, its title naming its source (Following, Prediction or Fantasy) and why it matters. Following: a Scoring Play, an Overturn of a score, or a Final in a Game their Team or Player Follows cover. Prediction: its key moments, meaning the odds on their side swinging sharply, a Combo's Leg hitting or missing, and its result. Fantasy: a Starter's key events, meaning their scores and, for the Viewer's own Starters, big plays. Each source sends at the Viewer's Alert level for it. League Follows never Alert. Never sent for history a LiveGame backfills.
 _Avoid_: notification, push, ping
+
+**Alert level**:
+How much one Alert source sends a Viewer. Following: scores and finals, finals only, or off. Predictions: key moments, key moments plus every score in its Games, or off. Fantasy: key events for both sides' Starters, for the Viewer's own only, or off.
+_Avoid_: notification settings, preferences
 
 **Viewer**:
 A person signed in to Sportsline, who owns a set of Follows. Signed-out visitors see a default Timeline and have no Follows.

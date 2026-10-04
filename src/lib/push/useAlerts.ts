@@ -1,10 +1,14 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useState } from 'react'
 import {
   deletePushSubscription,
+  getAlertLevels,
   getPushKey,
   savePushSubscription,
+  setAlertLevels,
 } from './server'
 import { b64urlDecode } from './webpush'
+import type { AlertLevels } from './alerts'
 
 /**
  * This device's Alerts state. On iPhone, Web Push only works once the site
@@ -103,4 +107,23 @@ export function useAlerts() {
   }, [])
 
   return { state, busy, enable, disable }
+}
+
+const LEVELS_KEY = ['alert-levels'] as const
+
+/** The Viewer's Alert levels; a change shows at once and saves behind. */
+export function useAlertLevels(enabled: boolean) {
+  const queryClient = useQueryClient()
+  const query = useQuery({
+    queryKey: LEVELS_KEY,
+    queryFn: () => getAlertLevels(),
+    enabled,
+    staleTime: 5 * 60_000,
+  })
+  const save = useMutation({
+    mutationFn: (levels: AlertLevels) => setAlertLevels({ data: levels }),
+    onMutate: (levels) => queryClient.setQueryData(LEVELS_KEY, levels),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: LEVELS_KEY }),
+  })
+  return { levels: query.data, set: (l: AlertLevels) => save.mutate(l) }
 }

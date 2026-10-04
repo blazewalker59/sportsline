@@ -27,7 +27,7 @@ import { sourceFor } from '@/lib/sources'
 import { games, itemPlayers, players, timelineItems } from '@/lib/db/schema'
 import { teamColors } from '@/lib/brand/teamColors'
 import { dbFromD1 } from '@/lib/db'
-import { isAlertable, isPredictionAlertable } from '@/lib/push/alerts'
+import { isAlertCandidate } from '@/lib/push/alerts'
 import { deliverAlerts, vapidKeys } from '@/lib/push/deliver'
 
 const GAME_KEY = 'game'
@@ -378,8 +378,7 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
       const fresh = events.flatMap((e) =>
         e.type === 'upsert' &&
         freshIds.has(e.item.id) &&
-        (isAlertable(e.item, Date.now()) ||
-          isPredictionAlertable(e.item, Date.now()))
+        isAlertCandidate(e.item, Date.now())
           ? [e.item]
           : [],
       )

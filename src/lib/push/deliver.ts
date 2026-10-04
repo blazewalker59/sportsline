@@ -1,17 +1,26 @@
 /**
- * Delivering Alerts (CONTEXT.md, "Alert"): find the devices whose Viewers'
- * Team or Player Follows cover an item, whose open Predictions depend on
- * its Game, or with a Starter in it in a Fantasy Matchup, push to each, and forget dead subscriptions. Called by
- * LiveGame for news it has just recorded.
+ * Delivering play Alerts (CONTEXT.md, "Alert"): find the devices whose
+ * Viewers' Team or Player Follows cover an item, whose open Predictions
+ * depend on its Game, or with a Starter in it in a Fantasy Matchup; keep
+ * those each Viewer's Alert levels allow; push one Alert a device, its
+ * title naming the source. Called by LiveGame for news it just recorded.
  */
 
 import { and, eq, inArray, or, sql } from 'drizzle-orm'
-import { alertMessage, isAlertable, isPredictionAlertable } from './alerts'
+import {
+  DEFAULT_LEVELS,
+  alertMessage,
+  fantasyEvent,
+  isFollowingAlertable,
+  isPredictionPlayAlertable,
+} from './alerts'
 import { sendPush } from './webpush'
+import type { AlertLevels, AlertReason } from './alerts'
 import type { CloudflareEnv, Database } from '@/lib/db'
 import type { TimelineItem } from '@/lib/model/timeline'
 import type { VapidKeys } from './webpush'
 import {
+  alertSettings,
   fantasyLeagues,
   fantasyPlayers,
   follows,
@@ -37,8 +46,24 @@ interface Recipient {
   viewerId: string
   p256dh: string
   auth: string
-  /** Why a Prediction holder hears about it: their pick and its Odds now. */
-  prediction?: string
+}
+
+/** Each Viewer's Alert levels (the defaults until they change them). */
+export async function alertLevels(
+  db: Database,
+  viewerIds: ReadonlyArray<string>,
+): Promise<Map<string, AlertLevels>> {
+  const out = new Map<string, AlertLevels>()
+  const ids = [...new Set(viewerIds)]
+  for (let i = 0; i < ids.length; i += 80) {
+    const rows = await db
+      .select()
+      .from(alertSettings)
+      .where(inArray(alertSettings.viewerId, ids.slice(i, i + 80)))
+    for (const r of rows) out.set(r.viewerId, r)
+  }
+  for (const id of ids) if (!out.has(id)) out.set(id, DEFAULT_LEVELS)
+  return out
 }
 
 /**
@@ -48,7 +73,7 @@ interface Recipient {
 async function predictionRecipients(
   db: Database,
   item: TimelineItem,
-): Promise<Array<Recipient>> {
+): Promise<Array<Recipient & { reason: AlertReason }>> {
   const rows = await db
     .selectDistinct({
       endpoint: pushSubscriptions.endpoint,
@@ -76,7 +101,7 @@ async function predictionRecipients(
       ),
     )
     .leftJoin(kalshiMarkets, eq(kalshiMarkets.ticker, predictions.marketTicker))
-  const byEndpoint = new Map<string, Recipient>()
+  const byEndpoint = new Map<string, Recipient & { reason: AlertReason }>()
   for (const r of rows) {
     if (byEndpoint.has(r.endpoint)) continue
     const yes =
@@ -87,8 +112,13 @@ async function predictionRecipients(
       viewerId: r.viewerId,
       p256dh: r.p256dh,
       auth: r.auth,
-      prediction:
-        chance === null ? r.title : `${r.title}: ${Math.round(chance * 100)}%`,
+      reason: {
+        source: 'prediction',
+        prediction:
+          chance === null
+            ? r.title
+            : `${r.title}: ${Math.round(chance * 100)}%`,
+      },
     })
   }
   return [...byEndpoint.values()]
@@ -141,7 +171,9 @@ async function recipients(
 async function fantasyRecipients(
   db: Database,
   item: TimelineItem,
-): Promise<Array<Recipient>> {
+  levels: (viewerId: string) => Promise<AlertLevels>,
+  now: number,
+): Promise<Array<Recipient & { reason: AlertReason }>> {
   const ids = item.players.map((p) => p.id)
   if (ids.length === 0) return []
   const rows = await db
@@ -172,28 +204,34 @@ async function fantasyRecipients(
         inArray(fantasyPlayers.playerId, ids),
       ),
     )
-  const byEndpoint = new Map<string, Recipient>()
+  const byEndpoint = new Map<string, Recipient & { reason: AlertReason }>()
   // The Viewer's own Starter wins over their opponent's in one play.
   for (const r of [...rows].sort((a, b) =>
     a.side === b.side ? 0 : a.side === 'mine' ? -1 : 1,
   )) {
-    if (byEndpoint.has(r.endpoint)) continue
+    if (byEndpoint.has(r.endpoint) || !r.playerId) continue
+    const level = (await levels(r.viewerId)).fantasy
+    if (!fantasyEvent(item, r.playerId, r.side, level, now)) continue
     const m = r.matchup
     const name =
       item.players
         .find((p) => p.id === r.playerId)
         ?.name.split(' ')
         .at(-1) ?? 'player'
-    const score =
-      m && m.opponent
-        ? ` · ${m.mine.abbrev} ${m.mine.score}–${m.opponent.score} ${m.opponent.abbrev}`
-        : ''
     byEndpoint.set(r.endpoint, {
       endpoint: r.endpoint,
       viewerId: r.viewerId,
       p256dh: r.p256dh,
       auth: r.auth,
-      prediction: `${r.side === 'mine' ? 'Your' : 'Opponent’s'} ${name}${score}`,
+      reason: {
+        source: 'fantasy',
+        side: r.side,
+        player: name,
+        matchup:
+          m && m.opponent
+            ? `${m.leagueName} ${m.mine.score}–${m.opponent.score}`
+            : null,
+      },
     })
   }
   return [...byEndpoint.values()]
@@ -212,40 +250,42 @@ export async function deliverAlerts(
   let sent = 0
   const gone = new Set<string>()
   const now = Date.now()
+  const cache = new Map<string, AlertLevels>()
+  const levels = async (viewerId: string) => {
+    if (!cache.has(viewerId))
+      for (const [id, l] of await alertLevels(db, [viewerId])) cache.set(id, l)
+    return cache.get(viewerId)!
+  }
   for (const item of items) {
-    const message = alertMessage(item)
-    // Follows Alert on Scoring Plays, Overturns and Finals; Predictions on
-    // every Scoring and Notable Play. One push a device, Follows first.
-    const targets = new Map<string, Recipient>()
-    if (isPredictionAlertable(item, now)) {
-      for (const r of await fantasyRecipients(db, item))
-        targets.set(r.endpoint, r)
-      for (const r of await predictionRecipients(db, item))
-        targets.set(r.endpoint, r)
+    // One Alert a device, the most personal source first: a Starter, then
+    // a Prediction, then a Follow.
+    const targets = new Map<string, Recipient & { reason: AlertReason }>()
+    const add = (r: Recipient & { reason: AlertReason }) => {
+      if (!targets.has(r.endpoint)) targets.set(r.endpoint, r)
     }
-    if (isAlertable(item, now))
-      for (const r of await recipients(db, item))
-        targets.set(r.endpoint, {
-          ...r,
-          prediction: targets.get(r.endpoint)?.prediction,
-        })
-    const allowed: Array<Recipient> = []
+    if (item.kind === 'play' && item.players.length > 0)
+      for (const r of await fantasyRecipients(db, item, levels, now)) add(r)
+    if (item.kind === 'play' && item.significance === 'scoring')
+      for (const r of await predictionRecipients(db, item))
+        if (
+          isPredictionPlayAlertable(
+            item,
+            (await levels(r.viewerId)).predictions,
+            now,
+          )
+        )
+          add(r)
+    for (const r of await recipients(db, item))
+      if (isFollowingAlertable(item, (await levels(r.viewerId)).following, now))
+        add({ ...r, reason: { source: 'following' } })
+    const allowed: Array<Recipient & { reason: AlertReason }> = []
     for (const r of targets.values())
-      if (await allow(r.viewerId, message.final)) allowed.push(r)
+      if (await allow(r.viewerId, item.kind === 'milestone')) allowed.push(r)
     const results = await Promise.allSettled(
       allowed.map((r) =>
-        sendPush(
-          r,
-          JSON.stringify(
-            r.prediction
-              ? { ...message, body: `${message.body} · ${r.prediction}` }
-              : message,
-          ),
-          keys,
-          {
-            topic: message.tag.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32),
-          },
-        ),
+        sendPush(r, JSON.stringify(alertMessage(item, r.reason)), keys, {
+          topic: item.gameId.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32),
+        }),
       ),
     )
     results.forEach((res, i) => {

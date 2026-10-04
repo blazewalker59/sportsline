@@ -8,9 +8,11 @@ import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { vapidKeys } from './deliver'
 import { sendPush } from './webpush'
+import { DEFAULT_LEVELS } from './alerts'
+import type { AlertLevels } from './alerts'
 import { getAuth } from '@/lib/auth/server'
 import { getCloudflareEnv, getDb, serverRequestContext } from '@/lib/db'
-import { pushSubscriptions } from '@/lib/db/schema'
+import { alertSettings, pushSubscriptions } from '@/lib/db/schema'
 
 async function viewerId(): Promise<string> {
   const headers = serverRequestContext.getStore()?.headers
@@ -66,7 +68,7 @@ export const savePushSubscription = createServerFn({ method: 'POST' })
       },
       JSON.stringify({
         title: 'Alerts are on',
-        body: 'You’ll get scores and finals for the Teams and Players you follow.',
+        body: 'Scores for what you follow, key moments in your Predictions and Fantasy Matchups. Tune each in the menu.',
         url: '/',
         tag: 'sportsline-welcome',
       }),
@@ -89,4 +91,40 @@ export const deletePushSubscription = createServerFn({ method: 'POST' })
           eq(pushSubscriptions.viewerId, id),
         ),
       )
+  })
+
+/** The Viewer's Alert levels for each source (defaults until changed). */
+export const getAlertLevels = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<AlertLevels> => {
+    const id = await viewerId()
+    const row = await getDb()
+      .select()
+      .from(alertSettings)
+      .where(eq(alertSettings.viewerId, id))
+      .get()
+    return row
+      ? {
+          following: row.following,
+          predictions: row.predictions,
+          fantasy: row.fantasy,
+        }
+      : DEFAULT_LEVELS
+  },
+)
+
+const levelsInput = z.object({
+  following: z.enum(['scores', 'finals', 'off']),
+  predictions: z.enum(['key', 'scores', 'off']),
+  fantasy: z.enum(['key', 'mine', 'off']),
+})
+
+export const setAlertLevels = createServerFn({ method: 'POST' })
+  .validator((data: AlertLevels) => levelsInput.parse(data))
+  .handler(async ({ data }): Promise<AlertLevels> => {
+    const id = await viewerId()
+    await getDb()
+      .insert(alertSettings)
+      .values({ viewerId: id, ...data })
+      .onConflictDoUpdate({ target: alertSettings.viewerId, set: data })
+    return data
   })

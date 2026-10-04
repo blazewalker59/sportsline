@@ -315,6 +315,31 @@ export const pushSubscriptions = sqliteTable(
   (table) => [index('push_subscriptions_viewer_idx').on(table.viewerId)],
 )
 
+/** How much each Alert source sends a Viewer (CONTEXT.md, "Alert level"). */
+export const alertSettings = sqliteTable('alert_settings', {
+  viewerId: text('viewer_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  following: text('following')
+    .$type<'scores' | 'finals' | 'off'>()
+    .notNull()
+    .default('scores'),
+  predictions: text('predictions')
+    .$type<'key' | 'scores' | 'off'>()
+    .notNull()
+    .default('key'),
+  fantasy: text('fantasy')
+    .$type<'key' | 'mine' | 'off'>()
+    .notNull()
+    .default('key'),
+})
+
+/** Alerts already sent for one-time events (a Leg hitting), by key. */
+export const alertMarks = sqliteTable('alert_marks', {
+  key: text('key').primaryKey(),
+  at: text('at').notNull(),
+})
+
 // ─── Kalshi (docs/adr/0003) ─────────────────────────────────────────────────
 
 /** A Viewer's Kalshi connection: a read-only key, its private half sealed. */
@@ -354,6 +379,8 @@ export const predictions = sqliteTable(
     contracts: real('contracts').notNull(),
     /** What the Viewer paid, in dollars. */
     cost: real('cost').notNull(),
+    /** The Viewer's chance when last Alerted about it (or first seen). */
+    alertChance: real('alert_chance'),
     status: text('status').$type<'open' | 'settled' | 'closed'>().notNull(),
     result: text('result').$type<'won' | 'lost' | 'void'>(),
     payout: real('payout'),

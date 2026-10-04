@@ -25,6 +25,7 @@ import {
   refreshPrices,
   syncAccount,
 } from '@/lib/kalshi/sync'
+import { sendPredictionAlerts } from '@/lib/push/predictionAlerts'
 import { ACTIVE_LEAGUES } from '@/lib/sources'
 
 /**
@@ -106,7 +107,8 @@ export class Scheduler extends DurableObject<CloudflareEnv> {
 
   /**
    * Predictions (docs/adr/0003): Odds for every open Prediction's markets
-   * each minute, and each connected account's positions every few minutes.
+   * each minute, each connected account's positions every few minutes,
+   * then any Prediction Alerts those reveal.
    * Failures are logged; the loop never stops for Kalshi.
    */
   private async kalshi(): Promise<void> {
@@ -127,6 +129,13 @@ export class Scheduler extends DurableObject<CloudflareEnv> {
       }
     } catch (error) {
       console.error('Kalshi accounts failed', { error: String(error) })
+    }
+    // Prediction Alerts' key moments, read from what was just refreshed.
+    try {
+      const sent = await sendPredictionAlerts(this.env)
+      if (sent > 0) console.log('Prediction alerts sent', { sent })
+    } catch (error) {
+      console.error('Prediction alerts failed', { error: String(error) })
     }
   }
 }
