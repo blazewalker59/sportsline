@@ -86,7 +86,10 @@ async function coveredTeamIds(): Promise<Array<string>> {
 
 export const cfbAdapter: SourceAdapter = {
   league: 'cfb',
-  source: 'espn',
+  // Not 'espn': ESPN numbers college teams separately from the NFL's, so
+  // the ids overlap (8 is Detroit and Arkansas). A Source name of its own
+  // keeps the identity mapping apart (docs/adr/0002).
+  source: 'espn-cfb',
   async schedule(sportsDay) {
     const scoreboard = await getJson<NflScoreboard>(
       `${SITE}/scoreboard?groups=${FBS}&limit=300&dates=${sportsDay.replaceAll('-', '')}`,
