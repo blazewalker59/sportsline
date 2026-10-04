@@ -29,11 +29,11 @@ import { ACTIVE_LEAGUES } from '@/lib/sources'
 
 /**
  * Bump the version when the roster sync starts storing something new
- * (v2: headshots; v3: MLB's square headshots; v4: college football's own
- * Source, restoring NFL names), so every League resyncs
+ * (v2: headshots; v3: MLB's square headshots; v4/v5: college football's
+ * own Source, restoring NFL names and logos), so every League resyncs
  * right after the deploy instead of at its next daily run.
  */
-const ROSTER_DUE_KEY = 'rosterDueAt:v4'
+const ROSTER_DUE_KEY = 'rosterDueAt:v5'
 /** Rosters refresh daily; the first run after a deploy syncs straight away. */
 const ROSTER_EVERY_MS = 20 * 3_600_000
 const ROSTER_RETRY_MS = 15 * 60_000

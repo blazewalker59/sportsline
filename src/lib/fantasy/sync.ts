@@ -7,7 +7,7 @@ import { and, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm'
 import { EspnError, fanProfile, leagueViews } from './client'
 import { discoverLeagues } from './discovery'
 import { myTeamId, readMatchup } from './matchup'
-import { SPORTS, seasonOf } from './sports'
+import { NFL_PRO_TEAMS, SPORTS, seasonOf } from './sports'
 import type { EspnSession } from './client'
 import type { MatchupView } from './matchup'
 import type { FantasySport } from './sports'
@@ -203,9 +203,17 @@ export async function syncLeague(
     for (const p of everyone) {
       p.playerId = ids.get(p.espnId) ?? null
       const t = p.proTeamId === null ? undefined : teamsBy.get(p.proTeamId)
+      // NFL logos and abbreviations from ESPN's fixed team ids, so a stored
+      // Team's record can never put another League's logo on a D/ST.
+      const nfl =
+        row.sport === 'football' && p.proTeamId !== null
+          ? NFL_PRO_TEAMS[p.proTeamId]
+          : undefined
       p.teamId = t?.id ?? null
-      p.teamLogo = t?.logoUrl ?? null
-      p.teamAbbrev = t?.abbreviation ?? null
+      p.teamLogo = nfl
+        ? `https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500-dark/${nfl.toLowerCase()}.png&w=80&h=80`
+        : (t?.logoUrl ?? null)
+      p.teamAbbrev = nfl ?? t?.abbreviation ?? null
     }
     await db
       .delete(fantasyPlayers)
