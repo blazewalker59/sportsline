@@ -76,11 +76,13 @@ export type Follow =
   | { kind: 'top25' }
   /** College football Games involving a major Conference's team (its Scope). */
   | { kind: 'conference'; conference: Conference }
+  /** One Game, as a Prediction depends on it (the Predictions Scope). */
+  | { kind: 'game'; gameId: string }
 
 /** A Follow a Viewer can save (CONTEXT.md, "Follow"). */
 export type ViewerFollow = Exclude<
   Follow,
-  { kind: 'top25' } | { kind: 'conference' }
+  { kind: 'top25' } | { kind: 'conference' } | { kind: 'game' }
 >
 
 export interface TimelineFilter {
@@ -148,6 +150,13 @@ export function matchesFilter(
           item.significance !== 'routine' ||
           Boolean(filter.includeRoutine)
         )
+      case 'game':
+        if (item.gameId !== follow.gameId) return false
+        return (
+          item.kind !== 'play' ||
+          item.significance !== 'routine' ||
+          Boolean(filter.includeRoutine)
+        )
       case 'conference':
         if (item.league !== 'cfb' || !inConference(item, follow.conference))
           return false
@@ -194,7 +203,9 @@ export function followsToParam(follows: ReadonlyArray<Follow>): string {
             ? `player:${f.playerId}`
             : f.kind === 'conference'
               ? `conference:${f.conference}`
-              : 'top25:cfb',
+              : f.kind === 'game'
+                ? `game:${f.gameId}`
+                : 'top25:cfb',
     )
     .join(',')
 }
@@ -217,6 +228,8 @@ export function followsFromParam(
     if (kind === 'player' && /^pl_\w+$/.test(value))
       return [{ kind: 'player', playerId: value }]
     if (kind === 'top25' && value === 'cfb') return [{ kind: 'top25' }]
+    if (kind === 'game' && /^gm_\w+$/.test(value))
+      return [{ kind: 'game', gameId: value }]
     if (kind === 'conference' && isConference(value))
       return [{ kind: 'conference', conference: value }]
     return []

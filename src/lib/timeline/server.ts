@@ -129,6 +129,19 @@ export const getTimeline = createServerFn({ method: 'GET' })
         )!,
       )
     }
+    const gameIds = follows.flatMap((f) =>
+      f.kind === 'game' ? [f.gameId] : [],
+    )
+    if (gameIds.length > 0) {
+      covered.push(
+        and(
+          inArray(t.gameId, gameIds),
+          data.includeRoutine
+            ? undefined
+            : or(ne(t.kind, 'play'), ne(t.significance, 'routine')),
+        )!,
+      )
+    }
     if (teamIds.length > 0) {
       covered.push(
         or(inArray(t.awayTeamId, teamIds), inArray(t.homeTeamId, teamIds))!,

@@ -13,12 +13,15 @@ export function ScopeBar({
   scope,
   items,
   canFollow,
+  canPredict,
 }: {
   scope: Scope
   /** The Viewer's visible Leagues and college groups, in their order. */
   items: ReadonlyArray<RowItem>
   /** The Viewer follows something, so "Following" is offered. */
   canFollow: boolean
+  /** The Viewer has connected Kalshi, so "Predictions" is offered. */
+  canPredict?: boolean
 }) {
   const chip = (
     value: Scope,
@@ -58,6 +61,7 @@ export function ScopeBar({
         <ol className="flex w-max gap-1.5" aria-label="Scope">
           {chip('all', 'All', 'All Leagues')}
           {canFollow && chip('following', 'Following', 'Following')}
+          {canPredict && chip('predictions', 'Predictions', 'Your Predictions')}
           {items.map((item) =>
             chip(
               item,

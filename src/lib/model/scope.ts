@@ -9,10 +9,12 @@ import type { Follow } from './timeline'
 import type { RowItem } from './leagues'
 import type { League } from './types'
 
-export type Scope = 'all' | 'following' | RowItem
+/** Predictions: the Games the Viewer's open Predictions depend on. */
+export type Scope = 'all' | 'following' | 'predictions' | RowItem
 
 export function parseScope(value: unknown): Scope | undefined {
-  if (value === 'all' || value === 'following') return value
+  if (value === 'all' || value === 'following' || value === 'predictions')
+    return value
   return isRowItem(value) ? value : undefined
 }
 
@@ -27,6 +29,8 @@ export function scopeFollows(
   viewerFollows: ReadonlyArray<Follow>,
   /** The Viewer's visible Leagues: All leaves hidden ones out. */
   leagues?: ReadonlyArray<League>,
+  /** The Games the Viewer's open Predictions depend on. */
+  predictionGames: ReadonlyArray<string> = [],
 ): ReadonlyArray<Follow> {
   const all = leagues
     ? leagues.map((league) => ({ kind: 'league' as const, league }))
@@ -38,6 +42,8 @@ export function scopeFollows(
       return viewerFollows.length > 0 ? viewerFollows : all
     case 'top25':
       return [{ kind: 'top25' }]
+    case 'predictions':
+      return predictionGames.map((gameId) => ({ kind: 'game', gameId }))
     default:
       return isConference(scope)
         ? [{ kind: 'conference', conference: scope }]

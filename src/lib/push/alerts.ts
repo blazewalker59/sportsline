@@ -20,6 +20,22 @@ export interface AlertMessage {
   final: boolean
 }
 
+/**
+ * Alertable for a Viewer with an open Prediction on the Game: every
+ * Scoring and Notable Play (CONTEXT.md, "Alert").
+ */
+export function isPredictionAlertable(
+  item: TimelineItem,
+  now: number,
+): boolean {
+  return (
+    item.kind === 'play' &&
+    (item.significance === 'scoring' || item.significance === 'notable') &&
+    item.status === 'active' &&
+    now - Date.parse(item.occurredAt) < STALE_MS
+  )
+}
+
 export function isAlertable(item: TimelineItem, now: number): boolean {
   const news = now - Date.parse(item.occurredAt) < STALE_MS
   if (item.kind === 'overturn') return news

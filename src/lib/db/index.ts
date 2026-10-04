@@ -32,6 +32,8 @@ export interface CloudflareEnv {
   VAPID_SUBJECT?: string
   /** Production's one host; every other host redirects to it. Unset locally. */
   CANONICAL_HOST?: string
+  /** 32 bytes, base64: seals Viewers' Kalshi keys (docs/adr/0003). */
+  KALSHI_ENCRYPTION_KEY?: string
 }
 
 export type Database = DrizzleD1Database<typeof schema>

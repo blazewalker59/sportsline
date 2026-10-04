@@ -15,6 +15,12 @@ import { syncRoster } from './roster'
 import { trimRoutinePlays } from './retention'
 import { syncSchedules } from './schedule'
 import type { CloudflareEnv } from '@/lib/db'
+import {
+  accountsDue,
+  pruneHistory,
+  refreshPrices,
+  syncAccount,
+} from '@/lib/kalshi/sync'
 import { ACTIVE_LEAGUES } from '@/lib/sources'
 
 /**
@@ -27,6 +33,8 @@ const ROSTER_DUE_KEY = 'rosterDueAt:v3'
 const ROSTER_EVERY_MS = 20 * 3_600_000
 const ROSTER_RETRY_MS = 15 * 60_000
 const TRIM_DUE_KEY = 'trimDueAt'
+const KALSHI_SYNC_EVERY_MS = 5 * 60_000
+const KALSHI_SYNCS_PER_TICK = 5
 const TRIM_EVERY_MS = 24 * 3_600_000
 
 export class Scheduler extends DurableObject<CloudflareEnv> {
@@ -61,10 +69,38 @@ export class Scheduler extends DurableObject<CloudflareEnv> {
       try {
         const deleted = await trimRoutinePlays(this.env, new Date(now))
         console.log('Retention trimmed Routine Plays', { deleted })
+        await pruneHistory(this.env)
         await this.ctx.storage.put(TRIM_DUE_KEY, now + TRIM_EVERY_MS)
       } catch (error) {
         console.error('Retention trim failed', { error: String(error) })
       }
+    }
+    await this.kalshi()
+  }
+
+  /**
+   * Predictions (docs/adr/0003): Odds for every open Prediction's markets
+   * each minute, and each connected account's positions every few minutes.
+   * Failures are logged; the loop never stops for Kalshi.
+   */
+  private async kalshi(): Promise<void> {
+    try {
+      await refreshPrices(this.env)
+    } catch (error) {
+      console.error('Kalshi prices failed', { error: String(error) })
+    }
+    try {
+      for (const viewerId of await accountsDue(
+        this.env,
+        KALSHI_SYNC_EVERY_MS,
+        KALSHI_SYNCS_PER_TICK,
+      )) {
+        await syncAccount(this.env, viewerId).catch((error: unknown) =>
+          console.error('Kalshi sync failed', { error: String(error) }),
+        )
+      }
+    } catch (error) {
+      console.error('Kalshi accounts failed', { error: String(error) })
     }
   }
 }

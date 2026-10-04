@@ -11,6 +11,14 @@ import type { FeedEntry, Typing } from '@/lib/timeline/chat'
 import type { Follow, GameSummary } from '@/lib/model/timeline'
 import type { Connection } from '@/lib/timeline/useLiveTimeline'
 import type { League } from '@/lib/model/types'
+import {
+  useKalshiConnection,
+  usePredictions,
+} from '@/lib/kalshi/usePredictions'
+import {
+  PredictionSheet,
+  PredictionStrip,
+} from '@/components/predictions/PredictionParts'
 import { ReactionsProvider } from '@/components/chat/Reactions'
 import { defaultScope, scopeFollows } from '@/lib/model/scope'
 import { inConference, isRanked } from '@/lib/model/timeline'
@@ -91,8 +99,10 @@ function inScope(
   viewerFollows: ReadonlyArray<Follow>,
   items: ReadonlyArray<{ gameId: string }>,
   leagues: ReadonlyArray<League>,
+  predictionGames: ReadonlyArray<string>,
 ): boolean {
   if (scope === 'all') return leagues.includes(game.league)
+  if (scope === 'predictions') return predictionGames.includes(game.id)
   if (scope === 'top25') return game.league === 'cfb' && isRanked(game)
   if (isConference(scope))
     return game.league === 'cfb' && inConference(game, scope)
@@ -118,7 +128,9 @@ function followsGame(
           ? game.league === 'cfb' && isRanked(game)
           : f.kind === 'conference'
             ? game.league === 'cfb' && inConference(game, f.conference)
-            : false,
+            : f.kind === 'game'
+              ? f.gameId === game.id
+              : false,
   )
 }
 
@@ -145,8 +157,27 @@ function Timeline({
   )
   // The Scope from the URL, else Following for a Viewer who follows
   // something, else All (CONTEXT.md, "Scope").
+  // Predictions (CONTEXT.md): open ones, and the Games they depend on.
+  const kalshi = useKalshiConnection()
+  const predictionList = usePredictions()
+  const openPredictions = useMemo(
+    () => (predictionList.data ?? []).filter((p) => p.status === 'open'),
+    [predictionList.data],
+  )
+  const predictionGames = useMemo(
+    () => [
+      ...new Set(
+        openPredictions.flatMap((p) =>
+          p.legs.flatMap((l) => (l.game ? [l.game.id] : [])),
+        ),
+      ),
+    ],
+    [openPredictions],
+  )
+  const [predictionOpen, setPredictionOpen] = useState<string | null>(null)
   const scope: Scope =
-    requestedScope === 'following' && viewerFollows.length === 0
+    (requestedScope === 'following' && viewerFollows.length === 0) ||
+    (requestedScope === 'predictions' && !kalshi.data)
       ? 'all'
       : (requestedScope ?? defaultScope(viewerFollows))
   // The Viewer's row in their order, hidden items left out; All covers
@@ -155,8 +186,8 @@ function Timeline({
   const rowItems = useMemo(() => visibleRowItems(settings), [settings])
   const leagues = useMemo(() => visibleLeagues(settings), [settings])
   const follows = useMemo(
-    () => scopeFollows(scope, viewerFollows, leagues),
-    [scope, viewerFollows, leagues],
+    () => scopeFollows(scope, viewerFollows, leagues, predictionGames),
+    [scope, viewerFollows, leagues, predictionGames],
   )
   // The divider marks where the Viewer stopped last time, so it is fixed at
   // load while the stored marker keeps moving.
@@ -319,18 +350,44 @@ function Timeline({
               scope={scope}
               items={rowItems}
               canFollow={viewerFollows.length > 0}
+              canPredict={Boolean(kalshi.data)}
             />
             <div className={cn('transition-opacity', dimmed && 'opacity-50')}>
-              <GameStrip
-                games={(dimmed && timeline.previousGames.length
-                  ? timeline.previousGames
-                  : timeline.games
-                ).filter((g) =>
-                  inScope(g, scope, viewerFollows, timeline.items, leagues),
-                )}
-                selected={gameId ?? undefined}
-                onBox={() => setBoxOpen(true)}
-              />
+              {scope === 'predictions' && !gameId ? (
+                // Predictions move like scores: their cards replace the Games'.
+                <PredictionStrip
+                  predictions={openPredictions}
+                  onOpen={setPredictionOpen}
+                />
+              ) : (
+                <>
+                  <GameStrip
+                    games={(dimmed && timeline.previousGames.length
+                      ? timeline.previousGames
+                      : timeline.games
+                    ).filter((g) =>
+                      inScope(
+                        g,
+                        scope,
+                        viewerFollows,
+                        timeline.items,
+                        leagues,
+                        predictionGames,
+                      ),
+                    )}
+                    selected={gameId ?? undefined}
+                    onBox={() => setBoxOpen(true)}
+                  />
+                  {gameId && (
+                    <PredictionStrip
+                      predictions={openPredictions.filter((p) =>
+                        p.legs.some((l) => l.game?.id === gameId),
+                      )}
+                      onOpen={setPredictionOpen}
+                    />
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -426,6 +483,17 @@ function Timeline({
       )}
 
       {playId && <PlaySheet playId={playId} onClose={closePlay} />}
+
+      {predictionOpen &&
+        (() => {
+          const p = predictionList.data?.find((x) => x.id === predictionOpen)
+          return p ? (
+            <PredictionSheet
+              prediction={p}
+              onClose={() => setPredictionOpen(null)}
+            />
+          ) : null
+        })()}
 
       {recapOpen && recap && (
         <CatchUpSheet

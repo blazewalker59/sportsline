@@ -92,7 +92,7 @@ The live, reverse-chronological stream of Plays and Game Milestones in the Viewe
 _Avoid_: feed, stream, ticker
 
 **Scope**:
-Which Plays a Timeline draws from: All (every League the Viewer hasn't hidden), Following (the Viewer's Follows), a single League, Top 25 (college football Games with a Ranked team), or a Conference. A Viewer switches Scope freely; it starts on Following when they follow anything, otherwise All.
+Which Plays a Timeline draws from: All (every League the Viewer hasn't hidden), Following (the Viewer's Follows), Predictions (the Games their open Predictions depend on), a single League, Top 25 (college football Games with a Ranked team), or a Conference. A Viewer switches Scope freely; it starts on Following when they follow anything, otherwise All.
 _Avoid_: view, tab, mode
 
 **Team page**:
@@ -127,8 +127,28 @@ _Avoid_: recap, digest, summary
 A Viewer's one-emoji response to a Play. Each Viewer has at most one Reaction per Play; reacting again replaces it.
 _Avoid_: like, emote
 
+**Prediction**:
+A Viewer's position on a Kalshi market, read from their connected Kalshi account: a single Prediction (one market, e.g. "CLE to win", "Taylor 70+ receiving yards") or a Combo. Open until Kalshi settles it, then kept with its result and profit or loss.
+_Avoid_: bet, wager, position (Kalshi's word, not ours)
+
+**Combo**:
+A Prediction made of several Legs that wins only if every Leg does, like a parlay. Its Legs can span Games and Leagues.
+_Avoid_: parlay, multi
+
+**Leg**:
+One market a Prediction rests on, with the side taken (yes or no), and the Game, Team or Player it's about once matched to ours. A single Prediction has one Leg. A Leg is pending, won or lost.
+_Avoid_: pick, selection
+
+**Odds**:
+The market's current chance of a Leg or Prediction resolving yes, from Kalshi's prices, shown as a percentage alongside where the Viewer got in. They move as the Game is played.
+_Avoid_: line, price (the dollar figure behind it)
+
+**Kalshi connection**:
+A Viewer's link to their own Kalshi account, through a read-only API key they provide (docs/adr/0003). It lets Sportsline read their Predictions, never trade.
+_Avoid_: login, integration
+
 **Alert**:
-A push notification to a Viewer's device for a Scoring Play, an Overturn of a score, or a Final, in a Game their Team or Player Follows cover. League Follows never Alert. Never sent for history a LiveGame backfills.
+A push notification to a Viewer's device for a Scoring Play, an Overturn of a score, or a Final, in a Game their Team or Player Follows cover; and for every Scoring and Notable Play in a Game one of their open Predictions depends on. League Follows never Alert. Never sent for history a LiveGame backfills.
 _Avoid_: notification, push, ping
 
 **Viewer**:

@@ -12,6 +12,7 @@ import {
   index,
   integer,
   primaryKey,
+  real,
   sqliteTable,
   text,
   unique,
@@ -311,3 +312,121 @@ export const pushSubscriptions = sqliteTable(
   },
   (table) => [index('push_subscriptions_viewer_idx').on(table.viewerId)],
 )
+
+// ─── Kalshi (docs/adr/0003) ─────────────────────────────────────────────────
+
+/** A Viewer's Kalshi connection: a read-only key, its private half sealed. */
+export const kalshiAccounts = sqliteTable('kalshi_accounts', {
+  viewerId: text('viewer_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  keyId: text('key_id').notNull(),
+  keyType: text('key_type').$type<'rsa' | 'ed25519'>().notNull(),
+  /** AES-GCM ciphertext and IV of the PEM private key (base64). */
+  keyCiphertext: text('key_ciphertext').notNull(),
+  keyIv: text('key_iv').notNull(),
+  scopes: text('scopes', { mode: 'json' }).$type<Array<string>>().notNull(),
+  status: text('status').$type<'ok' | 'error'>().notNull(),
+  lastError: text('last_error'),
+  connectedAt: text('connected_at').notNull(),
+  syncedAt: text('synced_at'),
+})
+
+/** A Viewer's Prediction (CONTEXT.md): one Kalshi market they hold. */
+export const predictions = sqliteTable(
+  'predictions',
+  {
+    id: text('id').primaryKey(),
+    viewerId: text('viewer_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    marketTicker: text('market_ticker').notNull(),
+    kind: text('kind').$type<'single' | 'combo'>().notNull(),
+    side: text('side').$type<'yes' | 'no'>().notNull(),
+    title: text('title').notNull(),
+    contracts: real('contracts').notNull(),
+    /** What the Viewer paid, in dollars. */
+    cost: real('cost').notNull(),
+    status: text('status').$type<'open' | 'settled' | 'closed'>().notNull(),
+    result: text('result').$type<'won' | 'lost' | 'void'>(),
+    payout: real('payout'),
+    pnl: real('pnl'),
+    openedAt: text('opened_at').notNull(),
+    settledAt: text('settled_at'),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    index('predictions_viewer_idx').on(table.viewerId, table.status),
+    unique('predictions_viewer_market_uq').on(
+      table.viewerId,
+      table.marketTicker,
+    ),
+  ],
+)
+
+/** One market a Prediction rests on, matched to our Game, Team or Player. */
+export const predictionLegs = sqliteTable(
+  'prediction_legs',
+  {
+    predictionId: text('prediction_id')
+      .notNull()
+      .references(() => predictions.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull(),
+    marketTicker: text('market_ticker').notNull(),
+    eventTicker: text('event_ticker').notNull(),
+    side: text('side').$type<'yes' | 'no'>().notNull(),
+    title: text('title').notNull(),
+    gameId: text('game_id'),
+    teamId: text('team_id'),
+    playerId: text('player_id'),
+  },
+  (table) => [
+    primaryKey({ columns: [table.predictionId, table.position] }),
+    index('prediction_legs_game_idx').on(table.gameId),
+    index('prediction_legs_market_idx').on(table.marketTicker),
+  ],
+)
+
+/** Kalshi markets we watch, with their latest prices (dollars). */
+export const kalshiMarkets = sqliteTable('kalshi_markets', {
+  ticker: text('ticker').primaryKey(),
+  eventTicker: text('event_ticker').notNull(),
+  title: text('title').notNull(),
+  yesBid: real('yes_bid'),
+  yesAsk: real('yes_ask'),
+  lastPrice: real('last_price'),
+  status: text('status'),
+  result: text('result'),
+  updatedAt: text('updated_at').notNull(),
+})
+
+/** A watched market's YES chance over time, one point a minute at most. */
+export const kalshiPrices = sqliteTable(
+  'kalshi_prices',
+  {
+    ticker: text('ticker').notNull(),
+    at: text('at').notNull(),
+    chance: real('chance').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.ticker, table.at] })],
+)
+
+/** Kalshi's real-world game behind an event, and our Game once matched. */
+export const kalshiEvents = sqliteTable('kalshi_events', {
+  eventTicker: text('event_ticker').primaryKey(),
+  milestoneId: text('milestone_id'),
+  league: text('league').$type<League>(),
+  startsAt: text('starts_at'),
+  homeName: text('home_name'),
+  awayName: text('away_name'),
+  gameId: text('game_id'),
+  checkedAt: text('checked_at').notNull(),
+})
+
+/** Kalshi's team and player records (structured targets), cached. */
+export const kalshiTargets = sqliteTable('kalshi_targets', {
+  id: text('id').primaryKey(),
+  type: text('type').notNull(),
+  name: text('name').notNull(),
+  league: text('league'),
+})

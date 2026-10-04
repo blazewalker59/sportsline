@@ -1,11 +1,12 @@
 /**
  * Delivering Alerts (CONTEXT.md, "Alert"): find the devices whose Viewers'
- * Team or Player Follows cover an item, push to each, and forget dead
- * subscriptions. Called by LiveGame for news it has just recorded.
+ * Team or Player Follows cover an item, or whose open Predictions depend on
+ * its Game, push to each, and forget dead subscriptions. Called by
+ * LiveGame for news it has just recorded.
  */
 
 import { and, eq, inArray, or, sql } from 'drizzle-orm'
-import { alertMessage } from './alerts'
+import { alertMessage, isAlertable, isPredictionAlertable } from './alerts'
 import { sendPush } from './webpush'
 import type { CloudflareEnv, Database } from '@/lib/db'
 import type { TimelineItem } from '@/lib/model/timeline'
@@ -13,6 +14,9 @@ import type { VapidKeys } from './webpush'
 import {
   follows,
   itemPlayers,
+  kalshiMarkets,
+  predictionLegs,
+  predictions,
   pushSubscriptions,
   timelineItems,
 } from '@/lib/db/schema'
@@ -31,6 +35,61 @@ interface Recipient {
   viewerId: string
   p256dh: string
   auth: string
+  /** Why a Prediction holder hears about it: their pick and its Odds now. */
+  prediction?: string
+}
+
+/**
+ * Devices of Viewers with an open Prediction resting on this Game, each
+ * with a line about their Prediction ("Browns win: 63%").
+ */
+async function predictionRecipients(
+  db: Database,
+  item: TimelineItem,
+): Promise<Array<Recipient>> {
+  const rows = await db
+    .selectDistinct({
+      endpoint: pushSubscriptions.endpoint,
+      viewerId: pushSubscriptions.viewerId,
+      p256dh: pushSubscriptions.p256dh,
+      auth: pushSubscriptions.auth,
+      title: predictions.title,
+      side: predictions.side,
+      yesBid: kalshiMarkets.yesBid,
+      yesAsk: kalshiMarkets.yesAsk,
+    })
+    .from(pushSubscriptions)
+    .innerJoin(
+      predictions,
+      and(
+        eq(predictions.viewerId, pushSubscriptions.viewerId),
+        eq(predictions.status, 'open'),
+      ),
+    )
+    .innerJoin(
+      predictionLegs,
+      and(
+        eq(predictionLegs.predictionId, predictions.id),
+        eq(predictionLegs.gameId, item.gameId),
+      ),
+    )
+    .leftJoin(kalshiMarkets, eq(kalshiMarkets.ticker, predictions.marketTicker))
+  const byEndpoint = new Map<string, Recipient>()
+  for (const r of rows) {
+    if (byEndpoint.has(r.endpoint)) continue
+    const yes =
+      r.yesBid !== null && r.yesAsk !== null ? (r.yesBid + r.yesAsk) / 2 : null
+    const chance = yes === null ? null : r.side === 'yes' ? yes : 1 - yes
+    byEndpoint.set(r.endpoint, {
+      endpoint: r.endpoint,
+      viewerId: r.viewerId,
+      p256dh: r.p256dh,
+      auth: r.auth,
+      prediction:
+        chance === null ? r.title : `${r.title}: ${Math.round(chance * 100)}%`,
+    })
+  }
+  return [...byEndpoint.values()]
 }
 
 async function recipients(
@@ -84,18 +143,38 @@ export async function deliverAlerts(
 ): Promise<{ sent: number; pruned: number }> {
   let sent = 0
   const gone = new Set<string>()
+  const now = Date.now()
   for (const item of items) {
     const message = alertMessage(item)
-    const payload = JSON.stringify(message)
-    const targets = await recipients(db, item)
+    // Follows Alert on Scoring Plays, Overturns and Finals; Predictions on
+    // every Scoring and Notable Play. One push a device, Follows first.
+    const targets = new Map<string, Recipient>()
+    if (isPredictionAlertable(item, now))
+      for (const r of await predictionRecipients(db, item))
+        targets.set(r.endpoint, r)
+    if (isAlertable(item, now))
+      for (const r of await recipients(db, item))
+        targets.set(r.endpoint, {
+          ...r,
+          prediction: targets.get(r.endpoint)?.prediction,
+        })
     const allowed: Array<Recipient> = []
-    for (const r of targets)
+    for (const r of targets.values())
       if (await allow(r.viewerId, message.final)) allowed.push(r)
     const results = await Promise.allSettled(
       allowed.map((r) =>
-        sendPush(r, payload, keys, {
-          topic: message.tag.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32),
-        }),
+        sendPush(
+          r,
+          JSON.stringify(
+            r.prediction
+              ? { ...message, body: `${message.body} · ${r.prediction}` }
+              : message,
+          ),
+          keys,
+          {
+            topic: message.tag.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32),
+          },
+        ),
       ),
     )
     results.forEach((res, i) => {

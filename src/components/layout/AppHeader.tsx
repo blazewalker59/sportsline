@@ -103,6 +103,13 @@ function AccountButton() {
           >
             Reactions
           </Link>
+          <Link
+            to="/predictions"
+            onClick={() => setOpen(false)}
+            className="block rounded-lg px-3 py-2 hover:bg-background"
+          >
+            Predictions
+          </Link>
           <AlertsItem />
           <button
             type="button"
