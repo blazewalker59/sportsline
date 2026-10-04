@@ -227,15 +227,18 @@ export const getPredictions = createServerFn({ method: 'GET' }).handler(
       if (all.length === 0) return []
       const ids = all.map((p) => p.id)
 
-      const legs = await db
-        .select({
-          leg: predictionLegs,
-          playerName: players.name,
-        })
-        .from(predictionLegs)
-        .leftJoin(players, eq(players.id, predictionLegs.playerId))
-        .where(inArray(predictionLegs.predictionId, ids))
-        .orderBy(predictionLegs.predictionId, predictionLegs.position)
+      // In parts: D1 binds at most 100 parameters, and history grows.
+      const legs = await inChunks(ids, (part) =>
+        db
+          .select({
+            leg: predictionLegs,
+            playerName: players.name,
+          })
+          .from(predictionLegs)
+          .leftJoin(players, eq(players.id, predictionLegs.playerId))
+          .where(inArray(predictionLegs.predictionId, part))
+          .orderBy(predictionLegs.predictionId, predictionLegs.position),
+      )
       const tickers = [
         ...new Set([
           ...all.map((p) => p.marketTicker),

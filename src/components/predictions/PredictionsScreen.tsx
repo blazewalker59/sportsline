@@ -162,12 +162,24 @@ function Connected() {
         </button>
       </section>
 
-      <PredictionList
-        title="Open"
-        empty="No open Predictions. New ones appear within a few minutes of making them on Kalshi."
-        predictions={open}
-        onOpen={setOpenId}
-      />
+      {list.isError && (
+        <p
+          role="alert"
+          className="rounded-xl border border-live/40 bg-live/10 px-3 py-2 text-sm text-live"
+        >
+          Couldn’t load your Predictions: {list.error.message}
+        </p>
+      )}
+      {list.isPending ? (
+        <p className="text-sm text-muted">Loading…</p>
+      ) : (
+        <PredictionList
+          title="Open"
+          empty="No open Predictions. New ones appear within a few minutes of making them on Kalshi."
+          predictions={open}
+          onOpen={setOpenId}
+        />
+      )}
       {past.length > 0 && (
         <PredictionList title="Settled" predictions={past} onOpen={setOpenId} />
       )}

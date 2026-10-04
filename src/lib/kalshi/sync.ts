@@ -564,11 +564,11 @@ export async function syncAccount(
           !settledNow.has(ticker),
       )
       .map(([ticker]) => predictionId(viewerId, ticker))
-    if (gone.length > 0) {
+    for (let i = 0; i < gone.length; i += 80) {
       await db
         .update(predictions)
         .set({ status: 'closed', updatedAt: new Date().toISOString() })
-        .where(inArray(predictions.id, gone))
+        .where(inArray(predictions.id, gone.slice(i, i + 80)))
     }
 
     await db
@@ -634,18 +634,24 @@ export async function refreshPrices(
     .from(predictions)
     .where(eq(predictions.status, 'open'))
   if (open.length === 0) return 0
-  const legs = await db
-    .select({
-      ticker: predictionLegs.marketTicker,
-      predictionId: predictionLegs.predictionId,
-    })
-    .from(predictionLegs)
-    .where(
-      inArray(
-        predictionLegs.predictionId,
-        open.map((o) => o.id),
-      ),
+  // In parts: D1 binds at most 100 parameters.
+  const legs: Array<{ ticker: string; predictionId: string }> = []
+  for (let i = 0; i < open.length; i += 80) {
+    legs.push(
+      ...(await db
+        .select({
+          ticker: predictionLegs.marketTicker,
+          predictionId: predictionLegs.predictionId,
+        })
+        .from(predictionLegs)
+        .where(
+          inArray(
+            predictionLegs.predictionId,
+            open.slice(i, i + 80).map((o) => o.id),
+          ),
+        )),
     )
+  }
   const at = new Date().toISOString().slice(0, 16)
   const own = new Set(open.map((o) => o.ticker))
   const done = new Set<string>()
