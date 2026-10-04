@@ -5,6 +5,7 @@
 
 import { Link } from '@tanstack/react-router'
 import type { LegView, PredictionView } from '@/lib/kalshi/server'
+import type { Progress } from '@/lib/kalshi/props'
 import type { GameSummary } from '@/lib/model/timeline'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
@@ -97,14 +98,72 @@ function leadGame(p: PredictionView): GameSummary | null {
   return p.legs.find((l) => l.game)?.game ?? null
 }
 
+/**
+ * A stat prop's count against its line: "212 / 300 rec yds", filling as it
+ * climbs, a check once the line is reached.
+ */
+export function PropProgress({
+  progress,
+  compact,
+}: {
+  progress: Progress
+  compact?: boolean
+}) {
+  const hit = progress.current >= progress.target
+  const share = Math.min(1, progress.current / Math.max(1, progress.target))
+  return (
+    <span className="flex flex-col gap-0.5">
+      <span
+        className={cn(
+          'flex items-baseline justify-between gap-2 tabular-nums',
+          compact ? 'text-[11px]' : 'text-xs',
+        )}
+      >
+        <span className={cn('font-semibold', hit && 'text-scoring')}>
+          {hit && '✓ '}
+          {progress.current}
+          <span className="font-normal text-muted">
+            {' '}
+            / {progress.target} {progress.label}
+          </span>
+        </span>
+        {!hit && !compact && (
+          <span className="text-muted">
+            {progress.target - progress.current} to go
+          </span>
+        )}
+      </span>
+      <span
+        className="h-1.5 overflow-hidden rounded-full bg-notice"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={progress.target}
+        aria-valuenow={progress.current}
+        aria-label={`${progress.current} of ${progress.target} ${progress.label}`}
+      >
+        <span
+          className={cn(
+            'block h-full rounded-full transition-[width] duration-500',
+            hit ? 'bg-scoring' : 'bg-accent',
+          )}
+          style={{ width: `${share * 100}%` }}
+        />
+      </span>
+    </span>
+  )
+}
+
 /** A Prediction as a small card: its Odds now, how they've moved, its Legs. */
 export function PredictionCard({
   prediction: p,
-  onOpen,
+  selected,
+  onSelect,
 }: {
   prediction: PredictionView
-  onOpen: () => void
+  selected?: boolean
+  onSelect: () => void
 }) {
+  const progress = p.kind === 'single' ? (p.legs[0]?.progress ?? null) : null
   const move = movement(p)
   const game = leadGame(p)
   const won = p.legs.filter((l) => l.status === 'won').length
@@ -112,10 +171,15 @@ export function PredictionCard({
   return (
     <button
       type="button"
-      onClick={onOpen}
+      onClick={onSelect}
+      aria-pressed={selected}
       className={cn(
         'flex w-[176px] flex-col gap-1 rounded-2xl border bg-surface px-2.5 py-1.5 text-left transition-colors',
-        lost ? 'border-live/40' : 'border-border',
+        selected
+          ? 'border-accent bg-accent-soft'
+          : lost
+            ? 'border-live/40'
+            : 'border-border',
       )}
     >
       <span className="flex items-center gap-1.5 text-[11px] font-semibold text-muted">
@@ -164,25 +228,63 @@ export function PredictionCard({
         </span>
         <Sparkline points={p.history} entry={p.entryChance} width={64} />
       </span>
+      {progress && <PropProgress progress={progress} compact />}
     </button>
   )
 }
 
-/** Open Predictions as a strip of cards, like the score cards. */
+/**
+ * Open Predictions as a strip of cards, like the score cards: tapping one
+ * narrows the Timeline to it (tap again to clear), and its Details button
+ * opens the sheet.
+ */
 export function PredictionStrip({
   predictions,
-  onOpen,
+  selected,
+  onSelect,
+  onDetails,
 }: {
   predictions: ReadonlyArray<PredictionView>
-  onOpen: (id: string) => void
+  selected?: string
+  onSelect: (id: string | null) => void
+  onDetails: (id: string) => void
 }) {
   if (predictions.length === 0) return null
   return (
     <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none]">
       <ul className="flex gap-2 pt-1.5 pb-0.5" aria-label="Your Predictions">
         {predictions.map((p) => (
-          <li key={p.id} className="shrink-0">
-            <PredictionCard prediction={p} onOpen={() => onOpen(p.id)} />
+          <li key={p.id} className="flex shrink-0 gap-1.5">
+            <PredictionCard
+              prediction={p}
+              selected={p.id === selected}
+              onSelect={() => onSelect(p.id === selected ? null : p.id)}
+            />
+            <button
+              type="button"
+              onClick={() => onDetails(p.id)}
+              aria-label="Prediction details"
+              className={cn(
+                'flex w-12 flex-col items-center justify-center gap-0.5 rounded-2xl bg-notice text-[10px] font-semibold text-muted hover:text-foreground',
+                p.id === selected
+                  ? 'animate-in fade-in zoom-in-95 duration-200'
+                  : 'hidden',
+              )}
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <path d="M4 6h16M4 12h16M4 18h10" />
+              </svg>
+              Details
+            </button>
           </li>
         ))}
       </ul>
@@ -229,6 +331,11 @@ function LegRow({ leg, onNavigate }: { leg: LegView; onNavigate: () => void }) {
           </span>
         )}
       </span>
+      {leg.progress && (
+        <span className="ml-7">
+          <PropProgress progress={leg.progress} />
+        </span>
+      )}
       {g && (
         <Link
           to="/"

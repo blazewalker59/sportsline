@@ -281,6 +281,8 @@ async function rememberMarkets(
           lastPrice: m.last_price_dollars
             ? dollars(m.last_price_dollars)
             : null,
+          floorStrike:
+            typeof m.floor_strike === 'number' ? m.floor_strike : null,
           status: m.status ?? null,
           result: m.result ?? null,
           updatedAt: now,
@@ -293,6 +295,7 @@ async function rememberMarkets(
           yesBid: sqlExcluded('yes_bid'),
           yesAsk: sqlExcluded('yes_ask'),
           lastPrice: sqlExcluded('last_price'),
+          floorStrike: sqlExcluded('floor_strike'),
           status: sqlExcluded('status'),
           result: sqlExcluded('result'),
           updatedAt: sqlExcluded('updated_at'),

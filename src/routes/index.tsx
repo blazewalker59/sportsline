@@ -20,14 +20,22 @@ const search = z.object({
     .catch(undefined),
   /** A Play whose detail is open in a sheet over the Timeline. */
   play: z.string().max(240).optional().catch(undefined),
+  /** Narrow the Timeline to one Prediction's Games and Players. */
+  prediction: z.string().max(400).optional().catch(undefined),
 })
 
 export const Route = createFileRoute('/')({
   validateSearch: search,
   component: function TimelineRoute() {
-    const { day, game, scope, play } = Route.useSearch()
+    const { day, game, scope, play, prediction } = Route.useSearch()
     return (
-      <TimelineScreen day={day} gameId={game} scope={scope} playId={play} />
+      <TimelineScreen
+        day={day}
+        gameId={game}
+        scope={scope}
+        playId={play}
+        predictionId={prediction}
+      />
     )
   },
 })

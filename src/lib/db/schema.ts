@@ -395,6 +395,8 @@ export const kalshiMarkets = sqliteTable('kalshi_markets', {
   yesBid: real('yes_bid'),
   yesAsk: real('yes_ask'),
   lastPrice: real('last_price'),
+  /** The line a "greater than" market is over (299.5 for 300+). */
+  floorStrike: real('floor_strike'),
   status: text('status'),
   result: text('result'),
   updatedAt: text('updated_at').notNull(),

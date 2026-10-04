@@ -9,8 +9,10 @@ import { z } from 'zod'
 import { KalshiError, apiKeys } from './client'
 import { importSigningKey } from './keys'
 import { isReadOnly } from './scopes'
+import { progressOf } from './props'
 import { refreshPrices, syncAccount } from './sync'
 import { seal } from './vault'
+import type { Progress } from './props'
 import type { GameSummary } from '@/lib/model/timeline'
 import { getCloudflareEnv } from '@/lib/db'
 import {
@@ -43,6 +45,8 @@ export interface LegView {
   playerId: string | null
   playerName: string | null
   teamId: string | null
+  /** A stat prop's count so far against its line (212 of 300 rec yds). */
+  progress: Progress | null
 }
 
 export interface PredictionView {
@@ -282,6 +286,7 @@ export const getPredictions = createServerFn({ method: 'GET' }).handler(
       const gameBy = new Map(
         gameRows.map((r) => [r.game.id, toGameSummary(r.game, r.away, r.home)]),
       )
+      const boxBy = new Map(gameRows.map((r) => [r.game.id, r.game.box]))
       const yesChance = (ticker: string): number | null => {
         const m = marketBy.get(ticker)
         if (!m) return null
@@ -333,6 +338,7 @@ export const getPredictions = createServerFn({ method: 'GET' }).handler(
             .map(({ leg, playerName }) => {
               const lm = marketBy.get(leg.marketTicker)
               const result = lm?.result
+              const game = leg.gameId ? (gameBy.get(leg.gameId) ?? null) : null
               return {
                 title: leg.title,
                 side: leg.side,
@@ -343,10 +349,22 @@ export const getPredictions = createServerFn({ method: 'GET' }).handler(
                       ? 'won'
                       : 'lost'
                     : 'pending',
-                game: leg.gameId ? (gameBy.get(leg.gameId) ?? null) : null,
+                game,
                 playerId: leg.playerId,
                 playerName,
                 teamId: leg.teamId,
+                progress: game
+                  ? progressOf({
+                      league: game.league,
+                      eventTicker: leg.eventTicker,
+                      title: leg.title,
+                      floorStrike: lm?.floorStrike ?? null,
+                      game,
+                      box: boxBy.get(game.id) ?? null,
+                      teamId: leg.teamId,
+                      playerId: leg.playerId,
+                    })
+                  : null,
               }
             }),
         }

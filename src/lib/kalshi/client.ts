@@ -121,6 +121,8 @@ export interface KalshiMarket {
   yes_ask_dollars?: string
   last_price_dollars?: string
   custom_strike?: Record<string, string>
+  floor_strike?: number
+  strike_type?: string
   mve_collection_ticker?: string
   mve_selected_legs?: Array<KalshiLeg>
   close_time?: string

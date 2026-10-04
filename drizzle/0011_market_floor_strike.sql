@@ -1,0 +1,1 @@
+ALTER TABLE `kalshi_markets` ADD `floor_strike` real;

@@ -92,7 +92,7 @@ The live, reverse-chronological stream of Plays and Game Milestones in the Viewe
 _Avoid_: feed, stream, ticker
 
 **Scope**:
-Which Plays a Timeline draws from: All (every League the Viewer hasn't hidden), Following (the Viewer's Follows), Predictions (the Games their open Predictions depend on), a single League, Top 25 (college football Games with a Ranked team), or a Conference. A Viewer switches Scope freely; it starts on Following when they follow anything, otherwise All.
+Which Plays a Timeline draws from: All (every League the Viewer hasn't hidden), Following (the Viewer's Follows), Predictions (the Games their open Predictions depend on, or just one Prediction's: its Players' plays and its other Legs' Games), a single League, Top 25 (college football Games with a Ranked team), or a Conference. A Viewer switches Scope freely; it starts on Following when they follow anything, otherwise All.
 _Avoid_: view, tab, mode
 
 **Team page**:
@@ -142,6 +142,10 @@ _Avoid_: pick, selection
 **Odds**:
 The market's current chance of a Leg or Prediction resolving yes, from Kalshi's prices, shown as a percentage alongside where the Viewer got in. They move as the Game is played.
 _Avoid_: line, price (the dollar figure behind it)
+
+**Progress**:
+Where a stat Leg stands against its line while the Game is played: the count so far from the live box score (a team's or Player's receiving yards, a Player's points) or the score itself (totals), against what it takes to win ("212 of 300").
+_Avoid_: tracker, status
 
 **Kalshi connection**:
 A Viewer's link to their own Kalshi account, through a read-only API key they provide (docs/adr/0003). It lets Sportsline read their Predictions, never trade.

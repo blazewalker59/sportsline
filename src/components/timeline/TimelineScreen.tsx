@@ -9,6 +9,7 @@ import { CatchUpCard, CatchUpSheet } from './CatchUp'
 import type { Scope } from '@/lib/model/scope'
 import type { FeedEntry, Typing } from '@/lib/timeline/chat'
 import type { Follow, GameSummary } from '@/lib/model/timeline'
+import type { PredictionView } from '@/lib/kalshi/server'
 import type { Connection } from '@/lib/timeline/useLiveTimeline'
 import type { League } from '@/lib/model/types'
 import {
@@ -59,11 +60,13 @@ export function TimelineScreen({
   gameId,
   scope,
   playId,
+  predictionId,
 }: {
   day?: string
   gameId?: string
   scope?: Scope
   playId?: string
+  predictionId?: string
 }) {
   const viewerState = useViewer()
   const [today] = useState(() => sportsDayOf(new Date()))
@@ -87,9 +90,25 @@ export function TimelineScreen({
         gameId={gameId ?? null}
         scope={scope}
         playId={playId ?? null}
+        predictionId={predictionId ?? null}
       />
     </ReactionsProvider>
   )
+}
+
+/**
+ * What one Prediction covers: plays naming each Player a Leg is about, and
+ * the whole Game for every other Leg.
+ */
+function predictionFollows(p: PredictionView): Array<Follow> {
+  const out = new Map<string, Follow>()
+  for (const leg of p.legs) {
+    if (leg.playerId)
+      out.set(`p:${leg.playerId}`, { kind: 'player', playerId: leg.playerId })
+    else if (leg.game)
+      out.set(`g:${leg.game.id}`, { kind: 'game', gameId: leg.game.id })
+  }
+  return [...out.values()]
 }
 
 /** Does this Game belong on the score cards for the Scope? */
@@ -140,12 +159,15 @@ function Timeline({
   gameId,
   scope: requestedScope,
   playId,
+  predictionId,
 }: {
   sportsDay: string
   today: string
   gameId: string | null
   scope?: Scope
   playId: string | null
+  /** One Prediction selected: the Timeline narrows to its Games and Players. */
+  predictionId: string | null
 }) {
   const isToday = sportsDay === today
   const { data } = useViewer()
@@ -175,9 +197,13 @@ function Timeline({
     [openPredictions],
   )
   const [predictionOpen, setPredictionOpen] = useState<string | null>(null)
-  const scope: Scope =
-    (requestedScope === 'following' && viewerFollows.length === 0) ||
-    (requestedScope === 'predictions' && !kalshi.data)
+  const selectedPrediction = predictionId
+    ? (predictionList.data?.find((p) => p.id === predictionId) ?? null)
+    : null
+  const scope: Scope = selectedPrediction
+    ? 'predictions'
+    : (requestedScope === 'following' && viewerFollows.length === 0) ||
+        (requestedScope === 'predictions' && !kalshi.data)
       ? 'all'
       : (requestedScope ?? defaultScope(viewerFollows))
   // The Viewer's row in their order, hidden items left out; All covers
@@ -186,8 +212,29 @@ function Timeline({
   const rowItems = useMemo(() => visibleRowItems(settings), [settings])
   const leagues = useMemo(() => visibleLeagues(settings), [settings])
   const follows = useMemo(
-    () => scopeFollows(scope, viewerFollows, leagues, predictionGames),
-    [scope, viewerFollows, leagues, predictionGames],
+    () =>
+      selectedPrediction
+        ? predictionFollows(selectedPrediction)
+        : scopeFollows(scope, viewerFollows, leagues, predictionGames),
+    [selectedPrediction, scope, viewerFollows, leagues, predictionGames],
+  )
+  const navigate = useNavigate()
+  /** Select a Prediction (narrowing the Timeline to it), or clear it. */
+  const selectPrediction = useCallback(
+    (id: string | null) =>
+      void navigate({
+        to: '/',
+        search: (prev) => ({
+          ...prev,
+          scope: 'predictions',
+          prediction: id ?? undefined,
+          game: undefined,
+          play: undefined,
+        }),
+        viewTransition: true,
+        resetScroll: false,
+      }),
+    [navigate],
   )
   // The divider marks where the Viewer stopped last time, so it is fixed at
   // load while the stored marker keeps moving.
@@ -219,7 +266,6 @@ function Timeline({
     setTopHeight(el.offsetHeight)
     return () => observer.disconnect()
   }, [])
-  const navigate = useNavigate()
   const router = useRouter()
   const closePlay = useCallback(() => {
     // Opened from a bubble: go Back, exactly like the Back gesture.
@@ -357,7 +403,9 @@ function Timeline({
                 // Predictions move like scores: their cards replace the Games'.
                 <PredictionStrip
                   predictions={openPredictions}
-                  onOpen={setPredictionOpen}
+                  selected={selectedPrediction?.id}
+                  onSelect={selectPrediction}
+                  onDetails={setPredictionOpen}
                 />
               ) : (
                 <>
@@ -383,7 +431,8 @@ function Timeline({
                       predictions={openPredictions.filter((p) =>
                         p.legs.some((l) => l.game?.id === gameId),
                       )}
-                      onOpen={setPredictionOpen}
+                      onSelect={selectPrediction}
+                      onDetails={setPredictionOpen}
                     />
                   )}
                 </>
