@@ -210,7 +210,7 @@ export function PredictionCard({
       onClick={onSelect}
       aria-pressed={selected}
       className={cn(
-        'flex w-[176px] flex-col gap-1 rounded-2xl border bg-surface px-2.5 py-1.5 text-left transition-colors',
+        'flex h-full w-[176px] flex-col gap-1 rounded-2xl border bg-surface px-2.5 py-1.5 text-left transition-colors',
         selected
           ? 'border-accent bg-accent-soft'
           : lost
@@ -277,7 +277,22 @@ export function PredictionCard({
         </span>
         <Sparkline points={p.history} entry={p.entryChance} width={64} />
       </span>
-      {progress && <PropProgress progress={progress} compact />}
+      {/* Every card ends on a footer so the row's cards share a height:
+          a prop's Progress, else what it pays. */}
+      <span className="mt-auto pt-0.5">
+        {progress ? (
+          <PropProgress progress={progress} compact />
+        ) : (
+          <span className="flex h-[22px] items-center justify-between text-[11px] text-muted tabular-nums">
+            <span>Pays {money(p.contracts)}</span>
+            {p.kind === 'combo' && (
+              <span>
+                {won} of {p.legs.length} hit
+              </span>
+            )}
+          </span>
+        )}
+      </span>
     </button>
   )
 }
@@ -305,7 +320,7 @@ export function PredictionStrip({
     <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none]">
       <ul className="flex gap-2 pt-2 pb-0.5" aria-label="Your Predictions">
         {predictions.map((p) => (
-          <li key={p.id} className="relative shrink-0">
+          <li key={p.id} className="relative flex shrink-0">
             <PredictionCard
               prediction={p}
               display={display}
