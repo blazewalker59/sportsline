@@ -23,7 +23,15 @@ import type { GameSummary, TeamRef, TimelineItem } from '@/lib/model/timeline'
 import type { League } from '@/lib/model/types'
 import { teamColors } from '@/lib/brand/teamColors'
 import { getCloudflareEnv, getDb } from '@/lib/db'
-import { games, itemPlayers, teams, timelineItems } from '@/lib/db/schema'
+import {
+  fantasyLeagues,
+  fantasyPlayers,
+  games,
+  itemPlayers,
+  teams,
+  timelineItems,
+} from '@/lib/db/schema'
+import { sessionViewer } from '@/lib/viewer/session'
 import { shiftSportsDay, sportsDayOf } from '@/lib/model/sportsDay'
 import { syncDay } from '@/lib/live/schedule'
 import { followsFromParam } from '@/lib/model/timeline'
@@ -34,7 +42,7 @@ const SPORTS_DAY = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 
 const timelineInput = z.object({
   sportsDay: SPORTS_DAY.optional(),
-  follows: z.string().max(4000),
+  follows: z.string().max(20_000),
   includeRoutine: z.boolean().optional(),
   /** Cursor: load items strictly older than this occurredAt. */
   before: z.string().optional(),
@@ -141,6 +149,43 @@ export const getTimeline = createServerFn({ method: 'GET' })
             : or(ne(t.kind, 'play'), ne(t.significance, 'routine')),
         )!,
       )
+    }
+    if (follows.some((f) => f.kind === 'fantasy')) {
+      // The Viewer's own Starters, either side of each Matchup, read here:
+      // one bound value however many there are (D1 binds at most 100).
+      const viewer = await sessionViewer()
+      if (viewer) {
+        covered.push(
+          and(
+            ne(t.kind, 'milestone'),
+            inArray(
+              t.id,
+              db
+                .select({ id: itemPlayers.itemId })
+                .from(itemPlayers)
+                .where(
+                  inArray(
+                    itemPlayers.playerId,
+                    db
+                      .select({ id: fantasyPlayers.playerId })
+                      .from(fantasyPlayers)
+                      .innerJoin(
+                        fantasyLeagues,
+                        eq(fantasyLeagues.id, fantasyPlayers.leagueRowId),
+                      )
+                      .where(
+                        and(
+                          eq(fantasyLeagues.viewerId, viewer.id),
+                          eq(fantasyLeagues.enabled, true),
+                          eq(fantasyPlayers.starter, true),
+                        ),
+                      ),
+                  ),
+                ),
+            ),
+          )!,
+        )
+      }
     }
     if (teamIds.length > 0) {
       covered.push(

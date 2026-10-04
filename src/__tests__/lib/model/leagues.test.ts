@@ -150,3 +150,35 @@ describe('Conference Scopes', () => {
     ).toBeNull()
   })
 })
+
+describe('Fantasy coverage', () => {
+  it('carries its Starters through the URL form and matches their plays', () => {
+    const follows = scopeFollows(
+      'fantasy',
+      [],
+      undefined,
+      [],
+      ['pl_a1', 'pl_b2'],
+    )
+    expect(follows).toEqual([
+      { kind: 'fantasy', playerIds: ['pl_a1', 'pl_b2'] },
+    ])
+    const param = followsToParam(follows)
+    expect(param).toBe('fantasy:pl_a1|pl_b2')
+    expect(followsFromParam(param)).toEqual(follows)
+    // No Starters yet still asks for the Viewer's own (read on the server).
+    expect(followsFromParam('fantasy:')).toEqual([
+      { kind: 'fantasy', playerIds: [] },
+    ])
+    const play = {
+      kind: 'play',
+      players: [{ id: 'pl_b2', name: 'B', role: 'rusher' }],
+    } as unknown as TimelineItem
+    expect(matchesFilter(play, { follows: [...follows] })).toBe(true)
+    expect(
+      matchesFilter({ ...play, players: [] } as TimelineItem, {
+        follows: [...follows],
+      }),
+    ).toBe(false)
+  })
+})

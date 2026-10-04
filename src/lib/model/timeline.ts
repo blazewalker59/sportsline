@@ -78,11 +78,20 @@ export type Follow =
   | { kind: 'conference'; conference: Conference }
   /** One Game, as a Prediction depends on it (the Predictions Scope). */
   | { kind: 'game'; gameId: string }
+  /**
+   * The Starters, either side, in the Viewer's Fantasy Matchups (the
+   * Fantasy Scope). The ids route live plays; the server reads the
+   * Viewer's own Starters rather than trusting (or binding) the list.
+   */
+  | { kind: 'fantasy'; playerIds: ReadonlyArray<string> }
 
 /** A Follow a Viewer can save (CONTEXT.md, "Follow"). */
 export type ViewerFollow = Exclude<
   Follow,
-  { kind: 'top25' } | { kind: 'conference' } | { kind: 'game' }
+  | { kind: 'top25' }
+  | { kind: 'conference' }
+  | { kind: 'game' }
+  | { kind: 'fantasy' }
 >
 
 export interface TimelineFilter {
@@ -150,6 +159,11 @@ export function matchesFilter(
           item.significance !== 'routine' ||
           Boolean(filter.includeRoutine)
         )
+      case 'fantasy':
+        return (
+          item.kind !== 'milestone' &&
+          item.players.some((p) => follow.playerIds.includes(p.id))
+        )
       case 'game':
         if (item.gameId !== follow.gameId) return false
         return (
@@ -205,7 +219,9 @@ export function followsToParam(follows: ReadonlyArray<Follow>): string {
               ? `conference:${f.conference}`
               : f.kind === 'game'
                 ? `game:${f.gameId}`
-                : 'top25:cfb',
+                : f.kind === 'fantasy'
+                  ? `fantasy:${f.playerIds.join('|')}`
+                  : 'top25:cfb',
     )
     .join(',')
 }
@@ -215,8 +231,8 @@ export function followsFromParam(
 ): Array<Follow> {
   if (!param) return []
   return param.split(',').flatMap((part): Array<Follow> => {
-    const [kind, value] = part.split(':')
-    if (!value) return []
+    const [kind, value = ''] = part.split(':')
+    if (!value && kind !== 'fantasy') return []
     if (
       kind === 'league' &&
       (LEAGUES as ReadonlyArray<string>).includes(value)
@@ -228,6 +244,13 @@ export function followsFromParam(
     if (kind === 'player' && /^pl_\w+$/.test(value))
       return [{ kind: 'player', playerId: value }]
     if (kind === 'top25' && value === 'cfb') return [{ kind: 'top25' }]
+    if (kind === 'fantasy')
+      return [
+        {
+          kind: 'fantasy',
+          playerIds: value.split('|').filter((id) => /^pl_\w+$/.test(id)),
+        },
+      ]
     if (kind === 'game' && /^gm_\w+$/.test(value))
       return [{ kind: 'game', gameId: value }]
     if (kind === 'conference' && isConference(value))

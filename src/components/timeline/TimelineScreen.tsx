@@ -595,7 +595,23 @@ function Timeline({
         </ol>
       </FantasyTagsProvider>
 
-      {items.length === 0 && typing.length === 0 && (
+      {timeline.error && (
+        <div
+          role="alert"
+          className="mt-6 flex items-center justify-between gap-3 rounded-xl border border-live/40 bg-live/10 px-3 py-2 text-sm text-live"
+        >
+          Couldn’t load this feed.
+          <button
+            type="button"
+            onClick={() => void timeline.reload()}
+            className="min-h-9 rounded-full bg-background px-3 font-semibold"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
+      {!timeline.error && items.length === 0 && typing.length === 0 && (
         <p className="mt-16 text-center text-sm text-muted">
           {gameId
             ? game.isPending

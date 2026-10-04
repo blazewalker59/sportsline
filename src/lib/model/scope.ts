@@ -55,7 +55,7 @@ export function scopeFollows(
     case 'predictions':
       return predictionGames.map((gameId) => ({ kind: 'game', gameId }))
     case 'fantasy':
-      return fantasyPlayers.map((playerId) => ({ kind: 'player', playerId }))
+      return [{ kind: 'fantasy', playerIds: [...fantasyPlayers] }]
     default:
       return isConference(scope)
         ? [{ kind: 'conference', conference: scope }]

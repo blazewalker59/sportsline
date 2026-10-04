@@ -193,7 +193,10 @@ export function useLiveTimeline(
     previousItems,
     previousGames: games.isPlaceholderData ? (games.data ?? []) : [],
     games: gameList,
-    loading: pages.isPlaceholderData || pages.isPending,
+    // A failed load isn't loading: the Timeline shows the error instead of
+    // staying dimmed.
+    loading: !pages.isError && (pages.isPlaceholderData || pages.isPending),
+    error: pages.isError,
     connection: live ? connection : ('live' as const),
     hasMore: Boolean(pages.hasNextPage),
     loadingMore: pages.isFetchingNextPage,
