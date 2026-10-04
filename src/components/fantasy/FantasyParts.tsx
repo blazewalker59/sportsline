@@ -4,7 +4,8 @@
  * of the Viewer's Starters' or their opponent's.
  */
 
-import { createContext, useContext, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { createContext, useContext, useMemo, useState } from 'react'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type {
   LineupPlayer,
@@ -18,6 +19,7 @@ import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { statName, statValue } from '@/lib/fantasy/stats'
 import { SPORTS } from '@/lib/fantasy/sports'
+import { getMatchupGames } from '@/lib/fantasy/schedule'
 import { PlayerButton } from '@/components/players/playerSheet'
 import { CornerButton } from '@/components/timeline/GameStrip'
 import { cn } from '@/lib/utils'
@@ -413,6 +415,7 @@ function PlayerCell({
   games,
   open,
   onToggle,
+  byes = false,
 }: {
   sport: FantasyLeagueView['sport']
   player: LineupPlayer | undefined
@@ -420,6 +423,7 @@ function PlayerCell({
   games: ReadonlyArray<GameSummary>
   open: boolean
   onToggle: () => void
+  byes?: boolean
 }) {
   if (!player) return <div className="min-h-14" />
   const right = align === 'right'
@@ -529,7 +533,16 @@ function PlayerCell({
           )}
         </button>
       </div>
-      {state && <GameStrip player={player} state={state} />}
+      {state ? (
+        <GameStrip player={player} state={state} />
+      ) : (
+        byes &&
+        player.teamId && (
+          <span className="block rounded-md border border-border/60 px-1.5 py-1 text-center text-[9px] leading-none font-semibold tracking-wide text-muted uppercase">
+            Bye week
+          </span>
+        )
+      )}
     </div>
   )
 }
@@ -693,11 +706,14 @@ function LineupRows({
   mine,
   theirs,
   games,
+  byes = false,
 }: {
   sport: FantasyLeagueView['sport']
   mine: Array<LineupPlayer>
   theirs: Array<LineupPlayer>
   games: ReadonlyArray<GameSummary>
+  /** The week's Games are all here: a Team without one is on a bye. */
+  byes?: boolean
 }) {
   const [open, setOpen] = useState<string | null>(null)
   const rows = Math.max(mine.length, theirs.length)
@@ -717,6 +733,7 @@ function LineupRows({
                 player={mine[i]}
                 align="left"
                 games={games}
+                byes={byes}
                 open={open === `m${i}`}
                 onToggle={toggle('m')}
               />
@@ -733,6 +750,7 @@ function LineupRows({
                 player={theirs[i]}
                 align="right"
                 games={games}
+                byes={byes}
                 open={open === `t${i}`}
                 onToggle={toggle('t')}
               />
@@ -812,6 +830,24 @@ export function MatchupSheet({
   onClose: () => void
 }) {
   const m = league.matchup!
+  // Every Lineup Team's Game this matchup (a Thursday Final, a Monday
+  // night kickoff), behind today's live ones.
+  const teamIds = [...m.mine.lineup, ...(m.opponent?.lineup ?? [])].flatMap(
+    (p) => (p.teamId ? [p.teamId] : []),
+  )
+  const week = useQuery({
+    queryKey: ['matchup-games', league.id, [...new Set(teamIds)].sort().join()],
+    queryFn: () =>
+      getMatchupGames({
+        data: { league: SPORTS[m.sport].league, teamIds },
+      }),
+    staleTime: 5 * 60_000,
+  })
+  const allGames = useMemo(
+    () => [...games, ...(week.data ?? [])],
+    [games, week.data],
+  )
+  const byeWeeks = m.sport === 'football' && week.isSuccess
   const starters = (s: MatchupSide | null) =>
     (s?.lineup ?? []).filter((p) => p.starter)
   const bench = (s: MatchupSide | null) =>
@@ -859,7 +895,8 @@ export function MatchupSheet({
           sport={m.sport}
           mine={starters(m.mine)}
           theirs={starters(m.opponent)}
-          games={games}
+          games={allGames}
+          byes={byeWeeks}
         />
       </section>
       <section>
@@ -870,7 +907,8 @@ export function MatchupSheet({
           sport={m.sport}
           mine={bench(m.mine)}
           theirs={bench(m.opponent)}
-          games={games}
+          games={allGames}
+          byes={byeWeeks}
         />
       </section>
       <p className="text-[11px] text-muted">
