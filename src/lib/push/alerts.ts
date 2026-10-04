@@ -4,7 +4,7 @@
  */
 
 import type { TimelineItem } from '@/lib/model/timeline'
-import { scoringHeadline } from '@/lib/timeline/chat'
+import { notableLead, scoringHeadline } from '@/lib/timeline/chat'
 import { segmentDescription } from '@/lib/timeline/format'
 
 /** An item older than this when first seen is history, not news. */
@@ -47,6 +47,17 @@ function scoreLine(item: TimelineItem): string {
   return `${item.awayTeam.abbreviation} ${item.score.away}–${item.score.home} ${item.homeTeam.abbreviation}`
 }
 
+/**
+ * A Scoring Play or Overturn leads with what scored ("Home run"); a Notable
+ * one (a Prediction's Alert) with what happened ("Stolen base"), never a
+ * score that didn't happen.
+ */
+function headline(item: TimelineItem): string {
+  if (item.kind === 'overturn' || item.significance === 'scoring')
+    return scoringHeadline(item)
+  return notableLead(item) ?? 'Big play'
+}
+
 export function alertMessage(item: TimelineItem): AlertMessage {
   const day = `&day=${item.sportsDay}`
   if (item.kind === 'milestone') {
@@ -66,7 +77,7 @@ export function alertMessage(item: TimelineItem): AlertMessage {
     .map((s) => s.text)
     .join('')
   return {
-    title: `${scoringHeadline(item)} · ${scoreLine(item)}`,
+    title: `${headline(item)} · ${scoreLine(item)}`,
     body: text,
     url: `/?game=${encodeURIComponent(item.gameId)}&play=${encodeURIComponent(item.id)}${day}`,
     tag: item.gameId,

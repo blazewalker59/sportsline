@@ -88,3 +88,30 @@ describe('alertMessage', () => {
     })
   })
 })
+
+describe('alertMessage for Notable Plays (Prediction Alerts)', () => {
+  it('leads with what happened, never a score that did not happen', () => {
+    const steal = alertMessage(
+      item({
+        league: 'mlb',
+        significance: 'notable',
+        playType: 'stolen_base_2b',
+        description: 'Jackson Chourio steals (12) 2nd base.',
+      }),
+    )
+    expect(steal.title).toMatch(/^Stolen base · /)
+    expect(steal.title).not.toMatch(/Run scores/)
+  })
+
+  it('falls back to "Big play" when there is no lead for it', () => {
+    const m = alertMessage(
+      item({
+        league: 'mlb',
+        significance: 'notable',
+        playType: 'something_new',
+        description: 'Something notable.',
+      }),
+    )
+    expect(m.title).toMatch(/^Big play · /)
+  })
+})
