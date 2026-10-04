@@ -15,6 +15,7 @@ import type { GameSummary, TimelineItem } from '@/lib/model/timeline'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { Sheet } from '@/components/chat/Sheet'
 import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
+import { TeamLogo } from '@/components/brand/TeamMark'
 import { statName, statValue } from '@/lib/fantasy/stats'
 import { SPORTS } from '@/lib/fantasy/sports'
 import { PlayerButton } from '@/components/players/playerSheet'
@@ -277,29 +278,34 @@ const SLOT_TONES: Record<string, string> = {
   'F/C': 'bg-orange-500/15 text-orange-700 dark:text-orange-400',
 }
 
-interface FieldState {
-  /** "Sun 1:00 PM", "Q2 4:31", "Final". */
+interface GameState {
+  game: GameSummary
+  home: boolean
+  /** "Sun 4:25 PM", "Q2 0:03", "Final". */
   status: string
   live: boolean
+  upcoming: boolean
   onField: boolean
   redZone: boolean
 }
 
 /**
- * A Player's Game right now, from today's Games: when it is, and in
- * football whether their unit is on the field (their team has the ball, or
- * for a defense, doesn't) and in the red zone (inside the 20).
+ * A Player's Game from the Games we have: its state, and in football
+ * whether their unit is on the field (their team has the ball, or for a
+ * defense, doesn't) and in the red zone (inside the 20).
  */
-function fieldState(
+function gameState(
   p: LineupPlayer,
   games: ReadonlyArray<GameSummary>,
-): FieldState | null {
+): GameState | null {
   if (!p.teamId) return null
   const g = games.find(
     (x) => x.awayTeam.id === p.teamId || x.homeTeam.id === p.teamId,
   )
   if (!g) return null
+  const home = g.homeTeam.id === p.teamId
   const live = g.status === 'live' || g.status === 'delayed'
+  const upcoming = !live && g.status !== 'final'
   const status = live
     ? (g.situation?.segmentLabel ?? 'Live')
     : g.status === 'final'
@@ -309,50 +315,73 @@ function fieldState(
           hour: 'numeric',
           minute: '2-digit',
         })
+  const base = { game: g, home, status, live, upcoming }
   const detail = (g.situation?.detail ?? {}) as {
     possession?: string | null
     downDistance?: string | null
   }
   if (!live || g.league !== 'nfl' || !detail.possession)
-    return { status, live, onField: false, redZone: false }
-  const hasBall = detail.possession === p.teamAbbrev
+    return { ...base, onField: false, redZone: false }
+  const ours = home ? g.homeTeam.abbreviation : g.awayTeam.abbreviation
+  const hasBall = detail.possession === (p.teamAbbrev ?? ours)
   const defense = p.positionId === 16
   const spot = /at ([A-Z]{2,4}) (\d{1,2})/.exec(detail.downDistance ?? '')
   // Inside the 20 on the defending team's side.
   const redZone =
     spot !== null && spot[1] !== detail.possession && Number(spot[2]) <= 20
   const onField = defense ? !hasBall : hasBall
-  return { status, live, onField, redZone: onField && redZone }
+  return { ...base, onField, redZone: onField && redZone }
 }
 
-function Avatar({
-  sport,
-  player,
-}: {
-  sport: FantasyLeagueView['sport']
-  player: LineupPlayer
-}) {
-  const tone = injuryTone(player.injury)
-  return (
-    <span className="relative shrink-0">
-      <PlayerAvatar
-        name={player.name}
-        headshotUrl={headshotOf(sport, player)}
-        size={32}
-      />
-      {tone && (
-        <span
-          aria-label={injuryLabel(player.injury!)}
-          className={cn(
-            'absolute -top-0.5 -right-0.5 size-3 rounded-full ring-2 ring-surface',
-            tone === 'red' ? 'bg-red-500' : 'bg-yellow-400',
-          )}
-        />
-      )}
-    </span>
-  )
+/** ESPN's default position ids, per sport. */
+const POSITIONS: Record<
+  FantasyLeagueView['sport'],
+  Readonly<Record<number, string>>
+> = {
+  football: { 1: 'QB', 2: 'RB', 3: 'WR', 4: 'TE', 5: 'K', 16: 'D/ST' },
+  basketball: { 1: 'PG', 2: 'SG', 3: 'SF', 4: 'PF', 5: 'C' },
+  baseball: {
+    1: 'SP',
+    2: 'C',
+    3: '1B',
+    4: '2B',
+    5: '3B',
+    6: 'SS',
+    7: 'OF',
+    8: 'OF',
+    9: 'OF',
+    10: 'DH',
+    11: 'RP',
+  },
 }
 
+/** Sleeper's position colors, so a position reads without reading it. */
+const POSITION_COLOR: Record<string, string> = {
+  QB: 'text-[#e0245e] dark:text-[#ff2a6d]',
+  RB: 'text-[#00a594] dark:text-[#00ceb8]',
+  WR: 'text-[#2f86e8] dark:text-[#58a7ff]',
+  TE: 'text-[#e08a1e] dark:text-[#ffae58]',
+  K: 'text-[#9b4ae0] dark:text-[#bd66ff]',
+  'D/ST': 'text-[#a65f48] dark:text-[#bf755d]',
+}
+
+/** Injury statuses as the letters Sleeper shows: Q, D, O, IR. */
+const INJURY_ABBREV: Record<string, string> = {
+  QUESTIONABLE: 'Q',
+  DOUBTFUL: 'D',
+  OUT: 'O',
+  INJURY_RESERVE: 'IR',
+  SUSPENSION: 'SUSP',
+  DAY_TO_DAY: 'DTD',
+  PROBABLE: 'P',
+}
+
+/**
+ * One side of a Lineup row (dreamteam's football layout): name and figure
+ * abreast on the top line, position · team · injury under the name, the
+ * projection under the figure, and the Game as a strip across the bottom.
+ * On the field shows as an edge bar and tint, not a label.
+ */
 function PlayerCell({
   sport,
   player,
@@ -368,73 +397,190 @@ function PlayerCell({
   open: boolean
   onToggle: () => void
 }) {
-  if (!player) return <span className="flex-1" />
-  const state = fieldState(player, games)
-  const name = player.playerId ? (
-    <PlayerButton
-      playerId={player.playerId}
-      className="truncate hover:underline"
-    >
+  if (!player) return <div className="min-h-14" />
+  const right = align === 'right'
+  const state = gameState(player, games)
+  const position = player.positionId
+    ? POSITIONS[sport][player.positionId]
+    : undefined
+  const injury = player.injury
+    ? (INJURY_ABBREV[player.injury] ?? player.injury.slice(0, 4))
+    : null
+  const tone = injuryTone(player.injury)
+  const name = (
+    <span className="block text-[13px] leading-tight font-semibold break-words">
       {shortName(player)}
-    </PlayerButton>
-  ) : (
-    <span className="truncate">{shortName(player)}</span>
+    </span>
   )
+  return (
+    <div
+      className={cn(
+        'flex min-w-0 flex-col gap-1 rounded-lg px-1.5 py-1.5',
+        state?.onField && 'field-state',
+        state?.onField && right && 'field-state--right',
+        state?.redZone && 'field-state--red-zone',
+      )}
+      aria-label={
+        state?.onField
+          ? `${player.name}: ${state.redZone ? 'in the red zone' : 'on the field'}`
+          : undefined
+      }
+    >
+      <div
+        className={cn('flex items-start gap-1.5', right && 'flex-row-reverse')}
+      >
+        <Avatar sport={sport} player={player} />
+        <div className={cn('min-w-0 flex-1', right && 'text-right')}>
+          {player.playerId ? (
+            <PlayerButton
+              playerId={player.playerId}
+              className={cn('w-full', right && 'text-right')}
+            >
+              {name}
+            </PlayerButton>
+          ) : (
+            name
+          )}
+          <span
+            className={cn(
+              'mt-0.5 flex flex-wrap items-center gap-x-1 text-[10px] leading-tight font-medium',
+              right && 'justify-end',
+            )}
+          >
+            {position && (
+              <span
+                className={cn(
+                  'font-bold',
+                  POSITION_COLOR[position] ?? 'text-muted',
+                )}
+              >
+                {position}
+              </span>
+            )}
+            {position && player.teamAbbrev && (
+              <span className="text-muted/60" aria-hidden="true">
+                ·
+              </span>
+            )}
+            {player.teamAbbrev && (
+              <span className="text-muted">{player.teamAbbrev}</span>
+            )}
+            {injury && (
+              <span
+                className={cn(
+                  'font-bold',
+                  tone === 'yellow'
+                    ? 'text-yellow-700 dark:text-yellow-400'
+                    : 'text-red-600 dark:text-red-400',
+                )}
+                title={injuryLabel(player.injury!)}
+              >
+                {injury}
+              </span>
+            )}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          aria-label={
+            player.dayLine == null
+              ? `${shortName(player)}: ${pts(player.points)} points. Show breakdown`
+              : `${shortName(player)}: today's line`
+          }
+          className={cn(
+            'flex shrink-0 flex-col rounded-md px-1 py-0.5 tabular-nums transition-colors',
+            right ? 'items-start' : 'items-end',
+            open ? 'bg-accent-soft' : 'hover:bg-notice',
+          )}
+        >
+          <span className="text-[15px] leading-tight font-bold">
+            {playerFigure(player)}
+          </span>
+          {player.dayLine == null && player.projected !== null && (
+            <span className="text-[10px] leading-tight text-muted">
+              {pts(player.projected)}
+            </span>
+          )}
+        </button>
+      </div>
+      {state && <GameStrip player={player} state={state} />}
+    </div>
+  )
+}
+
+/**
+ * The Player's Game across the bottom of their cell: their team and score,
+ * the opponent's, and its state; quieter before kickoff, warm while live.
+ */
+function GameStrip({
+  player,
+  state,
+}: {
+  player: LineupPlayer
+  state: GameState
+}) {
+  const g = state.game
+  const ours = state.home ? g.homeTeam : g.awayTeam
+  const theirs = state.home ? g.awayTeam : g.homeTeam
+  const ourScore = state.home ? g.score.home : g.score.away
+  const theirScore = state.home ? g.score.away : g.score.home
+  const started = !state.upcoming
   return (
     <span
       className={cn(
-        'flex min-w-0 flex-1 items-center gap-2',
-        align === 'right' && 'flex-row-reverse text-right',
+        'block rounded-md border px-1.5 py-1 tabular-nums',
+        state.upcoming
+          ? 'border-border/70 bg-background/40'
+          : state.live
+            ? 'border-amber-500/25 bg-amber-500/10'
+            : 'border-border/40 bg-notice/60',
       )}
     >
-      <Avatar sport={sport} player={player} />
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-[13px] leading-tight font-medium">
-          {name}
+      <span className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 text-[10px] leading-none font-semibold">
+        <span className="flex min-w-0 items-center gap-1">
+          <TeamLogo team={ours} size={13} />
+          <span className="truncate">
+            {player.teamAbbrev ?? ours.abbreviation}
+          </span>
+          {started && <span>{ourScore}</span>}
         </span>
-        <span
-          className={cn(
-            'flex items-center gap-1 text-[11px] text-muted',
-            align === 'right' && 'justify-end',
-          )}
-        >
-          {/* On the field (or in the red zone) says more than the clock. */}
-          {state?.redZone ? (
-            <span className="rounded bg-red-500/15 px-1 text-[10px] leading-4 font-bold whitespace-nowrap text-red-600 dark:text-red-400">
-              Red zone
-            </span>
-          ) : state?.onField ? (
-            <span className="rounded bg-scoring/15 px-1 text-[10px] leading-4 font-bold whitespace-nowrap text-scoring">
-              On field
-            </span>
-          ) : (
-            <span className={cn('truncate', state?.live && 'text-live')}>
-              {state?.status ??
-                (player.projected !== null
-                  ? `proj ${pts(player.projected)}`
-                  : '')}
-            </span>
-          )}
+        <span className="text-muted" aria-hidden="true">
+          {started ? '-' : state.home ? 'vs' : '@'}
+        </span>
+        <span className="flex min-w-0 items-center justify-end gap-1">
+          {started && <span>{theirScore}</span>}
+          <span className="truncate">{theirs.abbreviation}</span>
+          <TeamLogo team={theirs} size={13} />
         </span>
       </span>
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        aria-label={
-          player.dayLine == null
-            ? `${shortName(player)}: ${pts(player.points)} points. Show breakdown`
-            : `${shortName(player)}: today's line`
-        }
+      <span
         className={cn(
-          'flex min-w-9 shrink-0 flex-col rounded-lg px-1 py-0.5 tabular-nums transition-colors',
-          align === 'right' ? 'items-start' : 'items-end',
-          open ? 'bg-accent-soft' : 'hover:bg-notice',
+          'mt-1 block text-center text-[9px] leading-none font-semibold tracking-wide uppercase',
+          state.live ? 'text-amber-700 dark:text-amber-300' : 'text-muted',
         )}
       >
-        <span className="text-sm font-bold">{playerFigure(player)}</span>
-      </button>
+        {state.upcoming ? `Upcoming · ${state.status}` : state.status}
+      </span>
     </span>
+  )
+}
+
+function Avatar({
+  sport,
+  player,
+}: {
+  sport: FantasyLeagueView['sport']
+  player: LineupPlayer
+}) {
+  // Injury reads as its letter (Q, O) on the meta line, not a dot here.
+  return (
+    <PlayerAvatar
+      name={player.name}
+      headshotUrl={headshotOf(sport, player)}
+      size={28}
+    />
   )
 }
 
@@ -514,6 +660,10 @@ export function Breakdown({
   )
 }
 
+/**
+ * Both Lineups slot by slot: the Viewer's Player left, their opponent's
+ * right, the slot as a small chip on the top line between them.
+ */
 function LineupRows({
   sport,
   mine,
@@ -537,7 +687,7 @@ function LineupRows({
           open === `m${i}` ? mine[i] : open === `t${i}` ? theirs[i] : undefined
         return (
           <li key={i}>
-            <div className="flex items-center gap-1.5 px-2 py-2">
+            <div className="grid grid-cols-[minmax(0,1fr)_2.25rem_minmax(0,1fr)] items-start gap-x-1 px-1 py-1">
               <PlayerCell
                 sport={sport}
                 player={mine[i]}
@@ -548,7 +698,7 @@ function LineupRows({
               />
               <span
                 className={cn(
-                  'w-10 shrink-0 rounded-md py-0.5 text-center text-[10px] font-bold uppercase',
+                  'mt-2 flex h-6 items-center justify-center rounded-md text-[9px] leading-none font-bold uppercase',
                   SLOT_TONES[slot] ?? 'bg-notice text-muted',
                 )}
               >

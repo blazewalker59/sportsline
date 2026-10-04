@@ -169,3 +169,54 @@ textarea,
 .dark .team-name {
   color: color-mix(in srgb, var(--name-dark, var(--foreground)) 68%, #fff);
 }
+
+/*
+  A Fantasy Starter whose unit is on the field: a bar on the cell's outer
+  edge and a tint fading inward (dreamteam's field state). Amber with the
+  ball; red, pulsing, in the red zone. Mirrored for the right-hand side.
+*/
+.field-state {
+  --field-state-color: #d99a06;
+  background-image: linear-gradient(
+    var(--field-state-direction, 90deg),
+    color-mix(in oklab, var(--field-state-color) 18%, transparent) 0%,
+    transparent 78%
+  );
+  box-shadow: inset 3px 0 0 0 var(--field-state-color);
+}
+.dark .field-state {
+  --field-state-color: #f5c451;
+  background-image: linear-gradient(
+    var(--field-state-direction, 90deg),
+    color-mix(in oklab, var(--field-state-color) 26%, transparent) 0%,
+    transparent 78%
+  );
+}
+.field-state--right {
+  --field-state-direction: 270deg;
+  box-shadow: inset -3px 0 0 0 var(--field-state-color);
+}
+.field-state.field-state--red-zone {
+  --field-state-color: var(--live);
+  animation: field-state-pulse 2.4s ease-in-out infinite;
+}
+.field-state--right.field-state--red-zone {
+  animation-name: field-state-pulse-right;
+}
+@keyframes field-state-pulse {
+  50% {
+    box-shadow: inset 3px 0 0 0
+      color-mix(in oklab, var(--field-state-color) 45%, transparent);
+  }
+}
+@keyframes field-state-pulse-right {
+  50% {
+    box-shadow: inset -3px 0 0 0
+      color-mix(in oklab, var(--field-state-color) 45%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .field-state.field-state--red-zone {
+    animation: none;
+  }
+}
