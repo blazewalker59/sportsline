@@ -330,6 +330,11 @@ export const kalshiAccounts = sqliteTable('kalshi_accounts', {
   lastError: text('last_error'),
   connectedAt: text('connected_at').notNull(),
   syncedAt: text('synced_at'),
+  /** How Prediction cards show profit or loss: dollars or percent return. */
+  changeDisplay: text('change_display')
+    .$type<'dollars' | 'percent'>()
+    .notNull()
+    .default('dollars'),
 })
 
 /** A Viewer's Prediction (CONTEXT.md): one Kalshi market they hold. */

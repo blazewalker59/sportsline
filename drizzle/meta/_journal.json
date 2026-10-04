@@ -85,6 +85,13 @@
       "when": 1791077477516,
       "tag": "0011_market_floor_strike",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1791078863625,
+      "tag": "0012_change_display",
+      "breakpoints": true
     }
   ]
 }

@@ -4,7 +4,11 @@
  */
 
 import { Link } from '@tanstack/react-router'
-import type { LegView, PredictionView } from '@/lib/kalshi/server'
+import type {
+  ChangeDisplay,
+  LegView,
+  PredictionView,
+} from '@/lib/kalshi/server'
 import type { Progress } from '@/lib/kalshi/props'
 import type { GameSummary } from '@/lib/model/timeline'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
@@ -22,6 +26,31 @@ function movement(p: PredictionView): number | null {
   if (p.chance === null || p.entryChance === null) return null
   return Math.round((p.chance - p.entryChance) * 100)
 }
+
+/** What cashing out now would make or lose, in dollars and as a return. */
+export function profitOf(
+  p: Pick<PredictionView, 'value' | 'cost'>,
+): { dollars: number; percent: number | null } | null {
+  if (p.value === null) return null
+  const dollars = p.value - p.cost
+  return { dollars, percent: p.cost > 0 ? dollars / p.cost : null }
+}
+
+/** "+$3.40" / "−$1.10", or "+27%" / "−12%". */
+export function profitText(
+  profit: { dollars: number; percent: number | null },
+  display: ChangeDisplay,
+): string {
+  if (display === 'percent' && profit.percent !== null) {
+    const n = Math.round(profit.percent * 100)
+    return `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n)}%`
+  }
+  const sign = profit.dollars > 0.004 ? '+' : profit.dollars < -0.004 ? '−' : ''
+  return `${sign}$${Math.abs(profit.dollars).toFixed(2)}`
+}
+
+const toneOf = (n: number) =>
+  n > 0.004 ? 'text-scoring' : n < -0.004 ? 'text-live' : 'text-muted'
 
 /** Odds over time as a line, with where the Viewer got in dashed. */
 export function Sparkline({
@@ -158,11 +187,15 @@ export function PredictionCard({
   prediction: p,
   selected,
   onSelect,
+  display = 'dollars',
 }: {
   prediction: PredictionView
   selected?: boolean
   onSelect: () => void
+  /** Profit or loss in dollars or percent return. */
+  display?: ChangeDisplay
 }) {
+  const profit = profitOf(p)
   const progress = p.kind === 'single' ? (p.legs[0]?.progress ?? null) : null
   const move = movement(p)
   const game = leadGame(p)
@@ -210,20 +243,33 @@ export function PredictionCard({
           <span className="text-xl leading-none font-bold tabular-nums">
             {p.chance === null ? '—' : pct(p.chance)}
           </span>
-          {move !== null && (
+          {profit ? (
+            // At a glance: what cashing out now would make or lose.
             <span
               className={cn(
                 'text-[11px] font-semibold tabular-nums',
-                move > 0
-                  ? 'text-scoring'
-                  : move < 0
-                    ? 'text-live'
-                    : 'text-muted',
+                toneOf(profit.dollars),
               )}
             >
-              {move > 0 ? '▲' : move < 0 ? '▼' : '·'} {Math.abs(move)} from{' '}
-              {pct(p.entryChance!)}
+              {profit.dollars > 0.004
+                ? '▲'
+                : profit.dollars < -0.004
+                  ? '▼'
+                  : '·'}{' '}
+              {profitText(profit, display)}
             </span>
+          ) : (
+            move !== null && (
+              <span
+                className={cn(
+                  'text-[11px] font-semibold tabular-nums',
+                  toneOf(move),
+                )}
+              >
+                {move > 0 ? '▲' : move < 0 ? '▼' : '·'} {Math.abs(move)} from{' '}
+                {pct(p.entryChance!)}
+              </span>
+            )
           )}
         </span>
         <Sparkline points={p.history} entry={p.entryChance} width={64} />
@@ -243,11 +289,13 @@ export function PredictionStrip({
   selected,
   onSelect,
   onDetails,
+  display,
 }: {
   predictions: ReadonlyArray<PredictionView>
   selected?: string
   onSelect: (id: string | null) => void
   onDetails: (id: string) => void
+  display?: ChangeDisplay
 }) {
   if (predictions.length === 0) return null
   return (
@@ -257,6 +305,7 @@ export function PredictionStrip({
           <li key={p.id} className="flex shrink-0 gap-1.5">
             <PredictionCard
               prediction={p}
+              display={display}
               selected={p.id === selected}
               onSelect={() => onSelect(p.id === selected ? null : p.id)}
             />
@@ -453,7 +502,7 @@ export function PredictionSheet({
           </dd>
         </div>
         <div>
-          <dt>{settled ? 'Payout' : 'Worth now'}</dt>
+          <dt>{settled ? 'Payout' : 'Cash out now'}</dt>
           <dd className="text-base font-semibold text-foreground tabular-nums">
             {settled
               ? p.payout === null
@@ -462,6 +511,22 @@ export function PredictionSheet({
               : p.value === null
                 ? '—'
                 : money(p.value)}
+            {!settled &&
+              (() => {
+                const profit = profitOf(p)
+                return profit ? (
+                  <span
+                    className={cn(
+                      'block text-[11px] font-semibold',
+                      toneOf(profit.dollars),
+                    )}
+                  >
+                    {profitText(profit, 'dollars')}
+                    {profit.percent !== null &&
+                      ` (${profitText(profit, 'percent')})`}
+                  </span>
+                ) : null
+              })()}
           </dd>
         </div>
       </dl>
@@ -479,5 +544,62 @@ export function PredictionSheet({
         Read from your Kalshi account. Odds are Kalshi’s market prices.
       </p>
     </Sheet>
+  )
+}
+
+/**
+ * Open Predictions at a glance, across the strip's width: how many, what's
+ * staked, and what cashing everything out now would bring.
+ */
+export function PredictionSummary({
+  predictions,
+  display = 'dollars',
+}: {
+  predictions: ReadonlyArray<PredictionView>
+  display?: ChangeDisplay
+}) {
+  const open = predictions.filter((p) => p.status === 'open')
+  if (open.length === 0) return null
+  const staked = open.reduce((n, p) => n + p.cost, 0)
+  const priced = open.filter((p) => p.value !== null)
+  const cashout = priced.reduce((n, p) => n + (p.value ?? 0), 0)
+  const profit =
+    priced.length > 0
+      ? profitOf({
+          value: cashout,
+          cost: priced.reduce((n, p) => n + p.cost, 0),
+        })
+      : null
+  return (
+    <div className="mt-2 flex items-stretch divide-x divide-border rounded-2xl border border-border bg-surface text-center">
+      <div className="flex flex-1 flex-col justify-center px-2 py-1.5">
+        <span className="text-[11px] text-muted">Open</span>
+        <span className="text-[15px] font-bold tabular-nums">
+          {open.length}
+        </span>
+      </div>
+      <div className="flex flex-1 flex-col justify-center px-2 py-1.5">
+        <span className="text-[11px] text-muted">Staked</span>
+        <span className="text-[15px] font-bold tabular-nums">
+          {money(staked)}
+        </span>
+      </div>
+      <div className="flex flex-[1.4] flex-col justify-center px-2 py-1.5">
+        <span className="text-[11px] text-muted">Cash out now</span>
+        <span className="text-[15px] font-bold tabular-nums">
+          {priced.length > 0 ? money(cashout) : '—'}
+          {profit && (
+            <span
+              className={cn(
+                'ml-1 text-xs font-semibold',
+                toneOf(profit.dollars),
+              )}
+            >
+              {profitText(profit, display)}
+            </span>
+          )}
+        </span>
+      </div>
+    </div>
   )
 }

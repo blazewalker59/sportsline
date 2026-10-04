@@ -6,8 +6,10 @@ import {
   disconnectKalshi,
   getKalshiConnection,
   getPredictions,
+  setChangeDisplay,
   syncKalshiNow,
 } from './server'
+import type { ChangeDisplay, KalshiConnection } from './server'
 import { useViewer } from '@/lib/viewer/useViewer'
 
 export const CONNECTION_KEY = ['kalshi-connection'] as const
@@ -67,5 +69,22 @@ export function useSyncKalshi() {
       void queryClient.invalidateQueries({ queryKey: PREDICTIONS_KEY })
       void queryClient.invalidateQueries({ queryKey: CONNECTION_KEY })
     },
+  })
+}
+
+/** Dollars or percent on Prediction cards; the cards switch straight away. */
+export function useSetChangeDisplay() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (display: ChangeDisplay) =>
+      setChangeDisplay({ data: { display } }),
+    onMutate: (display) => {
+      queryClient.setQueryData<KalshiConnection | null>(
+        CONNECTION_KEY,
+        (old) => (old ? { ...old, changeDisplay: display } : old),
+      )
+    },
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: CONNECTION_KEY }),
   })
 }

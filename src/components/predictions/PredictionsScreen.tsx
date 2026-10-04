@@ -4,8 +4,16 @@
  */
 
 import { useState } from 'react'
-import { PredictionSheet, Sparkline, money, pct } from './PredictionParts'
-import type { PredictionView } from '@/lib/kalshi/server'
+import {
+  PredictionSheet,
+  PredictionSummary,
+  Sparkline,
+  money,
+  pct,
+  profitOf,
+  profitText,
+} from './PredictionParts'
+import type { ChangeDisplay, PredictionView } from '@/lib/kalshi/server'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { timeAgo, useNow } from '@/components/timeline/format'
 import {
@@ -13,6 +21,7 @@ import {
   useDisconnectKalshi,
   useKalshiConnection,
   usePredictions,
+  useSetChangeDisplay,
   useSyncKalshi,
 } from '@/lib/kalshi/usePredictions'
 import { useViewer } from '@/lib/viewer/useViewer'
@@ -113,6 +122,7 @@ function Connected() {
   const list = usePredictions()
   const sync = useSyncKalshi()
   const disconnect = useDisconnectKalshi()
+  const setDisplay = useSetChangeDisplay()
   const [openId, setOpenId] = useState<string | null>(null)
   const predictions = list.data ?? []
   const open = predictions.filter((p) => p.status === 'open')
@@ -162,6 +172,40 @@ function Connected() {
         </button>
       </section>
 
+      <section className="flex items-center justify-between gap-3 text-sm">
+        <span className="text-muted">Show profit and loss as</span>
+        <span
+          role="radiogroup"
+          aria-label="Show profit and loss as"
+          className="flex gap-1 rounded-full bg-notice p-1"
+        >
+          {(
+            [
+              ['dollars', 'Dollars'],
+              ['percent', 'Percent'],
+            ] as Array<[ChangeDisplay, string]>
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={c.changeDisplay === value}
+              onClick={() => setDisplay.mutate(value)}
+              className={cn(
+                'min-h-8 rounded-full px-3 text-[13px] font-semibold transition-colors',
+                c.changeDisplay === value
+                  ? 'bg-background text-foreground shadow-sm'
+                  : 'text-muted',
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </span>
+      </section>
+
+      <PredictionSummary predictions={open} display={c.changeDisplay} />
+
       {list.isError && (
         <p
           role="alert"
@@ -178,6 +222,7 @@ function Connected() {
           empty="No open Predictions. New ones appear within a few minutes of making them on Kalshi."
           predictions={open}
           onOpen={setOpenId}
+          display={c.changeDisplay}
         />
       )}
       {past.length > 0 && (
@@ -198,11 +243,13 @@ function PredictionList({
   empty,
   predictions,
   onOpen,
+  display = 'dollars',
 }: {
   title: string
   empty?: string
   predictions: Array<PredictionView>
   onOpen: (id: string) => void
+  display?: ChangeDisplay
 }) {
   return (
     <section>
@@ -245,8 +292,27 @@ function PredictionList({
                       width={48}
                       height={22}
                     />
-                    <span className="w-12 text-right text-base font-bold tabular-nums">
-                      {p.chance === null ? '—' : pct(p.chance)}
+                    <span className="flex w-16 flex-col text-right">
+                      <span className="text-base leading-tight font-bold tabular-nums">
+                        {p.chance === null ? '—' : pct(p.chance)}
+                      </span>
+                      {(() => {
+                        const profit = profitOf(p)
+                        return profit ? (
+                          <span
+                            className={cn(
+                              'text-[11px] font-semibold tabular-nums',
+                              profit.dollars > 0.004
+                                ? 'text-scoring'
+                                : profit.dollars < -0.004
+                                  ? 'text-live'
+                                  : 'text-muted',
+                            )}
+                          >
+                            {profitText(profit, display)}
+                          </span>
+                        ) : null
+                      })()}
                     </span>
                   </span>
                 ) : (

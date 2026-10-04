@@ -28,11 +28,15 @@ import {
 import { toGameSummary } from '@/lib/live/rows'
 import { sessionViewer, withViewer } from '@/lib/viewer/session'
 
+export type ChangeDisplay = 'dollars' | 'percent'
+
 export interface KalshiConnection {
   keyId: string
   status: 'ok' | 'error'
   lastError: string | null
   syncedAt: string | null
+  /** How Prediction cards show profit or loss. */
+  changeDisplay: ChangeDisplay
 }
 
 export interface LegView {
@@ -89,6 +93,7 @@ export const getKalshiConnection = createServerFn({ method: 'GET' }).handler(
             status: row.status,
             lastError: row.lastError,
             syncedAt: row.syncedAt,
+            changeDisplay: row.changeDisplay,
           }
         : null
     })
@@ -154,6 +159,7 @@ export const connectKalshi = createServerFn({ method: 'POST' })
         lastError: null,
         connectedAt: now,
         syncedAt: null,
+        changeDisplay: 'dollars' as const,
       }
       await db
         .insert(kalshiAccounts)
@@ -171,7 +177,23 @@ export const connectKalshi = createServerFn({ method: 'POST' })
         status: 'ok',
         lastError: null,
         syncedAt: new Date().toISOString(),
+        changeDisplay: row.changeDisplay,
       }
+    }),
+  )
+
+/** Show Prediction cards' profit or loss in dollars or percent return. */
+export const setChangeDisplay = createServerFn({ method: 'POST' })
+  .validator((data: { display: string }) =>
+    z.object({ display: z.enum(['dollars', 'percent']) }).parse(data),
+  )
+  .handler(({ data }) =>
+    withViewer(async ({ db, viewerId }) => {
+      await db
+        .update(kalshiAccounts)
+        .set({ changeDisplay: data.display })
+        .where(eq(kalshiAccounts.viewerId, viewerId))
+      return data.display
     }),
   )
 

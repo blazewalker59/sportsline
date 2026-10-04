@@ -19,9 +19,10 @@ import {
 import {
   PredictionSheet,
   PredictionStrip,
+  PredictionSummary,
 } from '@/components/predictions/PredictionParts'
 import { ReactionsProvider } from '@/components/chat/Reactions'
-import { defaultScope, scopeFollows } from '@/lib/model/scope'
+import { defaultScope, parseScope, scopeFollows } from '@/lib/model/scope'
 import { inConference, isRanked } from '@/lib/model/timeline'
 import {
   DEFAULT_LEAGUE_SETTINGS,
@@ -94,6 +95,25 @@ export function TimelineScreen({
       />
     </ReactionsProvider>
   )
+}
+
+const SCOPE_KEY = 'sportsline:scope'
+
+/** The Scope last chosen on this device, if any (and still a Scope). */
+function readStoredScope(): Scope | undefined {
+  try {
+    return parseScope(localStorage.getItem(SCOPE_KEY))
+  } catch {
+    return undefined
+  }
+}
+
+function storeScope(scope: Scope): void {
+  try {
+    localStorage.setItem(SCOPE_KEY, scope)
+  } catch {
+    // Private mode: the Scope just isn't remembered.
+  }
 }
 
 /**
@@ -200,12 +220,19 @@ function Timeline({
   const selectedPrediction = predictionId
     ? (predictionList.data?.find((p) => p.id === predictionId) ?? null)
     : null
+  // The Scope from the link, else the one the Viewer last chose (on this
+  // device), else their default.
+  const [storedScope] = useState(readStoredScope)
+  useEffect(() => {
+    if (requestedScope) storeScope(requestedScope)
+  }, [requestedScope])
+  const wanted = requestedScope ?? storedScope
   const scope: Scope = selectedPrediction
     ? 'predictions'
-    : (requestedScope === 'following' && viewerFollows.length === 0) ||
-        (requestedScope === 'predictions' && !kalshi.data)
+    : (wanted === 'following' && viewerFollows.length === 0) ||
+        (wanted === 'predictions' && !kalshi.data && !kalshi.isPending)
       ? 'all'
-      : (requestedScope ?? defaultScope(viewerFollows))
+      : (wanted ?? defaultScope(viewerFollows))
   // The Viewer's row in their order, hidden items left out; All covers
   // the visible Leagues.
   const settings = data?.leagues ?? DEFAULT_LEAGUE_SETTINGS
@@ -401,12 +428,19 @@ function Timeline({
             <div className={cn('transition-opacity', dimmed && 'opacity-50')}>
               {scope === 'predictions' && !gameId ? (
                 // Predictions move like scores: their cards replace the Games'.
-                <PredictionStrip
-                  predictions={openPredictions}
-                  selected={selectedPrediction?.id}
-                  onSelect={selectPrediction}
-                  onDetails={setPredictionOpen}
-                />
+                <>
+                  <PredictionStrip
+                    predictions={openPredictions}
+                    selected={selectedPrediction?.id}
+                    onSelect={selectPrediction}
+                    onDetails={setPredictionOpen}
+                    display={kalshi.data?.changeDisplay}
+                  />
+                  <PredictionSummary
+                    predictions={openPredictions}
+                    display={kalshi.data?.changeDisplay}
+                  />
+                </>
               ) : (
                 <>
                   <GameStrip
@@ -433,6 +467,7 @@ function Timeline({
                       )}
                       onSelect={selectPrediction}
                       onDetails={setPredictionOpen}
+                      display={kalshi.data?.changeDisplay}
                     />
                   )}
                 </>

@@ -1,0 +1,1 @@
+ALTER TABLE `kalshi_accounts` ADD `change_display` text DEFAULT 'dollars' NOT NULL;
