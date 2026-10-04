@@ -70,6 +70,28 @@ export default {
       }
     }
 
+    // TEMPORARY: Kalshi rate-limit diagnostic (anonymous public reads only).
+    if (
+      url.pathname === '/__kalshi-diag' &&
+      url.searchParams.get('t') === 'e088eb7e4b976ad17ba435bdfdb91989'
+    ) {
+      const out: Array<string> = []
+      for (const gap of [0, 0, 0, 250, 250, 1000, 1000, 2000, 2000, 3000]) {
+        await new Promise((r) => setTimeout(r, gap))
+        const t0 = Date.now()
+        const res = await fetch(
+          'https://api.elections.kalshi.com/trade-api/v2/markets?limit=1',
+          {
+            headers: { accept: 'application/json' },
+          },
+        )
+        out.push(
+          `gap ${gap}ms -> ${res.status} (${Date.now() - t0}ms) ${res.status === 429 ? (await res.text()).slice(0, 80) : ''}`,
+        )
+      }
+      return Response.json(out)
+    }
+
     if (url.pathname === LOGO_PATH && request.method === 'GET') {
       return serveLogo(url)
     }
