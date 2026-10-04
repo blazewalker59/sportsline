@@ -3,6 +3,7 @@ import type { GameSummary, TimelineItem } from '@/lib/model/timeline'
 import {
   bubbleTints,
   buildChat,
+  fillEdges,
   nameColors,
   notableLead,
   scoringHeadline,
@@ -217,5 +218,19 @@ describe('nameColors', () => {
       '#ff4c00',
     )
     expect(nameColors(null)).toBeNull()
+  })
+})
+
+describe('fillEdges', () => {
+  it('edges a fill only in the theme it would vanish in', () => {
+    // Texans navy: lost on the dark page, fine on the light one.
+    expect(fillEdges('#021018')).toEqual({
+      light: null,
+      dark: 'rgb(255 255 255 / 0.2)',
+    })
+    // A gold the light page swallows.
+    expect(fillEdges('#ffc627').light).not.toBeNull()
+    // A strong color stands out in both.
+    expect(fillEdges('#c8102e')).toEqual({ light: null, dark: null })
   })
 })

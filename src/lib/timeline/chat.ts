@@ -287,6 +287,35 @@ export function luminance(hex: string): number | null {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b
 }
 
+/** WCAG contrast ratio between two `#rrggbb` colors (1–21). */
+export function contrast(a: string, b: string): number {
+  const la = luminance(a) ?? 0
+  const lb = luminance(b) ?? 0
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)
+}
+
+/** The page backgrounds a filled bubble sits on (styles.css --background). */
+const BACKGROUNDS = { light: '#f3f4f8', dark: '#0e1015' } as const
+/** Below this, a fill melts into the page. */
+const MIN_EDGE_CONTRAST = 1.6
+
+/**
+ * An edge for a team-color fill that would blend into the page in a theme
+ * (the Texans' navy in dark, a gold in light): a quiet neutral hairline,
+ * the same for every team. Null where the fill already stands out.
+ */
+export function fillEdges(fill: string): {
+  light: string | null
+  dark: string | null
+} {
+  const low = (theme: keyof typeof BACKGROUNDS) =>
+    contrast(fill, BACKGROUNDS[theme]) < MIN_EDGE_CONTRAST
+  return {
+    light: low('light') ? 'rgb(0 0 0 / 0.14)' : null,
+    dark: low('dark') ? 'rgb(255 255 255 / 0.2)' : null,
+  }
+}
+
 /** Readable text on a team-color fill: near-black on light colors, white on dark. */
 export function textOn(hex: string): string {
   const l = luminance(hex)

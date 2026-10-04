@@ -18,6 +18,7 @@ import { timeAgo } from '@/components/timeline/format'
 import { segmentDescription } from '@/lib/timeline/format'
 import {
   bubbleTints,
+  fillEdges,
   notableLead,
   scoringHeadline,
   textOn,
@@ -128,6 +129,17 @@ function actingTeam(item: TimelineItem): TeamRef {
   return item.side === 'home' ? item.homeTeam : item.awayTeam
 }
 
+/** A team-color fill, with an edge in whichever theme it would vanish in. */
+function fillStyle(fill: string): React.CSSProperties {
+  const edges = fillEdges(fill)
+  return {
+    background: fill,
+    color: textOn(fill),
+    ...(edges.light && { '--fill-edge-light': edges.light }),
+    ...(edges.dark && { '--fill-edge-dark': edges.dark }),
+  } as React.CSSProperties
+}
+
 export function PlayBubble({
   item,
   align,
@@ -210,9 +222,10 @@ function PlayBubbleLink({
           'flex max-w-[300px] flex-col gap-1.5 px-4 py-3 transition-transform select-none [-webkit-touch-callout:none] active:scale-[0.99]',
           shape,
           !fill && 'border-2 border-live bg-bubble',
+          fill && 'fill-edge',
           struck && 'opacity-60',
         )}
-        style={fill ? { background: fill, color: textOn(fill) } : undefined}
+        style={fill ? fillStyle(fill) : undefined}
       >
         <span
           className={cn(
