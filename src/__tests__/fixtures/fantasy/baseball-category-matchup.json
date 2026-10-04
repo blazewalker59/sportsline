@@ -1,0 +1,1030 @@
+{
+  "id": 54321,
+  "seasonId": 2025,
+  "scoringPeriodId": 82,
+  "status": {
+    "currentMatchupPeriod": 12,
+    "latestScoringPeriod": 82,
+    "isActive": true,
+    "finalScoringPeriod": 186
+  },
+  "settings": {
+    "name": "Test Fantasy Baseball League",
+    "size": 10,
+    "scheduleSettings": {
+      "matchupPeriodCount": 22,
+      "playoffTeamCount": 6,
+      "matchupPeriods": {
+        "12": [78, 79, 80, 81, 82, 83, 84]
+      }
+    },
+    "scoringSettings": {
+      "scoringType": "H2H_CATEGORY",
+      "statQualificationMinimum": {
+        "statId": 34,
+        "limitValue": 105
+      }
+    }
+  },
+  "members": [
+    {
+      "id": "{bb-owner-1}",
+      "displayName": "BomberBoss",
+      "firstName": "Ann",
+      "lastName": "Rivera"
+    },
+    {
+      "id": "{bb-owner-2}",
+      "displayName": "BlueCrew",
+      "firstName": "Luis",
+      "lastName": "Ortega"
+    }
+  ],
+  "teams": [
+    {
+      "id": 1,
+      "abbrev": "BBX",
+      "name": "Bronx Bombers",
+      "location": "Bronx",
+      "nickname": "Bombers",
+      "logo": "https://example.com/bbx.png",
+      "owners": ["{bb-owner-1}"],
+      "record": {
+        "overall": {
+          "wins": 7,
+          "losses": 3,
+          "ties": 1,
+          "pointsFor": 88,
+          "pointsAgainst": 61,
+          "streakLength": 2,
+          "streakType": "WIN"
+        }
+      },
+      "rankCalculatedFinal": 1,
+      "currentProjectedRank": 1,
+      "playoffSeed": 1,
+      "valuesByStat": {
+        "0": 1080,
+        "1": 300,
+        "10": 120,
+        "12": 12,
+        "13": 6,
+        "20": 180,
+        "5": 54,
+        "8": 540,
+        "21": 168,
+        "27": 240,
+        "23": 36,
+        "24": 6,
+        "81": 240,
+        "34": 720,
+        "45": 72,
+        "48": 252,
+        "63": 18,
+        "53": 18,
+        "37": 180,
+        "39": 84,
+        "41": 1.1,
+        "57": 12,
+        "60": 12,
+        "83": 24,
+        "17": 0.355,
+        "2": 0.278
+      },
+      "roster": {
+        "entries": [
+          {
+            "playerId": 33192,
+            "lineupSlotId": 5,
+            "playerPoolEntry": {
+              "player": {
+                "id": 33192,
+                "fullName": "Aaron Judge",
+                "proTeamId": 10,
+                "defaultPositionId": 9,
+                "injured": false,
+                "stats": [
+                  {
+                    "scoringPeriodId": 82,
+                    "statSourceId": 0,
+                    "statSplitTypeId": 1,
+                    "stats": {
+                      "0": 4,
+                      "1": 2,
+                      "10": 1,
+                      "12": 0,
+                      "13": 0,
+                      "20": 1,
+                      "5": 1,
+                      "8": 5,
+                      "21": 2,
+                      "27": 1,
+                      "23": 0,
+                      "24": 0,
+                      "81": 1
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "playerId": 32081,
+            "lineupSlotId": 14,
+            "playerPoolEntry": {
+              "player": {
+                "id": 32081,
+                "fullName": "Gerrit Cole",
+                "proTeamId": 10,
+                "defaultPositionId": 1,
+                "injured": false,
+                "stats": [
+                  {
+                    "scoringPeriodId": 82,
+                    "statSourceId": 0,
+                    "statSplitTypeId": 1,
+                    "stats": {
+                      "34": 21,
+                      "45": 1,
+                      "48": 9,
+                      "63": 1,
+                      "53": 1,
+                      "37": 4,
+                      "39": 1,
+                      "41": 0.714,
+                      "57": 0,
+                      "60": 0,
+                      "83": 0,
+                      "81": 1
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "abbrev": "LAD",
+      "name": "Dodger Blue",
+      "location": "Los Angeles",
+      "nickname": "Blue",
+      "logo": "https://example.com/lad.png",
+      "owners": ["{bb-owner-2}"],
+      "record": {
+        "overall": {
+          "wins": 6,
+          "losses": 4,
+          "ties": 1,
+          "pointsFor": 80,
+          "pointsAgainst": 70,
+          "streakLength": 1,
+          "streakType": "LOSS"
+        }
+      },
+      "rankCalculatedFinal": 2,
+      "currentProjectedRank": 2,
+      "playoffSeed": 2,
+      "valuesByStat": {
+        "0": 1050,
+        "1": 270,
+        "10": 90,
+        "12": 6,
+        "13": 12,
+        "20": 150,
+        "5": 66,
+        "8": 528,
+        "21": 180,
+        "27": 210,
+        "23": 18,
+        "24": 12,
+        "81": 228,
+        "34": 594,
+        "45": 90,
+        "48": 228,
+        "63": 12,
+        "53": 12,
+        "37": 186,
+        "39": 72,
+        "41": 1.3,
+        "57": 24,
+        "60": 12,
+        "83": 36,
+        "17": 0.316,
+        "2": 0.257
+      },
+      "roster": {
+        "entries": [
+          {
+            "playerId": 30836,
+            "lineupSlotId": 11,
+            "playerPoolEntry": {
+              "player": {
+                "id": 30836,
+                "fullName": "Shohei Ohtani",
+                "proTeamId": 19,
+                "defaultPositionId": 10,
+                "injured": false,
+                "stats": [
+                  {
+                    "scoringPeriodId": 82,
+                    "statSourceId": 0,
+                    "statSplitTypeId": 1,
+                    "stats": {
+                      "0": 4,
+                      "1": 1,
+                      "10": 0,
+                      "12": 0,
+                      "13": 0,
+                      "20": 0,
+                      "5": 0,
+                      "8": 1,
+                      "21": 0,
+                      "27": 2,
+                      "23": 1,
+                      "24": 0,
+                      "81": 1
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "playerId": 4917694,
+            "lineupSlotId": 13,
+            "playerPoolEntry": {
+              "player": {
+                "id": 4917694,
+                "fullName": "Yoshinobu Yamamoto",
+                "proTeamId": 19,
+                "defaultPositionId": 1,
+                "injured": false,
+                "stats": []
+              }
+            }
+          },
+          {
+            "playerId": 33095,
+            "lineupSlotId": 16,
+            "playerPoolEntry": {
+              "player": {
+                "id": 33095,
+                "fullName": "Mookie Betts",
+                "proTeamId": 19,
+                "defaultPositionId": 6,
+                "injured": false,
+                "stats": [
+                  {
+                    "scoringPeriodId": 82,
+                    "statSourceId": 0,
+                    "statSplitTypeId": 1,
+                    "stats": {
+                      "0": 4,
+                      "1": 1,
+                      "10": 0,
+                      "12": 0,
+                      "13": 0,
+                      "20": 1,
+                      "5": 0,
+                      "8": 1,
+                      "21": 0,
+                      "27": 0,
+                      "23": 0,
+                      "24": 0,
+                      "81": 1
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "schedule": [
+    {
+      "matchupPeriodId": 12,
+      "winner": "UNDECIDED",
+      "home": {
+        "teamId": 1,
+        "totalPointsByStat": {
+          "0": 180,
+          "1": 50,
+          "10": 20,
+          "12": 2,
+          "13": 1,
+          "20": 30,
+          "5": 9,
+          "8": 90,
+          "21": 28,
+          "27": 40,
+          "23": 6,
+          "24": 1,
+          "81": 40,
+          "34": 120,
+          "45": 12,
+          "48": 42,
+          "63": 3,
+          "53": 3,
+          "37": 30,
+          "39": 14,
+          "41": 1.1,
+          "57": 2,
+          "60": 2,
+          "83": 4,
+          "17": 0.355
+        },
+        "cumulativeScore": {
+          "scoreByStat": {
+            "0": {
+              "score": 180,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "1": {
+              "score": 50,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "10": {
+              "score": 20,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "12": {
+              "score": 2,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "13": {
+              "score": 1,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "20": {
+              "score": 30,
+              "result": "WIN",
+              "rank": 1,
+              "ineligible": false
+            },
+            "5": {
+              "score": 9,
+              "result": "LOSS",
+              "rank": 1,
+              "ineligible": false
+            },
+            "8": {
+              "score": 90,
+              "result": "WIN",
+              "rank": 1,
+              "ineligible": false
+            },
+            "21": {
+              "score": 28,
+              "result": "LOSS",
+              "rank": 1,
+              "ineligible": false
+            },
+            "27": {
+              "score": 40,
+              "result": "LOSS",
+              "rank": 1,
+              "ineligible": false
+            },
+            "23": {
+              "score": 6,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "24": {
+              "score": 1,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "81": {
+              "score": 40,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "34": {
+              "score": 120,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "45": {
+              "score": 12,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "48": {
+              "score": 42,
+              "result": "WIN",
+              "rank": 1,
+              "ineligible": false
+            },
+            "63": {
+              "score": 3,
+              "result": "WIN",
+              "rank": 1,
+              "ineligible": false
+            },
+            "53": {
+              "score": 3,
+              "result": "WIN",
+              "rank": 1,
+              "ineligible": false
+            },
+            "37": {
+              "score": 30,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "39": {
+              "score": 14,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "41": {
+              "score": 1.1,
+              "result": "WIN",
+              "rank": 1,
+              "ineligible": false
+            },
+            "57": {
+              "score": 2,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "60": {
+              "score": 2,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "83": {
+              "score": 4,
+              "result": "LOSS",
+              "rank": 1,
+              "ineligible": false
+            },
+            "17": {
+              "score": 0.355,
+              "result": "WIN",
+              "rank": 1,
+              "ineligible": false
+            }
+          },
+          "wins": 7,
+          "losses": 4,
+          "ties": 3
+        },
+        "rosterForCurrentScoringPeriod": {
+          "entries": [
+            {
+              "playerId": 33192,
+              "lineupSlotId": 5,
+              "playerPoolEntry": {
+                "player": {
+                  "id": 33192,
+                  "fullName": "Aaron Judge",
+                  "proTeamId": 10,
+                  "defaultPositionId": 9,
+                  "injured": false,
+                  "stats": [
+                    {
+                      "scoringPeriodId": 82,
+                      "statSourceId": 0,
+                      "statSplitTypeId": 1,
+                      "stats": {
+                        "0": 4,
+                        "1": 2,
+                        "10": 1,
+                        "12": 0,
+                        "13": 0,
+                        "20": 1,
+                        "5": 1,
+                        "8": 5,
+                        "21": 2,
+                        "27": 1,
+                        "23": 0,
+                        "24": 0,
+                        "81": 1
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "playerId": 32081,
+              "lineupSlotId": 14,
+              "playerPoolEntry": {
+                "player": {
+                  "id": 32081,
+                  "fullName": "Gerrit Cole",
+                  "proTeamId": 10,
+                  "defaultPositionId": 1,
+                  "injured": false,
+                  "stats": [
+                    {
+                      "scoringPeriodId": 82,
+                      "statSourceId": 0,
+                      "statSplitTypeId": 1,
+                      "stats": {
+                        "34": 21,
+                        "45": 1,
+                        "48": 9,
+                        "63": 1,
+                        "53": 1,
+                        "37": 4,
+                        "39": 1,
+                        "41": 0.714,
+                        "57": 0,
+                        "60": 0,
+                        "83": 0,
+                        "81": 1
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "rosterForMatchupPeriod": {
+          "entries": [
+            {
+              "playerId": 33192,
+              "lineupSlotId": 5,
+              "playerPoolEntry": {
+                "player": {
+                  "id": 33192,
+                  "fullName": "Aaron Judge",
+                  "proTeamId": 10,
+                  "defaultPositionId": 9,
+                  "injured": false,
+                  "stats": [
+                    {
+                      "scoringPeriodId": 0,
+                      "statSourceId": 0,
+                      "statSplitTypeId": 5,
+                      "stats": {
+                        "0": 20,
+                        "1": 7,
+                        "10": 3,
+                        "12": 0,
+                        "13": 0,
+                        "20": 5,
+                        "5": 2,
+                        "8": 14,
+                        "21": 6,
+                        "27": 5,
+                        "23": 1,
+                        "24": 0,
+                        "81": 5
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "playerId": 32081,
+              "lineupSlotId": 14,
+              "playerPoolEntry": {
+                "player": {
+                  "id": 32081,
+                  "fullName": "Gerrit Cole",
+                  "proTeamId": 10,
+                  "defaultPositionId": 1,
+                  "injured": false,
+                  "stats": [
+                    {
+                      "scoringPeriodId": 0,
+                      "statSourceId": 0,
+                      "statSplitTypeId": 5,
+                      "stats": {
+                        "34": 21,
+                        "45": 1,
+                        "48": 9,
+                        "63": 1,
+                        "53": 1,
+                        "37": 4,
+                        "39": 1,
+                        "41": 0.714,
+                        "57": 0,
+                        "60": 0,
+                        "83": 0,
+                        "81": 1
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "away": {
+        "teamId": 2,
+        "totalPointsByStat": {
+          "0": 175,
+          "1": 45,
+          "10": 15,
+          "12": 1,
+          "13": 2,
+          "20": 25,
+          "5": 11,
+          "8": 88,
+          "21": 30,
+          "27": 35,
+          "23": 3,
+          "24": 2,
+          "81": 38,
+          "34": 99,
+          "45": 15,
+          "48": 38,
+          "63": 2,
+          "53": 2,
+          "37": 31,
+          "39": 12,
+          "41": 1.3,
+          "57": 4,
+          "60": 2,
+          "83": 6,
+          "17": 0.316
+        },
+        "cumulativeScore": {
+          "scoreByStat": {
+            "0": {
+              "score": 175,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "1": {
+              "score": 45,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "10": {
+              "score": 15,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "12": {
+              "score": 1,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "13": {
+              "score": 2,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "20": {
+              "score": 25,
+              "result": "LOSS",
+              "rank": 1,
+              "ineligible": false
+            },
+            "5": {
+              "score": 11,
+              "result": "WIN",
+              "rank": 1,
+              "ineligible": false
+            },
+            "8": {
+              "score": 88,
+              "result": "LOSS",
+              "rank": 1,
+              "ineligible": false
+            },
+            "21": {
+              "score": 30,
+              "result": "WIN",
+              "rank": 1,
+              "ineligible": false
+            },
+            "27": {
+              "score": 35,
+              "result": "WIN",
+              "rank": 1,
+              "ineligible": false
+            },
+            "23": {
+              "score": 3,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "24": {
+              "score": 2,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "81": {
+              "score": 38,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "34": {
+              "score": 99,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "45": {
+              "score": 15,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "48": {
+              "score": 38,
+              "result": "LOSS",
+              "rank": 1,
+              "ineligible": false
+            },
+            "63": {
+              "score": 2,
+              "result": "LOSS",
+              "rank": 1,
+              "ineligible": false
+            },
+            "53": {
+              "score": 2,
+              "result": "LOSS",
+              "rank": 1,
+              "ineligible": false
+            },
+            "37": {
+              "score": 31,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "39": {
+              "score": 12,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "41": {
+              "score": 1.3,
+              "result": "LOSS",
+              "rank": 1,
+              "ineligible": false
+            },
+            "57": {
+              "score": 4,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "60": {
+              "score": 2,
+              "result": "TIE",
+              "rank": 1,
+              "ineligible": false
+            },
+            "83": {
+              "score": 6,
+              "result": "WIN",
+              "rank": 1,
+              "ineligible": false
+            },
+            "17": {
+              "score": 0.316,
+              "result": "LOSS",
+              "rank": 1,
+              "ineligible": false
+            }
+          },
+          "wins": 4,
+          "losses": 7,
+          "ties": 3
+        },
+        "rosterForCurrentScoringPeriod": {
+          "entries": [
+            {
+              "playerId": 30836,
+              "lineupSlotId": 11,
+              "playerPoolEntry": {
+                "player": {
+                  "id": 30836,
+                  "fullName": "Shohei Ohtani",
+                  "proTeamId": 19,
+                  "defaultPositionId": 10,
+                  "injured": false,
+                  "stats": [
+                    {
+                      "scoringPeriodId": 82,
+                      "statSourceId": 0,
+                      "statSplitTypeId": 1,
+                      "stats": {
+                        "0": 4,
+                        "1": 1,
+                        "10": 0,
+                        "12": 0,
+                        "13": 0,
+                        "20": 0,
+                        "5": 0,
+                        "8": 1,
+                        "21": 0,
+                        "27": 2,
+                        "23": 1,
+                        "24": 0,
+                        "81": 1
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "playerId": 4917694,
+              "lineupSlotId": 13,
+              "playerPoolEntry": {
+                "player": {
+                  "id": 4917694,
+                  "fullName": "Yoshinobu Yamamoto",
+                  "proTeamId": 19,
+                  "defaultPositionId": 1,
+                  "injured": false,
+                  "stats": []
+                }
+              }
+            },
+            {
+              "playerId": 33095,
+              "lineupSlotId": 16,
+              "playerPoolEntry": {
+                "player": {
+                  "id": 33095,
+                  "fullName": "Mookie Betts",
+                  "proTeamId": 19,
+                  "defaultPositionId": 6,
+                  "injured": false,
+                  "stats": [
+                    {
+                      "scoringPeriodId": 82,
+                      "statSourceId": 0,
+                      "statSplitTypeId": 1,
+                      "stats": {
+                        "0": 4,
+                        "1": 1,
+                        "10": 0,
+                        "12": 0,
+                        "13": 0,
+                        "20": 1,
+                        "5": 0,
+                        "8": 1,
+                        "21": 0,
+                        "27": 0,
+                        "23": 0,
+                        "24": 0,
+                        "81": 1
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "rosterForMatchupPeriod": {
+          "entries": [
+            {
+              "playerId": 30836,
+              "lineupSlotId": 11,
+              "playerPoolEntry": {
+                "player": {
+                  "id": 30836,
+                  "fullName": "Shohei Ohtani",
+                  "proTeamId": 19,
+                  "defaultPositionId": 10,
+                  "injured": false,
+                  "stats": [
+                    {
+                      "scoringPeriodId": 0,
+                      "statSourceId": 0,
+                      "statSplitTypeId": 5,
+                      "stats": {
+                        "0": 19,
+                        "1": 6,
+                        "10": 2,
+                        "12": 0,
+                        "13": 0,
+                        "20": 4,
+                        "5": 3,
+                        "8": 15,
+                        "21": 7,
+                        "27": 6,
+                        "23": 2,
+                        "24": 1,
+                        "81": 5
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "playerId": 4917694,
+              "lineupSlotId": 13,
+              "playerPoolEntry": {
+                "player": {
+                  "id": 4917694,
+                  "fullName": "Yoshinobu Yamamoto",
+                  "proTeamId": 19,
+                  "defaultPositionId": 1,
+                  "injured": false,
+                  "stats": [
+                    {
+                      "scoringPeriodId": 0,
+                      "statSourceId": 0,
+                      "statSplitTypeId": 5,
+                      "stats": {
+                        "34": 18,
+                        "45": 2,
+                        "48": 7,
+                        "63": 1,
+                        "53": 0,
+                        "37": 5,
+                        "39": 2,
+                        "41": 1.167,
+                        "57": 0,
+                        "60": 0,
+                        "83": 0,
+                        "81": 1
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "playerId": 33095,
+              "lineupSlotId": 16,
+              "playerPoolEntry": {
+                "player": {
+                  "id": 33095,
+                  "fullName": "Mookie Betts",
+                  "proTeamId": 19,
+                  "defaultPositionId": 6,
+                  "injured": false,
+                  "stats": [
+                    {
+                      "scoringPeriodId": 0,
+                      "statSourceId": 0,
+                      "statSplitTypeId": 5,
+                      "stats": {
+                        "0": 12,
+                        "1": 3,
+                        "10": 1,
+                        "12": 0,
+                        "13": 0,
+                        "20": 2,
+                        "5": 0,
+                        "8": 4,
+                        "21": 1,
+                        "27": 3,
+                        "23": 0,
+                        "24": 0,
+                        "81": 3
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

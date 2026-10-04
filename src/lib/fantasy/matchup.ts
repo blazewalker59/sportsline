@@ -3,10 +3,21 @@
  * (mTeam, mRoster, mMatchup, mMatchupScore, mSettings). Points leagues:
  * a side's live score is ESPN's live total when it has one, else its
  * Starters' points this scoring period (ESPN's final team total stays 0
- * until the period is over). Pure.
+ * until the period is over). Category leagues (categories.ts): a side's
+ * score is the categories it leads. Pure.
  */
 
+import {
+  addStats,
+  isCategoryScoring,
+  leagueCategories,
+  playerDayLine,
+  scoreCategories,
+  tally,
+  toStats,
+} from './categories'
 import { SPORTS, slotName } from './sports'
+import type { CategoryResult, LeagueCategory, Stats } from './categories'
 import type { FantasySport } from './sports'
 
 // ─── ESPN's shapes (loose) ─────────────────────────────────────────────────
@@ -19,7 +30,7 @@ interface WireStat {
   /** Points awarded per stat id. */
   appliedStats?: Record<string, number>
   /** Raw values per stat id. */
-  stats?: Record<string, number>
+  stats?: Record<string, number | string>
 }
 
 interface WireEntry {
@@ -43,6 +54,13 @@ interface WireSide {
   totalPoints?: number
   totalPointsLive?: number
   totalProjectedPointsLive?: number
+  /** Category leagues: each stat's total through the last scoring period. */
+  cumulativeScore?: {
+    wins?: number
+    losses?: number
+    ties?: number
+    scoreByStat?: Record<string, { score?: number | string }>
+  }
   rosterForCurrentScoringPeriod?: { entries?: Array<WireEntry> }
 }
 
@@ -52,7 +70,12 @@ export interface WireLeague {
   status?: { currentMatchupPeriod?: number; latestScoringPeriod?: number }
   settings?: {
     name?: string
-    scoringSettings?: { scoringType?: string }
+    scoringSettings?: {
+      scoringType?: string
+      scoringItems?: Array<{ statId?: number; isReverseItem?: boolean }>
+      /** Category leagues' innings minimum: { statId: 34, limitValue: outs }. */
+      statQualificationMinimum?: { statId?: number; limitValue?: number }
+    }
   }
   teams?: Array<{
     id: number
@@ -94,6 +117,8 @@ export interface LineupPlayer {
   injury: string | null
   /** Where this period's points came from: each stat's value and points. */
   breakdown: Array<{ statId: number; value: number; points: number }>
+  /** Category leagues: their line today in the league's categories. */
+  dayLine?: Array<{ label: string; value: string }> | null
   /** Our Team, its logo and abbreviation (for D/ST, and the Game's state). */
   teamId?: string | null
   teamLogo?: string | null
@@ -121,6 +146,12 @@ export interface MatchupView {
   mine: MatchupSide
   /** Null on a bye week. */
   opponent: MatchupSide | null
+  /**
+   * Category leagues: each category's values and leader. Each side's
+   * `score` is then the categories it leads; ties are counted here.
+   */
+  categories?: Array<CategoryResult> | null
+  ties?: number
 }
 
 const round = (n: number) => Math.round(n * 100) / 100
@@ -132,10 +163,32 @@ function teamName(t: NonNullable<WireLeague['teams']>[number]): string {
   )
 }
 
+/** This scoring period's stat lines (split 1 or 5; ESPN uses both). */
+const periodLine = (
+  s: WireStat,
+  scoringPeriod: number,
+  source: number,
+): boolean =>
+  s.scoringPeriodId === scoringPeriod &&
+  s.statSourceId === source &&
+  (s.statSplitTypeId === undefined ||
+    s.statSplitTypeId === 1 ||
+    s.statSplitTypeId === 5)
+
+/** A Player's raw stats today, summed (a doubleheader has two lines). */
+function dayStats(e: WireEntry, scoringPeriod: number): Stats {
+  return addStats(
+    ...(e.playerPoolEntry?.player?.stats ?? [])
+      .filter((s) => periodLine(s, scoringPeriod, 0))
+      .map((s) => toStats(s.stats)),
+  )
+}
+
 function lineupOf(
   sport: FantasySport,
   entries: ReadonlyArray<WireEntry>,
   scoringPeriod: number,
+  categories: ReadonlyArray<LeagueCategory> | null,
 ): Array<LineupPlayer> {
   const notStarting = SPORTS[sport].notStarting
   return entries.flatMap((e) => {
@@ -143,12 +196,7 @@ function lineupOf(
     const id = p?.id ?? e.playerId
     if (id === undefined) return []
     const line = (source: number) =>
-      p?.stats?.find(
-        (s) =>
-          s.scoringPeriodId === scoringPeriod &&
-          s.statSourceId === source &&
-          (s.statSplitTypeId === undefined || s.statSplitTypeId === 1),
-      )
+      p?.stats?.find((s) => periodLine(s, scoringPeriod, source))
     const stat = (source: number) => line(source)?.appliedTotal
     const actual = stat(0)
     const actualLine = line(0)
@@ -172,10 +220,13 @@ function lineupOf(
           .filter(([, points]) => Math.abs(points) > 0.001)
           .map(([statId, points]) => ({
             statId: Number(statId),
-            value: actualLine?.stats?.[statId] ?? 0,
+            value: Number(actualLine?.stats?.[statId] ?? 0),
             points: round(points),
           }))
           .sort((a, b) => Math.abs(b.points) - Math.abs(a.points)),
+        dayLine: categories
+          ? playerDayLine(sport, categories, dayStats(e, scoringPeriod))
+          : null,
       },
     ]
   })
@@ -195,17 +246,38 @@ function sorted(
   return [...lineup].sort((a, b) => rank(a) - rank(b))
 }
 
+/**
+ * A side's category totals: through yesterday from ESPN, plus today's
+ * Starters (ratios are recomputed from the sum, in categories.ts).
+ */
+function categoryTotals(
+  sport: FantasySport,
+  side: WireSide,
+  scoringPeriod: number,
+): { totals: Stats; given: Stats } {
+  const given = toStats(side.cumulativeScore?.scoreByStat)
+  const notStarting = SPORTS[sport].notStarting
+  const today = (side.rosterForCurrentScoringPeriod?.entries ?? [])
+    .filter((e) => !notStarting.has(e.lineupSlotId ?? -1))
+    .map((e) => dayStats(e, scoringPeriod))
+  return { totals: addStats(given, ...today), given }
+}
+
 function sideOf(
   sport: FantasySport,
   league: WireLeague,
   side: WireSide,
   scoringPeriod: number,
+  categories: ReadonlyArray<LeagueCategory> | null = null,
 ): MatchupSide | null {
   const team = league.teams?.find((t) => t.id === side.teamId)
   if (!team) return null
   const entries =
     side.rosterForCurrentScoringPeriod?.entries ?? team.roster?.entries ?? []
-  const lineup = sorted(sport, lineupOf(sport, entries, scoringPeriod))
+  const lineup = sorted(
+    sport,
+    lineupOf(sport, entries, scoringPeriod, categories),
+  )
   const starters = lineup.filter((p) => p.starter)
   const summed = starters.reduce((n, p) => n + (p.points ?? 0), 0)
   const projectedSum = starters.reduce(
@@ -265,17 +337,46 @@ export function readMatchup(
     game?.home?.teamId === teamId ? game.home : (game?.away ?? { teamId })
   const theirsWire =
     game && game.home?.teamId === teamId ? game.away : game?.home
-  const mine = sideOf(sport, league, mineWire, scoringPeriod)
+  const scoring = league.settings?.scoringSettings
+  const scoringType = scoring?.scoringType ?? 'H2H_POINTS'
+  const categories = isCategoryScoring(scoringType)
+    ? leagueCategories(sport, scoring?.scoringItems ?? [])
+    : null
+  const mine = sideOf(sport, league, mineWire, scoringPeriod, categories)
   if (!mine) return null
-  return {
+  const opponent = theirsWire
+    ? sideOf(sport, league, theirsWire, scoringPeriod, categories)
+    : null
+  const view: MatchupView = {
     sport,
     leagueName: league.settings?.name ?? `League ${league.id ?? ''}`.trim(),
-    scoringType: league.settings?.scoringSettings?.scoringType ?? 'H2H_POINTS',
+    scoringType,
     matchupPeriod: period,
     scoringPeriod,
     mine,
-    opponent: theirsWire
-      ? sideOf(sport, league, theirsWire, scoringPeriod)
-      : null,
+    opponent,
   }
+  if (categories) {
+    const minimum = scoring?.statQualificationMinimum
+    const results = scoreCategories(
+      sport,
+      categories,
+      categoryTotals(sport, mineWire, scoringPeriod),
+      theirsWire && opponent
+        ? categoryTotals(sport, theirsWire, scoringPeriod)
+        : null,
+      minimum?.statId === 34 && minimum.limitValue ? minimum.limitValue : null,
+    )
+    const t = tally(results)
+    view.categories = results
+    view.ties = t.ties
+    // A side's score is the categories it leads; points mean nothing here.
+    mine.score = t.wins
+    mine.projected = null
+    if (opponent) {
+      opponent.score = t.losses
+      opponent.projected = null
+    }
+  }
+  return view
 }

@@ -7,7 +7,7 @@ import { and, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm'
 import { EspnError, fanProfile, leagueViews } from './client'
 import { discoverLeagues } from './discovery'
 import { myTeamId, readMatchup } from './matchup'
-import { NFL_PRO_TEAMS, SPORTS, seasonOf } from './sports'
+import { MLB_PRO_TEAMS, NFL_PRO_TEAMS, SPORTS, seasonOf } from './sports'
 import type { EspnSession } from './client'
 import type { MatchupView } from './matchup'
 import type { FantasySport } from './sports'
@@ -133,7 +133,10 @@ async function ourPlayers(
   return out
 }
 
-/** Our Teams for ESPN's pro team ids (football and basketball share ids). */
+/**
+ * Our Teams for ESPN's pro team ids: football and basketball share ESPN's
+ * ids; baseball's MLB Teams come from MLB, so they're matched by abbreviation.
+ */
 async function ourTeams(
   db: Database,
   sport: FantasySport,
@@ -151,7 +154,24 @@ async function ourTeams(
       lineup.flatMap((p) => (p.proTeamId ? [String(p.proTeamId)] : [])),
     ),
   ]
-  if (!source || ids.length === 0) return out
+  if (ids.length === 0) return out
+  if (sport === 'baseball') {
+    const abbrevs = ids.flatMap((id) => MLB_PRO_TEAMS[Number(id)] ?? [])
+    const rows = await db
+      .select({
+        id: teams.id,
+        logoUrl: teams.logoUrl,
+        abbreviation: teams.abbreviation,
+      })
+      .from(teams)
+      .where(and(eq(teams.league, 'mlb'), inArray(teams.abbreviation, abbrevs)))
+    for (const id of ids) {
+      const row = rows.find((r) => r.abbreviation === MLB_PRO_TEAMS[Number(id)])
+      if (row) out.set(Number(id), row)
+    }
+    return out
+  }
+  if (!source) return out
   const rows = await db
     .select({
       sourceId: sourceIds.sourceId,

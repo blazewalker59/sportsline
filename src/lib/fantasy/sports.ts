@@ -72,7 +72,7 @@ export const SPORTS: Record<FantasySport, SportConfig> = {
     code: 'flb',
     league: 'mlb',
     playerSource: null,
-    notStarting: new Set([16, 17]),
+    notStarting: new Set([16, 17, 18]),
     slotNames: {
       0: 'C',
       1: '1B',
@@ -80,16 +80,22 @@ export const SPORTS: Record<FantasySport, SportConfig> = {
       3: '3B',
       4: 'SS',
       5: 'OF',
-      6: '2B/SS',
-      7: '1B/3B',
+      6: 'MI',
+      7: 'CI',
+      8: 'OF',
+      9: 'OF',
+      10: 'OF',
+      11: 'DH',
       12: 'UTIL',
       13: 'P',
       14: 'SP',
       15: 'RP',
       16: 'Bench',
       17: 'IL',
+      18: 'IL+',
+      19: 'IF',
     },
-    slotOrder: [0, 1, 2, 3, 4, 6, 7, 5, 12, 14, 15, 13],
+    slotOrder: [0, 1, 2, 3, 4, 6, 7, 19, 5, 8, 9, 10, 11, 12, 14, 15, 13],
   },
 }
 
@@ -130,6 +136,43 @@ export const NFL_PRO_TEAMS: Readonly<Record<number, string>> = {
   30: 'JAX',
   33: 'BAL',
   34: 'HOU',
+}
+
+/**
+ * ESPN's MLB team ids (fantasy pro team ids) as the MLB Stats API
+ * abbreviates them (our MLB Teams' abbreviations): CWS, AZ, ATH.
+ */
+export const MLB_PRO_TEAMS: Readonly<Record<number, string>> = {
+  1: 'BAL',
+  2: 'BOS',
+  3: 'LAA',
+  4: 'CWS',
+  5: 'CLE',
+  6: 'DET',
+  7: 'KC',
+  8: 'MIL',
+  9: 'MIN',
+  10: 'NYY',
+  11: 'ATH',
+  12: 'SEA',
+  13: 'TEX',
+  14: 'TOR',
+  15: 'ATL',
+  16: 'CHC',
+  17: 'CIN',
+  18: 'HOU',
+  19: 'LAD',
+  20: 'WSH',
+  21: 'NYM',
+  22: 'PHI',
+  23: 'PIT',
+  24: 'STL',
+  25: 'SD',
+  26: 'SF',
+  27: 'COL',
+  28: 'MIA',
+  29: 'AZ',
+  30: 'TB',
 }
 
 /** ESPN's game code back to our sport. */

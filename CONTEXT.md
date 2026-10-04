@@ -167,6 +167,10 @@ _Avoid_: game (a Game is real), fixture
 What a Player's real stats are worth under a Fantasy league's scoring, totalled over a Lineup's Starters.
 _Avoid_: score (a Game's), FP
 
+**Category**:
+One stat a head-to-head category league plays (runs, ERA, FG%, turnovers): each Matchup side's total over the matchup period, the better total leading it (lower for ERA, WHIP, turnovers). A side's Matchup score is the Categories it leads. Rates are totalled from their parts, never added.
+_Avoid_: cat, stat category
+
 **ESPN connection**:
 A Viewer's link to their ESPN fantasy leagues, through their ESPN session cookies (docs/adr/0004). Read-only by Sportsline's choice, not ESPN's.
 _Avoid_: login, integration

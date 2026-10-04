@@ -6,7 +6,11 @@
 
 import { createContext, useContext, useState } from 'react'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
-import type { LineupPlayer, MatchupSide } from '@/lib/fantasy/matchup'
+import type {
+  LineupPlayer,
+  MatchupSide,
+  MatchupView,
+} from '@/lib/fantasy/matchup'
 import type { GameSummary, TimelineItem } from '@/lib/model/timeline'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { Sheet } from '@/components/chat/Sheet'
@@ -17,6 +21,26 @@ import { PlayerButton } from '@/components/players/playerSheet'
 import { cn } from '@/lib/utils'
 
 const pts = (n: number | null) => (n === null ? '—' : n.toFixed(1))
+
+/** A Matchup side's score: points, or categories led (a whole number). */
+const scoreText = (m: MatchupView, n: number | null) =>
+  m.categories ? (n === null ? '—' : String(n)) : pts(n)
+
+/** "6–3–1": categories won, lost and tied (from the Viewer's side). */
+const categoryRecord = (m: MatchupView) =>
+  `${m.mine.score}–${m.opponent?.score ?? 0}${m.ties ? `–${m.ties}` : ''}`
+
+/**
+ * A Player's figure beside their name: points, or in a category league
+ * their day's headline (2-4 at the plate, 6.0 IP, 24 PTS).
+ */
+function playerFigure(p: LineupPlayer): string {
+  if (p.dayLine == null) return pts(p.points)
+  const lead =
+    p.dayLine.find((l) => l.label === 'PTS') ??
+    p.dayLine.find((l) => l.label === 'H/AB' || l.label === 'IP')
+  return lead?.value ?? '—'
+}
 
 // ─── Feed tags ──────────────────────────────────────────────────────────────
 
@@ -78,7 +102,15 @@ export function FantasyTag({
 
 // ─── Strip ──────────────────────────────────────────────────────────────────
 
-function SideRow({ side, leading }: { side: MatchupSide; leading: boolean }) {
+function SideRow({
+  m,
+  side,
+  leading,
+}: {
+  m: MatchupView
+  side: MatchupSide
+  leading: boolean
+}) {
   return (
     <span
       className={cn(
@@ -87,7 +119,7 @@ function SideRow({ side, leading }: { side: MatchupSide; leading: boolean }) {
       )}
     >
       <span className="truncate text-[13px] font-semibold">{side.abbrev}</span>
-      <span className="text-[17px]">{pts(side.score)}</span>
+      <span className="text-[17px]">{scoreText(m, side.score)}</span>
     </span>
   )
 }
@@ -123,17 +155,23 @@ export function MatchupCard({
         <LeagueLogo league={SPORTS[m.sport].league} size={14} />
         <span className="truncate">{m.leagueName}</span>
       </span>
-      <SideRow side={m.mine} leading={lead === 'mine'} />
+      <SideRow m={m} side={m.mine} leading={lead === 'mine'} />
       {m.opponent ? (
-        <SideRow side={m.opponent} leading={lead === 'opponent'} />
+        <SideRow m={m} side={m.opponent} leading={lead === 'opponent'} />
       ) : (
         <span className="text-[13px] text-muted">Bye week</span>
       )}
-      {(m.mine.projected !== null || m.opponent?.projected != null) && (
+      {m.categories ? (
         <span className="mt-auto text-[11px] text-muted tabular-nums">
-          Proj {pts(m.mine.projected)}
-          {m.opponent && ` – ${pts(m.opponent.projected)}`}
+          Categories {categoryRecord(m)}
         </span>
+      ) : (
+        (m.mine.projected !== null || m.opponent?.projected != null) && (
+          <span className="mt-auto text-[11px] text-muted tabular-nums">
+            Proj {pts(m.mine.projected)}
+            {m.opponent && ` – ${pts(m.opponent.projected)}`}
+          </span>
+        )
       )}
     </button>
   )
@@ -211,6 +249,32 @@ const SLOT_TONES: Record<string, string> = {
   OP: 'bg-violet-500/15 text-violet-700 dark:text-violet-400',
   'D/ST': 'bg-slate-500/15 text-slate-700 dark:text-slate-300',
   K: 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400',
+  // Baseball: catchers, infield, outfield, utility, pitching.
+  C: 'bg-orange-500/15 text-orange-700 dark:text-orange-400',
+  '1B': 'bg-sky-500/15 text-sky-700 dark:text-sky-400',
+  '2B': 'bg-sky-500/15 text-sky-700 dark:text-sky-400',
+  '3B': 'bg-sky-500/15 text-sky-700 dark:text-sky-400',
+  SS: 'bg-sky-500/15 text-sky-700 dark:text-sky-400',
+  MI: 'bg-sky-500/15 text-sky-700 dark:text-sky-400',
+  CI: 'bg-sky-500/15 text-sky-700 dark:text-sky-400',
+  IF: 'bg-sky-500/15 text-sky-700 dark:text-sky-400',
+  OF: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+  DH: 'bg-violet-500/15 text-violet-700 dark:text-violet-400',
+  UTIL: 'bg-violet-500/15 text-violet-700 dark:text-violet-400',
+  SP: 'bg-rose-500/15 text-rose-600 dark:text-rose-400',
+  RP: 'bg-rose-500/15 text-rose-600 dark:text-rose-400',
+  P: 'bg-rose-500/15 text-rose-600 dark:text-rose-400',
+  // Basketball: guards, forwards, bigs.
+  PG: 'bg-sky-500/15 text-sky-700 dark:text-sky-400',
+  SG: 'bg-sky-500/15 text-sky-700 dark:text-sky-400',
+  G: 'bg-sky-500/15 text-sky-700 dark:text-sky-400',
+  SF: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+  PF: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+  F: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+  'SG/SF': 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+  'G/F': 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+  'PF/C': 'bg-orange-500/15 text-orange-700 dark:text-orange-400',
+  'F/C': 'bg-orange-500/15 text-orange-700 dark:text-orange-400',
 }
 
 interface FieldState {
@@ -357,14 +421,18 @@ function PlayerCell({
         type="button"
         onClick={onToggle}
         aria-expanded={open}
-        aria-label={`${shortName(player)}: ${pts(player.points)} points. Show breakdown`}
+        aria-label={
+          player.dayLine == null
+            ? `${shortName(player)}: ${pts(player.points)} points. Show breakdown`
+            : `${shortName(player)}: today's line`
+        }
         className={cn(
           'flex min-w-9 shrink-0 flex-col rounded-lg px-1 py-0.5 tabular-nums transition-colors',
           align === 'right' ? 'items-start' : 'items-end',
           open ? 'bg-accent-soft' : 'hover:bg-notice',
         )}
       >
-        <span className="text-sm font-bold">{pts(player.points)}</span>
+        <span className="text-sm font-bold">{playerFigure(player)}</span>
       </button>
     </span>
   )
@@ -381,7 +449,9 @@ export function Breakdown({
     <div className="mx-3 mb-2 rounded-lg bg-notice px-3 py-2 text-xs">
       <div className="mb-1 flex justify-between font-semibold">
         <span>{player.name}</span>
-        <span className="tabular-nums">{pts(player.points)} pts</span>
+        {player.dayLine == null && (
+          <span className="tabular-nums">{pts(player.points)} pts</span>
+        )}
       </div>
       {player.injury && (
         <p
@@ -395,7 +465,21 @@ export function Breakdown({
           {injuryLabel(player.injury)}
         </p>
       )}
-      {player.breakdown.length === 0 ? (
+      {player.dayLine != null ? (
+        // Category leagues: the day's line in the league's categories.
+        player.dayLine.length === 0 ? (
+          <p className="text-muted">No stats today.</p>
+        ) : (
+          <ul className="flex flex-wrap gap-x-3 gap-y-0.5 tabular-nums">
+            {player.dayLine.map((l) => (
+              <li key={l.label}>
+                <span className="font-semibold">{l.value}</span>{' '}
+                <span className="text-muted">{l.label}</span>
+              </li>
+            ))}
+          </ul>
+        )
+      ) : player.breakdown.length === 0 ? (
         <p className="text-muted">No points yet.</p>
       ) : (
         <ul className="flex flex-col gap-0.5 tabular-nums">
@@ -423,7 +507,7 @@ export function Breakdown({
           ))}
         </ul>
       )}
-      {player.projected !== null && (
+      {player.dayLine == null && player.projected !== null && (
         <p className="mt-1 text-muted">Projected {pts(player.projected)}</p>
       )}
     </div>
@@ -487,6 +571,62 @@ function LineupRows({
   )
 }
 
+/** Each category, both sides' totals, the leader's side in bold. */
+function CategoryTable({
+  m,
+  categories,
+}: {
+  m: MatchupView
+  categories: NonNullable<MatchupView['categories']>
+}) {
+  const tone = (leading: boolean, trailing: boolean) =>
+    cn(
+      'w-20 tabular-nums',
+      leading
+        ? 'font-bold text-scoring'
+        : trailing
+          ? 'text-foreground/60'
+          : 'font-medium',
+    )
+  return (
+    <section>
+      <h3 className="mb-2 flex justify-between text-xs font-bold tracking-wide text-muted uppercase">
+        <span>Categories</span>
+        <span className="tabular-nums">{categoryRecord(m)}</span>
+      </h3>
+      <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+        {categories.map((c) => (
+          <li key={c.statId} className="flex items-center px-3 py-1.5 text-sm">
+            <span
+              className={cn(
+                'text-left',
+                tone(c.leader === 'mine', c.leader === 'opponent'),
+              )}
+            >
+              {c.mine}
+            </span>
+            <span className="flex-1 text-center text-xs font-semibold text-muted">
+              {c.label}
+              {c.reverse && <span className="sr-only"> (lower is better)</span>}
+              {c.leader === 'tie' && (
+                <span className="ml-1 font-normal">· tied</span>
+              )}
+            </span>
+            <span
+              className={cn(
+                'text-right',
+                tone(c.leader === 'opponent', c.leader === 'mine'),
+              )}
+            >
+              {c.opponent}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 export function MatchupSheet({
   league,
   games = [],
@@ -512,7 +652,7 @@ export function MatchupSheet({
       <span className="truncate text-sm font-semibold">{s.name}</span>
       {s.record && <span className="text-[11px] text-muted">{s.record}</span>}
       <span className="text-3xl leading-tight font-bold tabular-nums">
-        {pts(s.score)}
+        {scoreText(m, s.score)}
       </span>
       {s.projected !== null && (
         <span className="text-xs text-muted tabular-nums">
@@ -534,6 +674,9 @@ export function MatchupSheet({
           </span>
         )}
       </header>
+      {m.categories && m.categories.length > 0 && (
+        <CategoryTable m={m} categories={m.categories} />
+      )}
       <section>
         <h3 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
           Starters
@@ -557,8 +700,9 @@ export function MatchupSheet({
         />
       </section>
       <p className="text-[11px] text-muted">
-        Read from ESPN Fantasy. Points refresh every couple of minutes; tap a
-        player’s points for the breakdown.
+        {m.categories
+          ? 'Read from ESPN Fantasy: categories through yesterday plus today’s starters, refreshed every couple of minutes. Tap a player’s figure for their line today.'
+          : 'Read from ESPN Fantasy. Points refresh every couple of minutes; tap a player’s points for the breakdown.'}
       </p>
     </Sheet>
   )
