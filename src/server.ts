@@ -76,18 +76,29 @@ export default {
       url.searchParams.get('t') === 'e088eb7e4b976ad17ba435bdfdb91989'
     ) {
       const out: Array<string> = []
-      for (const gap of [0, 0, 0, 250, 250, 1000, 1000, 2000, 2000, 3000]) {
+      const { loadAccount } = await import('@/lib/kalshi/sync')
+      const { signedGet } = await import('@/lib/kalshi/client')
+      const row = await env.DB.prepare(
+        'select viewer_id from kalshi_accounts limit 1',
+      ).first<{ viewer_id: string }>()
+      const account = row ? await loadAccount(env, row.viewer_id) : null
+      if (!account) return Response.json(['no account'])
+      for (const gap of [0, 0, 0, 0, 0, 100, 100, 250, 250, 500]) {
         await new Promise((r) => setTimeout(r, gap))
         const t0 = Date.now()
-        const res = await fetch(
-          'https://api.elections.kalshi.com/trade-api/v2/markets?limit=1',
-          {
-            headers: { accept: 'application/json' },
-          },
-        )
-        out.push(
-          `gap ${gap}ms -> ${res.status} (${Date.now() - t0}ms) ${res.status === 429 ? (await res.text()).slice(0, 80) : ''}`,
-        )
+        try {
+          const r = await signedGet<{ markets?: Array<unknown> }>(
+            account,
+            '/markets?limit=1',
+          )
+          out.push(
+            `signed, gap ${gap}ms -> 200 (${Date.now() - t0}ms) ${r.markets?.length ?? 0} market`,
+          )
+        } catch (e) {
+          out.push(
+            `signed, gap ${gap}ms -> ${String(e).slice(0, 80)} (${Date.now() - t0}ms)`,
+          )
+        }
       }
       return Response.json(out)
     }
