@@ -9,7 +9,8 @@ import { cn } from '@/lib/utils'
  * The Sports Day's Games as small score cards, live first. Tapping one
  * filters the Timeline to that Game (a View Transition, so the feed just
  * loses the other Games' messages); tapping it again shows everything.
- * Selecting never changes the strip's layout.
+ * Selecting never changes the strip's layout: the selected card's corner
+ * badge opens its box score.
  */
 export function GameStrip({
   games,
@@ -24,32 +25,15 @@ export function GameStrip({
   if (games.length === 0) return null
   return (
     <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none]">
-      <ul className="flex gap-2 pt-1.5 pb-0.5">
+      <ul className="flex gap-2 pt-2 pb-0.5">
         {games.map((game) => (
-          <li key={game.id} className="flex shrink-0 gap-1.5">
+          <li key={game.id} className="relative shrink-0">
             <GameCard game={game} selected={game.id === selected} />
             {game.id === selected && onBox && (
-              <button
-                type="button"
-                onClick={onBox}
-                aria-label="Box score"
-                className="animate-in fade-in zoom-in-95 flex w-12 flex-col items-center justify-center gap-0.5 rounded-2xl bg-notice text-[10px] font-semibold text-muted duration-200 hover:text-foreground"
-              >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  aria-hidden="true"
-                >
-                  <rect x="3" y="4" width="18" height="16" rx="2" />
-                  <path d="M3 10h18M9 10v10M15 10v10" />
-                </svg>
-                Box
-              </button>
+              <CornerButton label="Box score" onClick={onBox}>
+                <rect x="3" y="4" width="18" height="16" rx="2" />
+                <path d="M3 10h18M9 10v10M15 10v10" />
+              </CornerButton>
             )}
           </li>
         ))}
@@ -124,25 +108,44 @@ function GameCard({
           </span>
         )
       })}
-      {selected && (
-        <span
-          aria-hidden="true"
-          className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full bg-accent text-background"
-        >
-          <svg
-            width="10"
-            height="10"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="3.5"
-            strokeLinecap="round"
-          >
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
-        </span>
-      )}
     </Link>
+  )
+}
+
+/**
+ * A selected card's action (box score, details) as a badge on its corner:
+ * it appears in place, so nothing in the strip moves.
+ */
+export function CornerButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="animate-in fade-in zoom-in-75 absolute -top-2 -right-1.5 z-10 flex size-7 items-center justify-center rounded-full bg-accent text-background shadow-md ring-2 ring-background duration-200 active:scale-90"
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.25"
+        strokeLinecap="round"
+        aria-hidden="true"
+      >
+        {children}
+      </svg>
+    </button>
   )
 }
 

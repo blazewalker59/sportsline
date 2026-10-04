@@ -38,6 +38,8 @@ export function ScopeBar({
             scope: value,
             game: undefined,
             play: undefined,
+            // A Scope replaces any one Prediction the Timeline was narrowed to.
+            prediction: undefined,
           })}
           viewTransition
           resetScroll={false}

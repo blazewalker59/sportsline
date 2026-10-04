@@ -204,7 +204,11 @@ function Connected() {
         </span>
       </section>
 
-      <PredictionSummary predictions={open} display={c.changeDisplay} />
+      <PredictionSummary
+        predictions={open}
+        display={c.changeDisplay}
+        onOpen={setOpenId}
+      />
 
       {list.isError && (
         <p

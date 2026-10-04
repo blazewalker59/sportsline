@@ -41,7 +41,7 @@ export function BoxSheet({
  * Score by segment. With 9+ innings it is wider than a phone, so the team
  * column and the totals stay pinned and only the segments scroll.
  */
-function Linescore({ box, game }: { box: GameBox; game: GameSummary }) {
+export function Linescore({ box, game }: { box: GameBox; game: GameSummary }) {
   const ls = box.linescore
   if (ls.segments.length === 0) return null
   const pinnedLeft = 'sticky left-0 z-[1] bg-surface'

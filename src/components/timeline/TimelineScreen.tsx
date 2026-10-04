@@ -439,6 +439,7 @@ function Timeline({
                   <PredictionSummary
                     predictions={openPredictions}
                     display={kalshi.data?.changeDisplay}
+                    onOpen={setPredictionOpen}
                   />
                 </>
               ) : (
