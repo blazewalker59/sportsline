@@ -13,6 +13,7 @@ import {
   and,
   eq,
   inArray,
+  isNull,
   like,
   lt,
   ne,
@@ -37,7 +38,12 @@ import {
   teamMatches,
 } from './match'
 import { unseal } from './vault'
-import type { KalshiAccount, KalshiLeg, KalshiMarket } from './client'
+import type {
+  KalshiAccount,
+  KalshiLeg,
+  KalshiMarket,
+  KalshiSettlement,
+} from './client'
 import type { CloudflareEnv, Database } from '@/lib/db'
 import type { League } from '@/lib/model/types'
 import { dbFromD1 } from '@/lib/db'
@@ -433,6 +439,28 @@ export async function savePrediction(
   }
 }
 
+/**
+ * What a settlement paid, in dollars. Kalshi's revenue (cents) when it
+ * reports one; it has been seen as 0 on winning Combos, so a win with no
+ * revenue pays its winning contracts at $1 each (or the market's
+ * per-contract value).
+ */
+export function payoutOf(
+  s: Pick<
+    KalshiSettlement,
+    'revenue' | 'value' | 'yes_count_fp' | 'no_count_fp'
+  >,
+  side: 'yes' | 'no',
+  result: 'won' | 'lost' | 'void',
+): number {
+  const revenue = (s.revenue ?? 0) / 100
+  if (revenue > 0 || result !== 'won') return revenue
+  const winning = dollars(side === 'yes' ? s.yes_count_fp : s.no_count_fp)
+  const perContract =
+    typeof s.value === 'number' && s.value > 0 ? s.value / 100 : 1
+  return winning * perContract
+}
+
 /** Bring one Viewer's Predictions up to date from their Kalshi account. */
 export async function syncAccount(
   env: CloudflareEnv,
@@ -530,13 +558,13 @@ export async function syncAccount(
         const side: 'yes' | 'no' = yes >= no ? 'yes' : 'no'
         const cost =
           dollars(s.yes_total_cost_dollars) + dollars(s.no_total_cost_dollars)
-        const payout = (s.revenue ?? 0) / 100
         const result =
           s.market_result === side
             ? 'won'
             : s.market_result === 'yes' || s.market_result === 'no'
               ? 'lost'
               : 'void'
+        const payout = payoutOf(s, side, result)
         const settledAt = s.settled_time ?? new Date().toISOString()
         await savePrediction(env, account, db, viewerId, m, {
           side,
@@ -552,6 +580,23 @@ export async function syncAccount(
       })
       if (saved) settledCount++
     }
+
+    // Wins stored before payoutOf's fallback, with no payout: each winning
+    // contract paid $1. The fee is already in their P&L, so it carries.
+    await db
+      .update(predictions)
+      .set({
+        payout: sql`${predictions.contracts}`,
+        pnl: sql`coalesce(${predictions.pnl}, -${predictions.cost}) + ${predictions.contracts}`,
+      })
+      .where(
+        and(
+          eq(predictions.viewerId, viewerId),
+          eq(predictions.status, 'settled'),
+          eq(predictions.result, 'won'),
+          or(isNull(predictions.payout), eq(predictions.payout, 0)),
+        ),
+      )
 
     // Open Predictions no longer held and not settled were sold: closed.
     const stillHeld = new Set(held.map((p) => p.ticker))

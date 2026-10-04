@@ -99,6 +99,8 @@ export interface KalshiSettlement {
   no_total_cost_dollars?: string
   /** Integer cents. */
   revenue?: number
+  /** Payout of one YES contract, in cents (null for most binary markets). */
+  value?: number | null
   fee_cost?: string
   settled_time?: string
 }

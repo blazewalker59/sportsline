@@ -92,3 +92,26 @@ describe('isReadOnly', () => {
     expect(isReadOnly(undefined)).toBe(false)
   })
 })
+
+describe('payoutOf', () => {
+  it("uses Kalshi's revenue when it reports one", async () => {
+    const { payoutOf } = await import('@/lib/kalshi/sync')
+    expect(
+      payoutOf({ revenue: 10200, yes_count_fp: '102.00' }, 'yes', 'won'),
+    ).toBe(102)
+  })
+
+  it('pays a win with no revenue (as seen on Combos) at $1 a contract', async () => {
+    const { payoutOf } = await import('@/lib/kalshi/sync')
+    expect(
+      payoutOf(
+        { revenue: 0, yes_count_fp: '102.00', no_count_fp: '0.00' },
+        'yes',
+        'won',
+      ),
+    ).toBe(102)
+    expect(payoutOf({ revenue: 0, yes_count_fp: '10.00' }, 'yes', 'lost')).toBe(
+      0,
+    )
+  })
+})
