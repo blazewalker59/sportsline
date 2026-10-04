@@ -168,13 +168,20 @@ const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1)
 /** Why it matters, per source: the Prediction or the Starter. */
 export type AlertReason =
   | { source: 'following' }
-  | { source: 'prediction'; prediction: string }
+  | {
+      source: 'prediction'
+      prediction: string
+      /** Opens the Timeline narrowed to this Prediction. */
+      predictionId?: string
+    }
   | {
       source: 'fantasy'
       side: 'mine' | 'opponent'
       player: string
       /** "Flex Gods 98–87". */
       matchup: string | null
+      /** The Matchup's league row: opens the Timeline narrowed to it. */
+      matchupId?: string
     }
 
 /**
@@ -198,7 +205,15 @@ export function alertMessage(
   }
   const what = headline(item)
   const where = `${scoreLine(item)} · ${item.segmentLabel}`
-  const url = `/?game=${encodeURIComponent(item.gameId)}&play=${encodeURIComponent(item.id)}${day}`
+  const play = `&play=${encodeURIComponent(item.id)}${day}`
+  // Each source opens its own view: the Game for a Follow, the Prediction
+  // or the Matchup (in their Scopes) for the others, the Play over it.
+  const url =
+    reason.source === 'fantasy' && reason.matchupId
+      ? `/?scope=fantasy&matchup=${encodeURIComponent(reason.matchupId)}${play}`
+      : reason.source === 'prediction' && reason.predictionId
+        ? `/?scope=predictions&prediction=${encodeURIComponent(reason.predictionId)}${play}`
+        : `/?game=${encodeURIComponent(item.gameId)}${play}`
   const base = { url, tag: item.gameId, final: false }
   switch (reason.source) {
     case 'following': {

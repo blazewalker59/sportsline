@@ -80,6 +80,7 @@ async function predictionRecipients(
       viewerId: pushSubscriptions.viewerId,
       p256dh: pushSubscriptions.p256dh,
       auth: pushSubscriptions.auth,
+      predictionId: predictions.id,
       title: predictions.title,
       side: predictions.side,
       yesBid: kalshiMarkets.yesBid,
@@ -114,6 +115,7 @@ async function predictionRecipients(
       auth: r.auth,
       reason: {
         source: 'prediction',
+        predictionId: r.predictionId,
         prediction:
           chance === null
             ? r.title
@@ -183,6 +185,7 @@ async function fantasyRecipients(
       p256dh: pushSubscriptions.p256dh,
       auth: pushSubscriptions.auth,
       side: fantasyPlayers.side,
+      leagueRowId: fantasyPlayers.leagueRowId,
       playerId: fantasyPlayers.playerId,
       matchup: fantasyLeagues.matchup,
     })
@@ -226,6 +229,7 @@ async function fantasyRecipients(
       reason: {
         source: 'fantasy',
         side: r.side,
+        matchupId: r.leagueRowId,
         player: name,
         matchup:
           m && m.opponent

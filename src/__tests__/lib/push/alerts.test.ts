@@ -208,6 +208,32 @@ describe('alertMessage', () => {
     ).toBe('FANTASY · Opp. Rodgers · Touchdown')
   })
 
+  it('opens each source’s own view, the Play over it', () => {
+    expect(
+      alertMessage(item(), {
+        source: 'fantasy',
+        side: 'mine',
+        player: 'Williams',
+        matchup: null,
+        matchupId: 'v1~football~42',
+      }).url,
+    ).toBe(
+      '/?scope=fantasy&matchup=v1~football~42&play=g1~play%3A1&day=2026-10-01',
+    )
+    expect(
+      alertMessage(item(), {
+        source: 'prediction',
+        prediction: 'Steelers win: 58%',
+        predictionId: 'pr_1',
+      }).url,
+    ).toBe(
+      '/?scope=predictions&prediction=pr_1&play=g1~play%3A1&day=2026-10-01',
+    )
+    expect(alertMessage(item()).url).toBe(
+      '/?game=g1&play=g1~play%3A1&day=2026-10-01',
+    )
+  })
+
   it('makes a Final its own Alert that opens the Game', () => {
     expect(alertMessage(final)).toMatchObject({
       title: 'FOLLOWING · Final',
