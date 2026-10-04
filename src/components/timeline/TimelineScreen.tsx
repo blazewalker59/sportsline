@@ -10,6 +10,7 @@ import type { Scope } from '@/lib/model/scope'
 import type { FeedEntry, Typing } from '@/lib/timeline/chat'
 import type { Follow, GameSummary } from '@/lib/model/timeline'
 import type { PredictionView } from '@/lib/kalshi/server'
+import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { Connection } from '@/lib/timeline/useLiveTimeline'
 import type { League } from '@/lib/model/types'
 import { useEspnConnection, useFantasy } from '@/lib/fantasy/useFantasy'
@@ -68,12 +69,14 @@ export function TimelineScreen({
   scope,
   playId,
   predictionId,
+  matchupId,
 }: {
   day?: string
   gameId?: string
   scope?: Scope
   playId?: string
   predictionId?: string
+  matchupId?: string
 }) {
   const viewerState = useViewer()
   const [today] = useState(() => sportsDayOf(new Date()))
@@ -98,6 +101,7 @@ export function TimelineScreen({
         scope={scope}
         playId={playId ?? null}
         predictionId={predictionId ?? null}
+        matchupId={matchupId ?? null}
       />
     </ReactionsProvider>
   )
@@ -135,6 +139,23 @@ function predictionFollows(p: PredictionView): Array<Follow> {
       out.set(`g:${leg.game.id}`, { kind: 'game', gameId: leg.game.id })
   }
   return [...out.values()]
+}
+
+/**
+ * What one Fantasy Matchup covers: plays naming either side's Starters.
+ * (Unmatched Starters, team defenses among them, can't be followed by play.)
+ */
+function matchupFollows(league: FantasyLeagueView): Array<Follow> {
+  const m = league.matchup
+  const ids = [...(m?.mine.lineup ?? []), ...(m?.opponent?.lineup ?? [])]
+    .filter((p) => p.starter && p.playerId)
+    .map((p) => p.playerId!)
+  // As Player Follows (a few dozen ids at most); with no Starters matched
+  // yet, an id that covers nothing rather than every league's.
+  return (ids.length ? [...new Set(ids)] : ['pl_none']).map((playerId) => ({
+    kind: 'player' as const,
+    playerId,
+  }))
 }
 
 /** Does this Game belong on the score cards for the Scope? */
@@ -188,6 +209,7 @@ function Timeline({
   scope: requestedScope,
   playId,
   predictionId,
+  matchupId,
 }: {
   sportsDay: string
   today: string
@@ -196,6 +218,8 @@ function Timeline({
   playId: string | null
   /** One Prediction selected: the Timeline narrows to its Games and Players. */
   predictionId: string | null
+  /** One Fantasy Matchup selected: the Timeline narrows to its Starters. */
+  matchupId: string | null
 }) {
   const isToday = sportsDay === today
   const { data } = useViewer()
@@ -246,6 +270,9 @@ function Timeline({
     [fantasyLeagues],
   )
   const [matchupOpen, setMatchupOpen] = useState<string | null>(null)
+  const selectedMatchup = matchupId
+    ? (fantasyLeagues.find((l) => l.id === matchupId) ?? null)
+    : null
   const selectedPrediction = predictionId
     ? (predictionList.data?.find((p) => p.id === predictionId) ?? null)
     : null
@@ -258,11 +285,13 @@ function Timeline({
   const wanted = requestedScope ?? storedScope
   const scope: Scope = selectedPrediction
     ? 'predictions'
-    : (wanted === 'following' && viewerFollows.length === 0) ||
-        (wanted === 'predictions' && !kalshi.data && !kalshi.isPending) ||
-        (wanted === 'fantasy' && !espn.data && !espn.isPending)
-      ? 'all'
-      : (wanted ?? defaultScope(viewerFollows))
+    : selectedMatchup
+      ? 'fantasy'
+      : (wanted === 'following' && viewerFollows.length === 0) ||
+          (wanted === 'predictions' && !kalshi.data && !kalshi.isPending) ||
+          (wanted === 'fantasy' && !espn.data && !espn.isPending)
+        ? 'all'
+        : (wanted ?? defaultScope(viewerFollows))
   // The Viewer's row in their order, hidden items left out; All covers
   // the visible Leagues.
   const settings = data?.leagues ?? DEFAULT_LEAGUE_SETTINGS
@@ -272,15 +301,18 @@ function Timeline({
     () =>
       selectedPrediction
         ? predictionFollows(selectedPrediction)
-        : scopeFollows(
-            scope,
-            viewerFollows,
-            leagues,
-            predictionGames,
-            fantasyPlayers,
-          ),
+        : selectedMatchup
+          ? matchupFollows(selectedMatchup)
+          : scopeFollows(
+              scope,
+              viewerFollows,
+              leagues,
+              predictionGames,
+              fantasyPlayers,
+            ),
     [
       selectedPrediction,
+      selectedMatchup,
       scope,
       viewerFollows,
       leagues,
@@ -298,6 +330,25 @@ function Timeline({
           ...prev,
           scope: 'predictions',
           prediction: id ?? undefined,
+          matchup: undefined,
+          game: undefined,
+          play: undefined,
+        }),
+        viewTransition: true,
+        resetScroll: false,
+      }),
+    [navigate],
+  )
+  /** Select a Fantasy Matchup (narrowing the Timeline to it), or clear it. */
+  const selectMatchup = useCallback(
+    (id: string | null) =>
+      void navigate({
+        to: '/',
+        search: (prev) => ({
+          ...prev,
+          scope: 'fantasy',
+          matchup: id ?? undefined,
+          prediction: undefined,
           game: undefined,
           play: undefined,
         }),
@@ -474,7 +525,9 @@ function Timeline({
                 // Matchups move like scores: their cards replace the Games'.
                 <FantasyStrip
                   leagues={fantasyLeagues}
-                  onOpen={setMatchupOpen}
+                  selected={selectedMatchup?.id}
+                  onSelect={selectMatchup}
+                  onDetails={setMatchupOpen}
                 />
               ) : scope === 'predictions' && !gameId ? (
                 // Predictions move like scores: their cards replace the Games'.
@@ -543,7 +596,15 @@ function Timeline({
       )}
 
       {/* Tags plays by either side's Starters, in the Fantasy view. */}
-      <FantasyTagsProvider leagues={scope === 'fantasy' ? fantasyLeagues : []}>
+      <FantasyTagsProvider
+        leagues={
+          selectedMatchup
+            ? [selectedMatchup]
+            : scope === 'fantasy'
+              ? fantasyLeagues
+              : []
+        }
+      >
         <ol
           className={cn(
             'flex flex-col gap-3 transition-opacity',

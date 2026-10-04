@@ -332,7 +332,7 @@ function LeagueRow({
       {l.lastError && <p className="text-xs text-live">{l.lastError}</p>}
       {l.enabled && l.matchup && (
         <span className="flex">
-          <MatchupCard league={l} onOpen={onOpen} />
+          <MatchupCard league={l} onSelect={onOpen} />
         </span>
       )}
     </li>

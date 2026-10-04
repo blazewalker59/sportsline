@@ -77,6 +77,7 @@ export function ScopeBar({
         play: undefined,
         // A Scope replaces any one Prediction the Timeline was narrowed to.
         prediction: undefined,
+        matchup: undefined,
       }),
       viewTransition: true,
       resetScroll: false,

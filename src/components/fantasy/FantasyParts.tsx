@@ -19,6 +19,7 @@ import { TeamLogo } from '@/components/brand/TeamMark'
 import { statName, statValue } from '@/lib/fantasy/stats'
 import { SPORTS } from '@/lib/fantasy/sports'
 import { PlayerButton } from '@/components/players/playerSheet'
+import { CornerButton } from '@/components/timeline/GameStrip'
 import { cn } from '@/lib/utils'
 
 const pts = (n: number | null) => (n === null ? '—' : n.toFixed(1))
@@ -127,10 +128,12 @@ function SideRow({
 
 export function MatchupCard({
   league,
-  onOpen,
+  selected,
+  onSelect,
 }: {
   league: FantasyLeagueView
-  onOpen: () => void
+  selected?: boolean
+  onSelect: () => void
 }) {
   const m = league.matchup!
   const lead =
@@ -142,14 +145,17 @@ export function MatchupCard({
   return (
     <button
       type="button"
-      onClick={onOpen}
+      onClick={onSelect}
+      aria-pressed={selected}
       className={cn(
-        'flex h-full w-[150px] flex-col gap-0.5 rounded-2xl border bg-surface px-2.5 py-1.5 text-left',
-        lead === 'mine'
-          ? 'border-scoring/40'
-          : lead === 'opponent'
-            ? 'border-live/40'
-            : 'border-border',
+        'flex h-full w-[150px] flex-col gap-0.5 rounded-2xl border px-2.5 py-1.5 text-left transition-colors',
+        selected
+          ? 'border-accent bg-accent-soft'
+          : lead === 'mine'
+            ? 'border-scoring/40 bg-surface'
+            : lead === 'opponent'
+              ? 'border-live/40 bg-surface'
+              : 'border-border bg-surface',
       )}
     >
       <span className="flex items-center gap-1.5 text-[11px] font-semibold text-muted">
@@ -178,12 +184,21 @@ export function MatchupCard({
   )
 }
 
+/**
+ * Matchups as a strip of cards, like the score cards: tapping one narrows
+ * the Timeline to its Starters (tap again to clear), and the selected
+ * card's corner badge opens its sheet.
+ */
 export function FantasyStrip({
   leagues,
-  onOpen,
+  selected,
+  onSelect,
+  onDetails,
 }: {
   leagues: ReadonlyArray<FantasyLeagueView>
-  onOpen: (id: string) => void
+  selected?: string
+  onSelect: (id: string | null) => void
+  onDetails: (id: string) => void
 }) {
   const shown = leagues.filter((l) => l.enabled && l.matchup)
   if (shown.length === 0) return null
@@ -191,8 +206,17 @@ export function FantasyStrip({
     <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none]">
       <ul className="flex gap-2 pt-2 pb-0.5" aria-label="Your Matchups">
         {shown.map((l) => (
-          <li key={l.id} className="flex shrink-0">
-            <MatchupCard league={l} onOpen={() => onOpen(l.id)} />
+          <li key={l.id} className="relative flex shrink-0">
+            <MatchupCard
+              league={l}
+              selected={l.id === selected}
+              onSelect={() => onSelect(l.id === selected ? null : l.id)}
+            />
+            {l.id === selected && (
+              <CornerButton label="Matchup" onClick={() => onDetails(l.id)}>
+                <path d="M4 6h16M4 12h16M4 18h16" />
+              </CornerButton>
+            )}
           </li>
         ))}
       </ul>
