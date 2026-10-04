@@ -435,15 +435,28 @@ function PlayerCell({
     ? (INJURY_ABBREV[player.injury] ?? player.injury.slice(0, 4))
     : null
   const tone = injuryTone(player.injury)
+  // One line, never split inside a word: longer names step down a size
+  // to fit, and only then trail off.
+  const short = shortName(player)
   const name = (
-    <span className="block text-[13px] leading-tight font-semibold break-words">
-      {shortName(player)}
+    <span
+      title={player.name}
+      className={cn(
+        'block truncate leading-tight font-semibold whitespace-nowrap',
+        short.length > 14
+          ? 'text-[11px] tracking-tight'
+          : short.length > 11
+            ? 'text-[12px] tracking-tight'
+            : 'text-[12.5px]',
+      )}
+    >
+      {short}
     </span>
   )
   return (
     <div
       className={cn(
-        'flex min-w-0 flex-col gap-1 rounded-lg px-1.5 py-1.5',
+        'flex min-w-0 flex-col gap-1 rounded-lg px-1 py-1.5',
         state?.onField && 'field-state',
         state?.onField && right && 'field-state--right',
         state?.redZone && 'field-state--red-zone',
@@ -455,7 +468,7 @@ function PlayerCell({
       }
     >
       <div
-        className={cn('flex items-start gap-1.5', right && 'flex-row-reverse')}
+        className={cn('flex items-start gap-1', right && 'flex-row-reverse')}
       >
         <Avatar sport={sport} player={player} />
         <div className={cn('min-w-0 flex-1', right && 'text-right')}>
@@ -518,12 +531,12 @@ function PlayerCell({
               : `${shortName(player)}: today's line`
           }
           className={cn(
-            'flex shrink-0 flex-col rounded-md px-1 py-0.5 tabular-nums transition-colors',
+            'flex shrink-0 flex-col rounded-md px-0.5 py-0.5 tabular-nums transition-colors',
             right ? 'items-start' : 'items-end',
             open ? 'bg-accent-soft' : 'hover:bg-notice',
           )}
         >
-          <span className="text-[15px] leading-tight font-bold">
+          <span className="text-[14px] leading-tight font-bold">
             {playerFigure(player)}
           </span>
           {player.dayLine == null && player.projected !== null && (
@@ -616,7 +629,7 @@ function Avatar({
     <PlayerAvatar
       name={player.name}
       headshotUrl={headshotOf(sport, player)}
-      size={28}
+      size={22}
     />
   )
 }
@@ -727,7 +740,7 @@ function LineupRows({
           open === `m${i}` ? mine[i] : open === `t${i}` ? theirs[i] : undefined
         return (
           <li key={i}>
-            <div className="grid grid-cols-[minmax(0,1fr)_2.25rem_minmax(0,1fr)] items-start gap-x-1 px-1 py-1">
+            <div className="grid grid-cols-[minmax(0,1fr)_2rem_minmax(0,1fr)] items-start gap-x-0.5 px-0.5 py-1">
               <PlayerCell
                 sport={sport}
                 player={mine[i]}
@@ -743,7 +756,7 @@ function LineupRows({
                   SLOT_TONES[slot] ?? 'bg-notice text-muted',
                 )}
               >
-                {slot}
+                {slot === 'Bench' ? 'BN' : slot}
               </span>
               <PlayerCell
                 sport={sport}
