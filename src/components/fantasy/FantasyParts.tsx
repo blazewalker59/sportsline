@@ -5,7 +5,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query'
-import { createContext, useContext, useMemo, useState } from 'react'
+import { Fragment, createContext, useContext, useMemo, useState } from 'react'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type {
   LineupPlayer,
@@ -641,71 +641,122 @@ export function Breakdown({
   sport: FantasyLeagueView['sport']
   player: LineupPlayer
 }) {
+  const tone = injuryTone(player.injury)
   return (
-    <div className="mx-3 mb-2 rounded-lg bg-notice px-3 py-2 text-xs">
-      <div className="mb-1 flex justify-between font-semibold">
-        <span>{player.name}</span>
-        {player.dayLine == null && (
-          <span className="tabular-nums">{pts(player.points)} pts</span>
+    <div className="mx-2 mb-2 rounded-lg bg-notice px-3 py-2.5 text-xs">
+      <p className="mb-2 flex items-baseline gap-2">
+        <span className="font-semibold">{player.name}</span>
+        {player.injury && (
+          <span
+            className={cn(
+              'font-semibold',
+              tone === 'red'
+                ? 'text-red-600 dark:text-red-400'
+                : 'text-yellow-700 dark:text-yellow-400',
+            )}
+          >
+            {injuryLabel(player.injury)}
+          </span>
         )}
-      </div>
-      {player.injury && (
-        <p
-          className={cn(
-            'mb-1 font-semibold',
-            injuryTone(player.injury) === 'red'
-              ? 'text-red-600 dark:text-red-400'
-              : 'text-yellow-700 dark:text-yellow-400',
-          )}
-        >
-          {injuryLabel(player.injury)}
-        </p>
-      )}
+      </p>
       {player.dayLine != null ? (
-        // Category leagues: the day's line in the league's categories.
-        player.dayLine.length === 0 ? (
-          <p className="text-muted">No stats today.</p>
-        ) : (
-          <ul className="flex flex-wrap gap-x-3 gap-y-0.5 tabular-nums">
-            {player.dayLine.map((l) => (
-              <li key={l.label}>
-                <span className="font-semibold">{l.value}</span>{' '}
-                <span className="text-muted">{l.label}</span>
-              </li>
-            ))}
-          </ul>
-        )
-      ) : player.breakdown.length === 0 ? (
-        <p className="text-muted">No points yet.</p>
+        <DayLine line={player.dayLine} />
       ) : (
-        <ul className="flex flex-col gap-0.5 tabular-nums">
-          {player.breakdown.map((b) => (
-            <li key={b.statId} className="flex justify-between gap-3">
-              <span className="text-muted">
-                {statName(sport, b.statId)}
-                {b.value !== 0 && (
-                  <span className="text-foreground/80">
-                    {' '}
-                    {statValue(b.value)}
-                  </span>
-                )}
-              </span>
-              <span
-                className={cn(
-                  'font-semibold',
-                  b.points < 0 && 'text-red-600 dark:text-red-400',
-                )}
-              >
-                {b.points > 0 ? '+' : ''}
-                {pts(b.points)}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <PointsTable sport={sport} player={player} />
       )}
-      {player.dayLine == null && player.projected !== null && (
-        <p className="mt-1 text-muted">Projected {pts(player.projected)}</p>
+    </div>
+  )
+}
+
+/**
+ * A points league's breakdown as a table without rules: each stat, its
+ * value and its points in aligned columns, then the total and projection.
+ */
+function PointsTable({
+  sport,
+  player,
+}: {
+  sport: FantasyLeagueView['sport']
+  player: LineupPlayer
+}) {
+  if (player.breakdown.length === 0)
+    return (
+      <p className="text-muted">
+        No points yet
+        {player.projected !== null && ` · projected ${pts(player.projected)}`}
+      </p>
+    )
+  const cell = 'text-right tabular-nums'
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_3.5rem_3.5rem] gap-x-3 gap-y-1">
+      <span className="text-[10px] font-semibold tracking-wide text-muted uppercase">
+        Stat
+      </span>
+      <span
+        className={cn(
+          cell,
+          'text-[10px] font-semibold tracking-wide text-muted uppercase',
+        )}
+      >
+        Value
+      </span>
+      <span
+        className={cn(
+          cell,
+          'text-[10px] font-semibold tracking-wide text-muted uppercase',
+        )}
+      >
+        Pts
+      </span>
+      {player.breakdown.map((b) => (
+        <Fragment key={b.statId}>
+          <span className="truncate text-foreground/80">
+            {statName(sport, b.statId)}
+          </span>
+          <span className={cn(cell, 'text-muted')}>
+            {b.value === 0 ? '—' : statValue(b.value)}
+          </span>
+          <span
+            className={cn(
+              cell,
+              'font-semibold',
+              b.points < 0 && 'text-red-600 dark:text-red-400',
+            )}
+          >
+            {b.points > 0 ? '+' : ''}
+            {pts(b.points)}
+          </span>
+        </Fragment>
+      ))}
+      <span className="mt-1.5 font-semibold">Total</span>
+      <span className="mt-1.5" />
+      <span className={cn(cell, 'mt-1.5 font-bold')}>{pts(player.points)}</span>
+      {player.projected !== null && (
+        <>
+          <span className="text-muted">Projected</span>
+          <span />
+          <span className={cn(cell, 'text-muted')}>
+            {pts(player.projected)}
+          </span>
+        </>
       )}
+    </div>
+  )
+}
+
+/** A category league's day as a box-score line: values over their labels. */
+function DayLine({ line }: { line: NonNullable<LineupPlayer['dayLine']> }) {
+  if (line.length === 0) return <p className="text-muted">No stats today.</p>
+  return (
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(3rem,1fr))] gap-x-2 gap-y-2">
+      {line.map((l) => (
+        <span key={l.label} className="flex flex-col items-center">
+          <span className="text-sm font-bold tabular-nums">{l.value}</span>
+          <span className="text-[10px] font-semibold tracking-wide text-muted uppercase">
+            {l.label}
+          </span>
+        </span>
+      ))}
     </div>
   )
 }
