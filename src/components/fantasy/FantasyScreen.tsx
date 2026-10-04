@@ -6,10 +6,11 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
-import { MatchupCard, MatchupSheet } from './FantasyParts'
+import { MatchupSheet } from './FantasyParts'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import { getGames } from '@/lib/timeline/server'
 import { AppHeader } from '@/components/layout/AppHeader'
+import { GRIP_DOTS, useDragReorder } from '@/components/layout/useDragReorder'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { timeAgo, useNow } from '@/components/timeline/format'
 import { SPORTS } from '@/lib/fantasy/sports'
@@ -19,6 +20,7 @@ import {
   useDisconnectEspn,
   useEspnConnection,
   useFantasy,
+  useReorderFantasyLeagues,
   useSetFantasyLeagueEnabled,
   useSyncFantasy,
 } from '@/lib/fantasy/useFantasy'
@@ -237,52 +239,50 @@ function Connected() {
             again.
           </p>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {leagues.map((l) => (
-              <LeagueRow
-                key={l.id}
-                league={l}
-                onOpen={() => setOpen(l.id)}
-                onToggle={() =>
-                  setEnabled.mutate({ id: l.id, enabled: !l.enabled })
-                }
-              />
-            ))}
-          </ul>
+          <LeagueList
+            leagues={leagues}
+            onOpen={setOpen}
+            onToggle={(l) =>
+              setEnabled.mutate({ id: l.id, enabled: !l.enabled })
+            }
+          />
         )}
       </section>
 
-      <form
-        className="flex flex-col gap-2"
-        onSubmit={(e) => {
-          e.preventDefault()
-          add.mutate(url.trim(), { onSuccess: () => setUrl('') })
-        }}
-      >
-        <label className="text-xs font-bold tracking-wide text-muted uppercase">
-          Add a league
-        </label>
-        <span className="flex gap-2">
-          <input
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://fantasy.espn.com/football/league?leagueId=…"
-            className="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2 text-sm"
-          />
-          <button
-            type="submit"
-            disabled={!url.trim() || add.isPending}
-            className="min-h-10 rounded-full bg-notice px-4 text-[13px] font-semibold disabled:opacity-50"
-          >
-            {add.isPending ? 'Adding…' : 'Add'}
-          </button>
-        </span>
-        {add.error && (
-          <p role="alert" className="text-sm text-live">
-            {add.error.message}
-          </p>
-        )}
-      </form>
+      <details className="group">
+        <summary className="cursor-pointer list-none text-sm font-semibold text-accent [&::-webkit-details-marker]:hidden">
+          <span className="group-open:hidden">+ Add a league by its URL</span>
+          <span className="hidden group-open:inline">Add a league</span>
+        </summary>
+        <form
+          className="mt-2 flex flex-col gap-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            add.mutate(url.trim(), { onSuccess: () => setUrl('') })
+          }}
+        >
+          <span className="flex gap-2">
+            <input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://fantasy.espn.com/football/league?leagueId=…"
+              className="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2 text-sm"
+            />
+            <button
+              type="submit"
+              disabled={!url.trim() || add.isPending}
+              className="min-h-10 rounded-full bg-notice px-4 text-[13px] font-semibold disabled:opacity-50"
+            >
+              {add.isPending ? 'Adding…' : 'Add'}
+            </button>
+          </span>
+          {add.error && (
+            <p role="alert" className="text-sm text-live">
+              {add.error.message}
+            </p>
+          )}
+        </form>
+      </details>
       {selected && (
         <MatchupSheet
           league={selected}
@@ -294,47 +294,154 @@ function Connected() {
   )
 }
 
-function LeagueRow({
-  league: l,
+/**
+ * The Viewer's leagues, one compact row each, in their order (the
+ * Timeline's Fantasy cards follow it): drag the grip to reorder, tap the
+ * score for the Matchup, Show or Hide in the Timeline.
+ */
+function LeagueList({
+  leagues,
   onOpen,
   onToggle,
 }: {
-  league: FantasyLeagueView
-  onOpen: () => void
-  onToggle: () => void
+  leagues: ReadonlyArray<FantasyLeagueView>
+  onOpen: (id: string) => void
+  onToggle: (league: FantasyLeagueView) => void
 }) {
+  const reorder = useReorderFantasyLeagues()
+  const { dragging, active, shift, handle } = useDragReorder(
+    leagues.map((l) => l.id),
+    (ids) => reorder.mutate(ids),
+  )
   return (
-    <li className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-3">
-      <span className="flex items-center gap-2">
-        <LeagueLogo league={SPORTS[l.sport].league} size={18} />
-        <span className={cn('min-w-0 flex-1', !l.enabled && 'opacity-50')}>
-          <span className="block truncate text-sm font-semibold">{l.name}</span>
-          {l.teamName && (
-            <span className="block truncate text-xs text-muted">
-              {l.teamName}
-            </span>
-          )}
-        </span>
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-pressed={l.enabled}
+    <ol
+      className="divide-y divide-border rounded-xl border border-border bg-surface"
+      aria-label="Your leagues, in order"
+    >
+      {leagues.map((l, index) => (
+        <li
+          key={l.id}
           className={cn(
-            'min-h-9 rounded-full px-3 text-[13px] font-semibold',
-            l.enabled
-              ? 'border border-border text-foreground/80'
-              : 'bg-notice text-muted',
+            'relative flex min-h-14 items-center gap-2 bg-surface py-1.5 pr-2 pl-0.5',
+            dragging === l.id
+              ? 'z-10 rounded-xl shadow-lg ring-1 ring-border'
+              : active && 'transition-transform duration-150',
+          )}
+          style={
+            active ? { transform: `translateY(${shift(index)}px)` } : undefined
+          }
+        >
+          <button
+            type="button"
+            aria-label={`Move ${l.name}. Use the arrow keys to reorder.`}
+            className="flex h-11 w-8 shrink-0 cursor-grab touch-none items-center justify-center text-muted active:cursor-grabbing"
+            {...handle(l.id, index)}
+          >
+            <svg
+              width="14"
+              height="20"
+              viewBox="0 0 14 20"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              {GRIP_DOTS.map(({ x, y }) => (
+                <circle key={`${x}-${y}`} cx={x} cy={y} r="1.6" />
+              ))}
+            </svg>
+          </button>
+          <span
+            className={cn(
+              'flex min-w-0 flex-1 items-center gap-2.5',
+              !l.enabled && 'opacity-45',
+            )}
+          >
+            <LeagueLogo league={SPORTS[l.sport].league} size={20} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold">
+                {l.name}
+              </span>
+              <span
+                className={cn(
+                  'block truncate text-xs',
+                  l.lastError ? 'text-live' : 'text-muted',
+                )}
+              >
+                {l.lastError ??
+                  [l.teamName, l.matchup?.mine.record]
+                    .filter(Boolean)
+                    .join(' · ')}
+              </span>
+            </span>
+          </span>
+          {l.enabled && l.matchup && (
+            <button
+              type="button"
+              onClick={() => onOpen(l.id)}
+              aria-label={`${l.name} matchup`}
+              className="flex shrink-0 flex-col items-end rounded-lg px-1.5 py-0.5 tabular-nums hover:bg-notice"
+            >
+              <MatchupScore league={l} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onToggle(l)}
+            aria-pressed={l.enabled}
+            className={cn(
+              'min-h-8 shrink-0 rounded-full px-2.5 text-xs font-semibold',
+              l.enabled
+                ? 'border border-border text-foreground/80'
+                : 'bg-notice text-muted',
+            )}
+          >
+            {l.enabled ? 'Hide' : 'Show'}
+          </button>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+/** "98.4 – 87.2" (or categories "6–3–1"), the leader's side bold. */
+function MatchupScore({ league }: { league: FantasyLeagueView }) {
+  const m = league.matchup!
+  const cats = Boolean(m.categories)
+  const fmt = (n: number) => (cats ? String(n) : n.toFixed(1))
+  const theirs = m.opponent?.score
+  const lead =
+    theirs === undefined || m.mine.score === theirs
+      ? null
+      : m.mine.score > theirs
+        ? 'mine'
+        : 'opponent'
+  return (
+    <>
+      <span className="text-sm leading-tight">
+        <span
+          className={cn(
+            lead === 'mine' ? 'font-bold text-scoring' : 'text-foreground/75',
           )}
         >
-          {l.enabled ? 'Hide' : 'Show'}
-        </button>
-      </span>
-      {l.lastError && <p className="text-xs text-live">{l.lastError}</p>}
-      {l.enabled && l.matchup && (
-        <span className="flex">
-          <MatchupCard league={l} onSelect={onOpen} />
+          {fmt(m.mine.score)}
         </span>
-      )}
-    </li>
+        {theirs !== undefined && (
+          <>
+            <span className="text-muted"> – </span>
+            <span
+              className={cn(
+                lead === 'opponent'
+                  ? 'font-bold text-live'
+                  : 'text-foreground/75',
+              )}
+            >
+              {fmt(theirs)}
+            </span>
+          </>
+        )}
+      </span>
+      <span className="text-[10px] leading-tight text-muted">
+        {m.opponent ? `vs ${m.opponent.abbrev}` : 'Bye'}
+      </span>
+    </>
   )
 }

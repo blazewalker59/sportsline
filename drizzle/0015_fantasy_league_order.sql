@@ -1,0 +1,1 @@
+ALTER TABLE `fantasy_leagues` ADD `position` integer;

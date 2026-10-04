@@ -140,7 +140,7 @@ One market a Prediction rests on, with the side taken (yes or no), and the Game,
 _Avoid_: pick, selection
 
 **Odds**:
-The market's current chance of a Leg or Prediction resolving yes, from Kalshi's prices, shown as a percentage alongside where the Viewer got in. They move as the Game is played.
+The market's current chance of a Leg or Prediction resolving yes, from Kalshi's prices, shown as a percentage alongside where the Viewer got in. They move as the Game is played. A Combo's Odds are its Legs' Odds multiplied (a won Leg counting as certain), which is also what its cash-out is worth.
 _Avoid_: line, price (the dollar figure behind it)
 
 **Progress**:

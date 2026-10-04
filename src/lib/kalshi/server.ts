@@ -10,6 +10,7 @@ import { KalshiError, apiKeys } from './client'
 import { importSigningKey } from './keys'
 import { isReadOnly } from './scopes'
 import { progressOf } from './props'
+import { bookChance, positionValue, predictionYesChance } from './pricing'
 import { refreshPrices, syncAccount } from './sync'
 import { seal } from './vault'
 import type { Progress } from './props'
@@ -314,22 +315,25 @@ export const getPredictions = createServerFn({ method: 'GET' }).handler(
       const boxBy = new Map(gameRows.map((r) => [r.game.id, r.game.box]))
       const yesChance = (ticker: string): number | null => {
         const m = marketBy.get(ticker)
-        if (!m) return null
-        if (m.yesBid !== null && m.yesAsk !== null && m.yesAsk > 0)
-          return (m.yesBid + m.yesAsk) / 2
-        return m.lastPrice
+        return m ? bookChance(m) : null
       }
       const forSide = (chance: number | null, side: 'yes' | 'no') =>
         chance === null ? null : side === 'yes' ? chance : 1 - chance
 
       return all.map((p): PredictionView => {
         const m = marketBy.get(p.marketTicker)
-        const sellPrice =
-          p.side === 'yes'
-            ? (m?.yesBid ?? null)
-            : m?.yesAsk != null
-              ? 1 - m.yesAsk
-              : null
+        // A Combo has no book: its chance (and cash-out) come from its Legs.
+        const yes = predictionYesChance(
+          p.kind,
+          m,
+          legs
+            .filter((l) => l.leg.predictionId === p.id)
+            .map(({ leg }) => ({
+              side: leg.side,
+              yesChance: yesChance(leg.marketTicker),
+              result: marketBy.get(leg.marketTicker)?.result,
+            })),
+        )
         return {
           id: p.id,
           kind: p.kind,
@@ -343,14 +347,11 @@ export const getPredictions = createServerFn({ method: 'GET' }).handler(
           pnl: p.pnl,
           openedAt: p.openedAt,
           settledAt: p.settledAt,
-          chance:
-            p.status === 'open'
-              ? forSide(yesChance(p.marketTicker), p.side)
-              : null,
+          chance: p.status === 'open' ? forSide(yes, p.side) : null,
           entryChance: p.contracts > 0 ? p.cost / p.contracts : null,
           value:
-            p.status === 'open' && sellPrice !== null
-              ? p.contracts * sellPrice
+            p.status === 'open'
+              ? positionValue(p.side, p.contracts, m, yes)
               : null,
           history: history
             .filter((h) => h.ticker === p.marketTicker)

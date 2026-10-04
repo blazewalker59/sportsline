@@ -500,6 +500,8 @@ export const fantasyLeagues = sqliteTable(
     name: text('name').notNull(),
     teamName: text('team_name'),
     enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+    /** The Viewer's order for their leagues (null: after the ordered ones). */
+    position: integer('position'),
     matchup: text('matchup', { mode: 'json' }).$type<MatchupView | null>(),
     lastError: text('last_error'),
     updatedAt: text('updated_at').notNull(),

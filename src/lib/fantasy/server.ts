@@ -4,7 +4,7 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { EspnError, bracedSwid, fanProfile } from './client'
 import { leagueFromUrl } from './discovery'
@@ -212,6 +212,26 @@ export const setFantasyLeagueEnabled = createServerFn({ method: 'POST' })
     }),
   )
 
+/** Save the Viewer's order for their leagues (ids, first to last). */
+export const reorderFantasyLeagues = createServerFn({ method: 'POST' })
+  .validator((data: { ids: Array<string> }) =>
+    z.object({ ids: z.array(z.string().max(300)).max(60) }).parse(data),
+  )
+  .handler(({ data }) =>
+    withViewer(async ({ db, viewerId }) => {
+      for (const [position, id] of data.ids.entries())
+        await db
+          .update(fantasyLeagues)
+          .set({ position })
+          .where(
+            and(
+              eq(fantasyLeagues.id, id),
+              eq(fantasyLeagues.viewerId, viewerId),
+            ),
+          )
+    }),
+  )
+
 export const getFantasy = createServerFn({ method: 'GET' }).handler(
   async (): Promise<Array<FantasyLeagueView>> => {
     if (!(await sessionViewer())) return []
@@ -220,7 +240,10 @@ export const getFantasy = createServerFn({ method: 'GET' }).handler(
         .select()
         .from(fantasyLeagues)
         .where(eq(fantasyLeagues.viewerId, viewerId))
+        // The Viewer's order; leagues they haven't placed after, by sport.
         .orderBy(
+          sql`${fantasyLeagues.position} is null`,
+          fantasyLeagues.position,
           desc(fantasyLeagues.enabled),
           fantasyLeagues.sport,
           fantasyLeagues.name,

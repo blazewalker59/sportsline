@@ -7,9 +7,11 @@ import {
   disconnectEspn,
   getEspnConnection,
   getFantasy,
+  reorderFantasyLeagues,
   setFantasyLeagueEnabled,
   syncFantasyNow,
 } from './server'
+import type { FantasyLeagueView } from './server'
 import { useViewer } from '@/lib/viewer/useViewer'
 
 export const ESPN_KEY = ['espn-connection'] as const
@@ -85,5 +87,19 @@ export function useSetFantasyLeagueEnabled() {
     mutationFn: (v: { id: string; enabled: boolean }) =>
       setFantasyLeagueEnabled({ data: v }),
     onSettled: refresh,
+  })
+}
+
+/** Reorder leagues: the list moves at once and saves behind. */
+export function useReorderFantasyLeagues() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (ids: Array<string>) =>
+      reorderFantasyLeagues({ data: { ids } }),
+    onMutate: (ids) =>
+      queryClient.setQueryData<Array<FantasyLeagueView>>(FANTASY_KEY, (old) =>
+        old ? ids.flatMap((id) => old.find((l) => l.id === id) ?? []) : old,
+      ),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: FANTASY_KEY }),
   })
 }

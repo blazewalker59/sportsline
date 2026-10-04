@@ -14,6 +14,7 @@ import { alertLevels, vapidKeys } from './deliver'
 import { sendPush } from './webpush'
 import type { AlertMessage } from './alerts'
 import type { CloudflareEnv, Database } from '@/lib/db'
+import { bookChance, predictionYesChance } from '@/lib/kalshi/pricing'
 import { dbFromD1 } from '@/lib/db'
 import {
   alertMarks,
@@ -36,20 +37,6 @@ const SWING_COOLDOWN_MS = 20 * 60_000
 const RESULT_FRESH_MS = 3 * 3_600_000
 /** A Scoring Play this recent explains an odds swing. */
 const RECENT_PLAY_MS = 10 * 60_000
-
-type Market = typeof kalshiMarkets.$inferSelect
-
-export function chanceFor(
-  m: Market | undefined,
-  side: 'yes' | 'no',
-): number | null {
-  if (!m) return null
-  const yes =
-    m.yesBid !== null && m.yesAsk !== null && m.yesAsk > 0
-      ? (m.yesBid + m.yesAsk) / 2
-      : m.lastPrice
-  return yes === null ? null : side === 'yes' ? yes : 1 - yes
-}
 
 const pct = (n: number) => `${Math.round(n * 100)}%`
 const money = (n: number) =>
@@ -231,7 +218,19 @@ export async function sendPredictionAlerts(
 
     // The odds on the Viewer's side swinging since they last heard.
     if (p.status !== 'open') continue
-    const chance = chanceFor(own, p.side)
+    const yes = predictionYesChance(
+      p.kind,
+      own,
+      pLegs.map((l) => {
+        const lm = markets.get(l.marketTicker)
+        return {
+          side: l.side,
+          yesChance: lm ? bookChance(lm) : null,
+          result: lm?.result,
+        }
+      }),
+    )
+    const chance = yes === null ? null : p.side === 'yes' ? yes : 1 - yes
     if (chance === null) continue
     if (firstSight) {
       baselines.push({ id: p.id, chance })

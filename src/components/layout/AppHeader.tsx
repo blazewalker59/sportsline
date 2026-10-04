@@ -1,7 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { AlertsItem } from './AlertsItem'
 import { ThemeButton } from './ThemeButton'
 import { signIn, signOutClient } from '@/lib/auth/client'
 import { VIEWER_KEY, useViewer } from '@/lib/viewer/useViewer'
@@ -117,7 +116,13 @@ function AccountButton() {
           >
             Fantasy
           </Link>
-          <AlertsItem />
+          <Link
+            to="/alerts"
+            onClick={() => setOpen(false)}
+            className="block rounded-lg px-3 py-2 hover:bg-background"
+          >
+            Alerts
+          </Link>
           <button
             type="button"
             onClick={() =>

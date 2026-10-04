@@ -30,6 +30,7 @@ import {
   recentSettlements,
 } from './client'
 import { importSigningKey } from './keys'
+import { bookChance, predictionYesChance } from './pricing'
 import {
   findGame,
   kalshiTeamKey,
@@ -675,18 +676,24 @@ export async function refreshPrices(
       ticker: predictions.marketTicker,
       id: predictions.id,
       viewerId: predictions.viewerId,
+      kind: predictions.kind,
     })
     .from(predictions)
     .where(eq(predictions.status, 'open'))
   if (open.length === 0) return 0
   // In parts: D1 binds at most 100 parameters.
-  const legs: Array<{ ticker: string; predictionId: string }> = []
+  const legs: Array<{
+    ticker: string
+    predictionId: string
+    side: 'yes' | 'no'
+  }> = []
   for (let i = 0; i < open.length; i += 80) {
     legs.push(
       ...(await db
         .select({
           ticker: predictionLegs.marketTicker,
           predictionId: predictionLegs.predictionId,
+          side: predictionLegs.side,
         })
         .from(predictionLegs)
         .where(
@@ -722,30 +729,54 @@ export async function refreshPrices(
     )
     await rememberMarkets(db, latest)
     for (const m of latest) done.add(m.ticker)
-    const points = latest
-      .filter((m) => own.has(m.ticker))
-      .map((m) => ({ ticker: m.ticker, at, chance: chanceOf(m) }))
-      .filter(
-        (p): p is { ticker: string; at: string; chance: number } =>
-          p.chance !== null,
-      )
-    for (let i = 0; i < points.length; i += 30) {
-      await db
-        .insert(kalshiPrices)
-        .values(points.slice(i, i + 30))
-        .onConflictDoNothing()
-    }
     count += latest.length
+  }
+  // A point of history for each Prediction's own market, from everything
+  // just stored: a Combo's from its Legs (its own book is empty).
+  const tickers = [...new Set([...own, ...legs.map((l) => l.ticker)])]
+  const stored = new Map<string, typeof kalshiMarkets.$inferSelect>()
+  for (let i = 0; i < tickers.length; i += 80) {
+    for (const m of await db
+      .select()
+      .from(kalshiMarkets)
+      .where(inArray(kalshiMarkets.ticker, tickers.slice(i, i + 80))))
+      stored.set(m.ticker, m)
+  }
+  const points = new Map<string, number>()
+  for (const o of open) {
+    const chance = predictionYesChance(
+      o.kind,
+      stored.get(o.ticker),
+      legs
+        .filter((l) => l.predictionId === o.id)
+        .map((l) => {
+          const m = stored.get(l.ticker)
+          return {
+            side: l.side,
+            yesChance: m ? bookChance(m) : null,
+            result: m?.result,
+          }
+        }),
+    )
+    if (chance !== null) points.set(o.ticker, chance)
+  }
+  const rows = [...points].map(([ticker, chance]) => ({ ticker, at, chance }))
+  for (let i = 0; i < rows.length; i += 30) {
+    await db
+      .insert(kalshiPrices)
+      .values(rows.slice(i, i + 30))
+      .onConflictDoNothing()
   }
   return count
 }
 
-/** A market's YES chance (0–1): the bid/ask midpoint, else the last price. */
+/** A market's YES chance (0–1) as Kalshi reports it (see pricing.ts). */
 export function chanceOf(m: KalshiMarket): number | null {
-  const bid = m.yes_bid_dollars ? dollars(m.yes_bid_dollars) : null
-  const ask = m.yes_ask_dollars ? dollars(m.yes_ask_dollars) : null
-  if (bid !== null && ask !== null && ask > 0) return (bid + ask) / 2
-  return m.last_price_dollars ? dollars(m.last_price_dollars) : null
+  return bookChance({
+    yesBid: m.yes_bid_dollars ? dollars(m.yes_bid_dollars) : null,
+    yesAsk: m.yes_ask_dollars ? dollars(m.yes_ask_dollars) : null,
+    lastPrice: m.last_price_dollars ? dollars(m.last_price_dollars) : null,
+  })
 }
 
 /** Drop price history for markets no open Prediction watches any more. */
