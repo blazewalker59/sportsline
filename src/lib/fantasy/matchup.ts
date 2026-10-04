@@ -16,6 +16,10 @@ interface WireStat {
   statSourceId?: number
   statSplitTypeId?: number
   appliedTotal?: number
+  /** Points awarded per stat id. */
+  appliedStats?: Record<string, number>
+  /** Raw values per stat id. */
+  stats?: Record<string, number>
 }
 
 interface WireEntry {
@@ -80,12 +84,20 @@ export interface LineupPlayer {
   name: string
   slot: string
   slotId: number
+  /** ESPN's position id (football: 1 QB, 2 RB, 3 WR, 4 TE, 5 K, 16 D/ST). */
+  positionId: number | null
   starter: boolean
   /** Fantasy points this scoring period so far (null before any stats). */
   points: number | null
   projected: number | null
   proTeamId: number | null
   injury: string | null
+  /** Where this period's points came from: each stat's value and points. */
+  breakdown: Array<{ statId: number; value: number; points: number }>
+  /** Our Team, its logo and abbreviation (for D/ST, and the Game's state). */
+  teamId?: string | null
+  teamLogo?: string | null
+  teamAbbrev?: string | null
 }
 
 export interface MatchupSide {
@@ -130,14 +142,16 @@ function lineupOf(
     const p = e.playerPoolEntry?.player
     const id = p?.id ?? e.playerId
     if (id === undefined) return []
-    const stat = (source: number) =>
+    const line = (source: number) =>
       p?.stats?.find(
         (s) =>
           s.scoringPeriodId === scoringPeriod &&
           s.statSourceId === source &&
           (s.statSplitTypeId === undefined || s.statSplitTypeId === 1),
-      )?.appliedTotal
+      )
+    const stat = (source: number) => line(source)?.appliedTotal
     const actual = stat(0)
+    const actualLine = line(0)
     const slotId = e.lineupSlotId ?? 20
     return [
       {
@@ -145,6 +159,7 @@ function lineupOf(
         name: p?.fullName ?? `#${id}`,
         slot: slotName(sport, slotId),
         slotId,
+        positionId: p?.defaultPositionId ?? null,
         starter: !notStarting.has(slotId),
         points: actual === undefined ? null : round(actual),
         projected: stat(1) === undefined ? null : round(stat(1)!),
@@ -153,6 +168,14 @@ function lineupOf(
           p?.injuryStatus && p.injuryStatus !== 'ACTIVE'
             ? p.injuryStatus
             : null,
+        breakdown: Object.entries(actualLine?.appliedStats ?? {})
+          .filter(([, points]) => Math.abs(points) > 0.001)
+          .map(([statId, points]) => ({
+            statId: Number(statId),
+            value: actualLine?.stats?.[statId] ?? 0,
+            points: round(points),
+          }))
+          .sort((a, b) => Math.abs(b.points) - Math.abs(a.points)),
       },
     ]
   })

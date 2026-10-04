@@ -4,9 +4,11 @@
  * leagues, each with its live Matchup, shown or hidden in the Timeline.
  */
 
+import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { MatchupCard, MatchupSheet } from './FantasyParts'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
+import { getGames } from '@/lib/timeline/server'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { timeAgo, useNow } from '@/components/timeline/format'
@@ -173,6 +175,13 @@ function Connected() {
   const c = connection.data!
   const leagues = fantasy.data ?? []
   const selected = leagues.find((l) => l.id === open && l.matchup)
+  // Today's Games, for each Player's game state in the Matchup sheet.
+  const games = useQuery({
+    queryKey: ['games', 'today'],
+    queryFn: () => getGames({ data: {} }),
+    enabled: Boolean(selected),
+    refetchInterval: 30_000,
+  })
   return (
     <div className="flex flex-col gap-6">
       <section className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm">
@@ -275,7 +284,11 @@ function Connected() {
         )}
       </form>
       {selected && (
-        <MatchupSheet league={selected} onClose={() => setOpen(null)} />
+        <MatchupSheet
+          league={selected}
+          games={games.data ?? []}
+          onClose={() => setOpen(null)}
+        />
       )}
     </div>
   )

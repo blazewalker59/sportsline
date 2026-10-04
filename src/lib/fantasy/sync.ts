@@ -19,6 +19,7 @@ import {
   fantasyPlayers,
   players,
   sourceIds,
+  teams,
 } from '@/lib/db/schema'
 import { unseal } from '@/lib/kalshi/vault'
 import { normalizePlayerName } from '@/lib/kalshi/match'
@@ -132,6 +133,46 @@ async function ourPlayers(
   return out
 }
 
+/** Our Teams for ESPN's pro team ids (football and basketball share ids). */
+async function ourTeams(
+  db: Database,
+  sport: FantasySport,
+  lineup: ReadonlyArray<{ proTeamId: number | null }>,
+): Promise<
+  Map<number, { id: string; logoUrl: string | null; abbreviation: string }>
+> {
+  const out = new Map<
+    number,
+    { id: string; logoUrl: string | null; abbreviation: string }
+  >()
+  const source = SPORTS[sport].playerSource
+  const ids = [
+    ...new Set(
+      lineup.flatMap((p) => (p.proTeamId ? [String(p.proTeamId)] : [])),
+    ),
+  ]
+  if (!source || ids.length === 0) return out
+  const rows = await db
+    .select({
+      sourceId: sourceIds.sourceId,
+      id: teams.id,
+      logoUrl: teams.logoUrl,
+      abbreviation: teams.abbreviation,
+    })
+    .from(sourceIds)
+    .innerJoin(teams, eq(teams.id, sourceIds.internalId))
+    .where(
+      and(
+        eq(sourceIds.entity, 'team'),
+        eq(sourceIds.source, source),
+        inArray(sourceIds.sourceId, ids),
+        eq(teams.league, SPORTS[sport].league),
+      ),
+    )
+  for (const r of rows) out.set(Number(r.sourceId), r)
+  return out
+}
+
 /** Read one league's Matchup now and store it, with its Players mapped. */
 export async function syncLeague(
   db: Database,
@@ -158,7 +199,14 @@ export async function syncLeague(
   if (view) {
     const everyone = [...view.mine.lineup, ...(view.opponent?.lineup ?? [])]
     const ids = await ourPlayers(db, row.sport, everyone)
-    for (const p of everyone) p.playerId = ids.get(p.espnId) ?? null
+    const teamsBy = await ourTeams(db, row.sport, everyone)
+    for (const p of everyone) {
+      p.playerId = ids.get(p.espnId) ?? null
+      const t = p.proTeamId === null ? undefined : teamsBy.get(p.proTeamId)
+      p.teamId = t?.id ?? null
+      p.teamLogo = t?.logoUrl ?? null
+      p.teamAbbrev = t?.abbreviation ?? null
+    }
     await db
       .delete(fantasyPlayers)
       .where(eq(fantasyPlayers.leagueRowId, row.id))

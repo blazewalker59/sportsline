@@ -5,12 +5,14 @@
  */
 
 import { Link } from '@tanstack/react-router'
-import { createContext, useContext } from 'react'
+import { createContext, useContext, useState } from 'react'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { LineupPlayer, MatchupSide } from '@/lib/fantasy/matchup'
-import type { TimelineItem } from '@/lib/model/timeline'
+import type { GameSummary, TimelineItem } from '@/lib/model/timeline'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { Sheet } from '@/components/chat/Sheet'
+import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
+import { statName, statValue } from '@/lib/fantasy/stats'
 import { SPORTS } from '@/lib/fantasy/sports'
 import { cn } from '@/lib/utils'
 
@@ -161,16 +163,151 @@ export function FantasyStrip({
 
 // ─── Sheet ──────────────────────────────────────────────────────────────────
 
+/** "Jaxon Smith-Njigba" → "J. Smith-Njigba"; team defenses as they are. */
+export function shortName(p: Pick<LineupPlayer, 'name' | 'espnId'>): string {
+  if (p.espnId < 0 || /D\/ST$/.test(p.name)) return p.name
+  const [first, ...rest] = p.name.trim().split(/\s+/)
+  return rest.length > 0 ? `${first[0]}. ${rest.join(' ')}` : p.name
+}
+
+const HEADSHOT_LEAGUE: Record<FantasyLeagueView['sport'], string> = {
+  football: 'nfl',
+  basketball: 'nba',
+  baseball: 'mlb',
+}
+
+function headshotOf(
+  sport: FantasyLeagueView['sport'],
+  p: LineupPlayer,
+): string | null {
+  if (p.espnId < 0) return p.teamLogo ?? null
+  return `https://a.espncdn.com/combiner/i?img=/i/headshots/${HEADSHOT_LEAGUE[sport]}/players/full/${p.espnId}.png&w=96&h=70`
+}
+
+/** Red for out (or close to it), yellow for maybe. */
+function injuryTone(status: string | null): 'red' | 'yellow' | null {
+  if (!status) return null
+  if (/QUESTIONABLE|DAY_TO_DAY|PROBABLE/.test(status)) return 'yellow'
+  return 'red'
+}
+
+function injuryLabel(status: string): string {
+  return status
+    .replace('INJURY_RESERVE', 'IR')
+    .replace('DAY_TO_DAY', 'Day-to-day')
+    .toLowerCase()
+    .replace(/^\w/, (c) => c.toUpperCase())
+}
+
+/** Position groups, colored (Sleeper-style). */
+const SLOT_TONES: Record<string, string> = {
+  QB: 'bg-rose-500/15 text-rose-600 dark:text-rose-400',
+  RB: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+  WR: 'bg-sky-500/15 text-sky-700 dark:text-sky-400',
+  TE: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
+  FLEX: 'bg-violet-500/15 text-violet-700 dark:text-violet-400',
+  'RB/WR': 'bg-violet-500/15 text-violet-700 dark:text-violet-400',
+  'WR/TE': 'bg-violet-500/15 text-violet-700 dark:text-violet-400',
+  OP: 'bg-violet-500/15 text-violet-700 dark:text-violet-400',
+  'D/ST': 'bg-slate-500/15 text-slate-700 dark:text-slate-300',
+  K: 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-400',
+}
+
+interface FieldState {
+  /** "Sun 1:00 PM", "Q2 4:31", "Final". */
+  status: string
+  live: boolean
+  onField: boolean
+  redZone: boolean
+}
+
+/**
+ * A Player's Game right now, from today's Games: when it is, and in
+ * football whether their unit is on the field (their team has the ball, or
+ * for a defense, doesn't) and in the red zone (inside the 20).
+ */
+function fieldState(
+  p: LineupPlayer,
+  games: ReadonlyArray<GameSummary>,
+): FieldState | null {
+  if (!p.teamId) return null
+  const g = games.find(
+    (x) => x.awayTeam.id === p.teamId || x.homeTeam.id === p.teamId,
+  )
+  if (!g) return null
+  const live = g.status === 'live' || g.status === 'delayed'
+  const status = live
+    ? (g.situation?.segmentLabel ?? 'Live')
+    : g.status === 'final'
+      ? 'Final'
+      : new Date(g.startsAt).toLocaleString([], {
+          weekday: 'short',
+          hour: 'numeric',
+          minute: '2-digit',
+        })
+  const detail = (g.situation?.detail ?? {}) as {
+    possession?: string | null
+    downDistance?: string | null
+  }
+  if (!live || g.league !== 'nfl' || !detail.possession)
+    return { status, live, onField: false, redZone: false }
+  const hasBall = detail.possession === p.teamAbbrev
+  const defense = p.positionId === 16
+  const spot = /at ([A-Z]{2,4}) (\d{1,2})/.exec(detail.downDistance ?? '')
+  // Inside the 20 on the defending team's side.
+  const redZone =
+    spot !== null && spot[1] !== detail.possession && Number(spot[2]) <= 20
+  const onField = defense ? !hasBall : hasBall
+  return { status, live, onField, redZone: onField && redZone }
+}
+
+function Avatar({
+  sport,
+  player,
+}: {
+  sport: FantasyLeagueView['sport']
+  player: LineupPlayer
+}) {
+  const tone = injuryTone(player.injury)
+  return (
+    <span className="relative shrink-0">
+      <PlayerAvatar
+        name={player.name}
+        headshotUrl={headshotOf(sport, player)}
+        size={32}
+      />
+      {tone && (
+        <span
+          aria-label={injuryLabel(player.injury!)}
+          className={cn(
+            'absolute -top-0.5 -right-0.5 size-3 rounded-full ring-2 ring-surface',
+            tone === 'red' ? 'bg-red-500' : 'bg-yellow-400',
+          )}
+        />
+      )}
+    </span>
+  )
+}
+
 function PlayerCell({
+  sport,
   player,
   align,
+  games,
+  open,
+  onToggle,
   onNavigate,
 }: {
+  sport: FantasyLeagueView['sport']
   player: LineupPlayer | undefined
   align: 'left' | 'right'
+  games: ReadonlyArray<GameSummary>
+  open: boolean
+  onToggle: () => void
   onNavigate: () => void
 }) {
   if (!player) return <span className="flex-1" />
+  const state = fieldState(player, games)
   const name = player.playerId ? (
     <Link
       to="/players/$playerId"
@@ -178,10 +315,10 @@ function PlayerCell({
       onClick={onNavigate}
       className="truncate hover:underline"
     >
-      {player.name}
+      {shortName(player)}
     </Link>
   ) : (
-    <span className="truncate">{player.name}</span>
+    <span className="truncate">{shortName(player)}</span>
   )
   return (
     <span
@@ -190,54 +327,182 @@ function PlayerCell({
         align === 'right' && 'flex-row-reverse text-right',
       )}
     >
+      <Avatar sport={sport} player={player} />
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm font-medium">{name}</span>
-        <span className="text-[11px] text-muted tabular-nums">
-          {player.projected !== null && `proj ${pts(player.projected)}`}
-          {player.injury && ` · ${player.injury.toLowerCase()}`}
+        <span className="truncate text-[13px] leading-tight font-medium">
+          {name}
+        </span>
+        <span
+          className={cn(
+            'flex items-center gap-1 text-[11px] text-muted',
+            align === 'right' && 'justify-end',
+          )}
+        >
+          {/* On the field (or in the red zone) says more than the clock. */}
+          {state?.redZone ? (
+            <span className="rounded bg-red-500/15 px-1 text-[10px] leading-4 font-bold whitespace-nowrap text-red-600 dark:text-red-400">
+              Red zone
+            </span>
+          ) : state?.onField ? (
+            <span className="rounded bg-scoring/15 px-1 text-[10px] leading-4 font-bold whitespace-nowrap text-scoring">
+              On field
+            </span>
+          ) : (
+            <span className={cn('truncate', state?.live && 'text-live')}>
+              {state?.status ??
+                (player.projected !== null
+                  ? `proj ${pts(player.projected)}`
+                  : '')}
+            </span>
+          )}
         </span>
       </span>
-      <span className="text-sm font-bold tabular-nums">
-        {pts(player.points)}
-      </span>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-label={`${shortName(player)}: ${pts(player.points)} points. Show breakdown`}
+        className={cn(
+          'flex min-w-9 shrink-0 flex-col rounded-lg px-1 py-0.5 tabular-nums transition-colors',
+          align === 'right' ? 'items-start' : 'items-end',
+          open ? 'bg-accent-soft' : 'hover:bg-notice',
+        )}
+      >
+        <span className="text-sm font-bold">{pts(player.points)}</span>
+      </button>
     </span>
   )
 }
 
+function Breakdown({
+  sport,
+  player,
+}: {
+  sport: FantasyLeagueView['sport']
+  player: LineupPlayer
+}) {
+  return (
+    <div className="mx-3 mb-2 rounded-lg bg-notice px-3 py-2 text-xs">
+      <div className="mb-1 flex justify-between font-semibold">
+        <span>{player.name}</span>
+        <span className="tabular-nums">{pts(player.points)} pts</span>
+      </div>
+      {player.injury && (
+        <p
+          className={cn(
+            'mb-1 font-semibold',
+            injuryTone(player.injury) === 'red'
+              ? 'text-red-600 dark:text-red-400'
+              : 'text-yellow-700 dark:text-yellow-400',
+          )}
+        >
+          {injuryLabel(player.injury)}
+        </p>
+      )}
+      {player.breakdown.length === 0 ? (
+        <p className="text-muted">No points yet.</p>
+      ) : (
+        <ul className="flex flex-col gap-0.5 tabular-nums">
+          {player.breakdown.map((b) => (
+            <li key={b.statId} className="flex justify-between gap-3">
+              <span className="text-muted">
+                {statName(sport, b.statId)}
+                {b.value !== 0 && (
+                  <span className="text-foreground/80">
+                    {' '}
+                    {statValue(b.value)}
+                  </span>
+                )}
+              </span>
+              <span
+                className={cn(
+                  'font-semibold',
+                  b.points < 0 && 'text-red-600 dark:text-red-400',
+                )}
+              >
+                {b.points > 0 ? '+' : ''}
+                {pts(b.points)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {player.projected !== null && (
+        <p className="mt-1 text-muted">Projected {pts(player.projected)}</p>
+      )}
+    </div>
+  )
+}
+
 function LineupRows({
+  sport,
   mine,
   theirs,
+  games,
   onNavigate,
 }: {
+  sport: FantasyLeagueView['sport']
   mine: Array<LineupPlayer>
   theirs: Array<LineupPlayer>
+  games: ReadonlyArray<GameSummary>
   onNavigate: () => void
 }) {
+  const [open, setOpen] = useState<string | null>(null)
   const rows = Math.max(mine.length, theirs.length)
   return (
     <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
-      {Array.from({ length: rows }, (_, i) => (
-        <li key={i} className="flex items-center gap-2 px-3 py-2">
-          <PlayerCell player={mine[i]} align="left" onNavigate={onNavigate} />
-          <span className="w-12 shrink-0 text-center text-[10px] font-bold tracking-wide text-muted uppercase">
-            {(mine[i] ?? theirs[i])?.slot}
-          </span>
-          <PlayerCell
-            player={theirs[i]}
-            align="right"
-            onNavigate={onNavigate}
-          />
-        </li>
-      ))}
+      {Array.from({ length: rows }, (_, i) => {
+        const slot = (mine[i] ?? theirs[i])?.slot ?? ''
+        const toggle = (side: 'm' | 't') => () =>
+          setOpen((o) => (o === `${side}${i}` ? null : `${side}${i}`))
+        const expanded =
+          open === `m${i}` ? mine[i] : open === `t${i}` ? theirs[i] : undefined
+        return (
+          <li key={i}>
+            <div className="flex items-center gap-1.5 px-2 py-2">
+              <PlayerCell
+                sport={sport}
+                player={mine[i]}
+                align="left"
+                games={games}
+                open={open === `m${i}`}
+                onToggle={toggle('m')}
+                onNavigate={onNavigate}
+              />
+              <span
+                className={cn(
+                  'w-10 shrink-0 rounded-md py-0.5 text-center text-[10px] font-bold uppercase',
+                  SLOT_TONES[slot] ?? 'bg-notice text-muted',
+                )}
+              >
+                {slot}
+              </span>
+              <PlayerCell
+                sport={sport}
+                player={theirs[i]}
+                align="right"
+                games={games}
+                open={open === `t${i}`}
+                onToggle={toggle('t')}
+                onNavigate={onNavigate}
+              />
+            </div>
+            {expanded && <Breakdown sport={sport} player={expanded} />}
+          </li>
+        )
+      })}
     </ul>
   )
 }
 
 export function MatchupSheet({
   league,
+  games = [],
   onClose,
 }: {
   league: FantasyLeagueView
+  /** Today's Games, for each Player's game state. */
+  games?: ReadonlyArray<GameSummary>
   onClose: () => void
 }) {
   const m = league.matchup!
@@ -282,8 +547,10 @@ export function MatchupSheet({
           Starters
         </h3>
         <LineupRows
+          sport={m.sport}
           mine={starters(m.mine)}
           theirs={starters(m.opponent)}
+          games={games}
           onNavigate={onClose}
         />
       </section>
@@ -292,13 +559,16 @@ export function MatchupSheet({
           Bench
         </h3>
         <LineupRows
+          sport={m.sport}
           mine={bench(m.mine)}
           theirs={bench(m.opponent)}
+          games={games}
           onNavigate={onClose}
         />
       </section>
       <p className="text-[11px] text-muted">
-        Read from ESPN Fantasy. Points refresh every couple of minutes.
+        Read from ESPN Fantasy. Points refresh every couple of minutes; tap a
+        player’s points for the breakdown.
       </p>
     </Sheet>
   )

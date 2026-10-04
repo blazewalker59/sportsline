@@ -628,6 +628,7 @@ function Timeline({
           return league ? (
             <MatchupSheet
               league={league}
+              games={timeline.games}
               onClose={() => setMatchupOpen(null)}
             />
           ) : null
