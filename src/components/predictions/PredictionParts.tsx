@@ -18,6 +18,7 @@ import { TeamLogo } from '@/components/brand/TeamMark'
 import { Sheet } from '@/components/chat/Sheet'
 import { CornerButton } from '@/components/timeline/GameStrip'
 import { gameSearch } from '@/lib/timeline/gameLink'
+import { PlayerButton } from '@/components/players/playerSheet'
 import { cn } from '@/lib/utils'
 
 export const pct = (n: number) => `${Math.round(n * 100)}%`
@@ -364,14 +365,12 @@ function LegRow({ leg, onNavigate }: { leg: LegView; onNavigate: () => void }) {
         <span className="min-w-0 flex-1 text-sm leading-snug font-medium">
           {leg.side === 'no' && <span className="text-muted">Not: </span>}
           {leg.playerId ? (
-            <Link
-              to="/players/$playerId"
-              params={{ playerId: leg.playerId }}
-              onClick={onNavigate}
+            <PlayerButton
+              playerId={leg.playerId}
               className="underline-offset-2 hover:underline"
             >
               {leg.title}
-            </Link>
+            </PlayerButton>
           ) : (
             leg.title
           )}

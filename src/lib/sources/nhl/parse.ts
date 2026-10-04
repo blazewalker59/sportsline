@@ -14,6 +14,7 @@ import type {
   NhlClubSchedule,
   NhlPlay,
   NhlPlayByPlay,
+  NhlPlayerLanding,
   NhlSchedule,
   NhlStandings,
   NhlStatsTeams,
@@ -23,6 +24,7 @@ import type {
   GameSnapshot,
   GameStatus,
   InvolvedPlayer,
+  PlayerOverview,
   ScheduledGame,
   Score,
   Side,
@@ -679,5 +681,62 @@ export function parseRoster(
           }),
       ).values(),
     ],
+  }
+}
+
+/** A player's season and last five games, from their NHL.com page. */
+export function parsePlayerLanding(d: NhlPlayerLanding): PlayerOverview {
+  const goalie = d.position === 'G'
+  const season = d.featuredStats?.regularSeason?.subSeason
+  const whole = (n?: number) => (n === undefined ? '—' : String(n))
+  const pct = (n?: number) =>
+    n === undefined ? '—' : n.toFixed(3).replace(/^0/, '')
+  const fields: Array<[string, string, (n?: number) => string]> = goalie
+    ? [
+        ['gamesPlayed', 'GP', whole],
+        ['wins', 'W', whole],
+        [
+          'goalsAgainstAvg',
+          'GAA',
+          (n) => (n === undefined ? '—' : n.toFixed(2)),
+        ],
+        ['savePctg', 'SV%', pct],
+        ['shutouts', 'SO', whole],
+      ]
+    : [
+        ['gamesPlayed', 'GP', whole],
+        ['goals', 'G', whole],
+        ['assists', 'A', whole],
+        ['points', 'P', whole],
+        ['plusMinus', '+/-', whole],
+        ['shots', 'SOG', whole],
+      ]
+  const year = d.featuredStats?.season
+  return {
+    season: season
+      ? {
+          title: year
+            ? `${String(year).slice(0, 4)}-${String(year).slice(6)} Season`
+            : 'Season',
+          stats: fields.map(([key, label, show]) => ({
+            label,
+            value: show(season[key]),
+          })),
+        }
+      : null,
+    recent: (d.last5Games ?? []).map((g) => ({
+      date: g.gameDate ?? '',
+      opponent: g.opponentAbbrev ?? '',
+      home: g.homeRoadFlag === 'H',
+      result: g.decision ?? null,
+      score: null,
+      line: goalie
+        ? `${pct(g.savePctg)} SV% · ${g.goalsAgainst ?? 0} GA`
+        : `${g.goals ?? 0} G · ${g.assists ?? 0} A · ${g.shots ?? 0} SOG · ${g.toi ?? ''} TOI`,
+    })),
+    next: null,
+    news: [],
+    note: null,
+    fantasy: null,
   }
 }

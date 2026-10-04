@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { FollowButton } from './FollowButton'
 import { LeagueList } from './LeagueList'
 import type { FollowEntry } from '@/lib/viewer/server'
+import { PlayerButton } from '@/components/players/playerSheet'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
@@ -128,13 +129,12 @@ function EntryRow({ entry }: { entry: FollowEntry }) {
   return (
     <li className="flex items-center gap-3 px-4 py-2.5">
       {player ? (
-        <Link
-          to="/players/$playerId"
-          params={{ playerId: player.playerId }}
+        <PlayerButton
+          playerId={player.playerId}
           className="flex min-w-0 flex-1 items-center gap-3"
         >
           {body}
-        </Link>
+        </PlayerButton>
       ) : entry.follow.kind === 'team' ? (
         <Link
           to="/teams/$teamId"

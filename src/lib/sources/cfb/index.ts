@@ -8,6 +8,7 @@
 import { fetchTeamSchedule, top25 } from '../espn/common'
 import { parseGame, parseRoster, parseScoreboard } from '../nfl/parse'
 import { fetchWithRetry, mapPool } from '../pool'
+import { espnAthleteOverview } from '../espn/athlete'
 import type {
   NflCorePlays,
   NflRoster,
@@ -137,5 +138,13 @@ export const cfbAdapter: SourceAdapter = {
   },
   teamSchedule(team) {
     return fetchTeamSchedule(SITE, team.sourceId, 'cfb', getJson)
+  },
+  playerOverview(sourceId, teamSourceId) {
+    return espnAthleteOverview(
+      'football/college-football',
+      sourceId,
+      teamSourceId,
+      getJson,
+    )
   },
 }

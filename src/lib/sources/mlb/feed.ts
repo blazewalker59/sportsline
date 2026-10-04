@@ -208,3 +208,21 @@ export interface MlbBoxTeam {
   pitchers?: Array<number>
   players?: Record<string, MlbBoxPlayer | undefined>
 }
+
+/** A player with season and game-log stats (`/people/{id}?hydrate=stats(…)`). */
+export interface MlbPlayerStats {
+  people?: Array<{
+    primaryPosition?: { abbreviation?: string }
+    stats?: Array<{
+      type?: { displayName?: string }
+      group?: { displayName?: string }
+      splits?: Array<{
+        date?: string
+        isHome?: boolean
+        isWin?: boolean
+        opponent?: { name?: string; abbreviation?: string }
+        stat?: Record<string, string | number>
+      }>
+    }>
+  }>
+}

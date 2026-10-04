@@ -4,6 +4,7 @@ import { fetchWithRetry } from '../pool'
 import {
   parseClubSchedule,
   parseGame,
+  parsePlayerLanding,
   parseRoster,
   parseSchedule,
 } from './parse'
@@ -12,6 +13,7 @@ import type {
   NhlBoxscore,
   NhlClubSchedule,
   NhlPlayByPlay,
+  NhlPlayerLanding,
   NhlSchedule,
   NhlStandings,
   NhlStatsTeams,
@@ -70,6 +72,13 @@ export const nhlAdapter: SourceAdapter = {
     return parseClubSchedule(
       await getJson<NhlClubSchedule>(
         `${WEB}/club-schedule-season/${encodeURIComponent(team.abbreviation)}/now`,
+      ),
+    )
+  },
+  async playerOverview(sourceId) {
+    return parsePlayerLanding(
+      await getJson<NhlPlayerLanding>(
+        `${WEB}/player/${encodeURIComponent(sourceId)}/landing`,
       ),
     )
   },

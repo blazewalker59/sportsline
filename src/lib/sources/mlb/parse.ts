@@ -13,6 +13,7 @@ import type {
   MlbPeople,
   MlbPlay,
   MlbPlayEvent,
+  MlbPlayerStats,
   MlbRunner,
   MlbSchedule,
   MlbStatus,
@@ -23,6 +24,7 @@ import type {
   GameSnapshot,
   GameStatus,
   InvolvedPlayer,
+  PlayerOverview,
   ScheduledGame,
   Score,
   Side,
@@ -699,5 +701,68 @@ function box(
       homeTotals: totals('home'),
     },
     tables,
+  }
+}
+
+const HITTING: Array<[string, string]> = [
+  ['avg', 'AVG'],
+  ['homeRuns', 'HR'],
+  ['rbi', 'RBI'],
+  ['runs', 'R'],
+  ['hits', 'H'],
+  ['stolenBases', 'SB'],
+  ['obp', 'OBP'],
+  ['ops', 'OPS'],
+]
+const PITCHING: Array<[string, string]> = [
+  ['wins', 'W'],
+  ['losses', 'L'],
+  ['era', 'ERA'],
+  ['inningsPitched', 'IP'],
+  ['strikeOuts', 'K'],
+  ['whip', 'WHIP'],
+  ['saves', 'SV'],
+]
+
+/** A player's season and recent games: hitting, or pitching for a pitcher. */
+export function parsePlayerOverview(r: MlbPlayerStats): PlayerOverview | null {
+  const person = r.people?.[0]
+  if (!person) return null
+  const pitcher = person.primaryPosition?.abbreviation === 'P'
+  const group = pitcher ? 'pitching' : 'hitting'
+  const fields = pitcher ? PITCHING : HITTING
+  const of = (type: string) =>
+    person.stats?.find(
+      (s) => s.type?.displayName === type && s.group?.displayName === group,
+    )
+  const season = of('season')?.splits?.[0]?.stat
+  const log = of('gameLog')?.splits ?? []
+  return {
+    season: season
+      ? {
+          title: `${new Date().getUTCFullYear()} ${pitcher ? 'Pitching' : 'Batting'}`,
+          stats: fields.map(([key, label]) => ({
+            label,
+            value: String(season[key] ?? '—'),
+          })),
+        }
+      : null,
+    recent: [...log]
+      .reverse()
+      .slice(0, 5)
+      .map((g) => ({
+        date: g.date ?? '',
+        opponent: g.opponent?.abbreviation ?? g.opponent?.name ?? '',
+        home: Boolean(g.isHome),
+        result: g.isWin === undefined ? null : g.isWin ? 'W' : 'L',
+        score: null,
+        line: pitcher
+          ? `${g.stat?.inningsPitched ?? 0} IP · ${g.stat?.strikeOuts ?? 0} K · ${g.stat?.earnedRuns ?? 0} ER`
+          : `${g.stat?.hits ?? 0}-${g.stat?.atBats ?? 0} · ${g.stat?.homeRuns ?? 0} HR · ${g.stat?.rbi ?? 0} RBI`,
+      })),
+    next: null,
+    news: [],
+    note: null,
+    fantasy: null,
   }
 }

@@ -2,6 +2,7 @@
 
 import { fetchWithRetry, mapPool } from '../pool'
 import { fetchTeamSchedule } from '../espn/common'
+import { espnAthleteOverview } from '../espn/athlete'
 import { parseGame, parseRoster, parseScoreboard } from './parse'
 import type {
   NflCorePlays,
@@ -58,5 +59,8 @@ export const nflAdapter: SourceAdapter = {
   },
   teamSchedule(team) {
     return fetchTeamSchedule(SITE, team.sourceId, 'nfl', getJson)
+  },
+  playerOverview(sourceId, teamSourceId) {
+    return espnAthleteOverview('football/nfl', sourceId, teamSourceId, getJson)
   },
 }

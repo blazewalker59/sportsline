@@ -2,6 +2,7 @@
 
 import { fetchTeamSchedule, parseScoreboard } from '../espn/common'
 import { fetchWithRetry, mapPool } from '../pool'
+import { espnAthleteOverview } from '../espn/athlete'
 import { parseGame, parseRoster } from './parse'
 import type { NbaRoster, NbaSummary } from './feed'
 import type { NflScoreboard, NflTeams } from '../nfl/feed'
@@ -49,5 +50,13 @@ export const nbaAdapter: SourceAdapter = {
   },
   teamSchedule(team) {
     return fetchTeamSchedule(SITE, team.sourceId, 'nba', getJson)
+  },
+  playerOverview(sourceId, teamSourceId) {
+    return espnAthleteOverview(
+      'basketball/nba',
+      sourceId,
+      teamSourceId,
+      getJson,
+    )
   },
 }

@@ -1,5 +1,6 @@
 import {
   HeadContent,
+  Outlet,
   Scripts,
   createRootRouteWithContext,
 } from '@tanstack/react-router'
@@ -12,6 +13,7 @@ import appCss from '../styles.css?url'
 import { THEME_BOOT, THEME_COLOR_BOOT } from '../lib/theme'
 
 import type { QueryClient } from '@tanstack/react-query'
+import { PlayerSheetProvider } from '@/components/players/PlayerProfile'
 
 interface MyRouterContext {
   queryClient: QueryClient
@@ -49,6 +51,12 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
     ],
   }),
   shellComponent: RootDocument,
+  // A Player opens as a sheet over any screen, not a new page.
+  component: () => (
+    <PlayerSheetProvider>
+      <Outlet />
+    </PlayerSheetProvider>
+  ),
   notFoundComponent: () => (
     <p className="p-8 text-center text-muted">Page not found.</p>
   ),

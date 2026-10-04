@@ -170,3 +170,25 @@ export interface NhlBios {
     currentTeamAbbrev?: string | null
   }>
 }
+
+/** A player's page (`/player/{id}/landing`): season and last five games. */
+export interface NhlPlayerLanding {
+  position?: string
+  featuredStats?: {
+    season?: number
+    regularSeason?: { subSeason?: Record<string, number> }
+  }
+  last5Games?: Array<{
+    gameDate?: string
+    opponentAbbrev?: string
+    homeRoadFlag?: string
+    goals?: number
+    assists?: number
+    points?: number
+    shots?: number
+    toi?: string
+    savePctg?: number
+    goalsAgainst?: number
+    decision?: string
+  }>
+}

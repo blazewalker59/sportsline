@@ -1,9 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
+import { createPortal } from 'react-dom'
 
 /** Drag further than this (px), or flick faster than FLICK, to dismiss. */
 const DISMISS_PX = 110
 const FLICK_PX_PER_MS = 0.6
 const EXIT_MS = 220
+
+/** Open sheets, newest last: Escape closes only the top one. */
+const open: Array<symbol> = []
 
 /**
  * A bottom sheet over the Timeline (box score, Play Detail), so drilling
@@ -36,18 +46,24 @@ export function Sheet({
   }, [onClose])
 
   useEffect(() => {
+    const me = Symbol('sheet')
+    open.push(me)
     close.current?.focus({ preventScroll: true })
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && dismiss()
+    const onKey = (e: KeyboardEvent) =>
+      e.key === 'Escape' && open.at(-1) === me && dismiss()
     window.addEventListener('keydown', onKey)
     const overflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
+      open.splice(open.indexOf(me), 1)
       window.removeEventListener('keydown', onKey)
       document.body.style.overflow = overflow
     }
   }, [dismiss])
 
   const onTouchStart = (e: React.TouchEvent, fromContent: boolean) => {
+    // A sheet opened from this one is its child in React: keep its swipes.
+    e.stopPropagation()
     // From the content, only when it can't scroll up any further.
     if (fromContent && (body.current?.scrollTop ?? 0) > 0) return
     gesture.current = {
@@ -57,6 +73,7 @@ export function Sheet({
     }
   }
   const onTouchMove = (e: React.TouchEvent) => {
+    e.stopPropagation()
     const g = gesture.current
     if (!g?.active) return
     const dy = e.touches[0].clientY - g.startY
@@ -66,7 +83,8 @@ export function Sheet({
     }
     setDrag(dy)
   }
-  const onTouchEnd = () => {
+  const onTouchEnd = (e: React.TouchEvent) => {
+    e.stopPropagation()
     const g = gesture.current
     gesture.current = null
     if (!g?.active) return
@@ -76,7 +94,14 @@ export function Sheet({
   }
 
   const dragging = gesture.current?.active && drag > 0
-  return (
+  // On the body, so a sheet opened from another sheet isn't laid out
+  // inside it (the sheet's transform would trap a fixed child).
+  const portal = useSyncExternalStore(
+    noSubscribe,
+    () => true,
+    () => false,
+  )
+  const sheet = (
     <div
       className="fixed inset-0 z-30 flex flex-col justify-end"
       role="dialog"
@@ -134,4 +159,7 @@ export function Sheet({
       </div>
     </div>
   )
+  return portal ? createPortal(sheet, document.body) : sheet
 }
+
+const noSubscribe = () => () => {}

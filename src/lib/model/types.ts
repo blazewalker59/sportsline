@@ -203,4 +203,38 @@ export interface SourceAdapter {
   roster: (season: number) => Promise<SourceRoster>
   /** One Team's season: regular season and postseason Games, past and to come. */
   teamSchedule: (team: SourceTeamRef) => Promise<Array<ScheduledGame>>
+  /** A Player's season, recent games, next game and news, as the Source has them. */
+  playerOverview: (
+    sourceId: string,
+    teamSourceId: string | null,
+  ) => Promise<PlayerOverview | null>
+}
+
+/** A Player at a glance, from their Source (a Player's page and sheet). */
+export interface PlayerOverview {
+  /** Season stats, e.g. "2026 Passing": labelled values. */
+  season: {
+    title: string
+    /** `group` splits a mixed line: Passing, then Rushing. */
+    stats: Array<{ label: string; value: string; group?: string }>
+  } | null
+  /** Recent Games, newest first, each with the Player's line. */
+  recent: Array<{
+    date: string
+    opponent: string
+    home: boolean
+    result: string | null
+    score: string | null
+    line: string
+  }>
+  next: { date: string; opponent: string; home: boolean } | null
+  news: Array<{
+    headline: string
+    published: string | null
+    url: string | null
+  }>
+  /** The latest fantasy note (e.g. Rotowire's), if any. */
+  note: { headline: string; story: string | null } | null
+  /** Fantasy standing, e.g. "QB15 · 90% owned". */
+  fantasy: string | null
 }

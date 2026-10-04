@@ -4,7 +4,6 @@
  * of the Viewer's Starters' or their opponent's.
  */
 
-import { Link } from '@tanstack/react-router'
 import { createContext, useContext, useState } from 'react'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { LineupPlayer, MatchupSide } from '@/lib/fantasy/matchup'
@@ -14,6 +13,7 @@ import { Sheet } from '@/components/chat/Sheet'
 import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
 import { statName, statValue } from '@/lib/fantasy/stats'
 import { SPORTS } from '@/lib/fantasy/sports'
+import { PlayerButton } from '@/components/players/playerSheet'
 import { cn } from '@/lib/utils'
 
 const pts = (n: number | null) => (n === null ? '—' : n.toFixed(1))
@@ -185,13 +185,13 @@ function headshotOf(
 }
 
 /** Red for out (or close to it), yellow for maybe. */
-function injuryTone(status: string | null): 'red' | 'yellow' | null {
+export function injuryTone(status: string | null): 'red' | 'yellow' | null {
   if (!status) return null
   if (/QUESTIONABLE|DAY_TO_DAY|PROBABLE/.test(status)) return 'yellow'
   return 'red'
 }
 
-function injuryLabel(status: string): string {
+export function injuryLabel(status: string): string {
   return status
     .replace('INJURY_RESERVE', 'IR')
     .replace('DAY_TO_DAY', 'Day-to-day')
@@ -296,7 +296,6 @@ function PlayerCell({
   games,
   open,
   onToggle,
-  onNavigate,
 }: {
   sport: FantasyLeagueView['sport']
   player: LineupPlayer | undefined
@@ -304,19 +303,16 @@ function PlayerCell({
   games: ReadonlyArray<GameSummary>
   open: boolean
   onToggle: () => void
-  onNavigate: () => void
 }) {
   if (!player) return <span className="flex-1" />
   const state = fieldState(player, games)
   const name = player.playerId ? (
-    <Link
-      to="/players/$playerId"
-      params={{ playerId: player.playerId }}
-      onClick={onNavigate}
+    <PlayerButton
+      playerId={player.playerId}
       className="truncate hover:underline"
     >
       {shortName(player)}
-    </Link>
+    </PlayerButton>
   ) : (
     <span className="truncate">{shortName(player)}</span>
   )
@@ -374,7 +370,7 @@ function PlayerCell({
   )
 }
 
-function Breakdown({
+export function Breakdown({
   sport,
   player,
 }: {
@@ -439,13 +435,11 @@ function LineupRows({
   mine,
   theirs,
   games,
-  onNavigate,
 }: {
   sport: FantasyLeagueView['sport']
   mine: Array<LineupPlayer>
   theirs: Array<LineupPlayer>
   games: ReadonlyArray<GameSummary>
-  onNavigate: () => void
 }) {
   const [open, setOpen] = useState<string | null>(null)
   const rows = Math.max(mine.length, theirs.length)
@@ -467,7 +461,6 @@ function LineupRows({
                 games={games}
                 open={open === `m${i}`}
                 onToggle={toggle('m')}
-                onNavigate={onNavigate}
               />
               <span
                 className={cn(
@@ -484,7 +477,6 @@ function LineupRows({
                 games={games}
                 open={open === `t${i}`}
                 onToggle={toggle('t')}
-                onNavigate={onNavigate}
               />
             </div>
             {expanded && <Breakdown sport={sport} player={expanded} />}
@@ -551,7 +543,6 @@ export function MatchupSheet({
           mine={starters(m.mine)}
           theirs={starters(m.opponent)}
           games={games}
-          onNavigate={onClose}
         />
       </section>
       <section>
@@ -563,7 +554,6 @@ export function MatchupSheet({
           mine={bench(m.mine)}
           theirs={bench(m.opponent)}
           games={games}
-          onNavigate={onClose}
         />
       </section>
       <p className="text-[11px] text-muted">

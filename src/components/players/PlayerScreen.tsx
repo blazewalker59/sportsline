@@ -1,29 +1,28 @@
 /**
- * A Player's page: headshot, Team and position, a Follow button, and every
+ * A Player's page: their profile in full (as in their sheet), then every
  * Play naming them, newest first by Sports Day. Tapping a Play opens its
  * detail in a sheet here.
  */
 
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { Link, useNavigate, useRouter } from '@tanstack/react-router'
+import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useCallback, useEffect, useState } from 'react'
 import type { TimelineItem } from '@/lib/model/timeline'
 import { AppHeader } from '@/components/layout/AppHeader'
-import { LeagueLogo, leagueLabel } from '@/components/brand/LeagueLogo'
-import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
-import { TeamLogo } from '@/components/brand/TeamMark'
+import {
+  PlayerDetailSections,
+  PlayerHeader,
+} from '@/components/players/PlayerProfile'
 import {
   LeagueAvatar,
   PlayBubble,
   TeamAvatarLink,
 } from '@/components/chat/ChatParts'
-import { FollowButton } from '@/components/follows/FollowButton'
 import { PlaySheet } from '@/components/games/PlayDetailScreen'
 import { dayLabel } from '@/components/timeline/DayButton'
 import { sportsDayOf } from '@/lib/model/sportsDay'
 import { getPlayerPage } from '@/lib/players/server'
 import { takePlayOpened } from '@/lib/timeline/playSheet'
-import { useViewer } from '@/lib/viewer/useViewer'
 
 export function PlayerScreen({
   playerId,
@@ -32,7 +31,6 @@ export function PlayerScreen({
   playerId: string
   playId: string | null
 }) {
-  const { data: viewerState } = useViewer()
   const [today] = useState(() => sportsDayOf(new Date()))
   const query = useInfiniteQuery({
     queryKey: ['player', playerId],
@@ -72,42 +70,13 @@ export function PlayerScreen({
         </p>
       ) : (
         <>
-          <header className="mb-6 flex items-center gap-4">
-            <PlayerAvatar
-              name={first.player.name}
-              headshotUrl={first.player.headshotUrl}
-              team={first.player.team}
-              size={88}
-            />
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <h1 className="text-xl leading-tight font-bold tracking-tight">
-                {first.player.name}
-              </h1>
-              <span className="flex items-center gap-1.5 text-sm text-muted">
-                <LeagueLogo league={first.player.league} size={16} />
-                {first.player.team ? (
-                  <Link
-                    to="/teams/$teamId"
-                    params={{ teamId: first.player.team.id }}
-                    className="flex items-center gap-1.5 font-medium text-foreground/80 underline-offset-2 hover:underline"
-                  >
-                    <TeamLogo team={first.player.team} size={16} />
-                    {first.player.team.name}
-                  </Link>
-                ) : (
-                  leagueLabel(first.player.league)
-                )}
-                {first.player.position && ` · ${first.player.position}`}
-              </span>
-              {viewerState?.viewer && (
-                <div className="mt-1">
-                  <FollowButton
-                    follow={{ kind: 'player', playerId: first.player.id }}
-                  />
-                </div>
-              )}
-            </div>
-          </header>
+          <PlayerHeader player={first.player} />
+          <div className="mt-6 mb-6">
+            <PlayerDetailSections player={first.player} />
+          </div>
+          <h2 className="mb-3 text-xs font-bold tracking-wide text-muted uppercase">
+            Plays
+          </h2>
 
           {items.length === 0 ? (
             <p className="mt-10 text-center text-sm text-muted">

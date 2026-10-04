@@ -1,7 +1,18 @@
 /** MLB Source adapter: MLB StatsAPI (statsapi.mlb.com). */
 
-import { parseFeed, parseRoster, parseSchedule } from './parse'
-import type { MlbFeed, MlbPeople, MlbSchedule, MlbTeams } from './feed'
+import {
+  parseFeed,
+  parsePlayerOverview,
+  parseRoster,
+  parseSchedule,
+} from './parse'
+import type {
+  MlbFeed,
+  MlbPeople,
+  MlbPlayerStats,
+  MlbSchedule,
+  MlbTeams,
+} from './feed'
 import type { SourceAdapter } from '@/lib/model/types'
 
 const BASE = 'https://statsapi.mlb.com/api'
@@ -42,5 +53,12 @@ export const mlbAdapter: SourceAdapter = {
       `${BASE}/v1/schedule?sportId=1&teamId=${encodeURIComponent(team.sourceId)}&season=${season}&gameType=R,F,D,L,W&hydrate=team`,
     )
     return parseSchedule(schedule)
+  },
+  async playerOverview(sourceId) {
+    const season = new Date().getUTCFullYear()
+    const r = await getJson<MlbPlayerStats>(
+      `${BASE}/v1/people/${encodeURIComponent(sourceId)}?hydrate=stats(group=[hitting,pitching],type=[season,gameLog],season=${season})`,
+    )
+    return parsePlayerOverview(r)
   },
 }

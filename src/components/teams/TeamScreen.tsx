@@ -18,6 +18,8 @@ import { gameSearch } from '@/lib/timeline/gameLink'
 import { getTeamPage, openTeamGame } from '@/lib/teams/server'
 import { rosterGroups } from '@/lib/teams/positions'
 import { useViewer } from '@/lib/viewer/useViewer'
+import { PlayerButton } from '@/components/players/playerSheet'
+import { PredictionsSection } from '@/components/players/PlayerProfile'
 import { cn } from '@/lib/utils'
 
 const RESULTS_SHOWN = 10
@@ -43,6 +45,9 @@ export function TeamScreen({ teamId }: { teamId: string }) {
       ) : (
         <>
           <TeamHeader page={data} canFollow={Boolean(viewerState?.viewer)} />
+          <div className="mb-5 empty:hidden">
+            <PredictionsSection teamId={data.team.id} />
+          </div>
           <div
             role="tablist"
             aria-label="Team"
@@ -440,9 +445,8 @@ function Roster({
           <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
             {players.map((p) => (
               <li key={p.id}>
-                <Link
-                  to="/players/$playerId"
-                  params={{ playerId: p.id }}
+                <PlayerButton
+                  playerId={p.id}
                   className="flex items-center gap-3 px-3 py-2"
                 >
                   <PlayerAvatar
@@ -461,7 +465,7 @@ function Roster({
                   <span aria-hidden="true" className="text-muted">
                     ›
                   </span>
-                </Link>
+                </PlayerButton>
               </li>
             ))}
           </ul>
