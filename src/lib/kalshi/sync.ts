@@ -20,6 +20,7 @@ import {
   sql,
 } from 'drizzle-orm'
 import {
+  KalshiError,
   market as fetchMarket,
   markets as fetchMarkets,
   target as fetchTarget,
@@ -59,6 +60,10 @@ import { syncLeague } from '@/lib/live/schedule'
 const RECHECK_MS = 30 * 60_000
 /** Store a future Game's schedule this far ahead, to match it early. */
 const LOOKAHEAD_DAYS = 10
+/** New settled Predictions taken per sync (history fills in over runs). */
+const SETTLED_PER_RUN = 40
+/** Settled Predictions this recent are matched to Games; older aren't. */
+const MATCH_SETTLED_MS = 14 * 86_400_000
 
 const dollars = (v: string | undefined): number => Number(v ?? 0) || 0
 
@@ -83,6 +88,7 @@ export async function loadAccount(
 // ─── Matching (cached in kalshi_events / kalshi_targets) ───────────────────
 
 async function targetName(
+  account: KalshiAccount,
   db: Database,
   id: string,
 ): Promise<{ name: string; league: string | null } | null> {
@@ -92,7 +98,7 @@ async function targetName(
     .where(eq(kalshiTargets.id, id))
     .get()
   if (cached) return cached
-  const t = await fetchTarget(id)
+  const t = await fetchTarget(account, id)
   if (!t) return null
   const name = t.type?.endsWith('_player')
     ? [t.details?.first_name, t.details?.last_name].filter(Boolean).join(' ') ||
@@ -111,6 +117,7 @@ async function targetName(
 /** Our Game for a Kalshi event, matching (and remembering) it if we can. */
 async function gameFor(
   env: CloudflareEnv,
+  account: KalshiAccount,
   db: Database,
   eventTicker: string,
 ): Promise<{ gameId: string | null; league: League | null }> {
@@ -125,13 +132,13 @@ async function gameFor(
     return { gameId: null, league: cached.league }
   }
   if (!cached) {
-    const ms = await milestoneFor(eventTicker)
+    const ms = await milestoneFor(account, eventTicker)
     const [home, away] = await Promise.all([
       ms?.details?.home_team_id
-        ? targetName(db, ms.details.home_team_id)
+        ? targetName(account, db, ms.details.home_team_id)
         : null,
       ms?.details?.away_team_id
-        ? targetName(db, ms.details.away_team_id)
+        ? targetName(account, db, ms.details.away_team_id)
         : null,
     ])
     cached = {
@@ -196,6 +203,7 @@ async function gameFor(
 
 /** Our Team or Player a leg's market is about, from its custom strike. */
 async function subjectFor(
+  account: KalshiAccount,
   db: Database,
   m: KalshiMarket | undefined,
   league: League | null,
@@ -211,7 +219,7 @@ async function subjectFor(
   let playerId: string | null = null
   let teamId: string | null = null
   if (playerTarget && league) {
-    const t = await targetName(db, playerTarget)
+    const t = await targetName(account, db, playerTarget)
     if (t) {
       const want = normalizePlayerName(t.name)
       const last = t.name.trim().split(/\s+/).at(-1) ?? ''
@@ -224,7 +232,7 @@ async function subjectFor(
     }
   }
   if (teamTarget && gameId) {
-    const t = await targetName(db, teamTarget)
+    const t = await targetName(account, db, teamTarget)
     const game = await db
       .select({ home: games.homeTeamId, away: games.awayTeamId })
       .from(games)
@@ -303,6 +311,7 @@ function legTitle(m: KalshiMarket | undefined, fallback: string): string {
 /** Save a Prediction for a market, with its Legs (created or refreshed). Exported for scripts and tests. */
 export async function savePrediction(
   env: CloudflareEnv,
+  account: KalshiAccount,
   db: Database,
   viewerId: string,
   m: KalshiMarket,
@@ -315,6 +324,8 @@ export async function savePrediction(
     payout?: number | null
     pnl?: number | null
     settledAt?: string | null
+    /** Match Legs to our Games and Players (skipped for old history). */
+    match?: boolean
   },
 ): Promise<void> {
   const id = predictionId(viewerId, m.ticker)
@@ -329,7 +340,10 @@ export async function savePrediction(
         },
       ]
   const legMarkets = combo
-    ? await fetchMarkets(legs.map((l) => l.market_ticker))
+    ? await fetchMarkets(
+        account,
+        legs.map((l) => l.market_ticker),
+      )
     : [m]
   await rememberMarkets(db, [m, ...(combo ? legMarkets : [])])
   const byTicker = new Map(legMarkets.map((x) => [x.ticker, x]))
@@ -379,8 +393,15 @@ export async function savePrediction(
   const rows = []
   for (const [position, leg] of legs.entries()) {
     const lm = byTicker.get(leg.market_ticker)
-    const { gameId, league } = await gameFor(env, db, leg.event_ticker)
-    const { teamId, playerId } = await subjectFor(db, lm, league, gameId)
+    const matched =
+      fields.match === false
+        ? { gameId: null, league: null }
+        : await gameFor(env, account, db, leg.event_ticker)
+    const { gameId, league } = matched
+    const { teamId, playerId } =
+      fields.match === false
+        ? { teamId: null, playerId: null }
+        : await subjectFor(account, db, lm, league, gameId)
     rows.push({
       predictionId: id,
       position,
@@ -435,51 +456,98 @@ export async function syncAccount(
       ).map((r) => [r.ticker, r.status]),
     )
 
+    // A rate limit mid-sync stops it here: what's left waits for the next
+    // run rather than failing the whole sync. Any other trouble with one
+    // Prediction is logged and the rest carry on.
+    let limited = false
+    const each = async (what: string, save: () => Promise<void>) => {
+      if (limited) return false
+      try {
+        await save()
+        return true
+      } catch (error) {
+        if (error instanceof KalshiError && error.status === 429) {
+          limited = true
+        } else {
+          console.error('Kalshi prediction failed', {
+            what,
+            error: String(error),
+          })
+        }
+        return false
+      }
+    }
+
     // Open positions.
     const heldMarkets = new Map(
-      (await fetchMarkets(held.map((p) => p.ticker))).map((m) => [m.ticker, m]),
+      (
+        await fetchMarkets(
+          account,
+          held.map((p) => p.ticker),
+        )
+      ).map((m) => [m.ticker, m]),
     )
     for (const p of held) {
-      const m = heldMarkets.get(p.ticker) ?? (await fetchMarket(p.ticker))
-      if (!m) continue
-      const position = dollars(p.position_fp)
-      await savePrediction(env, db, viewerId, m, {
-        side: position > 0 ? 'yes' : 'no',
-        contracts: Math.abs(position),
-        cost: dollars(p.market_exposure_dollars),
-        status: 'open',
+      await each(p.ticker, async () => {
+        const m =
+          heldMarkets.get(p.ticker) ?? (await fetchMarket(account, p.ticker))
+        if (!m) return
+        const position = dollars(p.position_fp)
+        await savePrediction(env, account, db, viewerId, m, {
+          side: position > 0 ? 'yes' : 'no',
+          contracts: Math.abs(position),
+          cost: dollars(p.market_exposure_dollars),
+          status: 'open',
+        })
       })
     }
 
-    // Settled ones (new to us, or that we had as open).
+    // Settled ones new to us (or that we had as open), a few per run so a
+    // long history fills in over several syncs. Only recent ones are
+    // matched to Games: old history just keeps its result.
+    const fresh = settlements
+      .filter((s) => known.get(s.ticker) !== 'settled')
+      .slice(0, SETTLED_PER_RUN)
+    const settledMarkets = new Map(
+      (
+        await fetchMarkets(
+          account,
+          fresh.map((s) => s.ticker),
+        )
+      ).map((m) => [m.ticker, m]),
+    )
     let settledCount = 0
-    for (const s of settlements) {
-      if (known.get(s.ticker) === 'settled') continue
-      const m = await fetchMarket(s.ticker)
-      if (!m) continue
-      const yes = dollars(s.yes_count_fp)
-      const no = dollars(s.no_count_fp)
-      const side: 'yes' | 'no' = yes >= no ? 'yes' : 'no'
-      const cost =
-        dollars(s.yes_total_cost_dollars) + dollars(s.no_total_cost_dollars)
-      const payout = (s.revenue ?? 0) / 100
-      const result =
-        s.market_result === side
-          ? 'won'
-          : s.market_result === 'yes' || s.market_result === 'no'
-            ? 'lost'
-            : 'void'
-      await savePrediction(env, db, viewerId, m, {
-        side,
-        contracts: Math.max(yes, no),
-        cost,
-        status: 'settled',
-        result,
-        payout,
-        pnl: payout - cost - dollars(s.fee_cost),
-        settledAt: s.settled_time ?? new Date().toISOString(),
+    for (const s of fresh) {
+      const saved = await each(s.ticker, async () => {
+        const m =
+          settledMarkets.get(s.ticker) ?? (await fetchMarket(account, s.ticker))
+        if (!m) return
+        const yes = dollars(s.yes_count_fp)
+        const no = dollars(s.no_count_fp)
+        const side: 'yes' | 'no' = yes >= no ? 'yes' : 'no'
+        const cost =
+          dollars(s.yes_total_cost_dollars) + dollars(s.no_total_cost_dollars)
+        const payout = (s.revenue ?? 0) / 100
+        const result =
+          s.market_result === side
+            ? 'won'
+            : s.market_result === 'yes' || s.market_result === 'no'
+              ? 'lost'
+              : 'void'
+        const settledAt = s.settled_time ?? new Date().toISOString()
+        await savePrediction(env, account, db, viewerId, m, {
+          side,
+          contracts: Math.max(yes, no),
+          cost,
+          status: 'settled',
+          result,
+          payout,
+          pnl: payout - cost - dollars(s.fee_cost),
+          settledAt,
+          match: Date.now() - Date.parse(settledAt) < MATCH_SETTLED_MS,
+        })
       })
-      settledCount++
+      if (saved) settledCount++
     }
 
     // Open Predictions no longer held and not settled were sold: closed.
@@ -504,7 +572,9 @@ export async function syncAccount(
       .update(kalshiAccounts)
       .set({
         status: 'ok',
-        lastError: null,
+        lastError: limited
+          ? 'Kalshi asked us to slow down; the rest syncs shortly.'
+          : null,
         syncedAt: new Date().toISOString(),
       })
       .where(eq(kalshiAccounts.viewerId, viewerId))
@@ -545,19 +615,27 @@ export async function accountsDue(
 
 /**
  * Latest prices for every market an open Prediction depends on, plus a
- * point of history a minute for each Prediction's own market.
+ * point of history a minute for each Prediction's own market. Each
+ * Viewer's markets are read with their own key (see client.ts).
  */
 export async function refreshPrices(
-  env: Pick<CloudflareEnv, 'DB'>,
+  env: Pick<CloudflareEnv, 'DB' | 'KALSHI_ENCRYPTION_KEY'>,
 ): Promise<number> {
   const db = dbFromD1(env.DB)
   const open = await db
-    .select({ ticker: predictions.marketTicker, id: predictions.id })
+    .select({
+      ticker: predictions.marketTicker,
+      id: predictions.id,
+      viewerId: predictions.viewerId,
+    })
     .from(predictions)
     .where(eq(predictions.status, 'open'))
   if (open.length === 0) return 0
-  const legTickers = await db
-    .select({ ticker: predictionLegs.marketTicker })
+  const legs = await db
+    .select({
+      ticker: predictionLegs.marketTicker,
+      predictionId: predictionLegs.predictionId,
+    })
     .from(predictionLegs)
     .where(
       inArray(
@@ -565,30 +643,47 @@ export async function refreshPrices(
         open.map((o) => o.id),
       ),
     )
-  const tickers = [
-    ...new Set([
-      ...open.map((o) => o.ticker),
-      ...legTickers.map((l) => l.ticker),
-    ]),
-  ]
-  const latest = await fetchMarkets(tickers)
-  await rememberMarkets(db, latest)
   const at = new Date().toISOString().slice(0, 16)
   const own = new Set(open.map((o) => o.ticker))
-  const points = latest
-    .filter((m) => own.has(m.ticker))
-    .map((m) => ({ ticker: m.ticker, at, chance: chanceOf(m) }))
-    .filter(
-      (p): p is { ticker: string; at: string; chance: number } =>
-        p.chance !== null,
+  const done = new Set<string>()
+  let count = 0
+  for (const viewerId of new Set(open.map((o) => o.viewerId))) {
+    const ids = new Set(
+      open.filter((o) => o.viewerId === viewerId).map((o) => o.id),
     )
-  for (let i = 0; i < points.length; i += 30) {
-    await db
-      .insert(kalshiPrices)
-      .values(points.slice(i, i + 30))
-      .onConflictDoNothing()
+    const tickers = [
+      ...new Set([
+        ...open.filter((o) => ids.has(o.id)).map((o) => o.ticker),
+        ...legs.filter((l) => ids.has(l.predictionId)).map((l) => l.ticker),
+      ]),
+    ].filter((t) => !done.has(t))
+    if (tickers.length === 0) continue
+    const account = await loadAccount(env, viewerId).catch(() => null)
+    if (!account) continue
+    const latest = await fetchMarkets(account, tickers).catch(
+      (error: unknown) => {
+        console.error('Kalshi prices failed', { error: String(error) })
+        return []
+      },
+    )
+    await rememberMarkets(db, latest)
+    for (const m of latest) done.add(m.ticker)
+    const points = latest
+      .filter((m) => own.has(m.ticker))
+      .map((m) => ({ ticker: m.ticker, at, chance: chanceOf(m) }))
+      .filter(
+        (p): p is { ticker: string; at: string; chance: number } =>
+          p.chance !== null,
+      )
+    for (let i = 0; i < points.length; i += 30) {
+      await db
+        .insert(kalshiPrices)
+        .values(points.slice(i, i + 30))
+        .onConflictDoNothing()
+    }
+    count += latest.length
   }
-  return latest.length
+  return count
 }
 
 /** A market's YES chance (0–1): the bid/ask midpoint, else the last price. */

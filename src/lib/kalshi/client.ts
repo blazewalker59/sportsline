@@ -1,7 +1,10 @@
 /**
- * Kalshi's Trade API, read-only (docs/adr/0003). Market data (prices,
- * games, players, combo legs) is public; portfolio reads are signed with
- * the Viewer's key. Prices are dollar strings ("0.3400"), counts fixed-point
+ * Kalshi's Trade API, read-only (docs/adr/0003). Every request is signed
+ * with a Viewer's key, market data (prices, games, players, combo legs)
+ * included: Kalshi rejects unsigned requests from Cloudflare's shared
+ * addresses with 429, while signed ones count against that Viewer's own
+ * rate limit. Requests are paced well under Kalshi's basic tier (about 20
+ * a second). Prices are dollar strings ("0.3400"), counts fixed-point
  * strings ("10.00").
  */
 
@@ -33,19 +36,23 @@ async function read<T>(res: Response, path: string): Promise<T> {
   return (await res.json()) as T
 }
 
-/** A public read: market data needs no key. */
-export async function publicGet<T>(path: string): Promise<T> {
-  const res = await fetchWithRetry(`${KALSHI_HOST}${PREFIX}${path}`, {
-    headers: { accept: 'application/json' },
-  })
-  return read<T>(res, path)
+/** At least this long between Kalshi requests from one isolate. */
+const MIN_GAP_MS = 120
+let nextSlot = 0
+
+async function pace(): Promise<void> {
+  const now = Date.now()
+  const at = Math.max(now, nextSlot)
+  nextSlot = at + MIN_GAP_MS
+  if (at > now) await new Promise((r) => setTimeout(r, at - now))
 }
 
-/** A signed read of the Viewer's own account. */
+/** A signed read, of the Viewer's account or of market data. */
 export async function signedGet<T>(
   account: KalshiAccount,
   path: string,
 ): Promise<T> {
+  await pace()
   const timestamp = String(Date.now())
   // Kalshi signs timestamp + method + path, without the query string.
   const signature = await signMessage(
@@ -202,16 +209,20 @@ export async function recentSettlements(
   return out
 }
 
-export async function market(ticker: string): Promise<KalshiMarket | null> {
+export async function market(
+  account: KalshiAccount,
+  ticker: string,
+): Promise<KalshiMarket | null> {
   try {
-    const r = await publicGet<{ market: KalshiMarket }>(
+    const r = await signedGet<{ market: KalshiMarket }>(
+      account,
       `/markets/${encodeURIComponent(ticker)}`,
     )
     return r.market
   } catch (error) {
     // Some combos only answer the list endpoint.
     if (error instanceof KalshiError && error.status === 404) {
-      return (await markets([ticker]))[0] ?? null
+      return (await markets(account, [ticker]))[0] ?? null
     }
     throw error
   }
@@ -219,12 +230,14 @@ export async function market(ticker: string): Promise<KalshiMarket | null> {
 
 /** Prices for many markets at once (Kalshi takes a comma-joined list). */
 export async function markets(
+  account: KalshiAccount,
   tickers: ReadonlyArray<string>,
 ): Promise<Array<KalshiMarket>> {
   const out: Array<KalshiMarket> = []
   for (let i = 0; i < tickers.length; i += 50) {
     const part = tickers.slice(i, i + 50)
-    const r = await publicGet<{ markets?: Array<KalshiMarket> }>(
+    const r = await signedGet<{ markets?: Array<KalshiMarket> }>(
+      account,
       `/markets?limit=${part.length}&tickers=${part.map(encodeURIComponent).join(',')}`,
     )
     out.push(...(r.markets ?? []))
@@ -234,16 +247,22 @@ export async function markets(
 
 /** The real-world game behind an event (its milestone), if Kalshi has one. */
 export async function milestoneFor(
+  account: KalshiAccount,
   eventTicker: string,
 ): Promise<KalshiMilestone | null> {
-  const r = await publicGet<{ milestones?: Array<KalshiMilestone> }>(
+  const r = await signedGet<{ milestones?: Array<KalshiMilestone> }>(
+    account,
     `/milestones?limit=1&related_event_ticker=${encodeURIComponent(eventTicker)}`,
   )
   return r.milestones?.[0] ?? null
 }
 
-export async function target(id: string): Promise<KalshiTarget | null> {
-  const r = await publicGet<{ structured_target?: KalshiTarget }>(
+export async function target(
+  account: KalshiAccount,
+  id: string,
+): Promise<KalshiTarget | null> {
+  const r = await signedGet<{ structured_target?: KalshiTarget }>(
+    account,
     `/structured_targets/${encodeURIComponent(id)}`,
   )
   return r.structured_target ?? null

@@ -70,39 +70,6 @@ export default {
       }
     }
 
-    // TEMPORARY: Kalshi rate-limit diagnostic (anonymous public reads only).
-    if (
-      url.pathname === '/__kalshi-diag' &&
-      url.searchParams.get('t') === 'e088eb7e4b976ad17ba435bdfdb91989'
-    ) {
-      const out: Array<string> = []
-      const { loadAccount } = await import('@/lib/kalshi/sync')
-      const { signedGet } = await import('@/lib/kalshi/client')
-      const row = await env.DB.prepare(
-        'select viewer_id from kalshi_accounts limit 1',
-      ).first<{ viewer_id: string }>()
-      const account = row ? await loadAccount(env, row.viewer_id) : null
-      if (!account) return Response.json(['no account'])
-      for (const gap of [0, 0, 0, 0, 0, 100, 100, 250, 250, 500]) {
-        await new Promise((r) => setTimeout(r, gap))
-        const t0 = Date.now()
-        try {
-          const r = await signedGet<{ markets?: Array<unknown> }>(
-            account,
-            '/markets?limit=1',
-          )
-          out.push(
-            `signed, gap ${gap}ms -> 200 (${Date.now() - t0}ms) ${r.markets?.length ?? 0} market`,
-          )
-        } catch (e) {
-          out.push(
-            `signed, gap ${gap}ms -> ${String(e).slice(0, 80)} (${Date.now() - t0}ms)`,
-          )
-        }
-      }
-      return Response.json(out)
-    }
-
     if (url.pathname === LOGO_PATH && request.method === 'GET') {
       return serveLogo(url)
     }
