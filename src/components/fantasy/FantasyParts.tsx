@@ -598,7 +598,7 @@ function GameStrip({
           state.live ? 'text-amber-700 dark:text-amber-300' : 'text-muted',
         )}
       >
-        {state.upcoming ? `Upcoming · ${state.status}` : state.status}
+        {state.status}
       </span>
     </span>
   )
