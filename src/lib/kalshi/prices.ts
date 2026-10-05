@@ -4,7 +4,7 @@
  * only.
  */
 
-import { eq, inArray, ne, sql } from 'drizzle-orm'
+import { and, eq, inArray, ne, sql } from 'drizzle-orm'
 import { loadAccount } from './account'
 import { markets as fetchMarkets } from './client'
 import { dollars, rememberMarkets } from './markets'
@@ -18,6 +18,7 @@ import {
   predictionLegs,
   predictions,
 } from '@/lib/db/schema'
+import { reportError } from '@/lib/ops/errors'
 
 /**
  * Latest prices for every market an open Prediction depends on, plus a
@@ -26,6 +27,8 @@ import {
  */
 export async function refreshPrices(
   env: Pick<CloudflareEnv, 'DB' | 'KALSHI_ENCRYPTION_KEY'>,
+  /** Only this Viewer's (their ViewerSync); every Viewer's when unset. */
+  viewerId?: string,
 ): Promise<number> {
   const db = dbFromD1(env.DB)
   const open = await db
@@ -36,7 +39,12 @@ export async function refreshPrices(
       kind: predictions.kind,
     })
     .from(predictions)
-    .where(eq(predictions.status, 'open'))
+    .where(
+      and(
+        eq(predictions.status, 'open'),
+        viewerId ? eq(predictions.viewerId, viewerId) : undefined,
+      ),
+    )
   if (open.length === 0) return 0
   // In parts: D1 binds at most 100 parameters.
   const legs: Array<{
@@ -65,9 +73,9 @@ export async function refreshPrices(
   const own = new Set(open.map((o) => o.ticker))
   const done = new Set<string>()
   let count = 0
-  for (const viewerId of new Set(open.map((o) => o.viewerId))) {
+  for (const owner of new Set(open.map((o) => o.viewerId))) {
     const ids = new Set(
-      open.filter((o) => o.viewerId === viewerId).map((o) => o.id),
+      open.filter((o) => o.viewerId === owner).map((o) => o.id),
     )
     const tickers = [
       ...new Set([
@@ -76,11 +84,14 @@ export async function refreshPrices(
       ]),
     ].filter((t) => !done.has(t))
     if (tickers.length === 0) continue
-    const account = await loadAccount(env, viewerId).catch(() => null)
+    const account = await loadAccount(env, owner).catch(() => null)
     if (!account) continue
     const latest = await fetchMarkets(account, tickers).catch(
-      (error: unknown) => {
-        console.error('Kalshi prices failed', { error: String(error) })
+      async (error: unknown) => {
+        await reportError(env, 'kalshi', error, {
+          viewerId: owner,
+          step: 'prices',
+        })
         return []
       },
     )

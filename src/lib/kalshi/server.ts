@@ -29,6 +29,8 @@ import {
 } from '@/lib/db/schema'
 import { toGameSummary } from '@/lib/live/rows'
 import { sessionViewer, withViewer } from '@/lib/viewer/session'
+import { reportError } from '@/lib/ops/errors'
+import { startViewerSync } from '@/lib/live/startViewerSync'
 
 export type ChangeDisplay = 'dollars' | 'percent'
 
@@ -170,10 +172,11 @@ export const connectKalshi = createServerFn({ method: 'POST' })
       // First sync now, so Predictions appear straight away.
       try {
         await syncAccount(env, viewerId)
-        await refreshPrices(env)
+        await refreshPrices(env, viewerId)
       } catch (error) {
-        console.error('First Kalshi sync failed', { error: String(error) })
+        await reportError(env, 'kalshi', error, { viewerId, step: 'connect' })
       }
+      await startViewerSync(env, viewerId)
       return {
         keyId: row.keyId,
         status: 'ok',

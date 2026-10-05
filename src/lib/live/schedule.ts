@@ -14,6 +14,7 @@ import { ACTIVE_LEAGUES, sourceFor } from '@/lib/sources'
 import { sportsDayOf } from '@/lib/model/sportsDay'
 import { games, teams } from '@/lib/db/schema'
 import { dbFromD1 } from '@/lib/db'
+import { reportError } from '@/lib/ops/errors'
 
 /** Should a LiveGame be polling this Game right now? */
 export function needsTracking(
@@ -59,10 +60,7 @@ export async function syncDay(
   )
   for (const r of results) {
     if (r.status === 'rejected')
-      console.error('Schedule sync failed', {
-        sportsDay,
-        reason: String(r.reason),
-      })
+      await reportError(env, 'schedule', r.reason, { sportsDay })
   }
 }
 

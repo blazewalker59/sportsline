@@ -59,11 +59,16 @@ export async function sendPredictionAlerts(
     CloudflareEnv,
     'DB' | 'VAPID_PUBLIC_KEY' | 'VAPID_PRIVATE_JWK' | 'VAPID_SUBJECT'
   >,
+  /** Only this Viewer's (their ViewerSync); every Viewer's when unset. */
+  viewerId?: string,
 ): Promise<number> {
   const keys = vapidKeys(env as CloudflareEnv)
   if (!keys) return 0
   const db = dbFromD1(env.DB)
-  const devices = await db.select().from(pushSubscriptions)
+  const devices = await db
+    .select()
+    .from(pushSubscriptions)
+    .where(viewerId ? eq(pushSubscriptions.viewerId, viewerId) : undefined)
   if (devices.length === 0) return 0
   const levels = await alertLevels(
     db,

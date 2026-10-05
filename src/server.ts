@@ -19,10 +19,12 @@ import { canonicalRedirect } from '@/lib/canonical'
 import { serverRequestContext } from '@/lib/db'
 import { LIVE_PATH } from '@/lib/live/LiveHub'
 import { LOGO_PATH, serveLogo } from '@/lib/logoProxy'
+import { reportError } from '@/lib/ops/errors'
 
 export { LiveGame } from '@/lib/live/LiveGame'
 export { LiveHub } from '@/lib/live/LiveHub'
 export { Scheduler } from '@/lib/live/Scheduler'
+export { ViewerSync } from '@/lib/live/ViewerSync'
 
 /**
  * Any request makes sure the Scheduler loop is running, at most once per
@@ -77,7 +79,7 @@ export default {
     if (Date.now() - lastKick > KICK_EVERY_MS) {
       ctx.waitUntil(
         ensureScheduler(env).catch((error: unknown) =>
-          console.error('Scheduler kick failed', String(error)),
+          reportError(env, 'scheduler', error),
         ),
       )
     }

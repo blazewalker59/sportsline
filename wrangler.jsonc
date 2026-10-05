@@ -30,13 +30,15 @@
     },
   ],
   // One LiveGame per live Game polls its Source and diffs Plays; one LiveHub
-  // relays them to connected Viewers; one Scheduler syncs schedules every
-  // minute on its own alarm, in place of a Cron Trigger (docs/adr/0001).
+  // relays them to connected Viewers; one Scheduler runs global jobs every
+  // minute on its own alarm, in place of a Cron Trigger (docs/adr/0001); one
+  // ViewerSync per Viewer runs their Kalshi and fantasy syncing (0005).
   "durable_objects": {
     "bindings": [
       { "name": "LIVE_GAME", "class_name": "LiveGame" },
       { "name": "LIVE_HUB", "class_name": "LiveHub" },
       { "name": "SCHEDULER", "class_name": "Scheduler" },
+      { "name": "VIEWER_SYNC", "class_name": "ViewerSync" },
     ],
   },
   // No Cron Triggers: the Scheduler Durable Object runs the schedule sync
@@ -48,6 +50,8 @@
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["LiveGame", "LiveHub"] },
     { "tag": "v2", "new_sqlite_classes": ["Scheduler"] },
+    // One ViewerSync per Viewer runs their own syncing (docs/adr/0005).
+    { "tag": "v3", "new_sqlite_classes": ["ViewerSync"] },
   ],
   "env": {
     "production": {
@@ -73,6 +77,8 @@
         // private half is the VAPID_PRIVATE_JWK secret.
         "VAPID_PUBLIC_KEY": "BC0pDiE5foLBri7xunT8n5DgXHTk657Xi4tf1lcw6f5ZO2DO7Vz1Lm1JzBPltfQ8cuykUX2Nb-83g-qiNd1tVXs",
         "VAPID_SUBJECT": "https://sportsline.dev",
+        // The admin: sees /admin and is pushed about errors (docs/adr/0005).
+        "ADMIN_EMAILS": "blazewalker59@gmail.com",
       },
       "observability": {
         "logs": {
@@ -95,6 +101,7 @@
           { "name": "LIVE_GAME", "class_name": "LiveGame" },
           { "name": "LIVE_HUB", "class_name": "LiveHub" },
           { "name": "SCHEDULER", "class_name": "Scheduler" },
+          { "name": "VIEWER_SYNC", "class_name": "ViewerSync" },
         ],
       },
     },

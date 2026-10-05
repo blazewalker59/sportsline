@@ -9,11 +9,12 @@ import { z } from 'zod'
 import type { GameSummary } from '@/lib/model/timeline'
 import type { PlayerOverview } from '@/lib/model/types'
 import { requireViewer } from '@/lib/viewer/session'
-import { getDb } from '@/lib/db'
+import { getCloudflareEnv, getDb } from '@/lib/db'
 import { games, players, sourceIds, teams } from '@/lib/db/schema'
 import { toGameSummary } from '@/lib/live/rows'
 import { shiftSportsDay, sportsDayOf } from '@/lib/model/sportsDay'
 import { sourceFor } from '@/lib/sources'
+import { reportError } from '@/lib/ops/errors'
 
 /** One box-score table's row for the Player: "Passing", C/ATT 18/27 … */
 export interface PlayerLine {
@@ -69,9 +70,9 @@ export const getPlayerDetail = createServerFn({ method: 'GET' })
         return await adapter.playerOverview(id, team)
       } catch (error) {
         // The rest of the page stands without it.
-        console.error('Player overview failed', {
+        await reportError(getCloudflareEnv(), 'source', error, {
+          step: 'player-overview',
           playerId: player.id,
-          error: String(error),
         })
         return null
       }

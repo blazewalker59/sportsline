@@ -16,6 +16,7 @@ export interface ViewerProfile {
   id: string
   name: string
   image: string | null
+  email: string
 }
 
 export async function sessionViewer(): Promise<ViewerProfile | null> {
@@ -27,6 +28,7 @@ export async function sessionViewer(): Promise<ViewerProfile | null> {
     id: session.user.id,
     name: session.user.name,
     image: session.user.image ?? null,
+    email: session.user.email,
   }
 }
 

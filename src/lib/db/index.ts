@@ -15,12 +15,14 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1'
 import type { LiveGame } from '@/lib/live/LiveGame'
 import type { LiveHub } from '@/lib/live/LiveHub'
 import type { Scheduler } from '@/lib/live/Scheduler'
+import type { ViewerSync } from '@/lib/live/ViewerSync'
 
 export interface CloudflareEnv {
   DB: D1Database
   LIVE_GAME: DurableObjectNamespace<LiveGame>
   LIVE_HUB: DurableObjectNamespace<LiveHub>
   SCHEDULER: DurableObjectNamespace<Scheduler>
+  VIEWER_SYNC: DurableObjectNamespace<ViewerSync>
   BETTER_AUTH_SECRET?: string
   BETTER_AUTH_URL?: string
   GOOGLE_CLIENT_ID?: string
@@ -36,6 +38,8 @@ export interface CloudflareEnv {
   KALSHI_ENCRYPTION_KEY?: string
   /** 32 bytes, base64: seals Viewers' ESPN session cookies (docs/adr/0004). */
   ESPN_ENCRYPTION_KEY?: string
+  /** Emails (comma-separated) who see the health page and get error pushes. */
+  ADMIN_EMAILS?: string
 }
 
 export type Database = DrizzleD1Database<typeof schema>

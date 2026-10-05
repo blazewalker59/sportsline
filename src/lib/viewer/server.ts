@@ -16,7 +16,7 @@ import type { ViewerFollow } from '@/lib/model/timeline'
 import type { League } from '@/lib/model/types'
 import type { LeagueSettings } from '@/lib/model/leagues'
 import { requireViewer } from '@/lib/viewer/session'
-import { getDb } from '@/lib/db'
+import { getCloudflareEnv, getDb } from '@/lib/db'
 import {
   follows,
   leagueSettings,
@@ -30,6 +30,8 @@ import {
   ROW_ITEMS,
   normalizeLeagueSettings,
 } from '@/lib/model/leagues'
+import { startViewerSync } from '@/lib/live/startViewerSync'
+import { isAdmin, reportError } from '@/lib/ops/errors'
 
 export type { ViewerProfile } from './session'
 
@@ -52,6 +54,8 @@ export interface ViewerState {
   readAt: string | null
   /** League order on the Scope row, and which Leagues are hidden. */
   leagues: LeagueSettings
+  /** Sees the health page (docs/adr/0005). */
+  isAdmin?: boolean
 }
 
 const LEAGUE_LABELS: Record<League, string> = {
@@ -140,6 +144,24 @@ async function followEntries(
   })
 }
 
+/** Last time each Viewer's ViewerSync was started from this isolate. */
+const kicked = new Map<string, number>()
+const KICK_EVERY_MS = 5 * 60_000
+
+/**
+ * Opening the app keeps the Viewer's own syncing running (docs/adr/0005):
+ * idempotent, so at most every few minutes per isolate, and never awaited.
+ */
+function keepSyncing(viewerId: string): void {
+  const last = kicked.get(viewerId) ?? 0
+  if (Date.now() - last < KICK_EVERY_MS) return
+  kicked.set(viewerId, Date.now())
+  const env = getCloudflareEnv()
+  void startViewerSync(env, viewerId).catch((error: unknown) =>
+    reportError(env, 'viewer-sync', error, { viewerId }),
+  )
+}
+
 export const getViewerState = createServerFn({ method: 'GET' }).handler(
   async (): Promise<ViewerState> => {
     const viewer = await sessionViewer()
@@ -150,6 +172,7 @@ export const getViewerState = createServerFn({ method: 'GET' }).handler(
         readAt: null,
         leagues: DEFAULT_LEAGUE_SETTINGS,
       }
+    keepSyncing(viewer.id)
     const db = getDb()
     const [entries, marker, arrangement] = await Promise.all([
       followEntries(db, viewer.id),
@@ -169,6 +192,7 @@ export const getViewerState = createServerFn({ method: 'GET' }).handler(
       follows: entries,
       readAt: marker?.readAt ?? null,
       leagues: normalizeLeagueSettings(arrangement),
+      isAdmin: isAdmin(getCloudflareEnv(), viewer.email),
     }
   },
 )

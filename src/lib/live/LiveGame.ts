@@ -29,6 +29,7 @@ import { teamColors } from '@/lib/brand/teamColors'
 import { dbFromD1 } from '@/lib/db'
 import { isAlertCandidate } from '@/lib/push/alerts'
 import { deliverAlerts, vapidKeys } from '@/lib/push/deliver'
+import { reportError } from '@/lib/ops/errors'
 
 const GAME_KEY = 'game'
 const SEEN_PREFIX = 'seen:'
@@ -95,10 +96,9 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
     } catch (error) {
       const errors = ((await this.ctx.storage.get<number>(ERRORS_KEY)) ?? 0) + 1
       await this.ctx.storage.put(ERRORS_KEY, errors)
-      console.error('LiveGame poll failed', {
+      await reportError(this.env, 'live-game', error, {
         gameId: game.gameId,
         errors,
-        error: String(error),
       })
       delay = errors >= MAX_CONSECUTIVE_ERRORS ? null : RETRY_MS
     }
@@ -384,10 +384,7 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
       )
       if (fresh.length > 0) {
         await this.sendAlerts(db, fresh).catch((error: unknown) =>
-          console.error('Alerts failed', {
-            gameId: game.gameId,
-            error: String(error),
-          }),
+          reportError(this.env, 'alerts', error, { gameId: game.gameId }),
         )
       }
     }

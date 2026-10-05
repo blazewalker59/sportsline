@@ -547,3 +547,34 @@ export const fantasyPlayers = sqliteTable(
     index('fantasy_players_player_idx').on(table.playerId),
   ],
 )
+
+// ─── Operations (src/lib/ops) ───────────────────────────────────────────────
+
+/** Errors, grouped by what went wrong, for the health page and its Alerts. */
+export const errorEvents = sqliteTable('error_events', {
+  /** Scope plus the message with ids and numbers taken out. */
+  fingerprint: text('fingerprint').primaryKey(),
+  scope: text('scope').notNull(),
+  message: text('message').notNull(),
+  count: integer('count').notNull(),
+  firstAt: text('first_at').notNull(),
+  lastAt: text('last_at').notNull(),
+  /** The latest occurrence's details (ids, stack). */
+  context: text('context', { mode: 'json' }).$type<Record<string, unknown>>(),
+  /** When the admins were last pushed about it. */
+  notifiedAt: text('notified_at'),
+})
+
+/** Each background job's heartbeat: when it ran, last worked, last failed. */
+export const jobRuns = sqliteTable('job_runs', {
+  name: text('name').primaryKey(),
+  /** How often it should succeed (ms): older than twice this is stale. */
+  everyMs: integer('every_ms').notNull(),
+  lastStartedAt: text('last_started_at'),
+  lastOkAt: text('last_ok_at'),
+  lastErrorAt: text('last_error_at'),
+  lastError: text('last_error'),
+  lastDurationMs: integer('last_duration_ms'),
+  runs: integer('runs').notNull().default(0),
+  failures: integer('failures').notNull().default(0),
+})

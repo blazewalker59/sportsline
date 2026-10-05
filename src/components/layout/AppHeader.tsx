@@ -123,6 +123,15 @@ function AccountButton() {
           >
             Alerts
           </Link>
+          {data?.isAdmin && (
+            <Link
+              to="/admin"
+              onClick={() => setOpen(false)}
+              className="block rounded-lg px-3 py-2 hover:bg-background"
+            >
+              Health
+            </Link>
+          )}
           <button
             type="button"
             onClick={() =>

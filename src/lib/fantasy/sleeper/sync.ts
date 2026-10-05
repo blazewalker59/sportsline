@@ -28,6 +28,7 @@ import type { WeekData } from './read'
 import type { CloudflareEnv, Database } from '@/lib/db'
 import { dbFromD1 } from '@/lib/db'
 import { fantasyLeagues, sleeperAccounts } from '@/lib/db/schema'
+import { reportError } from '@/lib/ops/errors'
 
 /** Look for new leagues this often. */
 const DISCOVER_EVERY_MS = 24 * 3_600_000
@@ -160,7 +161,7 @@ export async function syncAccount(
     ) {
       await discover(db, viewerId, account.userId, state).catch(
         (error: unknown) =>
-          console.error('Sleeper discovery failed', { error: String(error) }),
+          reportError(env, 'sleeper', error, { viewerId, step: 'discovery' }),
       )
     }
     const leagues = await db

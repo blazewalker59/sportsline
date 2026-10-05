@@ -27,6 +27,7 @@ import {
 import { unseal } from '@/lib/kalshi/vault'
 import { normalizePlayerName } from '@/lib/kalshi/match'
 import { sportsDayOf } from '@/lib/model/sportsDay'
+import { reportError } from '@/lib/ops/errors'
 
 /** Look for new leagues this often. */
 const DISCOVER_EVERY_MS = 24 * 3_600_000
@@ -428,10 +429,10 @@ export async function syncAccount(
       !account?.discoveredAt ||
       Date.now() - Date.parse(account.discoveredAt) > DISCOVER_EVERY_MS
     ) {
-      await discover(db, viewerId, session).catch((error: unknown) => {
-        // Discovery is a convenience: leagues can be added by URL.
-        console.error('ESPN discovery failed', { error: String(error) })
-      })
+      // Discovery is a convenience: leagues can be added by URL.
+      await discover(db, viewerId, session).catch((error: unknown) =>
+        reportError(env, 'espn', error, { viewerId, step: 'discovery' }),
+      )
     }
     const leagues = await db
       .select()

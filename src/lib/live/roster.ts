@@ -12,6 +12,7 @@ import type { League } from '@/lib/model/types'
 import { sourceFor } from '@/lib/sources'
 import { players, teams } from '@/lib/db/schema'
 import { dbFromD1 } from '@/lib/db'
+import { reportError } from '@/lib/ops/errors'
 
 /** Sync one League's roster; false (and logged) if the Source failed. */
 export async function syncRoster(
@@ -23,7 +24,7 @@ export async function syncRoster(
     await syncLeagueRoster(env, league, now.getUTCFullYear())
     return true
   } catch (error) {
-    console.error('Roster sync failed', { league, error: String(error) })
+    await reportError(env, 'roster', error, { league })
     return false
   }
 }

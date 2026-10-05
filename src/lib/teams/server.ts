@@ -17,6 +17,7 @@ import { games, players, sourceIds, teams } from '@/lib/db/schema'
 import { syncLeague } from '@/lib/live/schedule'
 import { LEAGUES } from '@/lib/model/types'
 import { sourceFor } from '@/lib/sources'
+import { reportError } from '@/lib/ops/errors'
 
 export interface TeamProfile {
   id: string
@@ -186,9 +187,9 @@ export const getTeamPage = createServerFn({ method: 'GET' })
           abbreviation: team.abbreviation,
         })
       } catch (error) {
-        console.error('Team schedule failed', {
+        await reportError(getCloudflareEnv(), 'source', error, {
+          step: 'team-schedule',
           teamId: team.id,
-          error: String(error),
         })
         scheduleError = true
       }

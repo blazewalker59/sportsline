@@ -8,6 +8,7 @@ import {
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 
+import { useEffect } from 'react'
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
 import appCss from '../styles.css?url'
@@ -17,6 +18,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import { PlayerSheetProvider } from '@/components/players/PlayerProfile'
 import { Landing } from '@/components/landing/Landing'
 import { useViewer } from '@/lib/viewer/useViewer'
+import { sendClientError, useClientErrors } from '@/lib/ops/useClientErrors'
 
 interface MyRouterContext {
   queryClient: QueryClient
@@ -55,6 +57,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
   }),
   shellComponent: RootDocument,
   component: Gate,
+  errorComponent: Crashed,
   notFoundComponent: () => (
     <p className="p-8 text-center text-muted">Page not found.</p>
   ),
@@ -67,6 +70,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
  */
 function Gate() {
   const viewer = useViewer()
+  useClientErrors(Boolean(viewer.data?.viewer))
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   if (import.meta.env.DEV && pathname.startsWith('/zz-dev')) return <Outlet />
   if (viewer.isPending) return <Splash />
@@ -75,6 +79,26 @@ function Gate() {
     <PlayerSheetProvider>
       <Outlet />
     </PlayerSheetProvider>
+  )
+}
+
+/** A screen threw: say so, report it, offer a way back. */
+function Crashed({ error }: { error: unknown }) {
+  useEffect(() => sendClientError(error, 'render'), [error])
+  return (
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-background px-6 text-center">
+      <p className="text-lg font-bold">Something went wrong</p>
+      <p className="max-w-sm text-sm text-muted">
+        It’s been reported. Reloading usually gets you going again.
+      </p>
+      <button
+        type="button"
+        onClick={() => window.location.reload()}
+        className="min-h-11 rounded-full bg-foreground px-5 text-sm font-semibold text-background"
+      >
+        Reload
+      </button>
+    </div>
   )
 }
 

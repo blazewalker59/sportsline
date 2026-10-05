@@ -25,6 +25,7 @@ import { payoutOf } from './settlement'
 import type { CloudflareEnv } from '@/lib/db'
 import { dbFromD1 } from '@/lib/db'
 import { kalshiAccounts, predictions } from '@/lib/db/schema'
+import { reportError } from '@/lib/ops/errors'
 
 export { loadAccount } from './account'
 export { savePrediction } from './save'
@@ -77,9 +78,10 @@ export async function syncAccount(
         if (error instanceof KalshiError && error.status === 429) {
           limited = true
         } else {
-          console.error('Kalshi prediction failed', {
+          await reportError(env, 'kalshi', error, {
+            viewerId,
+            step: 'prediction',
             what,
-            error: String(error),
           })
         }
         return false
@@ -207,8 +209,8 @@ export async function syncAccount(
         const found = await firstBuys(
           account,
           undated.map((u) => u.ticker),
-        ).catch((error: unknown) => {
-          console.error('Kalshi fills failed', { error: String(error) })
+        ).catch(async (error: unknown) => {
+          await reportError(env, 'kalshi', error, { viewerId, step: 'fills' })
           return null
         })
         // Couldn't read the fills: try again next sync, don't guess.

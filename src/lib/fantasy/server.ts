@@ -28,6 +28,8 @@ import { getCloudflareEnv } from '@/lib/db'
 import { espnAccounts, fantasyLeagues, sleeperAccounts } from '@/lib/db/schema'
 import { seal } from '@/lib/kalshi/vault'
 import { sessionViewer, withViewer } from '@/lib/viewer/session'
+import { reportError } from '@/lib/ops/errors'
+import { startViewerSync } from '@/lib/live/startViewerSync'
 
 export interface EspnConnection {
   status: 'ok' | 'error'
@@ -126,8 +128,9 @@ export const connectEspn = createServerFn({ method: 'POST' })
         .values(row)
         .onConflictDoUpdate({ target: espnAccounts.viewerId, set: row })
       await syncAccount(env, viewerId).catch((error: unknown) =>
-        console.error('First ESPN sync failed', { error: String(error) }),
+        reportError(env, 'espn', error, { viewerId, step: 'connect' }),
       )
+      await startViewerSync(env, viewerId)
       return { status: 'ok', lastError: null, syncedAt: now }
     }),
   )
@@ -233,9 +236,11 @@ export const connectSleeper = createServerFn({ method: 'POST' })
         .insert(sleeperAccounts)
         .values(row)
         .onConflictDoUpdate({ target: sleeperAccounts.viewerId, set: row })
-      await syncSleeper(getCloudflareEnv(), viewerId).catch((error: unknown) =>
-        console.error('First Sleeper sync failed', { error: String(error) }),
+      const env = getCloudflareEnv()
+      await syncSleeper(env, viewerId).catch((error: unknown) =>
+        reportError(env, 'sleeper', error, { viewerId, step: 'connect' }),
       )
+      await startViewerSync(env, viewerId)
       return {
         username: row.username,
         status: 'ok',
