@@ -634,15 +634,19 @@ export async function syncAccount(
         const found = await firstBuys(
           account,
           undated.map((u) => u.ticker),
-        ).catch(() => new Map<string, string>())
-        for (const u of undated) {
+        ).catch((error: unknown) => {
+          console.error('Kalshi fills failed', { error: String(error) })
+          return null
+        })
+        // Couldn't read the fills: try again next sync, don't guess.
+        for (const u of found ? undated : []) {
           // Not in the fills (older than Kalshi keeps): when it settled,
           // else when we first saw it, so it isn't asked about again.
           await db
             .update(predictions)
             .set({
               tradedAt:
-                found.get(u.ticker) ??
+                found!.get(u.ticker) ??
                 sql`coalesce(${predictions.settledAt}, ${predictions.openedAt})`,
             })
             .where(eq(predictions.id, u.id))

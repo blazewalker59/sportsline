@@ -192,19 +192,19 @@ export async function openPositions(
 }
 
 /**
- * When each of these markets was first bought into: the earliest buy fill
- * (up to 100 tickers a request). Fills older than Kalshi's historical
- * cutoff aren't here; those markets are left out.
+ * When each of these markets was first bought into: the earliest buy fill.
+ * Pages through the Viewer's fills, recent then archived (Kalshi moves
+ * older fills to /historical/fills), until every market is found.
  */
 export async function firstBuys(
   account: KalshiAccount,
   tickers: ReadonlyArray<string>,
 ): Promise<Map<string, string>> {
+  const wanted = new Set(tickers)
   const out = new Map<string, string>()
-  for (let i = 0; i < tickers.length; i += 100) {
-    const list = encodeURIComponent(tickers.slice(i, i + 100).join(','))
+  for (const path of ['/portfolio/fills', '/historical/fills']) {
     let cursor = ''
-    for (let page = 0; page < 10; page++) {
+    for (let page = 0; page < 20; page++) {
       const r = await signedGet<{
         fills?: Array<{
           ticker?: string
@@ -215,11 +215,12 @@ export async function firstBuys(
         cursor?: string
       }>(
         account,
-        `/portfolio/fills?limit=1000&ticker=${list}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+        `${path}?limit=1000${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
       )
       for (const f of r.fills ?? []) {
         const t = f.ticker ?? f.market_ticker
-        if (!t || !f.created_time || f.action === 'sell') continue
+        if (!t || !wanted.has(t) || !f.created_time || f.action === 'sell')
+          continue
         const seen = out.get(t)
         if (!seen || f.created_time < seen) out.set(t, f.created_time)
       }
