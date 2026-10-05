@@ -6,7 +6,7 @@
  */
 
 import { useNavigate } from '@tanstack/react-router'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import {
   matchupFollows,
   predictionFollows,
@@ -14,6 +14,7 @@ import {
   storeScope,
 } from './timelineScope'
 import type { Scope } from '@/lib/model/scope'
+import { useDeviceValue } from '@/lib/useDeviceValue'
 import { useFantasy, useFantasyConnected } from '@/lib/fantasy/useFantasy'
 import {
   useKalshiConnection,
@@ -88,7 +89,7 @@ export function useTimelineScope({
   // The Scope from the link, else the one the Viewer last chose (on this
   // device), else their default: Following for a Viewer who follows
   // something, else All (CONTEXT.md, "Scope").
-  const [storedScope] = useState(readStoredScope)
+  const storedScope = useDeviceValue(readStoredScope, undefined)
   useEffect(() => {
     if (requestedScope) storeScope(requestedScope)
   }, [requestedScope])

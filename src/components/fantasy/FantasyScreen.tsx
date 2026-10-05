@@ -28,6 +28,7 @@ import {
   useSleeperConnection,
   useSyncFantasy,
 } from '@/lib/fantasy/useFantasy'
+import { useDeviceValue } from '@/lib/useDeviceValue'
 import { useViewer } from '@/lib/viewer/useViewer'
 import { cn } from '@/lib/utils'
 
@@ -68,11 +69,13 @@ function Connections() {
   const disconnectEspn = useDisconnectEspn()
   const disconnectSleeper = useDisconnectSleeper()
   // Back from the ESPN bookmarklet: open ESPN's form so it connects.
-  const [open, setOpen] = useState<'espn' | 'sleeper' | null>(() =>
-    typeof window !== 'undefined' && window.location.hash.includes('espn_s2')
-      ? 'espn'
-      : null,
+  // Until the Viewer picks: open ESPN's form when back from its bookmarklet.
+  const [chosen, setOpen] = useState<'espn' | 'sleeper' | null | undefined>()
+  const returning = useDeviceValue(
+    () => window.location.hash.includes('espn_s2'),
+    false,
   )
+  const open = chosen === undefined ? (returning ? 'espn' : null) : chosen
   const status = (c: {
     status: 'ok' | 'error'
     lastError: string | null
@@ -155,7 +158,7 @@ function Connections() {
               ) : (
                 <button
                   type="button"
-                  onClick={() => setOpen((o) => (o === r.key ? null : r.key))}
+                  onClick={() => setOpen(open === r.key ? null : r.key)}
                   aria-expanded={open === r.key}
                   className={cn(
                     'min-h-9 rounded-full px-3 text-[13px] font-semibold',

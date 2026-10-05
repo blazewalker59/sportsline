@@ -6,6 +6,7 @@
 
 import { useState } from 'react'
 import type { CatchUp } from '@/lib/timeline/catchup'
+import { useDeviceValue } from '@/lib/useDeviceValue'
 import { catchUpLine } from '@/lib/timeline/catchup'
 import { Sheet } from '@/components/chat/Sheet'
 import {
@@ -36,7 +37,9 @@ export function CatchUpCard({
   readAt: string
   onOpen: () => void
 }) {
-  const [dismissed, setDismissed] = useState(() => dismissedFor(readAt))
+  const stored = useDeviceValue(() => dismissedFor(readAt), false)
+  const [dismissedNow, setDismissed] = useState(false)
+  const dismissed = stored || dismissedNow
   if (dismissed) return null
   const dismiss = () => {
     setDismissed(true)
