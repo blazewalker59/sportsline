@@ -191,6 +191,45 @@ export async function openPositions(
   return out
 }
 
+/**
+ * When each of these markets was first bought into: the earliest buy fill
+ * (up to 100 tickers a request). Fills older than Kalshi's historical
+ * cutoff aren't here; those markets are left out.
+ */
+export async function firstBuys(
+  account: KalshiAccount,
+  tickers: ReadonlyArray<string>,
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  for (let i = 0; i < tickers.length; i += 100) {
+    const list = encodeURIComponent(tickers.slice(i, i + 100).join(','))
+    let cursor = ''
+    for (let page = 0; page < 10; page++) {
+      const r = await signedGet<{
+        fills?: Array<{
+          ticker?: string
+          market_ticker?: string
+          action?: string
+          created_time?: string
+        }>
+        cursor?: string
+      }>(
+        account,
+        `/portfolio/fills?limit=1000&ticker=${list}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+      )
+      for (const f of r.fills ?? []) {
+        const t = f.ticker ?? f.market_ticker
+        if (!t || !f.created_time || f.action === 'sell') continue
+        const seen = out.get(t)
+        if (!seen || f.created_time < seen) out.set(t, f.created_time)
+      }
+      cursor = r.cursor ?? ''
+      if (!cursor) break
+    }
+  }
+  return out
+}
+
 /** Recent settlements (a few pages: enough for history going forward). */
 export async function recentSettlements(
   account: KalshiAccount,

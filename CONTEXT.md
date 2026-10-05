@@ -143,6 +143,10 @@ _Avoid_: pick, selection
 The market's current chance of a Leg or Prediction resolving yes, from Kalshi's prices, shown as a percentage alongside where the Viewer got in. They move as the Game is played. A Combo's Odds are its Legs' Odds multiplied (a won Leg counting as certain), which is also what its cash-out is worth.
 _Avoid_: line, price (the dollar figure behind it)
 
+**Record**:
+A Viewer's Predictions over a range (7 days, 30 days, a custom range or all time), by when each was made: the volume staked, how they've done (settled results only), and where they win and lose by sport, market, Combo size and Leg.
+_Avoid_: stats, history (the list of Predictions), performance
+
 **Progress**:
 Where a stat Leg stands against its line while the Game is played: the count so far from the live box score (a team's or Player's receiving yards, a Player's points) or the score itself (totals), against what it takes to win ("212 of 300").
 _Avoid_: tracker, status

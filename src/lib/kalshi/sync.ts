@@ -25,6 +25,7 @@ import {
   market as fetchMarket,
   markets as fetchMarkets,
   target as fetchTarget,
+  firstBuys,
   milestoneFor,
   openPositions,
   recentSettlements,
@@ -67,6 +68,8 @@ import { syncLeague } from '@/lib/live/schedule'
 const RECHECK_MS = 30 * 60_000
 /** Store a future Game's schedule this far ahead, to match it early. */
 const LOOKAHEAD_DAYS = 10
+/** Predictions dated from Kalshi's fills per sync. */
+const DATED_PER_SYNC = 200
 /** New settled Predictions taken per sync (history fills in over runs). */
 const SETTLED_PER_RUN = 40
 /** Settled Predictions this recent are matched to Games; older aren't. */
@@ -615,6 +618,36 @@ export async function syncAccount(
         .update(predictions)
         .set({ status: 'closed', updatedAt: new Date().toISOString() })
         .where(inArray(predictions.id, gone.slice(i, i + 80)))
+    }
+
+    // When each Prediction was really made (first sight is just when we
+    // saw it): filled in from Kalshi's fills, a batch a sync.
+    if (!limited) {
+      const undated = await db
+        .select({ id: predictions.id, ticker: predictions.marketTicker })
+        .from(predictions)
+        .where(
+          and(eq(predictions.viewerId, viewerId), isNull(predictions.tradedAt)),
+        )
+        .limit(DATED_PER_SYNC)
+      if (undated.length > 0) {
+        const found = await firstBuys(
+          account,
+          undated.map((u) => u.ticker),
+        ).catch(() => new Map<string, string>())
+        for (const u of undated) {
+          // Not in the fills (older than Kalshi keeps): when it settled,
+          // else when we first saw it, so it isn't asked about again.
+          await db
+            .update(predictions)
+            .set({
+              tradedAt:
+                found.get(u.ticker) ??
+                sql`coalesce(${predictions.settledAt}, ${predictions.openedAt})`,
+            })
+            .where(eq(predictions.id, u.id))
+        }
+      }
     }
 
     await db

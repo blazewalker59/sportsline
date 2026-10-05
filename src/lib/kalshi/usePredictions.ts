@@ -5,6 +5,7 @@ import {
   connectKalshi,
   disconnectKalshi,
   getKalshiConnection,
+  getPredictionRecord,
   getPredictions,
   setChangeDisplay,
   syncKalshiNow,
@@ -86,5 +87,16 @@ export function useSetChangeDisplay() {
     },
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: CONNECTION_KEY }),
+  })
+}
+
+/** Every Prediction made, for the Record (built per range on the device). */
+export function usePredictionRecord() {
+  const connection = useKalshiConnection()
+  return useQuery({
+    queryKey: ['prediction-record'],
+    queryFn: () => getPredictionRecord(),
+    enabled: Boolean(connection.data),
+    staleTime: 5 * 60_000,
   })
 }

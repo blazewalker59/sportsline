@@ -13,6 +13,7 @@ import {
   profitOf,
   profitText,
 } from './PredictionParts'
+import { PredictionRecordSection } from './PredictionRecord'
 import type { ChangeDisplay, PredictionView } from '@/lib/kalshi/server'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { timeAgo, useNow } from '@/components/timeline/format'
@@ -209,6 +210,8 @@ function Connected() {
         display={c.changeDisplay}
         onOpen={setOpenId}
       />
+
+      <PredictionRecordSection />
 
       {list.isError && (
         <p

@@ -1,0 +1,1 @@
+ALTER TABLE `predictions` ADD `traded_at` text;

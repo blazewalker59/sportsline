@@ -386,6 +386,8 @@ export const predictions = sqliteTable(
     payout: real('payout'),
     pnl: real('pnl'),
     openedAt: text('opened_at').notNull(),
+    /** When the Viewer first bought in, from Kalshi's fills (null: unknown). */
+    tradedAt: text('traded_at'),
     settledAt: text('settled_at'),
     updatedAt: text('updated_at').notNull(),
   },

@@ -14,6 +14,7 @@ import { bookChance, positionValue, predictionYesChance } from './pricing'
 import { refreshPrices, syncAccount } from './sync'
 import { seal } from './vault'
 import type { Progress } from './props'
+import type { RecordEntry } from './record'
 import type { GameSummary } from '@/lib/model/timeline'
 import { getCloudflareEnv } from '@/lib/db'
 import {
@@ -395,6 +396,80 @@ export const getPredictions = createServerFn({ method: 'GET' }).handler(
             }),
         }
       })
+    })
+  },
+)
+
+/**
+ * Every Prediction the Viewer has made, compactly, for their Record
+ * (record.ts builds it on the device, for any range).
+ */
+export const getPredictionRecord = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<Array<RecordEntry>> => {
+    if (!(await sessionViewer())) return []
+    return withViewer(async ({ db, viewerId }) => {
+      const rows = await db
+        .select()
+        .from(predictions)
+        .where(eq(predictions.viewerId, viewerId))
+      if (rows.length === 0) return []
+      const legs = await inChunks(
+        rows.map((r) => r.id),
+        (part) =>
+          db
+            .select({
+              predictionId: predictionLegs.predictionId,
+              eventTicker: predictionLegs.eventTicker,
+              marketTicker: predictionLegs.marketTicker,
+              side: predictionLegs.side,
+              playerId: predictionLegs.playerId,
+            })
+            .from(predictionLegs)
+            .where(inArray(predictionLegs.predictionId, part)),
+      )
+      const results = new Map(
+        (
+          await inChunks(
+            [...new Set(legs.map((l) => l.marketTicker))],
+            (part) =>
+              db
+                .select({
+                  ticker: kalshiMarkets.ticker,
+                  result: kalshiMarkets.result,
+                })
+                .from(kalshiMarkets)
+                .where(inArray(kalshiMarkets.ticker, part)),
+          )
+        ).map((m) => [m.ticker, m.result]),
+      )
+      const legsOf = new Map<string, Array<RecordEntry['legs'][number]>>()
+      for (const l of legs) {
+        const r = results.get(l.marketTicker)
+        const list = legsOf.get(l.predictionId) ?? []
+        list.push({
+          series: l.eventTicker.split('-')[0],
+          playerProp: l.playerId !== null,
+          status:
+            r === 'yes' || r === 'no'
+              ? r === l.side
+                ? 'won'
+                : 'lost'
+              : 'pending',
+        })
+        legsOf.set(l.predictionId, list)
+      }
+      return rows.map((r) => ({
+        id: r.id,
+        kind: r.kind,
+        title: r.title,
+        cost: r.cost,
+        status: r.status,
+        result: r.result,
+        pnl: r.pnl,
+        madeAt: r.tradedAt ?? r.openedAt,
+        settledAt: r.settledAt,
+        legs: legsOf.get(r.id) ?? [],
+      }))
     })
   },
 )
