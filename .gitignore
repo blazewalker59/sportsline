@@ -11,3 +11,6 @@ dist-ssr
 .output
 coverage/*
 .claude/scheduled_tasks.lock
+
+# Agent worktrees (local only)
+.claude/worktrees/

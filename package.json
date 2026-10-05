@@ -14,10 +14,11 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "check": "prettier --check . && bun run lint",
-    "ci": "bun run check && bun run typecheck && bun run test:run && bun run build",
+    "ci": "bun run check && bun run typecheck && bun run db:check && bun run test:run && bun run build",
     "ship": "bun run ci && wrangler deploy dist/server/index.js --config wrangler.jsonc --env production",
     "fixtures:mlb": "bun scripts/record-mlb-fixture.ts",
     "db:generate": "drizzle-kit generate",
+    "db:check": "drizzle-kit check && drizzle-kit generate --name=ci-drift-check | grep -q \"No schema changes\"",
     "db:migrate:local": "wrangler d1 migrations apply sportsline-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply sportsline-db --remote",
     "postinstall": "lefthook install --force"
