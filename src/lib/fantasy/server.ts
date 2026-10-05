@@ -16,10 +16,16 @@ import {
   syncAccount,
   syncLeague,
 } from './sync'
+import { sleeperState, sleeperUser } from './sleeper/client'
+import {
+  discover as discoverSleeper,
+  sleeperLeagueRowId,
+  syncAccount as syncSleeper,
+} from './sleeper/sync'
 import type { MatchupView } from './matchup'
 import type { FantasySport } from './sports'
 import { getCloudflareEnv } from '@/lib/db'
-import { espnAccounts, fantasyLeagues } from '@/lib/db/schema'
+import { espnAccounts, fantasyLeagues, sleeperAccounts } from '@/lib/db/schema'
 import { seal } from '@/lib/kalshi/vault'
 import { sessionViewer, withViewer } from '@/lib/viewer/session'
 
@@ -32,6 +38,7 @@ export interface EspnConnection {
 export interface FantasyLeagueView {
   id: string
   sport: FantasySport
+  provider: 'espn' | 'sleeper'
   name: string
   teamName: string | null
   enabled: boolean
@@ -128,7 +135,14 @@ export const connectEspn = createServerFn({ method: 'POST' })
 /** Forget the cookies and every Fantasy league read with them. */
 export const disconnectEspn = createServerFn({ method: 'POST' }).handler(() =>
   withViewer(async ({ db, viewerId }) => {
-    await db.delete(fantasyLeagues).where(eq(fantasyLeagues.viewerId, viewerId))
+    await db
+      .delete(fantasyLeagues)
+      .where(
+        and(
+          eq(fantasyLeagues.viewerId, viewerId),
+          eq(fantasyLeagues.provider, 'espn'),
+        ),
+      )
     await db.delete(espnAccounts).where(eq(espnAccounts.viewerId, viewerId))
   }),
 )
@@ -136,11 +150,117 @@ export const disconnectEspn = createServerFn({ method: 'POST' }).handler(() =>
 export const syncFantasyNow = createServerFn({ method: 'POST' }).handler(() =>
   withViewer(async ({ db, viewerId }) => {
     const env = getCloudflareEnv()
-    // A manual sync also looks for new leagues.
+    // A manual sync also looks for new leagues, on every connection.
     const session = await loadSession(env, viewerId)
     if (session) await discover(db, viewerId, session).catch(() => 0)
-    return syncAccount(env, viewerId)
+    const sleeper = await db
+      .select()
+      .from(sleeperAccounts)
+      .where(eq(sleeperAccounts.viewerId, viewerId))
+      .get()
+    if (sleeper) {
+      await sleeperState()
+        .then((state) => discoverSleeper(db, viewerId, sleeper.userId, state))
+        .catch(() => 0)
+    }
+    const [espn, sleeperCount] = await Promise.all([
+      session ? syncAccount(env, viewerId) : 0,
+      sleeper ? syncSleeper(env, viewerId) : 0,
+    ])
+    return espn + sleeperCount
   }),
+)
+
+export interface SleeperConnection {
+  username: string
+  status: 'ok' | 'error'
+  lastError: string | null
+  syncedAt: string | null
+}
+
+export const getSleeperConnection = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<SleeperConnection | null> => {
+    if (!(await sessionViewer())) return null
+    return withViewer(async ({ db, viewerId }) => {
+      const row = await db
+        .select()
+        .from(sleeperAccounts)
+        .where(eq(sleeperAccounts.viewerId, viewerId))
+        .get()
+      return row
+        ? {
+            username: row.username,
+            status: row.status,
+            lastError: row.lastError,
+            syncedAt: row.syncedAt,
+          }
+        : null
+    })
+  },
+)
+
+/** Connect Sleeper by username: public, so nothing secret is kept. */
+export const connectSleeper = createServerFn({ method: 'POST' })
+  .validator((data: { username: string }) =>
+    z
+      .object({
+        username: z
+          .string()
+          .trim()
+          .min(2)
+          .max(40)
+          .regex(/^[\w.-]+$/, 'That isn’t a Sleeper username.'),
+      })
+      .parse(data),
+  )
+  .handler(({ data }) =>
+    withViewer(async ({ db, viewerId }): Promise<SleeperConnection> => {
+      const user = await sleeperUser(data.username).catch(() => null)
+      if (!user?.user_id)
+        throw new Error('Sleeper has no user by that name. Check the spelling.')
+      const now = new Date().toISOString()
+      const row = {
+        viewerId,
+        username: user.username ?? data.username,
+        userId: user.user_id,
+        status: 'ok' as const,
+        lastError: null,
+        connectedAt: now,
+        syncedAt: null,
+        discoveredAt: null,
+      }
+      await db
+        .insert(sleeperAccounts)
+        .values(row)
+        .onConflictDoUpdate({ target: sleeperAccounts.viewerId, set: row })
+      await syncSleeper(getCloudflareEnv(), viewerId).catch((error: unknown) =>
+        console.error('First Sleeper sync failed', { error: String(error) }),
+      )
+      return {
+        username: row.username,
+        status: 'ok',
+        lastError: null,
+        syncedAt: now,
+      }
+    }),
+  )
+
+/** Forget the Sleeper account and its leagues. */
+export const disconnectSleeper = createServerFn({ method: 'POST' }).handler(
+  () =>
+    withViewer(async ({ db, viewerId }) => {
+      await db
+        .delete(fantasyLeagues)
+        .where(
+          and(
+            eq(fantasyLeagues.viewerId, viewerId),
+            eq(fantasyLeagues.provider, 'sleeper'),
+          ),
+        )
+      await db
+        .delete(sleeperAccounts)
+        .where(eq(sleeperAccounts.viewerId, viewerId))
+    }),
 )
 
 /** Add a league from its ESPN URL (for one discovery missed). */
@@ -150,10 +270,39 @@ export const addFantasyLeague = createServerFn({ method: 'POST' })
   )
   .handler(({ data }) =>
     withViewer(async ({ db, viewerId }) => {
+      const sleeperId = /sleeper\.(?:com|app)\/leagues\/(\d+)/.exec(
+        data.url,
+      )?.[1]
+      if (sleeperId) {
+        const account = await db
+          .select()
+          .from(sleeperAccounts)
+          .where(eq(sleeperAccounts.viewerId, viewerId))
+          .get()
+        if (!account) throw new Error('Connect Sleeper first.')
+        await db
+          .insert(fantasyLeagues)
+          .values({
+            id: sleeperLeagueRowId(viewerId, sleeperId),
+            viewerId,
+            sport: 'football',
+            provider: 'sleeper',
+            leagueId: sleeperId,
+            season: new Date().getUTCFullYear(),
+            name: `League ${sleeperId}`,
+            updatedAt: new Date().toISOString(),
+          })
+          .onConflictDoUpdate({
+            target: fantasyLeagues.id,
+            set: { enabled: true },
+          })
+        await syncSleeper(getCloudflareEnv(), viewerId)
+        return
+      }
       const parsed = leagueFromUrl(data.url)
       if (!parsed) {
         throw new Error(
-          'Paste the league’s URL from fantasy.espn.com (it has leagueId= in it).',
+          'Paste the league’s URL from fantasy.espn.com (with leagueId= in it) or sleeper.com/leagues/….',
         )
       }
       const env = getCloudflareEnv()
@@ -251,6 +400,7 @@ export const getFantasy = createServerFn({ method: 'GET' }).handler(
       return rows.map((r) => ({
         id: r.id,
         sport: r.sport,
+        provider: r.provider,
         name: r.name,
         teamName: r.teamName,
         enabled: r.enabled,

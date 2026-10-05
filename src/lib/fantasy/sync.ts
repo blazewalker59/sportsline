@@ -9,7 +9,7 @@ import { discoverLeagues } from './discovery'
 import { myTeamId, readMatchup } from './matchup'
 import { MLB_PRO_TEAMS, NFL_PRO_TEAMS, SPORTS, seasonOf } from './sports'
 import type { EspnSession } from './client'
-import type { MatchupView } from './matchup'
+import type { LineupPlayer, MatchupView } from './matchup'
 import type { FantasySport } from './sports'
 import type { CloudflareEnv, Database } from '@/lib/db'
 import { dbFromD1 } from '@/lib/db'
@@ -89,46 +89,102 @@ export async function discover(
   return found.length
 }
 
-/** Our Players for ESPN's ids (by id where our Source is ESPN, else name). */
+/**
+ * Our Players for a Lineup's: by ESPN id where our Source is ESPN, else by
+ * name (baseball, and providers without ESPN ids): an exact match first,
+ * then the same name normalized. Matches already made for this league are
+ * reused, so a sync only looks up who's new.
+ */
 async function ourPlayers(
   db: Database,
   sport: FantasySport,
-  lineup: ReadonlyArray<{ espnId: number; name: string }>,
-): Promise<Map<number, string>> {
-  const out = new Map<number, string>()
+  lineup: ReadonlyArray<LineupPlayer>,
+  rowId: string,
+): Promise<Map<number, { id: string; headshotUrl: string | null }>> {
+  const out = new Map<number, { id: string; headshotUrl: string | null }>()
   const source = SPORTS[sport].playerSource
-  if (source) {
-    const ids = lineup.filter((p) => p.espnId > 0).map((p) => String(p.espnId))
-    for (let i = 0; i < ids.length; i += 80) {
-      const rows = await db
-        .select({ sourceId: sourceIds.sourceId, id: sourceIds.internalId })
-        .from(sourceIds)
-        .where(
-          and(
-            eq(sourceIds.entity, 'player'),
-            eq(sourceIds.source, source),
-            inArray(sourceIds.sourceId, ids.slice(i, i + 80)),
-          ),
-        )
-      for (const r of rows) out.set(Number(r.sourceId), r.id)
-    }
-    return out
-  }
-  // No shared ids (baseball): match on name within the League.
-  for (const p of lineup) {
-    const last = p.name.trim().split(/\s+/).at(-1) ?? ''
+  const byId = lineup.filter(
+    (p) => source && p.espnId > 0 && p.sourcePlayerId === undefined,
+  )
+  const ids = byId.map((p) => String(p.espnId))
+  for (let i = 0; i < ids.length; i += 80) {
     const rows = await db
-      .select({ id: players.id, name: players.name })
+      .select({
+        sourceId: sourceIds.sourceId,
+        id: sourceIds.internalId,
+        headshotUrl: players.headshotUrl,
+      })
+      .from(sourceIds)
+      .innerJoin(players, eq(players.id, sourceIds.internalId))
+      .where(
+        and(
+          eq(sourceIds.entity, 'player'),
+          eq(sourceIds.source, source!),
+          inArray(sourceIds.sourceId, ids.slice(i, i + 80)),
+        ),
+      )
+    for (const r of rows) out.set(Number(r.sourceId), r)
+  }
+  let byName = lineup.filter(
+    (p) => !byId.includes(p) && p.espnId > 0 && p.name && !/^#/.test(p.name),
+  )
+  if (byName.length === 0) return out
+  // Matches this league already has.
+  const known = await db
+    .select({
+      espnId: fantasyPlayers.espnId,
+      id: fantasyPlayers.playerId,
+      headshotUrl: players.headshotUrl,
+    })
+    .from(fantasyPlayers)
+    .innerJoin(players, eq(players.id, fantasyPlayers.playerId))
+    .where(eq(fantasyPlayers.leagueRowId, rowId))
+  for (const k of known)
+    if (k.id) out.set(k.espnId, { id: k.id, headshotUrl: k.headshotUrl })
+  byName = byName.filter((p) => !out.has(p.espnId))
+  const league = SPORTS[sport].league
+  const names = [...new Set(byName.map((p) => p.name))]
+  const exact = new Map<string, { id: string; headshotUrl: string | null }>()
+  for (let i = 0; i < names.length; i += 80) {
+    const rows = await db
+      .select({
+        id: players.id,
+        name: players.name,
+        headshotUrl: players.headshotUrl,
+      })
       .from(players)
       .where(
         and(
-          eq(players.league, SPORTS[sport].league),
+          eq(players.league, league),
+          inArray(players.name, names.slice(i, i + 80)),
+        ),
+      )
+    for (const r of rows) exact.set(r.name, r)
+  }
+  for (const p of byName) {
+    const hit = exact.get(p.name)
+    if (hit) {
+      out.set(p.espnId, hit)
+      continue
+    }
+    // Suffixes and punctuation differ between providers ("Jr.", "D.J.").
+    const last = p.name.trim().split(/\s+/).at(-1) ?? ''
+    const rows = await db
+      .select({
+        id: players.id,
+        name: players.name,
+        headshotUrl: players.headshotUrl,
+      })
+      .from(players)
+      .where(
+        and(
+          eq(players.league, league),
           sql`${players.name} like ${`%${last}%`}`,
         ),
       )
     const want = normalizePlayerName(p.name)
-    const hit = rows.find((r) => normalizePlayerName(r.name) === want)
-    if (hit) out.set(p.espnId, hit.id)
+    const found = rows.find((r) => normalizePlayerName(r.name) === want)
+    if (found) out.set(p.espnId, found)
   }
   return out
 }
@@ -193,35 +249,24 @@ async function ourTeams(
   return out
 }
 
-/** Read one league's Matchup now and store it, with its Players mapped. */
-export async function syncLeague(
+/**
+ * Store a league's Matchup (any provider's): its Players mapped to ours
+ * (with headshots), their Teams' logos, and who's in it for the feed.
+ */
+export async function storeMatchup(
   db: Database,
-  session: EspnSession,
   row: typeof fantasyLeagues.$inferSelect,
-): Promise<MatchupView | null> {
-  let league
-  let season = row.season
-  try {
-    league = await leagueViews(session, row.sport, season, row.leagueId)
-  } catch (error) {
-    // Not renewed for this season yet: read the season ESPN listed.
-    const fallback = seasonOf(row.sport, new Date()) - 1
-    if (
-      !(error instanceof EspnError && error.status === 404) ||
-      season === fallback
-    )
-      throw error
-    season = fallback
-    league = await leagueViews(session, row.sport, season, row.leagueId)
-  }
-  const teamId = myTeamId(league, session.swid, row.teamId)
-  const view = teamId === null ? null : readMatchup(row.sport, league, teamId)
+  view: MatchupView | null,
+  set: { season: number; teamId: number | null; lastError: string | null },
+): Promise<void> {
   if (view) {
     const everyone = [...view.mine.lineup, ...(view.opponent?.lineup ?? [])]
-    const ids = await ourPlayers(db, row.sport, everyone)
+    const ids = await ourPlayers(db, row.sport, everyone, row.id)
     const teamsBy = await ourTeams(db, row.sport, everyone)
     for (const p of everyone) {
-      p.playerId = ids.get(p.espnId) ?? null
+      const ours = ids.get(p.espnId)
+      p.playerId = ours?.id ?? null
+      if (p.sourcePlayerId !== undefined) p.headshot = ours?.headshotUrl ?? null
       const t = p.proTeamId === null ? undefined : teamsBy.get(p.proTeamId)
       // NFL logos and abbreviations from ESPN's fixed team ids, so a stored
       // Team's record can never put another League's logo on a D/ST.
@@ -261,16 +306,46 @@ export async function syncLeague(
   await db
     .update(fantasyLeagues)
     .set({
-      season,
-      teamId,
+      season: set.season,
+      teamId: set.teamId,
       name: view?.leagueName ?? row.name,
       teamName: view?.mine.name ?? row.teamName,
       matchup: view,
-      lastError:
-        teamId === null ? 'Couldn’t find your team in this league.' : null,
+      lastError: set.lastError,
       updatedAt: new Date().toISOString(),
     })
     .where(eq(fantasyLeagues.id, row.id))
+}
+
+/** Read one league's Matchup now and store it, with its Players mapped. */
+export async function syncLeague(
+  db: Database,
+  session: EspnSession,
+  row: typeof fantasyLeagues.$inferSelect,
+): Promise<MatchupView | null> {
+  let league
+  let season = row.season
+  try {
+    league = await leagueViews(session, row.sport, season, row.leagueId)
+  } catch (error) {
+    // Not renewed for this season yet: read the season ESPN listed.
+    const fallback = seasonOf(row.sport, new Date()) - 1
+    if (
+      !(error instanceof EspnError && error.status === 404) ||
+      season === fallback
+    )
+      throw error
+    season = fallback
+    league = await leagueViews(session, row.sport, season, row.leagueId)
+  }
+  const teamId = myTeamId(league, session.swid, row.teamId)
+  const view = teamId === null ? null : readMatchup(row.sport, league, teamId)
+  await storeMatchup(db, row, view, {
+    season,
+    teamId,
+    lastError:
+      teamId === null ? 'Couldn’t find your team in this league.' : null,
+  })
   return view
 }
 
@@ -312,6 +387,7 @@ export async function syncAccount(
       .where(
         and(
           eq(fantasyLeagues.viewerId, viewerId),
+          eq(fantasyLeagues.provider, 'espn'),
           eq(fantasyLeagues.enabled, true),
         ),
       )

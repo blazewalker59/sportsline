@@ -4,9 +4,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   addFantasyLeague,
   connectEspn,
+  connectSleeper,
   disconnectEspn,
+  disconnectSleeper,
   getEspnConnection,
   getFantasy,
+  getSleeperConnection,
   reorderFantasyLeagues,
   setFantasyLeagueEnabled,
   syncFantasyNow,
@@ -29,12 +32,37 @@ export function useEspnConnection() {
   })
 }
 
+export const SLEEPER_KEY = ['sleeper-connection'] as const
+
+export function useSleeperConnection() {
+  const { data: viewerState } = useViewer()
+  return useQuery({
+    queryKey: SLEEPER_KEY,
+    queryFn: () => getSleeperConnection(),
+    enabled: Boolean(viewerState?.viewer),
+    staleTime: 60_000,
+  })
+}
+
+/** Is any Fantasy provider connected (ESPN or Sleeper)? Pending while unknown. */
+export function useFantasyConnected(): {
+  connected: boolean
+  pending: boolean
+} {
+  const espn = useEspnConnection()
+  const sleeper = useSleeperConnection()
+  return {
+    connected: Boolean(espn.data) || Boolean(sleeper.data),
+    pending: espn.isPending || sleeper.isPending,
+  }
+}
+
 export function useFantasy() {
-  const connection = useEspnConnection()
+  const { connected } = useFantasyConnected()
   return useQuery({
     queryKey: FANTASY_KEY,
     queryFn: () => getFantasy(),
-    enabled: Boolean(connection.data),
+    enabled: connected,
     refetchInterval: REFRESH_MS,
     staleTime: REFRESH_MS / 2,
   })
@@ -44,6 +72,7 @@ function useRefreshAll() {
   const queryClient = useQueryClient()
   return () => {
     void queryClient.invalidateQueries({ queryKey: ESPN_KEY })
+    void queryClient.invalidateQueries({ queryKey: SLEEPER_KEY })
     void queryClient.invalidateQueries({ queryKey: FANTASY_KEY })
   }
 }
@@ -63,7 +92,8 @@ export function useDisconnectEspn() {
     mutationFn: () => disconnectEspn(),
     onSuccess: () => {
       queryClient.setQueryData(ESPN_KEY, null)
-      queryClient.setQueryData(FANTASY_KEY, [])
+      // Sleeper's leagues stay: read the list again.
+      void queryClient.invalidateQueries({ queryKey: FANTASY_KEY })
     },
   })
 }
@@ -101,5 +131,21 @@ export function useReorderFantasyLeagues() {
         old ? ids.flatMap((id) => old.find((l) => l.id === id) ?? []) : old,
       ),
     onSettled: () => queryClient.invalidateQueries({ queryKey: FANTASY_KEY }),
+  })
+}
+
+export function useConnectSleeper() {
+  const refresh = useRefreshAll()
+  return useMutation({
+    mutationFn: (username: string) => connectSleeper({ data: { username } }),
+    onSuccess: refresh,
+  })
+}
+
+export function useDisconnectSleeper() {
+  const refresh = useRefreshAll()
+  return useMutation({
+    mutationFn: () => disconnectSleeper(),
+    onSuccess: refresh,
   })
 }

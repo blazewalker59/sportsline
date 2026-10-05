@@ -485,6 +485,20 @@ export const espnAccounts = sqliteTable('espn_accounts', {
   discoveredAt: text('discovered_at'),
 })
 
+/** A Viewer's Sleeper connection: just who they are (Sleeper is public). */
+export const sleeperAccounts = sqliteTable('sleeper_accounts', {
+  viewerId: text('viewer_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  username: text('username').notNull(),
+  userId: text('user_id').notNull(),
+  status: text('status').$type<'ok' | 'error'>().notNull(),
+  lastError: text('last_error'),
+  connectedAt: text('connected_at').notNull(),
+  syncedAt: text('synced_at'),
+  discoveredAt: text('discovered_at'),
+})
+
 /** A Viewer's Fantasy league, with their latest Matchup (as read). */
 export const fantasyLeagues = sqliteTable(
   'fantasy_leagues',
@@ -494,6 +508,11 @@ export const fantasyLeagues = sqliteTable(
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
     sport: text('sport').$type<FantasySport>().notNull(),
+    /** Where the league lives: ESPN (cookies) or Sleeper (public). */
+    provider: text('provider')
+      .$type<'espn' | 'sleeper'>()
+      .notNull()
+      .default('espn'),
     leagueId: text('league_id').notNull(),
     season: integer('season').notNull(),
     teamId: integer('team_id'),

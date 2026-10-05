@@ -20,6 +20,10 @@ import {
   syncAccount as syncFantasy,
 } from '@/lib/fantasy/sync'
 import {
+  accountsDue as sleeperAccountsDue,
+  syncAccount as syncSleeper,
+} from '@/lib/fantasy/sleeper/sync'
+import {
   accountsDue,
   pruneHistory,
   refreshPrices,
@@ -88,7 +92,7 @@ export class Scheduler extends DurableObject<CloudflareEnv> {
     await this.fantasy()
   }
 
-  /** Fantasy (docs/adr/0004): each connected ESPN account's Matchups. */
+  /** Fantasy: each connected ESPN (docs/adr/0004) and Sleeper account's Matchups. */
   private async fantasy(): Promise<void> {
     try {
       for (const viewerId of await fantasyAccountsDue(
@@ -102,6 +106,19 @@ export class Scheduler extends DurableObject<CloudflareEnv> {
       }
     } catch (error) {
       console.error('Fantasy accounts failed', { error: String(error) })
+    }
+    try {
+      for (const viewerId of await sleeperAccountsDue(
+        this.env,
+        FANTASY_SYNC_EVERY_MS,
+        FANTASY_SYNCS_PER_TICK,
+      )) {
+        await syncSleeper(this.env, viewerId).catch((error: unknown) =>
+          console.error('Sleeper sync failed', { error: String(error) }),
+        )
+      }
+    } catch (error) {
+      console.error('Sleeper accounts failed', { error: String(error) })
     }
   }
 

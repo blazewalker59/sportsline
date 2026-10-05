@@ -13,7 +13,7 @@ import type { PredictionView } from '@/lib/kalshi/server'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { Connection } from '@/lib/timeline/useLiveTimeline'
 import type { League } from '@/lib/model/types'
-import { useEspnConnection, useFantasy } from '@/lib/fantasy/useFantasy'
+import { useFantasy, useFantasyConnected } from '@/lib/fantasy/useFantasy'
 import {
   FantasyStrip,
   FantasyTagsProvider,
@@ -251,7 +251,7 @@ function Timeline({
   const [predictionOpen, setPredictionOpen] = useState<string | null>(null)
   // Fantasy (CONTEXT.md, "Matchup"): enabled leagues' Matchups, and the
   // Players starting on either side.
-  const espn = useEspnConnection()
+  const fantasyConnection = useFantasyConnected()
   const fantasy = useFantasy()
   const fantasyLeagues = useMemo(
     () => (fantasy.data ?? []).filter((l) => l.enabled && l.matchup),
@@ -289,7 +289,9 @@ function Timeline({
       ? 'fantasy'
       : (wanted === 'following' && viewerFollows.length === 0) ||
           (wanted === 'predictions' && !kalshi.data && !kalshi.isPending) ||
-          (wanted === 'fantasy' && !espn.data && !espn.isPending)
+          (wanted === 'fantasy' &&
+            !fantasyConnection.connected &&
+            !fantasyConnection.pending)
         ? 'all'
         : (wanted ?? defaultScope(viewerFollows))
   // The Viewer's row in their order, hidden items left out; All covers

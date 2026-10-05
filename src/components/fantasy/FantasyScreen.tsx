@@ -17,11 +17,15 @@ import { SPORTS } from '@/lib/fantasy/sports'
 import {
   useAddFantasyLeague,
   useConnectEspn,
+  useConnectSleeper,
   useDisconnectEspn,
+  useDisconnectSleeper,
   useEspnConnection,
   useFantasy,
+  useFantasyConnected,
   useReorderFantasyLeagues,
   useSetFantasyLeagueEnabled,
+  useSleeperConnection,
   useSyncFantasy,
 } from '@/lib/fantasy/useFantasy'
 import { useViewer } from '@/lib/viewer/useViewer'
@@ -29,21 +33,197 @@ import { cn } from '@/lib/utils'
 
 export function FantasyScreen() {
   const { data: viewerState, isPending } = useViewer()
-  const connection = useEspnConnection()
+  const { connected, pending } = useFantasyConnected()
   return (
     <div className="mx-auto max-w-xl px-4 pb-16">
       <AppHeader />
       <h1 className="mb-4 text-xl font-bold tracking-tight">Fantasy</h1>
-      {isPending || connection.isPending ? null : !viewerState?.viewer ? (
+      {isPending || pending ? null : !viewerState?.viewer ? (
         <p className="mt-16 text-center text-sm text-muted">
-          Sign in to connect your ESPN fantasy leagues.
+          Sign in to connect your fantasy leagues.
         </p>
-      ) : connection.data ? (
-        <Connected />
       ) : (
-        <ConnectForm />
+        <div className="flex flex-col gap-6">
+          {!connected && (
+            <p className="text-sm text-muted">
+              Follow your fantasy Matchups live: your Starters’ and your
+              opponent’s plays in the feed, Alerts for their big plays, and your
+              score as it moves. Connect ESPN, Sleeper, or both.
+            </p>
+          )}
+          <Connections />
+          {connected && <Leagues />}
+        </div>
       )}
     </div>
+  )
+}
+
+/** ESPN and Sleeper: each connected or not, connected from right here. */
+function Connections() {
+  const now = useNow()
+  const espn = useEspnConnection()
+  const sleeper = useSleeperConnection()
+  const sync = useSyncFantasy()
+  const disconnectEspn = useDisconnectEspn()
+  const disconnectSleeper = useDisconnectSleeper()
+  // Back from the ESPN bookmarklet: open ESPN's form so it connects.
+  const [open, setOpen] = useState<'espn' | 'sleeper' | null>(() =>
+    typeof window !== 'undefined' && window.location.hash.includes('espn_s2')
+      ? 'espn'
+      : null,
+  )
+  const status = (c: {
+    status: 'ok' | 'error'
+    lastError: string | null
+    syncedAt: string | null
+  }) =>
+    c.status === 'error'
+      ? (c.lastError ?? 'Last sync failed')
+      : c.syncedAt
+        ? `Synced ${timeAgo(c.syncedAt, now)}`
+        : 'Syncing…'
+  const rows = [
+    {
+      key: 'espn' as const,
+      name: 'ESPN',
+      data: espn.data,
+      detail: espn.data ? status(espn.data) : 'Not connected',
+      disconnect: () => {
+        if (
+          window.confirm('Disconnect ESPN and delete its cookies and leagues?')
+        )
+          disconnectEspn.mutate()
+      },
+    },
+    {
+      key: 'sleeper' as const,
+      name: 'Sleeper',
+      data: sleeper.data,
+      detail: sleeper.data
+        ? `@${sleeper.data.username} · ${status(sleeper.data)}`
+        : 'Not connected',
+      disconnect: () => {
+        if (window.confirm('Disconnect Sleeper and remove its leagues?'))
+          disconnectSleeper.mutate()
+      },
+    },
+  ]
+  return (
+    <section>
+      <h2 className="mb-2 flex items-center justify-between text-xs font-bold tracking-wide text-muted uppercase">
+        <span>Connections</span>
+        {(espn.data || sleeper.data) && (
+          <button
+            type="button"
+            onClick={() => sync.mutate()}
+            disabled={sync.isPending}
+            className="rounded-full bg-notice px-3 py-1 text-[12px] font-semibold tracking-normal normal-case"
+          >
+            {sync.isPending ? 'Syncing…' : 'Sync now'}
+          </button>
+        )}
+      </h2>
+      <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+        {rows.map((r) => (
+          <li key={r.key}>
+            <div className="flex items-center gap-3 px-3 py-2.5 text-sm">
+              <span
+                className={cn(
+                  'size-2 shrink-0 rounded-full',
+                  !r.data
+                    ? 'bg-muted/40'
+                    : r.data.status === 'ok'
+                      ? 'bg-scoring'
+                      : 'bg-live',
+                )}
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold">{r.name}</span>
+                <span className="block truncate text-xs text-muted">
+                  {r.detail}
+                </span>
+              </span>
+              {r.data ? (
+                <button
+                  type="button"
+                  onClick={r.disconnect}
+                  className="min-h-9 rounded-full px-2 text-[13px] font-semibold text-muted hover:text-live"
+                >
+                  Disconnect
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setOpen((o) => (o === r.key ? null : r.key))}
+                  aria-expanded={open === r.key}
+                  className={cn(
+                    'min-h-9 rounded-full px-3 text-[13px] font-semibold',
+                    open === r.key
+                      ? 'bg-notice text-foreground'
+                      : 'bg-accent text-background',
+                  )}
+                >
+                  {open === r.key ? 'Cancel' : 'Connect'}
+                </button>
+              )}
+            </div>
+            {open === r.key && !r.data && (
+              <div className="border-t border-border px-3 py-3">
+                {r.key === 'espn' ? <ConnectForm /> : <SleeperForm />}
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+/** Sleeper is public: a username is all it takes. */
+function SleeperForm() {
+  const connect = useConnectSleeper()
+  const [username, setUsername] = useState('')
+  return (
+    <form
+      className="flex flex-col gap-2"
+      onSubmit={(e) => {
+        e.preventDefault()
+        connect.mutate(username.trim())
+      }}
+    >
+      <label className="text-sm font-semibold" htmlFor="sleeper-username">
+        Your Sleeper username
+      </label>
+      <span className="flex gap-2">
+        <input
+          id="sleeper-username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          placeholder="username"
+          className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm"
+        />
+        <button
+          type="submit"
+          disabled={!username.trim() || connect.isPending}
+          className="min-h-10 rounded-full bg-accent px-4 text-[13px] font-semibold text-background disabled:opacity-50"
+        >
+          {connect.isPending ? 'Finding…' : 'Connect'}
+        </button>
+      </span>
+      {connect.error && (
+        <p role="alert" className="text-sm text-live">
+          {connect.error.message}
+        </p>
+      )}
+      <p className="text-[11px] text-muted">
+        Sleeper’s leagues are public, so there’s no password or key: your NFL
+        leagues this season are found from your username.
+      </p>
+    </form>
   )
 }
 
@@ -82,11 +262,6 @@ function ConnectForm() {
   }, [origin])
   return (
     <div className="flex flex-col gap-5">
-      <p className="text-sm text-muted">
-        Follow your ESPN fantasy Matchups live: your Starters’ and your
-        opponent’s plays in the feed, Alerts for their big plays, and your score
-        as it moves.
-      </p>
       <section className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-3">
         <h2 className="text-sm font-semibold">The easy way</h2>
         <ol className="list-decimal space-y-1 pl-5 text-sm text-muted">
@@ -164,17 +339,12 @@ function ConnectForm() {
   )
 }
 
-function Connected() {
-  const now = useNow()
-  const connection = useEspnConnection()
+function Leagues() {
   const fantasy = useFantasy()
-  const sync = useSyncFantasy()
-  const disconnect = useDisconnectEspn()
   const add = useAddFantasyLeague()
   const setEnabled = useSetFantasyLeagueEnabled()
   const [url, setUrl] = useState('')
   const [open, setOpen] = useState<string | null>(null)
-  const c = connection.data!
   const leagues = fantasy.data ?? []
   const selected = leagues.find((l) => l.id === open && l.matchup)
   // Today's Games, for each Player's game state in the Matchup sheet.
@@ -186,47 +356,6 @@ function Connected() {
   })
   return (
     <div className="flex flex-col gap-6">
-      <section className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm">
-        <span
-          className={cn(
-            'size-2 shrink-0 rounded-full',
-            c.status === 'ok' ? 'bg-scoring' : 'bg-live',
-          )}
-        />
-        <span className="min-w-0 flex-1">
-          <span className="block font-semibold">ESPN connected</span>
-          <span className="block truncate text-xs text-muted">
-            {c.status === 'error'
-              ? (c.lastError ?? 'Last sync failed')
-              : c.syncedAt
-                ? `Synced ${timeAgo(c.syncedAt, now)}`
-                : 'Syncing…'}
-          </span>
-        </span>
-        <button
-          type="button"
-          onClick={() => sync.mutate()}
-          disabled={sync.isPending}
-          className="min-h-9 rounded-full bg-notice px-3 text-[13px] font-semibold"
-        >
-          {sync.isPending ? 'Syncing…' : 'Sync now'}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            if (
-              window.confirm(
-                'Disconnect ESPN and delete its cookies and leagues?',
-              )
-            )
-              disconnect.mutate()
-          }}
-          className="min-h-9 rounded-full px-2 text-[13px] font-semibold text-muted hover:text-live"
-        >
-          Disconnect
-        </button>
-      </section>
-
       <section>
         <h2 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
           Your leagues
@@ -235,8 +364,7 @@ function Connected() {
           <p className="text-sm text-muted">Loading…</p>
         ) : leagues.length === 0 ? (
           <p className="text-sm text-muted">
-            ESPN didn’t list any leagues yet. Add one by its URL below, or sync
-            again.
+            No leagues found yet. Add one by its URL below, or sync again.
           </p>
         ) : (
           <LeagueList
@@ -265,7 +393,7 @@ function Connected() {
             <input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://fantasy.espn.com/football/league?leagueId=…"
+              placeholder="ESPN or Sleeper league URL"
               className="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2 text-sm"
             />
             <button
@@ -367,7 +495,11 @@ function LeagueList({
                 )}
               >
                 {l.lastError ??
-                  [l.teamName, l.matchup?.mine.record]
+                  [
+                    l.teamName,
+                    l.matchup?.mine.record,
+                    l.provider === 'sleeper' ? 'Sleeper' : null,
+                  ]
                     .filter(Boolean)
                     .join(' · ')}
               </span>

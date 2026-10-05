@@ -5,7 +5,7 @@
 
 import type { AlertLevels } from '@/lib/push/alerts'
 import { AppHeader } from '@/components/layout/AppHeader'
-import { useEspnConnection } from '@/lib/fantasy/useFantasy'
+import { useFantasyConnected } from '@/lib/fantasy/useFantasy'
 import { useKalshiConnection } from '@/lib/kalshi/usePredictions'
 import { useAlertLevels, useAlerts } from '@/lib/push/useAlerts'
 import { useViewer } from '@/lib/viewer/useViewer'
@@ -162,12 +162,12 @@ function Levels() {
   const { state } = useAlerts()
   const { levels, set } = useAlertLevels(true)
   const kalshi = useKalshiConnection()
-  const espn = useEspnConnection()
+  const fantasy = useFantasyConnected()
   if (!levels) return null
   const sections: ReadonlyArray<readonly [keyof AlertLevels, string]> = [
     ['following', 'Following'],
     ...(kalshi.data ? [['predictions', 'Predictions'] as const] : []),
-    ...(espn.data ? [['fantasy', 'Fantasy'] as const] : []),
+    ...(fantasy.connected ? [['fantasy', 'Fantasy'] as const] : []),
   ]
   return (
     <div className={cn('flex flex-col gap-5', state !== 'on' && 'opacity-60')}>

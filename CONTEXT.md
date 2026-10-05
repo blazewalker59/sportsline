@@ -148,7 +148,7 @@ Where a stat Leg stands against its line while the Game is played: the count so 
 _Avoid_: tracker, status
 
 **Fantasy league**:
-A Viewer's ESPN fantasy league (football, basketball or baseball), read through their ESPN connection: the Viewer's own Fantasy team in it, and this scoring period's Matchup.
+A Viewer's fantasy league: on ESPN (football, basketball or baseball), read through their ESPN connection, or on Sleeper (football), read through their Sleeper connection. The Viewer's own Fantasy team in it, and this scoring period's Matchup; both providers' leagues look and behave the same.
 _Avoid_: league (that's a sports League), contest
 
 **Fantasy team**:
@@ -174,6 +174,10 @@ _Avoid_: cat, stat category
 **ESPN connection**:
 A Viewer's link to their ESPN fantasy leagues, through their ESPN session cookies (docs/adr/0004). Read-only by Sportsline's choice, not ESPN's.
 _Avoid_: login, integration
+
+**Sleeper connection**:
+A Viewer's Sleeper username, which finds their NFL leagues this season. Sleeper's leagues are public, so nothing secret is held.
+_Avoid_: Sleeper login, Sleeper account (the Viewer has no password with us)
 
 **Kalshi connection**:
 A Viewer's link to their own Kalshi account, through a read-only API key they provide (docs/adr/0003). It lets Sportsline read their Predictions, never trade.

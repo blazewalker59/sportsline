@@ -100,8 +100,15 @@ export interface WireLeague {
 // ─── What Sportsline keeps ─────────────────────────────────────────────────
 
 export interface LineupPlayer {
-  /** ESPN's player id (an ESPN athlete id; negative for D/ST). */
+  /**
+   * ESPN's player id (an ESPN athlete id; negative for D/ST). For another
+   * provider, a stand-in unique within the league (see sleeper/read.ts).
+   */
   espnId: number
+  /** The provider's own player id, when that isn't ESPN. */
+  sourcePlayerId?: string
+  /** A headshot found for the Player (when ESPN's id can't give one). */
+  headshot?: string | null
   /** Our Player, once matched (for links, the feed and Alerts). */
   playerId?: string | null
   name: string
@@ -116,7 +123,13 @@ export interface LineupPlayer {
   proTeamId: number | null
   injury: string | null
   /** Where this period's points came from: each stat's value and points. */
-  breakdown: Array<{ statId: number; value: number; points: number }>
+  breakdown: Array<{
+    statId: number
+    /** The stat's name, when it isn't one of ESPN's stat ids. */
+    label?: string
+    value: number
+    points: number
+  }>
   /** Category leagues: their line today in the league's categories. */
   dayLine?: Array<{ label: string; value: string }> | null
   /** Our Team, its logo and abbreviation (for D/ST, and the Game's state). */

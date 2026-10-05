@@ -246,6 +246,8 @@ function headshotOf(
   p: LineupPlayer,
 ): string | null {
   if (p.espnId < 0) return p.teamLogo ?? null
+  // Another provider's Player: the headshot we matched them to, if any.
+  if (p.sourcePlayerId !== undefined) return p.headshot ?? null
   return `https://a.espncdn.com/combiner/i?img=/i/headshots/${HEADSHOT_LEAGUE[sport]}/players/full/${p.espnId}.png&w=96&h=70`
 }
 
@@ -711,7 +713,7 @@ function PointsTable({
       {player.breakdown.map((b) => (
         <Fragment key={b.statId}>
           <span className="truncate text-foreground/80">
-            {statName(sport, b.statId)}
+            {b.label ?? statName(sport, b.statId)}
           </span>
           <span className={cn(cell, 'text-muted')}>
             {b.value === 0 ? '—' : statValue(b.value)}
