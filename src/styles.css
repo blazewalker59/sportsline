@@ -231,3 +231,22 @@ textarea,
 .dark .fill-edge {
   box-shadow: inset 0 0 0 1.5px var(--fill-edge-dark, transparent);
 }
+
+/*
+  Every text field at 16px or more on touch screens: iOS Safari zooms the
+  page into any field smaller than that when it's focused. Unlayered, so it
+  wins over a field's own text-sm/text-xs; desktop keeps the designed size.
+*/
+@media (pointer: coarse) {
+  input:not(
+    [type='checkbox'],
+    [type='radio'],
+    [type='range'],
+    [type='color'],
+    [type='file']
+  ),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
