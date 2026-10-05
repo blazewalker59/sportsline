@@ -83,6 +83,12 @@ export default {
     }
 
     if (url.pathname === LIVE_PATH) {
+      // Live updates are for signed-in Viewers, like everything else.
+      const session = await getAuth(env, url.origin).api.getSession({
+        headers: request.headers,
+      })
+      if (!session?.user)
+        return new Response('Sign in required', { status: 401 })
       return env.LIVE_HUB.get(env.LIVE_HUB.idFromName('global')).fetch(request)
     }
 

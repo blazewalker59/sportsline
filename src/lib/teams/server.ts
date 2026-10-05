@@ -10,6 +10,7 @@ import { z } from 'zod'
 import type { Database } from '@/lib/db'
 import type { Conference } from '@/lib/model/leagues'
 import type { League, ScheduledGame, SourceTeam } from '@/lib/model/types'
+import { requireViewer } from '@/lib/viewer/session'
 import { teamColors } from '@/lib/brand/teamColors'
 import { getCloudflareEnv, getDb } from '@/lib/db'
 import { games, players, sourceIds, teams } from '@/lib/db/schema'
@@ -118,6 +119,7 @@ export const getTeamPage = createServerFn({ method: 'GET' })
     z.object({ teamId: z.string().min(1).max(200) }).parse(data),
   )
   .handler(async ({ data }): Promise<TeamPage | null> => {
+    await requireViewer()
     const db = getDb()
     const team = await db
       .select()
@@ -278,6 +280,7 @@ export const openTeamGame = createServerFn({ method: 'POST' })
         .parse(data),
   )
   .handler(async ({ data }): Promise<{ gameId: string } | null> => {
+    await requireViewer()
     const db = getDb()
     const source = sourceFor(data.league).source
     const find = async () =>

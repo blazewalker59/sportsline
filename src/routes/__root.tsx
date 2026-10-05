@@ -3,6 +3,7 @@ import {
   Outlet,
   Scripts,
   createRootRouteWithContext,
+  useRouterState,
 } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
@@ -14,6 +15,8 @@ import { THEME_BOOT, THEME_COLOR_BOOT } from '../lib/theme'
 
 import type { QueryClient } from '@tanstack/react-query'
 import { PlayerSheetProvider } from '@/components/players/PlayerProfile'
+import { Landing } from '@/components/landing/Landing'
+import { useViewer } from '@/lib/viewer/useViewer'
 
 interface MyRouterContext {
   queryClient: QueryClient
@@ -51,16 +54,44 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
     ],
   }),
   shellComponent: RootDocument,
-  // A Player opens as a sheet over any screen, not a new page.
-  component: () => (
-    <PlayerSheetProvider>
-      <Outlet />
-    </PlayerSheetProvider>
-  ),
+  component: Gate,
   notFoundComponent: () => (
     <p className="p-8 text-center text-muted">Page not found.</p>
   ),
 })
+
+/**
+ * Sportsline is for signed-in Viewers: a visitor sees the Landing, a
+ * Viewer the app (where a Player opens as a sheet over any screen). Local
+ * preview pages (/zz-dev…) skip the gate in development.
+ */
+function Gate() {
+  const viewer = useViewer()
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
+  if (import.meta.env.DEV && pathname.startsWith('/zz-dev')) return <Outlet />
+  if (viewer.isPending) return <Splash />
+  if (!viewer.data?.viewer) return <Landing />
+  return (
+    <PlayerSheetProvider>
+      <Outlet />
+    </PlayerSheetProvider>
+  )
+}
+
+/** While the session is checked: the wordmark, nothing to flash. */
+function Splash() {
+  return (
+    <div className="flex min-h-dvh items-center justify-center bg-background">
+      <img
+        src="/favicon.svg"
+        alt="Sportsline"
+        width={44}
+        height={44}
+        className="animate-pulse"
+      />
+    </div>
+  )
+}
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (

@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { teamRef } from './cards'
 import type { TeamRef, TimelineItem } from '@/lib/model/timeline'
 import type { League } from '@/lib/model/types'
+import { requireViewer } from '@/lib/viewer/session'
 import { getDb } from '@/lib/db'
 import {
   games,
@@ -44,6 +45,7 @@ export const getPlayerPage = createServerFn({ method: 'GET' })
       .parse(data),
   )
   .handler(async ({ data }): Promise<PlayerPage | null> => {
+    await requireViewer()
     const db = getDb()
     const row = await db
       .select({ player: players, team: teams })

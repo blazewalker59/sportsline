@@ -10,7 +10,7 @@ import { teamColors } from '@/lib/brand/teamColors'
 import { toTimelineItem } from '@/lib/live/rows'
 import { getDb } from '@/lib/db'
 import { games, reactions, teams, timelineItems } from '@/lib/db/schema'
-import { sessionViewer, withViewer } from '@/lib/viewer/session'
+import { requireViewer, sessionViewer, withViewer } from '@/lib/viewer/session'
 
 const SPORTS_DAY = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 
@@ -20,6 +20,7 @@ export const getReactions = createServerFn({ method: 'GET' })
     z.object({ sportsDay: SPORTS_DAY }).parse(data),
   )
   .handler(async ({ data }): Promise<Record<string, ItemReactions>> => {
+    await requireViewer()
     const viewer = await sessionViewer()
     const rows = await getDb()
       .select({

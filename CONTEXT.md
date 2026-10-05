@@ -196,5 +196,5 @@ How much one Alert source sends a Viewer. Following: scores and finals, finals o
 _Avoid_: notification settings, preferences
 
 **Viewer**:
-A person signed in to Sportsline, who owns a set of Follows. Signed-out visitors see a default Timeline and have no Follows.
+A person signed in to Sportsline, who owns a set of Follows. Sportsline is only for Viewers: a signed-out visitor sees the landing page and nothing else.
 _Avoid_: user, account, member

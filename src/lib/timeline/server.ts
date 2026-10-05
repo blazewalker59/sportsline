@@ -31,7 +31,7 @@ import {
   teams,
   timelineItems,
 } from '@/lib/db/schema'
-import { sessionViewer } from '@/lib/viewer/session'
+import { requireViewer, sessionViewer } from '@/lib/viewer/session'
 import { shiftSportsDay, sportsDayOf } from '@/lib/model/sportsDay'
 import { syncDay } from '@/lib/live/schedule'
 import { followsFromParam } from '@/lib/model/timeline'
@@ -58,6 +58,7 @@ export interface TimelinePage {
 export const getTimeline = createServerFn({ method: 'GET' })
   .validator((data: z.input<typeof timelineInput>) => timelineInput.parse(data))
   .handler(async ({ data }): Promise<TimelinePage> => {
+    await requireViewer()
     const db = getDb()
     const sportsDay = data.sportsDay ?? sportsDayOf(new Date())
     const follows = followsFromParam(data.follows)
@@ -271,6 +272,7 @@ export const getGames = createServerFn({ method: 'GET' })
     z.object({ sportsDay: SPORTS_DAY.optional() }).parse(data),
   )
   .handler(async ({ data }): Promise<Array<GameSummary>> => {
+    await requireViewer()
     const db = getDb()
     const sportsDay = data.sportsDay ?? sportsDayOf(new Date())
     const away = aliasedTable(teams, 'away')
@@ -310,6 +312,7 @@ export const ensureSportsDay = createServerFn({ method: 'POST' })
     z.object({ sportsDay: SPORTS_DAY }).parse(data),
   )
   .handler(async ({ data }): Promise<{ games: number; loading: boolean }> => {
+    await requireViewer()
     const today = sportsDayOf(new Date())
     const oldest = shiftSportsDay(today, -BACKFILL_DAYS)
     if (data.sportsDay >= today || data.sportsDay < oldest) {

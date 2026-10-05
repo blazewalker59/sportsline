@@ -25,8 +25,10 @@ async function viewerId(): Promise<string> {
 
 /** The VAPID public key browsers subscribe with; null when Alerts aren't configured. */
 export const getPushKey = createServerFn({ method: 'GET' }).handler(
-  (): Promise<string | null> =>
-    Promise.resolve(getCloudflareEnv().VAPID_PUBLIC_KEY ?? null),
+  async (): Promise<string | null> => {
+    await viewerId()
+    return getCloudflareEnv().VAPID_PUBLIC_KEY ?? null
+  },
 )
 
 const subscriptionInput = z.object({

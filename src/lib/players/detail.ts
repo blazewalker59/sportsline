@@ -8,6 +8,7 @@ import { aliasedTable, and, asc, eq, gte, lte, or } from 'drizzle-orm'
 import { z } from 'zod'
 import type { GameSummary } from '@/lib/model/timeline'
 import type { PlayerOverview } from '@/lib/model/types'
+import { requireViewer } from '@/lib/viewer/session'
 import { getDb } from '@/lib/db'
 import { games, players, sourceIds, teams } from '@/lib/db/schema'
 import { toGameSummary } from '@/lib/live/rows'
@@ -33,6 +34,7 @@ export const getPlayerDetail = createServerFn({ method: 'GET' })
     z.object({ playerId: z.string().min(1).max(200) }).parse(data),
   )
   .handler(async ({ data }): Promise<PlayerDetail | null> => {
+    await requireViewer()
     const db = getDb()
     const player = await db
       .select()

@@ -15,6 +15,7 @@ import type { Database } from '@/lib/db'
 import type { ViewerFollow } from '@/lib/model/timeline'
 import type { League } from '@/lib/model/types'
 import type { LeagueSettings } from '@/lib/model/leagues'
+import { requireViewer } from '@/lib/viewer/session'
 import { getDb } from '@/lib/db'
 import {
   follows,
@@ -270,6 +271,7 @@ export const searchFollowables = createServerFn({ method: 'GET' })
     z.object({ q: z.string().trim().min(2).max(60) }).parse(data),
   )
   .handler(async ({ data }): Promise<Array<Followable>> => {
+    await requireViewer()
     const db = getDb()
     const pattern = `%${data.q.replace(/[%_]/g, '')}%`
     const [teamRows, playerRows] = await Promise.all([

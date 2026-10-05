@@ -250,3 +250,135 @@ textarea,
     font-size: 16px;
   }
 }
+
+/* ─── Landing (components/landing/Landing.tsx) ─────────────────────────── */
+
+.landing-glow {
+  position: absolute;
+  width: 70vmax;
+  height: 70vmax;
+  border-radius: 9999px;
+  opacity: 0.32;
+  filter: blur(90px);
+  animation: landing-drift 22s ease-in-out infinite alternate;
+}
+.landing-glow-2 {
+  animation-duration: 27s;
+  animation-delay: -6s;
+}
+.landing-glow-3 {
+  animation-duration: 31s;
+  animation-delay: -12s;
+  opacity: 0.24;
+}
+@keyframes landing-drift {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(8vmax, 6vmax) scale(1.15);
+  }
+}
+
+/* Yard lines under the glow, sliding slowly downfield. */
+.landing-field {
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgb(255 255 255 / 0.05) 0 1px,
+    transparent 1px 72px
+  );
+  mask-image: linear-gradient(to bottom, black, transparent 85%);
+  animation: landing-field 18s linear infinite;
+}
+@keyframes landing-field {
+  to {
+    background-position: 72px 0;
+  }
+}
+
+.landing-rise {
+  animation: landing-rise 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes landing-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
+.landing-live {
+  animation: landing-live 1.6s ease-in-out infinite;
+}
+@keyframes landing-live {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.landing-ink {
+  background-size: 200% 100%;
+  animation: landing-ink 6s ease-in-out infinite alternate;
+}
+@keyframes landing-ink {
+  to {
+    background-position: 100% 0;
+  }
+}
+
+/* The phone's feed: each play lands in turn, holds, and the night replays. */
+.landing-moment {
+  opacity: 0;
+  animation: landing-moment 11s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+@keyframes landing-moment {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.96);
+  }
+  5%,
+  80% {
+    opacity: 1;
+    transform: none;
+  }
+  90%,
+  100% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+.landing-typing {
+  animation: landing-typing 2.2s ease-in-out infinite;
+}
+@keyframes landing-typing {
+  0%,
+  70% {
+    opacity: 1;
+  }
+  85%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.landing-ticker {
+  animation: landing-ticker 40s linear infinite;
+}
+@keyframes landing-ticker {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.landing-cta:hover {
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing *,
+  .landing-moment {
+    animation: none !important;
+  }
+  .landing-moment {
+    opacity: 1;
+  }
+}

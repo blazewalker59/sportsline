@@ -30,6 +30,14 @@ export async function sessionViewer(): Promise<ViewerProfile | null> {
   }
 }
 
+/** Sportsline is for signed-in Viewers: every server function but the
+ * session check itself starts here. */
+export async function requireViewer(): Promise<ViewerProfile> {
+  const viewer = await sessionViewer()
+  if (!viewer) throw new Error('Sign in required')
+  return viewer
+}
+
 export async function withViewer<T>(
   fn: (scope: { db: Database; viewerId: string }) => Promise<T>,
 ): Promise<T> {
