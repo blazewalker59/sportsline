@@ -6,7 +6,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { desc } from 'drizzle-orm'
 import { z } from 'zod'
-import { isAdmin, reportError } from './errors'
+import { adminEmails, isAdmin, reportError } from './errors'
 import { isStale } from './jobs'
 import { getCloudflareEnv, getDb } from '@/lib/db'
 import {
@@ -51,17 +51,32 @@ export interface ErrorView {
   details: string | null
 }
 
+/** Why there's nothing to show: who the server sees, and who's an admin. */
+export interface OpsDenied {
+  denied: true
+  email: string
+  adminsConfigured: number
+}
+
 export interface OpsHealth {
+  denied?: false
   jobs: Array<JobView>
   accounts: Array<AccountView>
   errors: Array<ErrorView>
 }
 
 export const getOpsHealth = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<OpsHealth | null> => {
+  async (): Promise<OpsHealth | OpsDenied> => {
     const viewer = await requireViewer()
     const env = getCloudflareEnv()
-    if (!isAdmin(env, viewer.email)) return null
+    const admin = isAdmin(env, viewer.email)
+    console.log('[ops] health requested', { email: viewer.email, admin })
+    if (!admin)
+      return {
+        denied: true,
+        email: viewer.email,
+        adminsConfigured: adminEmails(env).length,
+      }
     const db = getDb()
     const [jobs, errors, users, kalshi, espn, sleeper] = await Promise.all([
       db.select().from(jobRuns),

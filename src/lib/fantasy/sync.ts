@@ -429,10 +429,15 @@ export async function syncAccount(
       !account?.discoveredAt ||
       Date.now() - Date.parse(account.discoveredAt) > DISCOVER_EVERY_MS
     ) {
-      // Discovery is a convenience: leagues can be added by URL.
-      await discover(db, viewerId, session).catch((error: unknown) =>
-        reportError(env, 'espn', error, { viewerId, step: 'discovery' }),
-      )
+      // Discovery is a convenience: leagues can be added by URL. A failed
+      // attempt still counts for the day, so it isn't retried every sync.
+      await discover(db, viewerId, session).catch(async (error: unknown) => {
+        await reportError(env, 'espn', error, { viewerId, step: 'discovery' })
+        await db
+          .update(espnAccounts)
+          .set({ discoveredAt: new Date().toISOString() })
+          .where(eq(espnAccounts.viewerId, viewerId))
+      })
     }
     const leagues = await db
       .select()

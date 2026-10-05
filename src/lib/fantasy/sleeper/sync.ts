@@ -159,9 +159,18 @@ export async function syncAccount(
       !account.discoveredAt ||
       Date.now() - Date.parse(account.discoveredAt) > DISCOVER_EVERY_MS
     ) {
+      // A failed attempt still counts for the day (not retried every sync).
       await discover(db, viewerId, account.userId, state).catch(
-        (error: unknown) =>
-          reportError(env, 'sleeper', error, { viewerId, step: 'discovery' }),
+        async (error: unknown) => {
+          await reportError(env, 'sleeper', error, {
+            viewerId,
+            step: 'discovery',
+          })
+          await db
+            .update(sleeperAccounts)
+            .set({ discoveredAt: new Date().toISOString() })
+            .where(eq(sleeperAccounts.viewerId, viewerId))
+        },
       )
     }
     const leagues = await db

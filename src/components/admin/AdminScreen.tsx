@@ -27,8 +27,15 @@ export function AdminScreen() {
         <p className="text-sm text-muted">Loading…</p>
       ) : health.isError ? (
         <p className="text-sm text-live">{health.error.message}</p>
-      ) : !health.data ? (
-        <p className="text-sm text-muted">This page is for admins.</p>
+      ) : health.data.denied ? (
+        <p className="rounded-xl border border-border bg-surface px-4 py-3 text-sm text-muted">
+          Signed in as{' '}
+          <span className="font-semibold text-foreground">
+            {health.data.email}
+          </span>
+          , which isn’t an admin
+          {health.data.adminsConfigured === 0 && ' (no admins are configured)'}.
+        </p>
       ) : (
         <Health health={health.data} />
       )}
@@ -44,10 +51,11 @@ function jobState(j: JobView): 'ok' | 'failing' | 'stale' {
   return 'ok'
 }
 
+/** Health colors, fixed: the app's gold "scoring" reads as a warning here. */
 const DOT = {
-  ok: 'bg-scoring',
-  failing: 'bg-yellow-400',
-  stale: 'bg-live',
+  ok: 'bg-emerald-500',
+  failing: 'bg-amber-400',
+  stale: 'bg-red-500',
 } as const
 
 function Health({ health }: { health: OpsHealth }) {
@@ -126,7 +134,7 @@ function Health({ health }: { health: OpsHealth }) {
               <span
                 className={cn(
                   'mt-1.5 size-2 shrink-0 rounded-full',
-                  a.status === 'ok' ? 'bg-scoring' : 'bg-live',
+                  a.status === 'ok' ? DOT.ok : DOT.stale,
                 )}
               />
               <span className="min-w-0 flex-1">
@@ -217,7 +225,9 @@ function Summary({
       <span
         className={cn(
           'block text-2xl font-bold tabular-nums',
-          bad && value > 0 ? 'text-live' : 'text-scoring',
+          bad && value > 0
+            ? 'text-red-500'
+            : 'text-emerald-600 dark:text-emerald-400',
         )}
       >
         {value}
