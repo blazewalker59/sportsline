@@ -1,66 +1,31 @@
+/**
+ * The Timeline (CONTEXT.md): a chat feed of the Sports Day's plays for the
+ * Viewer's Scope, live. This file wires its parts together: the Scope and
+ * what it covers (useTimelineScope), the pinned top (TimelineTop), the feed
+ * (TimelineFeed) and the sheets it opens (TimelineSheets).
+ */
+
 import { Link, useNavigate, useRouter } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { timeAgo, useNow } from './format'
-import { DayButton } from './DayButton'
-import { DayStrip } from './DayStrip'
-import { ScopeBar } from './ScopeBar'
-import { GameStrip } from './GameStrip'
-import { CatchUpCard, CatchUpSheet } from './CatchUp'
+import { useNow } from './format'
+import { entryTime } from './FeedRows'
+import { FeedFooter, TimelineFeed } from './TimelineFeed'
+import { TimelineSheets } from './TimelineSheets'
+import { TimelineTop } from './TimelineTop'
+import { followsGame } from './timelineScope'
+import { usePastDay } from './usePastDay'
+import { useTimelineScope } from './useTimelineScope'
 import type { Scope } from '@/lib/model/scope'
-import type { FeedEntry, Typing } from '@/lib/timeline/chat'
-import type { Follow, GameSummary } from '@/lib/model/timeline'
-import type { PredictionView } from '@/lib/kalshi/server'
-import type { FantasyLeagueView } from '@/lib/fantasy/server'
-import type { Connection } from '@/lib/timeline/useLiveTimeline'
-import type { League } from '@/lib/model/types'
-import { useFantasy, useFantasyConnected } from '@/lib/fantasy/useFantasy'
-import {
-  FantasyStrip,
-  FantasyTagsProvider,
-  MatchupSheet,
-} from '@/components/fantasy/FantasyParts'
-import {
-  useKalshiConnection,
-  usePredictions,
-} from '@/lib/kalshi/usePredictions'
-import {
-  PredictionSheet,
-  PredictionStrip,
-  PredictionSummary,
-} from '@/components/predictions/PredictionParts'
+import { FantasyTagsProvider } from '@/components/fantasy/FantasyParts'
 import { ReactionsProvider } from '@/components/chat/Reactions'
-import { defaultScope, parseScope, scopeFollows } from '@/lib/model/scope'
-import { inConference, isRanked } from '@/lib/model/timeline'
-import {
-  DEFAULT_LEAGUE_SETTINGS,
-  isConference,
-  visibleLeagues,
-  visibleRowItems,
-} from '@/lib/model/leagues'
 import { takePlayOpened } from '@/lib/timeline/playSheet'
-import { PlaySheet } from '@/components/games/PlayDetailScreen'
 import { useHideOnScroll } from '@/lib/useHideOnScroll'
-import { withViewTransition } from '@/lib/viewTransition'
-import { gameSearch, vtName } from '@/lib/timeline/gameLink'
 import { useLiveGame } from '@/lib/games/useLiveGame'
-import { BoxSheet } from '@/components/games/GameView'
-import { Sheet } from '@/components/chat/Sheet'
 import { catchUp } from '@/lib/timeline/catchup'
-import {
-  BubbleStack,
-  LeagueAvatar,
-  Notice,
-  ReadDivider,
-  TeamAvatar,
-  TeamAvatarLink,
-  TypingDots,
-} from '@/components/chat/ChatParts'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { sportsDayOf } from '@/lib/model/sportsDay'
 import { buildChat, typingFor } from '@/lib/timeline/chat'
-import { ensureSportsDay } from '@/lib/timeline/server'
 import { useLiveTimeline } from '@/lib/timeline/useLiveTimeline'
-import { cn } from '@/lib/utils'
 import { useReadMarkerWriter, useViewer } from '@/lib/viewer/useViewer'
 
 export function TimelineScreen({
@@ -107,101 +72,6 @@ export function TimelineScreen({
   )
 }
 
-const SCOPE_KEY = 'sportsline:scope'
-
-/** The Scope last chosen on this device, if any (and still a Scope). */
-function readStoredScope(): Scope | undefined {
-  try {
-    return parseScope(localStorage.getItem(SCOPE_KEY))
-  } catch {
-    return undefined
-  }
-}
-
-function storeScope(scope: Scope): void {
-  try {
-    localStorage.setItem(SCOPE_KEY, scope)
-  } catch {
-    // Private mode: the Scope just isn't remembered.
-  }
-}
-
-/**
- * What one Prediction covers: plays naming each Player a Leg is about, and
- * the whole Game for every other Leg.
- */
-function predictionFollows(p: PredictionView): Array<Follow> {
-  const out = new Map<string, Follow>()
-  for (const leg of p.legs) {
-    if (leg.playerId)
-      out.set(`p:${leg.playerId}`, { kind: 'player', playerId: leg.playerId })
-    else if (leg.game)
-      out.set(`g:${leg.game.id}`, { kind: 'game', gameId: leg.game.id })
-  }
-  return [...out.values()]
-}
-
-/**
- * What one Fantasy Matchup covers: plays naming either side's Starters.
- * (Unmatched Starters, team defenses among them, can't be followed by play.)
- */
-function matchupFollows(league: FantasyLeagueView): Array<Follow> {
-  const m = league.matchup
-  const ids = [...(m?.mine.lineup ?? []), ...(m?.opponent?.lineup ?? [])]
-    .filter((p) => p.starter && p.playerId)
-    .map((p) => p.playerId!)
-  // As Player Follows (a few dozen ids at most); with no Starters matched
-  // yet, an id that covers nothing rather than every league's.
-  return (ids.length ? [...new Set(ids)] : ['pl_none']).map((playerId) => ({
-    kind: 'player' as const,
-    playerId,
-  }))
-}
-
-/** Does this Game belong on the score cards for the Scope? */
-function inScope(
-  game: GameSummary,
-  scope: Scope,
-  viewerFollows: ReadonlyArray<Follow>,
-  items: ReadonlyArray<{ gameId: string }>,
-  leagues: ReadonlyArray<League>,
-  predictionGames: ReadonlyArray<string>,
-): boolean {
-  if (scope === 'all') return leagues.includes(game.league)
-  if (scope === 'predictions') return predictionGames.includes(game.id)
-  // Fantasy: the Games the Starters' plays came from.
-  if (scope === 'fantasy') return items.some((i) => i.gameId === game.id)
-  if (scope === 'top25') return game.league === 'cfb' && isRanked(game)
-  if (isConference(scope))
-    return game.league === 'cfb' && inConference(game, scope)
-  if (scope !== 'following') return game.league === scope
-  // Player Follows can't be judged from the Game alone: include any Game
-  // that has Plays on this Timeline.
-  return (
-    followsGame(game, viewerFollows) || items.some((i) => i.gameId === game.id)
-  )
-}
-
-/** Is this live Game one the Viewer's Follows cover (for its typing indicator)? */
-function followsGame(
-  game: GameSummary,
-  follows: ReadonlyArray<Follow>,
-): boolean {
-  return follows.some((f) =>
-    f.kind === 'league'
-      ? f.league === game.league
-      : f.kind === 'team'
-        ? f.teamId === game.awayTeam.id || f.teamId === game.homeTeam.id
-        : f.kind === 'top25'
-          ? game.league === 'cfb' && isRanked(game)
-          : f.kind === 'conference'
-            ? game.league === 'cfb' && inConference(game, f.conference)
-            : f.kind === 'game'
-              ? f.gameId === game.id
-              : false,
-  )
-}
-
 function Timeline({
   sportsDay,
   today,
@@ -225,140 +95,11 @@ function Timeline({
   const { data } = useViewer()
   const viewer = data?.viewer ?? null
   const followed = data?.follows
-  const viewerFollows = useMemo(
-    () => (followed ?? []).map((f) => f.follow),
-    [followed],
-  )
-  // The Scope from the URL, else Following for a Viewer who follows
-  // something, else All (CONTEXT.md, "Scope").
-  // Predictions (CONTEXT.md): open ones, and the Games they depend on.
-  const kalshi = useKalshiConnection()
-  const predictionList = usePredictions()
-  const openPredictions = useMemo(
-    () => (predictionList.data ?? []).filter((p) => p.status === 'open'),
-    [predictionList.data],
-  )
-  const predictionGames = useMemo(
-    () => [
-      ...new Set(
-        openPredictions.flatMap((p) =>
-          p.legs.flatMap((l) => (l.game ? [l.game.id] : [])),
-        ),
-      ),
-    ],
-    [openPredictions],
-  )
+  const s = useTimelineScope({ requestedScope, predictionId, matchupId })
+  const { scope, follows } = s
   const [predictionOpen, setPredictionOpen] = useState<string | null>(null)
-  // Fantasy (CONTEXT.md, "Matchup"): enabled leagues' Matchups, and the
-  // Players starting on either side.
-  const fantasyConnection = useFantasyConnected()
-  const fantasy = useFantasy()
-  const fantasyLeagues = useMemo(
-    () => (fantasy.data ?? []).filter((l) => l.enabled && l.matchup),
-    [fantasy.data],
-  )
-  const fantasyPlayers = useMemo(
-    () => [
-      ...new Set(
-        fantasyLeagues.flatMap((l) =>
-          [...l.matchup!.mine.lineup, ...(l.matchup!.opponent?.lineup ?? [])]
-            .filter((p) => p.starter && p.playerId)
-            .map((p) => p.playerId!),
-        ),
-      ),
-    ],
-    [fantasyLeagues],
-  )
   const [matchupOpen, setMatchupOpen] = useState<string | null>(null)
-  const selectedMatchup = matchupId
-    ? (fantasyLeagues.find((l) => l.id === matchupId) ?? null)
-    : null
-  const selectedPrediction = predictionId
-    ? (predictionList.data?.find((p) => p.id === predictionId) ?? null)
-    : null
-  // The Scope from the link, else the one the Viewer last chose (on this
-  // device), else their default.
-  const [storedScope] = useState(readStoredScope)
-  useEffect(() => {
-    if (requestedScope) storeScope(requestedScope)
-  }, [requestedScope])
-  const wanted = requestedScope ?? storedScope
-  const scope: Scope = selectedPrediction
-    ? 'predictions'
-    : selectedMatchup
-      ? 'fantasy'
-      : (wanted === 'following' && viewerFollows.length === 0) ||
-          (wanted === 'predictions' && !kalshi.data && !kalshi.isPending) ||
-          (wanted === 'fantasy' &&
-            !fantasyConnection.connected &&
-            !fantasyConnection.pending)
-        ? 'all'
-        : (wanted ?? defaultScope(viewerFollows))
-  // The Viewer's row in their order, hidden items left out; All covers
-  // the visible Leagues.
-  const settings = data?.leagues ?? DEFAULT_LEAGUE_SETTINGS
-  const rowItems = useMemo(() => visibleRowItems(settings), [settings])
-  const leagues = useMemo(() => visibleLeagues(settings), [settings])
-  const follows = useMemo(
-    () =>
-      selectedPrediction
-        ? predictionFollows(selectedPrediction)
-        : selectedMatchup
-          ? matchupFollows(selectedMatchup)
-          : scopeFollows(
-              scope,
-              viewerFollows,
-              leagues,
-              predictionGames,
-              fantasyPlayers,
-            ),
-    [
-      selectedPrediction,
-      selectedMatchup,
-      scope,
-      viewerFollows,
-      leagues,
-      predictionGames,
-      fantasyPlayers,
-    ],
-  )
   const navigate = useNavigate()
-  /** Select a Prediction (narrowing the Timeline to it), or clear it. */
-  const selectPrediction = useCallback(
-    (id: string | null) =>
-      void navigate({
-        to: '/',
-        search: (prev) => ({
-          ...prev,
-          scope: 'predictions',
-          prediction: id ?? undefined,
-          matchup: undefined,
-          game: undefined,
-          play: undefined,
-        }),
-        viewTransition: true,
-        resetScroll: false,
-      }),
-    [navigate],
-  )
-  /** Select a Fantasy Matchup (narrowing the Timeline to it), or clear it. */
-  const selectMatchup = useCallback(
-    (id: string | null) =>
-      void navigate({
-        to: '/',
-        search: (prev) => ({
-          ...prev,
-          scope: 'fantasy',
-          matchup: id ?? undefined,
-          prediction: undefined,
-          game: undefined,
-          play: undefined,
-        }),
-        viewTransition: true,
-        resetScroll: false,
-      }),
-    [navigate],
-  )
   // The divider marks where the Viewer stopped last time, so it is fixed at
   // load while the stored marker keeps moving.
   const [readAt] = useState(() => data?.readAt ?? null)
@@ -459,129 +200,27 @@ function Timeline({
     // A chat feed, not a document: nothing selects, so long-pressing a
     // bubble to react never makes iOS highlight the page around it.
     <div className="mx-auto max-w-xl px-4 pb-16 select-none [-webkit-touch-callout:none]">
-      {/*
-        Pinned over the content rather than in its flow: hiding the score
-        cards slides them up behind the header without changing the page's
-        height, so scrolling never feeds back into the hide/show.
-      */}
-      <div
-        ref={topRef}
-        className="pointer-events-none fixed inset-x-0 top-0 z-10"
-        style={{ viewTransitionName: 'pinned' }}
-      >
-        <div className="mx-auto max-w-xl">
-          <div
-            className={cn(
-              'pointer-events-auto relative z-20 bg-background px-4 transition-[border-color]',
-              'border-b',
-              panelHidden ? 'border-border' : 'border-transparent',
-            )}
-          >
-            <AppHeader
-              pinned={false}
-              title={
-                <DayButton
-                  sportsDay={sportsDay}
-                  today={today}
-                  open={dayOpen}
-                  onToggle={() => setDayOpen((v) => !v)}
-                />
-              }
-              right={
-                <HighlightsButton
-                  on={highlights}
-                  onChange={(value) =>
-                    withViewTransition(() => setHighlights(value))
-                  }
-                />
-              }
-            >
-              <ConnectionDot connection={timeline.connection} />
-            </AppHeader>
-            <Collapse open={dayOpen}>
-              <DayStrip
-                sportsDay={sportsDay}
-                today={today}
-                onPick={() => setDayOpen(false)}
-              />
-            </Collapse>
-          </div>
-          {/* Scope chips and score cards tuck away while reading down, return on the way up. */}
-          <div
-            className={cn(
-              'pointer-events-auto relative z-10 border-b border-border bg-background px-4 pb-2 transition-transform duration-300 ease-out',
-              panelHidden && '-translate-y-full',
-            )}
-            inert={panelHidden}
-            aria-hidden={panelHidden}
-          >
-            <ScopeBar
-              scope={scope}
-              items={rowItems}
-              canFollow={viewerFollows.length > 0}
-              canPredict={Boolean(kalshi.data)}
-              canFantasy={fantasyLeagues.length > 0}
-            />
-            <div className={cn('transition-opacity', dimmed && 'opacity-50')}>
-              {scope === 'fantasy' && !gameId ? (
-                // Matchups move like scores: their cards replace the Games'.
-                <FantasyStrip
-                  leagues={fantasyLeagues}
-                  selected={selectedMatchup?.id}
-                  onSelect={selectMatchup}
-                  onDetails={setMatchupOpen}
-                />
-              ) : scope === 'predictions' && !gameId ? (
-                // Predictions move like scores: their cards replace the Games'.
-                <>
-                  <PredictionStrip
-                    predictions={openPredictions}
-                    selected={selectedPrediction?.id}
-                    onSelect={selectPrediction}
-                    onDetails={setPredictionOpen}
-                    display={kalshi.data?.changeDisplay}
-                  />
-                  <PredictionSummary
-                    predictions={openPredictions}
-                    display={kalshi.data?.changeDisplay}
-                    onOpen={setPredictionOpen}
-                  />
-                </>
-              ) : (
-                <>
-                  <GameStrip
-                    games={(dimmed && timeline.previousGames.length
-                      ? timeline.previousGames
-                      : timeline.games
-                    ).filter((g) =>
-                      inScope(
-                        g,
-                        scope,
-                        viewerFollows,
-                        timeline.items,
-                        leagues,
-                        predictionGames,
-                      ),
-                    )}
-                    selected={gameId ?? undefined}
-                    onBox={() => setBoxOpen(true)}
-                  />
-                  {gameId && (
-                    <PredictionStrip
-                      predictions={openPredictions.filter((p) =>
-                        p.legs.some((l) => l.game?.id === gameId),
-                      )}
-                      onSelect={selectPrediction}
-                      onDetails={setPredictionOpen}
-                      display={kalshi.data?.changeDisplay}
-                    />
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      <TimelineTop
+        topRef={topRef}
+        scope={s}
+        sportsDay={sportsDay}
+        today={today}
+        gameId={gameId}
+        dayOpen={dayOpen}
+        onDayToggle={() => setDayOpen((v) => !v)}
+        onDayClose={() => setDayOpen(false)}
+        panelHidden={panelHidden}
+        highlights={highlights}
+        onHighlights={setHighlights}
+        connection={timeline.connection}
+        dimmed={dimmed}
+        games={timeline.games}
+        previousGames={timeline.previousGames}
+        items={timeline.items}
+        onBox={() => setBoxOpen(true)}
+        onPrediction={setPredictionOpen}
+        onMatchup={setMatchupOpen}
+      />
       <div aria-hidden="true" className="mb-3" style={{ height: topHeight }} />
 
       {viewer && !followed?.length && !gameId && (
@@ -600,83 +239,35 @@ function Timeline({
       {/* Tags plays by either side's Starters, in the Fantasy view. */}
       <FantasyTagsProvider
         leagues={
-          selectedMatchup
-            ? [selectedMatchup]
+          s.selectedMatchup
+            ? [s.selectedMatchup]
             : scope === 'fantasy'
-              ? fantasyLeagues
+              ? s.fantasyLeagues
               : []
         }
       >
-        <ol
-          className={cn(
-            'flex flex-col gap-3 transition-opacity',
-            dimmed && 'opacity-50',
-          )}
-          aria-busy={timeline.loading}
-        >
-          {recap && readAt && (
-            <li style={{ viewTransitionName: 'catchup' }}>
-              <CatchUpCard
-                catchUp={recap}
-                readAt={readAt}
-                onOpen={() => setRecapOpen(true)}
-              />
-            </li>
-          )}
-          {typing.length > 1 ? (
-            <li style={{ viewTransitionName: 'typing' }}>
-              <TypingSummary typing={typing} onOpen={() => setLiveOpen(true)} />
-            </li>
-          ) : (
-            typing.map(({ typing: t, game: g }) => (
-              <li
-                key={`typing:${g.id}`}
-                style={{ viewTransitionName: vtName(`typing:${g.id}`) }}
-              >
-                <TypingRow typing={t} game={g} focused={g.id === gameId} />
-              </li>
-            ))
-          )}
-          {entries.map((entry, i) => (
-            <li
-              key={entry.type === 'notice' ? entry.item.id : entry.id}
-              className="flex flex-col gap-3"
-            >
-              {i === dividerAt && i > 0 && <ReadDivider count={newCount} />}
-              {entry.type === 'notice' ? (
-                <div
-                  className="flex flex-col"
-                  style={{ viewTransitionName: vtName(entry.item.id) }}
-                >
-                  <Notice item={entry.item} now={now} showLeague={!gameId} />
-                </div>
-              ) : (
-                <Cluster entry={entry} now={now} focused={Boolean(gameId)} />
-              )}
-            </li>
-          ))}
-        </ol>
+        <TimelineFeed
+          entries={entries}
+          typing={typing}
+          gameId={gameId}
+          now={now}
+          dimmed={dimmed}
+          loading={timeline.loading}
+          recap={recap}
+          readAt={readAt}
+          dividerAt={dividerAt}
+          newCount={newCount}
+          onRecap={() => setRecapOpen(true)}
+          onLive={() => setLiveOpen(true)}
+        />
       </FantasyTagsProvider>
 
-      {timeline.error && (
-        <div
-          role="alert"
-          className="mt-6 flex items-center justify-between gap-3 rounded-xl border border-live/40 bg-live/10 px-3 py-2 text-sm text-live"
-        >
-          Couldn’t load this feed.
-          <button
-            type="button"
-            onClick={() => void timeline.reload()}
-            className="min-h-9 rounded-full bg-background px-3 font-semibold"
-          >
-            Try again
-          </button>
-        </div>
-      )}
-
-      {!timeline.error && items.length === 0 && typing.length === 0 && (
-        <p className="mt-16 text-center text-sm text-muted">
-          {gameId
+      <FeedFooter
+        error={Boolean(timeline.error)}
+        onRetry={() => void timeline.reload()}
+        empty={items.length === 0 && typing.length === 0}
+        emptyText={
+          gameId
             ? game.isPending
               ? 'Loading…'
               : 'No plays in this game yet.'
@@ -684,358 +275,39 @@ function Timeline({
               ? 'Loading this day’s games…'
               : isToday
                 ? 'No plays yet today.'
-                : 'No plays on this day.'}
-        </p>
-      )}
-
-      {!gameId && timeline.hasMore && (
-        <button
-          type="button"
-          onClick={() => void timeline.loadMore()}
-          disabled={timeline.loadingMore}
-          className="mx-auto mt-6 block min-h-11 rounded-full bg-accent-soft px-5 text-sm font-semibold text-accent"
-        >
-          {timeline.loadingMore ? 'Loading…' : 'Earlier plays'}
-        </button>
-      )}
-
-      {playId && <PlaySheet playId={playId} onClose={closePlay} />}
-
-      {matchupOpen &&
-        (() => {
-          const league = fantasyLeagues.find((l) => l.id === matchupOpen)
-          return league ? (
-            <MatchupSheet
-              league={league}
-              games={timeline.games}
-              onClose={() => setMatchupOpen(null)}
-            />
-          ) : null
-        })()}
-
-      {predictionOpen &&
-        (() => {
-          const p = predictionList.data?.find((x) => x.id === predictionOpen)
-          return p ? (
-            <PredictionSheet
-              prediction={p}
-              onClose={() => setPredictionOpen(null)}
-            />
-          ) : null
-        })()}
-
-      {recapOpen && recap && (
-        <CatchUpSheet
-          catchUp={recap}
-          now={now}
-          onClose={() => setRecapOpen(false)}
-        />
-      )}
-
-      {liveOpen && typing.length > 1 && (
-        <Sheet
-          title={`Live now · ${typing.length}`}
-          onClose={() => setLiveOpen(false)}
-        >
-          <ol className="flex flex-col gap-3">
-            {typing.map(({ typing: t, game: g }) => (
-              <li key={g.id} onClick={() => setLiveOpen(false)}>
-                <TypingRow typing={t} game={g} focused={false} />
-              </li>
-            ))}
-          </ol>
-        </Sheet>
-      )}
-
-      {boxOpen && selectedGame && (
-        <BoxSheet
-          game={selectedGame}
-          box={game.data?.box ?? null}
-          onClose={() => setBoxOpen(false)}
-        />
-      )}
-    </div>
-  )
-}
-
-/**
- * A past Sports Day that was never loaded is fetched on first open; its
- * finished Games then backfill in the background, so refetch a few times.
- */
-function usePastDay(
-  sportsDay: string,
-  isToday: boolean,
-  reload: () => Promise<unknown>,
-): 'idle' | 'loading' | 'done' {
-  const [state, setState] = useState<'idle' | 'loading' | 'done'>('idle')
-  useEffect(() => {
-    if (isToday) return
-    let cancelled = false
-    const timers: Array<ReturnType<typeof setTimeout>> = []
-    void ensureSportsDay({ data: { sportsDay } }).then((r) => {
-      if (cancelled || !r.loading) return
-      setState('loading')
-      for (const ms of [3_000, 8_000, 15_000, 30_000]) {
-        timers.push(setTimeout(() => void reload(), ms))
-      }
-      timers.push(setTimeout(() => setState('done'), 30_000))
-    })
-    return () => {
-      cancelled = true
-      timers.forEach(clearTimeout)
-    }
-  }, [sportsDay, isToday, reload])
-  return state
-}
-
-function entryTime(entry: FeedEntry): string {
-  if (entry.type === 'notice') return entry.item.occurredAt
-  const first = entry.bubbles[0]
-  return first.type === 'fold'
-    ? first.items[0].occurredAt
-    : first.item.occurredAt
-}
-
-function Cluster({
-  entry,
-  now,
-  focused,
-}: {
-  entry: Extract<FeedEntry, { type: 'cluster' }>
-  now: number
-  /** One Game is selected: the home team answers from the right, like a thread. */
-  focused: boolean
-}) {
-  const first = entry.bubbles[0]
-  const lead = first.type === 'fold' ? first.items[0] : first.item
-  const team = entry.side === 'home' ? lead.homeTeam : lead.awayTeam
-  const align = focused && entry.side === 'home' ? 'right' : 'left'
-  return (
-    <div
-      className={cn(
-        'flex items-end gap-2',
-        align === 'right' && 'flex-row-reverse',
-      )}
-    >
-      <TeamAvatarLink team={team} />
-      <div
-        className={cn(
-          'flex min-w-0 flex-col gap-1',
-          align === 'right' && 'items-end',
-        )}
-      >
-        {/* The avatar opens the Team; this line opens just this Game. */}
-        <Link
-          to="/"
-          search={(prev) => ({
-            ...prev,
-            play: undefined,
-            ...gameSearch(entry.gameId, lead.sportsDay),
-          })}
-          viewTransition
-          resetScroll={false}
-          aria-label={`Show only the ${team.abbreviation} game`}
-          className="px-1 text-[11px] text-muted"
-        >
-          <span className="font-semibold text-foreground/80">
-            {team.abbreviation}
-          </span>{' '}
-          · {lead.segmentLabel} · {timeAgo(lead.occurredAt, now)}
-        </Link>
-        <BubbleStack bubbles={entry.bubbles} align={align} />
-      </div>
-    </div>
-  )
-}
-
-function TypingRow({
-  typing,
-  game,
-  focused,
-}: {
-  typing: Typing
-  game: GameSummary
-  focused: boolean
-}) {
-  const team =
-    typing.side === 'home'
-      ? game.homeTeam
-      : typing.side === 'away'
-        ? game.awayTeam
-        : null
-  const right = focused && typing.side === 'home'
-  return (
-    <Link
-      to="/"
-      search={(prev) => ({
-        ...prev,
-        play: undefined,
-        ...gameSearch(game.id, game.sportsDay),
-      })}
-      viewTransition
-      resetScroll={false}
-      className={cn('flex items-end gap-2', right && 'flex-row-reverse')}
-    >
-      {team ? (
-        <TeamAvatar team={team} />
-      ) : (
-        <LeagueAvatar league={game.league} />
-      )}
-      <div className={cn('flex min-w-0 flex-col gap-1', right && 'items-end')}>
-        <span className="truncate px-1 text-[11px] text-muted">
-          <span className="font-semibold text-foreground/80">
-            {team
-              ? team.abbreviation
-              : `${game.awayTeam.abbreviation} @ ${game.homeTeam.abbreviation}`}
-          </span>{' '}
-          · {typing.text}
-        </span>
-        <TypingDots align={right ? 'right' : 'left'} />
-      </div>
-    </Link>
-  )
-}
-
-/**
- * Several Games in progress at once, as one typing bubble: their teams'
- * avatars stacked and a count. Opens the list of what's live.
- */
-/** Stacked avatars: up to three, stepped so the stack fills 32px. */
-const STACK_AVATAR = 24
-const STACK_STEP = 4
-
-function TypingSummary({
-  typing,
-  onOpen,
-}: {
-  typing: Array<{ typing: Typing; game: GameSummary }>
-  onOpen: () => void
-}) {
-  const shown = typing.slice(0, 3)
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      aria-label={`${typing.length} games in progress. Show them`}
-      className="flex items-end gap-2 text-left"
-    >
-      {/*
-        A stack the size of one avatar (32px), so the bubble lines up with
-        every other message: each team's mark sits a few pixels behind the
-        one in front.
-      */}
-      <span className="relative size-8 shrink-0" aria-hidden="true">
-        {shown.map(({ typing: t, game: g }, i) => {
-          const team =
-            t.side === 'home'
-              ? g.homeTeam
-              : t.side === 'away'
-                ? g.awayTeam
-                : null
-          const offset = (shown.length - 1 - i) * STACK_STEP
-          return (
-            <span
-              key={g.id}
-              className="absolute rounded-full ring-2 ring-background"
-              style={{ top: offset, left: offset, zIndex: shown.length - i }}
-            >
-              {team ? (
-                <TeamAvatar team={team} size={STACK_AVATAR} />
-              ) : (
-                <LeagueAvatar league={g.league} size={STACK_AVATAR} />
-              )}
-            </span>
-          )
-        })}
-      </span>
-      <span className="flex min-w-0 flex-col gap-1">
-        <span className="truncate px-1 text-[11px] text-muted">
-          <span className="font-semibold text-foreground/80">
-            {typing.length} games live
-          </span>{' '}
-          · tap to see all
-        </span>
-        <TypingDots align="left" />
-      </span>
-    </button>
-  )
-}
-
-/** Highlights on/off (Scoring and Notable only): a labeled pill in the header. */
-function HighlightsButton({
-  on,
-  onChange,
-}: {
-  on: boolean
-  onChange: (on: boolean) => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!on)}
-      aria-pressed={on}
-      className={cn(
-        'flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold transition-colors',
-        on
-          ? 'bg-accent text-background'
-          : 'bg-notice text-muted hover:text-foreground',
-      )}
-    >
-      <svg
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        aria-hidden="true"
-      >
-        <path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z" />
-      </svg>
-      Highlights
-    </button>
-  )
-}
-
-/** Height-animated show/hide (grid rows 0fr ↔ 1fr), so rows slide instead of popping. */
-function Collapse({
-  open,
-  children,
-}: {
-  open: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <div
-      className={cn(
-        'grid transition-[grid-template-rows,opacity] duration-250 ease-out',
-        open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
-      )}
-      aria-hidden={!open}
-      inert={!open}
-    >
-      <div className="min-h-0 overflow-hidden">{children}</div>
-    </div>
-  )
-}
-
-function ConnectionDot({ connection }: { connection: Connection }) {
-  const label = {
-    live: 'Live',
-    connecting: 'Connecting',
-    offline: 'Reconnecting',
-  }[connection]
-  return (
-    <span
-      role="status"
-      aria-label={label}
-      title={label}
-      className="flex size-6 items-center justify-center"
-    >
-      <span
-        className={cn(
-          'size-2 rounded-full',
-          connection === 'live' ? 'animate-pulse bg-live' : 'bg-muted',
-        )}
+                : 'No plays on this day.'
+        }
+        hasMore={!gameId && timeline.hasMore}
+        loadingMore={timeline.loadingMore}
+        onMore={() => void timeline.loadMore()}
       />
-    </span>
+
+      <TimelineSheets
+        playId={playId}
+        onPlayClose={closePlay}
+        matchup={
+          matchupOpen
+            ? (s.fantasyLeagues.find((l) => l.id === matchupOpen) ?? null)
+            : null
+        }
+        games={timeline.games}
+        onMatchupClose={() => setMatchupOpen(null)}
+        prediction={
+          predictionOpen
+            ? (s.predictionList.data?.find((x) => x.id === predictionOpen) ??
+              null)
+            : null
+        }
+        onPredictionClose={() => setPredictionOpen(null)}
+        recap={recapOpen ? recap : null}
+        now={now}
+        onRecapClose={() => setRecapOpen(false)}
+        live={liveOpen && typing.length > 1 ? typing : null}
+        onLiveClose={() => setLiveOpen(false)}
+        boxGame={boxOpen ? selectedGame : null}
+        box={game.data?.box ?? null}
+        onBoxClose={() => setBoxOpen(false)}
+      />
+    </div>
   )
 }
