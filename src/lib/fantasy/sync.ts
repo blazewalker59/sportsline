@@ -3,9 +3,11 @@
  * only: run by the Scheduler, and when a Viewer connects or adds a league.
  */
 
-import { and, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm'
+import { and, eq, gte, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm'
 import { EspnError, fanProfile, leagueViews } from './client'
 import { discoverLeagues } from './discovery'
+import { liveProjected } from './liveProjection'
+import { matchupWindow } from './schedule'
 import { myTeamId, readMatchup } from './matchup'
 import { MLB_PRO_TEAMS, NFL_PRO_TEAMS, SPORTS, seasonOf } from './sports'
 import type { EspnSession } from './client'
@@ -17,12 +19,14 @@ import {
   espnAccounts,
   fantasyLeagues,
   fantasyPlayers,
+  games,
   players,
   sourceIds,
   teams,
 } from '@/lib/db/schema'
 import { unseal } from '@/lib/kalshi/vault'
 import { normalizePlayerName } from '@/lib/kalshi/match'
+import { sportsDayOf } from '@/lib/model/sportsDay'
 
 /** Look for new leagues this often. */
 const DISCOVER_EVERY_MS = 24 * 3_600_000
@@ -280,6 +284,8 @@ export async function storeMatchup(
         : (t?.logoUrl ?? null)
       p.teamAbbrev = nfl ?? t?.abbreviation ?? null
     }
+    // Sleeper sends no live projection: work it out from each Starter's Game.
+    if (row.provider === 'sleeper') await projectLive(db, view)
     await db
       .delete(fantasyPlayers)
       .where(eq(fantasyPlayers.leagueRowId, row.id))
@@ -315,6 +321,52 @@ export async function storeMatchup(
       updatedAt: new Date().toISOString(),
     })
     .where(eq(fantasyLeagues.id, row.id))
+}
+
+/** Each side's live projection, from its Starters' Games this week. */
+async function projectLive(db: Database, view: MatchupView): Promise<void> {
+  const sides = [view.mine, ...(view.opponent ? [view.opponent] : [])]
+  const teamIds = [
+    ...new Set(
+      sides.flatMap((s) =>
+        s.lineup.flatMap((p) => (p.starter && p.teamId ? [p.teamId] : [])),
+      ),
+    ),
+  ]
+  const { from, to } = matchupWindow('nfl', sportsDayOf(new Date()))
+  const rows =
+    teamIds.length === 0
+      ? []
+      : await db
+          .select({
+            away: games.awayTeamId,
+            home: games.homeTeamId,
+            status: games.status,
+            situation: games.situation,
+          })
+          .from(games)
+          .where(
+            and(
+              eq(games.league, 'nfl'),
+              gte(games.sportsDay, from),
+              lte(games.sportsDay, to),
+              or(
+                inArray(games.awayTeamId, teamIds),
+                inArray(games.homeTeamId, teamIds),
+              ),
+            ),
+          )
+  const gameOf = (p: LineupPlayer) => {
+    const g = rows.find((r) => r.away === p.teamId || r.home === p.teamId)
+    return g
+      ? { status: g.status, segmentLabel: g.situation?.segmentLabel ?? null }
+      : undefined
+  }
+  for (const side of sides)
+    side.projected = liveProjected(
+      side.lineup.filter((p) => p.starter),
+      gameOf,
+    )
 }
 
 /** Read one league's Matchup now and store it, with its Players mapped. */
