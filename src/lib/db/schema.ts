@@ -596,3 +596,63 @@ export const jobRuns = sqliteTable('job_runs', {
   runs: integer('runs').notNull().default(0),
   failures: integer('failures').notNull().default(0),
 })
+
+// ─── Sharp picks (src/lib/sharp, docs/adr/0006) ─────────────────────────────
+
+/** A day's Sharp picks: five singles (rank 1–5) and the combo (rank 6). */
+export const sharpPicks = sqliteTable(
+  'sharp_picks',
+  {
+    /** "2026-10-05:1". */
+    id: text('id').primaryKey(),
+    /** The Sports Day the slate is for. */
+    day: text('day').notNull(),
+    rank: integer('rank').notNull(),
+    kind: text('kind').$type<'single' | 'combo'>().notNull(),
+    league: text('league').$type<League>(),
+    gameId: text('game_id'),
+    startsAt: text('starts_at').notNull(),
+    /** A single's market (null for the combo). */
+    marketTicker: text('market_ticker'),
+    side: text('side').$type<'yes' | 'no'>(),
+    marketKind: text('market_kind').$type<'moneyline' | 'spread' | 'total'>(),
+    title: text('title').notNull(),
+    gameLabel: text('game_label').notNull(),
+    /** Fair chance of the pick (the combo's: its legs multiplied). */
+    fair: real('fair').notNull(),
+    /** Kalshi's price when published (the combo's: its legs multiplied). */
+    price: real('price').notNull(),
+    fee: real('fee').notNull(),
+    edge: real('edge').notNull(),
+    evPerDollar: real('ev_per_dollar').notNull(),
+    grade: text('grade').$type<'strong' | 'edge' | 'thin'>().notNull(),
+    sources: text('sources', { mode: 'json' })
+      .$type<Array<{ source: string; prob: number }>>()
+      .notNull(),
+    /** The combo's legs, as singles are stored (without their own ids). */
+    legs: text('legs', { mode: 'json' }).$type<Array<{
+      marketTicker: string
+      side: 'yes' | 'no'
+      title: string
+      gameLabel: string
+      league: League
+      startsAt: string
+      fair: number
+      price: number
+      currentPrice: number | null
+      closingPrice: number | null
+      result: 'won' | 'lost' | null
+    }> | null>(),
+    /** The combo: the most worth paying for it on Kalshi. */
+    worthItUnder: real('worth_it_under'),
+    /** Re-checked through the day: Kalshi's price now and the edge left. */
+    currentPrice: real('current_price'),
+    currentEdge: real('current_edge'),
+    checkedAt: text('checked_at'),
+    /** Kalshi's price at the start (closing line value is measured on it). */
+    closingPrice: real('closing_price'),
+    result: text('result').$type<'won' | 'lost' | 'void'>(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [index('sharp_picks_day_idx').on(table.day)],
+)

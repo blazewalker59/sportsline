@@ -148,6 +148,13 @@
       "when": 1791247838237,
       "tag": "0020_fantasy_score_points",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1791250304077,
+      "tag": "0021_sharp_picks",
+      "breakpoints": true
     }
   ]
 }

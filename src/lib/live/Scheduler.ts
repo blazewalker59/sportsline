@@ -30,6 +30,8 @@ import { pruneHistory } from '@/lib/kalshi/sync'
 import { reportError } from '@/lib/ops/errors'
 import { isStale, runJob } from '@/lib/ops/jobs'
 import { ACTIVE_LEAGUES } from '@/lib/sources'
+import { publishDue, publishSlate, recheckSlate } from '@/lib/sharp/slate'
+import { sportsDayOf } from '@/lib/model/sportsDay'
 
 const MINUTE = 60_000
 /**
@@ -47,6 +49,10 @@ const TRIM_EVERY_MS = 24 * 60 * MINUTE
 const SWEEP_DUE_KEY = 'sweepDueAt'
 const SWEEP_EVERY_MS = 10 * MINUTE
 const STALE_DUE_KEY = 'staleDueAt'
+const SHARP_DAY_KEY = 'sharpDay'
+const SHARP_RETRY_KEY = 'sharpRetryAt'
+const SHARP_RECHECK_KEY = 'sharpRecheckDueAt'
+const SHARP_RECHECK_EVERY_MS = 15 * MINUTE
 
 export class Scheduler extends DurableObject<CloudflareEnv> {
   /** Start the loop if it is not already running. Idempotent and cheap. */
@@ -81,6 +87,13 @@ export class Scheduler extends DurableObject<CloudflareEnv> {
         await pruneHistory(env)
       }),
     )
+    // Sharp picks (docs/adr/0006): the morning slate, then re-checks.
+    await this.sharpSlate(now)
+    await this.daily(SHARP_RECHECK_KEY, SHARP_RECHECK_EVERY_MS, () =>
+      runJob(env, 'sharp-recheck', SHARP_RECHECK_EVERY_MS, () =>
+        recheckSlate(env, new Date()),
+      ),
+    )
     await this.daily(SWEEP_DUE_KEY, SWEEP_EVERY_MS, () =>
       runJob(env, 'sweep', SWEEP_EVERY_MS, () => this.sweep()),
     )
@@ -103,6 +116,23 @@ export class Scheduler extends DurableObject<CloudflareEnv> {
     if (now < ((await this.ctx.storage.get<number>(key)) ?? 0)) return
     await this.ctx.storage.put(key, now + Math.min(RETRY_MS, everyMs))
     if ((await work()).ok) await this.ctx.storage.put(key, now + everyMs)
+  }
+
+  /**
+   * Publish today's Sharp picks once, from 10am Eastern; a failed attempt
+   * waits RETRY_MS before the next.
+   */
+  private async sharpSlate(now: number): Promise<void> {
+    const day = sportsDayOf(new Date(now))
+    if (!publishDue(new Date(now))) return
+    if ((await this.ctx.storage.get<string>(SHARP_DAY_KEY)) === day) return
+    const retryAt = (await this.ctx.storage.get<number>(SHARP_RETRY_KEY)) ?? 0
+    if (now < retryAt) return
+    await this.ctx.storage.put(SHARP_RETRY_KEY, now + RETRY_MS)
+    const run = await runJob(this.env, 'sharp-slate', 24 * 60 * MINUTE, () =>
+      publishSlate(this.env, new Date(now)),
+    )
+    if (run.ok) await this.ctx.storage.put(SHARP_DAY_KEY, day)
   }
 
   /** Keep every Viewer with a connected account syncing (idempotent). */

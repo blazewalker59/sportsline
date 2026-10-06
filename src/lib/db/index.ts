@@ -38,6 +38,8 @@ export interface CloudflareEnv {
   KALSHI_ENCRYPTION_KEY?: string
   /** 32 bytes, base64: seals Viewers' ESPN session cookies (docs/adr/0004). */
   ESPN_ENCRYPTION_KEY?: string
+  /** The Odds API key: sharp books' prices for Sharp picks (docs/adr/0006). */
+  ODDS_API_KEY?: string
   /** Emails (comma-separated) who see the health page and get error pushes. */
   ADMIN_EMAILS?: string
 }

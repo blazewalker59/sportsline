@@ -1,0 +1,31 @@
+CREATE TABLE `sharp_picks` (
+	`id` text PRIMARY KEY NOT NULL,
+	`day` text NOT NULL,
+	`rank` integer NOT NULL,
+	`kind` text NOT NULL,
+	`league` text,
+	`game_id` text,
+	`starts_at` text NOT NULL,
+	`market_ticker` text,
+	`side` text,
+	`market_kind` text,
+	`title` text NOT NULL,
+	`game_label` text NOT NULL,
+	`fair` real NOT NULL,
+	`price` real NOT NULL,
+	`fee` real NOT NULL,
+	`edge` real NOT NULL,
+	`ev_per_dollar` real NOT NULL,
+	`grade` text NOT NULL,
+	`sources` text NOT NULL,
+	`legs` text,
+	`worth_it_under` real,
+	`current_price` real,
+	`current_edge` real,
+	`checked_at` text,
+	`closing_price` real,
+	`result` text,
+	`created_at` text NOT NULL
+);
+--> statement-breakpoint
+CREATE INDEX `sharp_picks_day_idx` ON `sharp_picks` (`day`);

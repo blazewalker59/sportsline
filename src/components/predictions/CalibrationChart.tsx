@@ -22,17 +22,43 @@ const FAIR = [
   { x: 1, y: 1 },
 ]
 
+/** The words around the chart: the Viewer's bets by default. */
+export interface CalibrationCopy {
+  x: string
+  y: string
+  legend: string
+  /** What the chance was: "the odds implied", "the fair price said". */
+  versus: string
+  /** "Bought at", "Fair at". */
+  at: string
+  /** "settled bets", "settled picks". */
+  noun: string
+  footnote: string
+}
+
+const BETS: CalibrationCopy = {
+  x: 'Chance you bought in at',
+  y: 'How often you won',
+  legend: 'Your bets, by price',
+  versus: 'the odds implied',
+  at: 'Bought at',
+  noun: 'settled bets',
+  footnote: 'Above the line, you beat the price.',
+}
+
 /** "Won 6 pts less often than the odds implied". */
-function edgeText(edge: number): string {
+function edgeText(edge: number, versus: string): string {
   const points = Math.round(Math.abs(edge) * 100)
-  if (points === 0) return 'Won about as often as the odds implied'
-  return `Won ${points} pt${points === 1 ? '' : 's'} ${edge > 0 ? 'more' : 'less'} often than the odds implied`
+  if (points === 0) return `Won about as often as ${versus}`
+  return `Won ${points} pt${points === 1 ? '' : 's'} ${edge > 0 ? 'more' : 'less'} often than ${versus}`
 }
 
 export function CalibrationChart({
   calibration: c,
+  copy = BETS,
 }: {
   calibration: Calibration
+  copy?: CalibrationCopy
 }) {
   const largest = Math.max(1, ...c.buckets.map((b) => b.count))
   const definition = useMemo(
@@ -65,7 +91,7 @@ export function CalibrationChart({
             scale: scaleLinear().domain([0, 1]),
             grid: true,
             axis: {
-              label: 'Chance you bought in at',
+              label: copy.x,
               ticks: { values: TICKS, format: pct },
             },
           },
@@ -73,7 +99,7 @@ export function CalibrationChart({
             scale: scaleLinear().domain([0, 1]),
             grid: true,
             axis: {
-              label: 'How often you won',
+              label: copy.y,
               ticks: { values: TICKS, format: pct },
             },
           },
@@ -83,11 +109,11 @@ export function CalibrationChart({
           format(point) {
             const b = point.datum as Partial<CalibrationBucket>
             if (b.count === undefined) return 'Fair: won as often as priced'
-            return `Bought at ~${pct(b.implied!)} · won ${b.won} of ${b.count} (${pct(b.actual!)})`
+            return `${copy.at} ~${pct(b.implied!)} · won ${b.won} of ${b.count} (${pct(b.actual!)})`
           },
         },
       }),
-    [c.buckets, largest],
+    [c.buckets, largest, copy],
   )
 
   if (c.count === 0 || c.edge === null) return null
@@ -95,7 +121,7 @@ export function CalibrationChart({
     <ChartCard
       legend={[
         {
-          label: 'Your bets, by price',
+          label: copy.legend,
           color: CHART_COLORS.accent,
           shape: 'dot',
         },
@@ -118,8 +144,8 @@ export function CalibrationChart({
       }
       footer={
         <>
-          {edgeText(c.edge)}, over {c.count} settled bets. Above the line, you
-          beat the price.
+          {edgeText(c.edge, copy.versus)}, over {c.count} {copy.noun}.{' '}
+          {copy.footnote}
         </>
       }
     >
@@ -127,7 +153,7 @@ export function CalibrationChart({
         definition={definition}
         height={220}
         initialWidth={340}
-        ariaLabel={`${edgeText(c.edge)}, over ${c.count} settled bets`}
+        ariaLabel={`${edgeText(c.edge, copy.versus)}, over ${c.count} ${copy.noun}`}
       />
     </ChartCard>
   )

@@ -147,6 +147,22 @@ _Avoid_: line, price (the dollar figure behind it)
 A Viewer's Predictions over a range (7 days, 30 days, a custom range or all time), by when each was made: the volume staked, how they've done (settled results only), and where they win and lose by sport, market, Combo size and Leg.
 _Avoid_: stats, history (the list of Predictions), performance
 
+**Sharp pick**:
+One of the day's five Kalshi offers priced furthest below its Fair price, after Kalshi's fee, across NFL, NBA, MLB and NHL winners, spreads and totals; with one combo of two or three likely legs from different Games. Published each morning for every Viewer, then followed to its Closing line value and result. Not a Prediction: nobody has bet it until a Viewer does.
+_Avoid_: tip, lock, best bet
+
+**Fair price**:
+The chance a market resolves yes according to the sharp sportsbooks and exchanges (Pinnacle first), with their margins taken out and weighted toward the sharpest.
+_Avoid_: true odds, consensus line
+
+**Edge**:
+A Sharp pick's Fair price minus what it costs on Kalshi, price plus fee, in percentage points. Graded strong (3 or more), edge (1 to 3) or thin (less: the best of a fairly priced day).
+_Avoid_: value, EV (expected value per dollar is the Edge divided by the cost)
+
+**Closing line value**:
+How far Kalshi's price moved toward a Sharp pick by the time its Game started, in percentage points. Picks that keep beating the close are sharp, whatever a handful of results say.
+_Avoid_: CLV in the app's text, line movement
+
 **Progress**:
 Where a stat Leg stands against its line while the Game is played: the count so far from the live box score (a team's or Player's receiving yards, a Player's points) or the score itself (totals), against what it takes to win ("212 of 300").
 _Avoid_: tracker, status
