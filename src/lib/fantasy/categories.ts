@@ -266,6 +266,9 @@ export type Leader = 'mine' | 'opponent' | 'tie'
 export interface CategoryResult extends LeagueCategory {
   mine: string
   opponent: string
+  /** The values behind `mine` and `opponent` (null: nothing yet, or none). */
+  mineValue?: number | null
+  opponentValue?: number | null
   leader: Leader | null
 }
 
@@ -303,13 +306,43 @@ export function scoreCategories(
         leader = x === y ? 'tie' : x > y !== c.reverse ? 'mine' : 'opponent'
       }
     }
+    const finite = (n: number | null) =>
+      n !== null && Number.isFinite(n) ? n : null
     return {
       ...c,
       mine: formatCategory(sport, c.statId, a),
       opponent: formatCategory(sport, c.statId, b),
+      mineValue: finite(a),
+      opponentValue: finite(b),
       leader,
     }
   })
+}
+
+/** The smallest lean a decided category shows, so a lead is never invisible. */
+const MIN_LEAN = 0.12
+
+/**
+ * How far a category leans, and which way: from −1 (the opponent's, all
+ * the way) through 0 (even) to 1 (the Viewer's). The size is the margin
+ * relative to the larger total, flipped where lower wins (ERA, turnovers),
+ * square-rooted so close rates (48% vs 44% FG) still read, and never
+ * smaller than MIN_LEAN once decided. Its direction always follows the
+ * leader (an innings minimum can decide a rate against its numbers).
+ */
+export function categoryLean(
+  c: Pick<CategoryResult, 'leader' | 'reverse' | 'mineValue' | 'opponentValue'>,
+): number {
+  if (c.leader === null || c.leader === 'tie') return 0
+  const sign = c.leader === 'mine' ? 1 : -1
+  const a = c.mineValue
+  const b = c.opponentValue
+  let size = 1
+  if (a != null && b != null) {
+    const scale = Math.max(Math.abs(a), Math.abs(b))
+    size = scale === 0 ? 0 : Math.abs(a - b) / scale
+  }
+  return sign * Math.min(1, Math.max(MIN_LEAN, Math.sqrt(size)))
 }
 
 /** "6-3-1": categories won, lost and tied, from the Viewer's side. */

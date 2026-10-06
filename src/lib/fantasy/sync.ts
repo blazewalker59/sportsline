@@ -3,7 +3,20 @@
  * only: run by the Scheduler, and when a Viewer connects or adds a league.
  */
 
-import { and, eq, gte, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm'
+import {
+  and,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  lte,
+  ne,
+  or,
+  sql,
+} from 'drizzle-orm'
+import { shouldRecord } from './race'
 import { EspnError, fanProfile, leagueViews } from './client'
 import { discoverLeagues } from './discovery'
 import { liveProjected } from './liveProjection'
@@ -19,6 +32,7 @@ import {
   espnAccounts,
   fantasyLeagues,
   fantasyPlayers,
+  fantasyScorePoints,
   games,
   players,
   sourceIds,
@@ -309,6 +323,7 @@ export async function storeMatchup(
         .values(rows.slice(i, i + 15))
         .onConflictDoNothing()
     }
+    await recordRacePoint(db, row.id, view)
   }
   await db
     .update(fantasyLeagues)
@@ -322,6 +337,58 @@ export async function storeMatchup(
       updatedAt: new Date().toISOString(),
     })
     .where(eq(fantasyLeagues.id, row.id))
+}
+
+/** Race points older than this go, whatever their period. */
+const RACE_KEEP_MS = 10 * 24 * 3_600_000
+
+/**
+ * Keep a point of the race (points leagues with an opponent): when the
+ * score moved or ten minutes passed. A new matchup period clears the last
+ * one's points, along with any past RACE_KEEP_MS. One read, at most one
+ * insert, and a delete only when the period turns.
+ */
+async function recordRacePoint(
+  db: Database,
+  rowId: string,
+  view: MatchupView,
+): Promise<void> {
+  if (!view.opponent || view.categories) return
+  const last = await db
+    .select()
+    .from(fantasyScorePoints)
+    .where(eq(fantasyScorePoints.leagueRowId, rowId))
+    .orderBy(desc(fantasyScorePoints.at))
+    .limit(1)
+    .get()
+  const now = Date.now()
+  const turned = last !== undefined && last.matchupPeriod !== view.matchupPeriod
+  if (turned || (last && now - Date.parse(last.at) > RACE_KEEP_MS))
+    await db
+      .delete(fantasyScorePoints)
+      .where(
+        and(
+          eq(fantasyScorePoints.leagueRowId, rowId),
+          or(
+            ne(fantasyScorePoints.matchupPeriod, view.matchupPeriod),
+            lt(
+              fantasyScorePoints.at,
+              new Date(now - RACE_KEEP_MS).toISOString(),
+            ),
+          ),
+        ),
+      )
+  const next = { mine: view.mine.score, opponent: view.opponent.score }
+  if (!shouldRecord(turned ? undefined : last, next, now)) return
+  await db
+    .insert(fantasyScorePoints)
+    .values({
+      leagueRowId: rowId,
+      at: new Date(now).toISOString(),
+      matchupPeriod: view.matchupPeriod,
+      ...next,
+    })
+    .onConflictDoNothing()
 }
 
 /** Each side's live projection, from its Starters' Games this week. */

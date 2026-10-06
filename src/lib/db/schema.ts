@@ -548,6 +548,24 @@ export const fantasyPlayers = sqliteTable(
   ],
 )
 
+/**
+ * A Matchup's score over its period, a point each time it moved (or every
+ * ten minutes): the race on the Matchup sheet (fantasy/race.ts).
+ */
+export const fantasyScorePoints = sqliteTable(
+  'fantasy_score_points',
+  {
+    leagueRowId: text('league_row_id')
+      .notNull()
+      .references(() => fantasyLeagues.id, { onDelete: 'cascade' }),
+    at: text('at').notNull(),
+    matchupPeriod: integer('matchup_period').notNull(),
+    mine: real('mine').notNull(),
+    opponent: real('opponent').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.leagueRowId, table.at] })],
+)
+
 // ─── Operations (src/lib/ops) ───────────────────────────────────────────────
 
 /** Errors, grouped by what went wrong, for the health page and its Alerts. */

@@ -4,7 +4,7 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { EspnError, bracedSwid, fanProfile } from './client'
 import { leagueFromUrl } from './discovery'
@@ -23,9 +23,15 @@ import {
   syncAccount as syncSleeper,
 } from './sleeper/sync'
 import type { MatchupView } from './matchup'
+import type { RacePoint } from './race'
 import type { FantasySport } from './sports'
 import { getCloudflareEnv } from '@/lib/db'
-import { espnAccounts, fantasyLeagues, sleeperAccounts } from '@/lib/db/schema'
+import {
+  espnAccounts,
+  fantasyLeagues,
+  fantasyScorePoints,
+  sleeperAccounts,
+} from '@/lib/db/schema'
 import { seal } from '@/lib/kalshi/vault'
 import { sessionViewer, withViewer } from '@/lib/viewer/session'
 import { reportError } from '@/lib/ops/errors'
@@ -383,6 +389,43 @@ export const reorderFantasyLeagues = createServerFn({ method: 'POST' })
               eq(fantasyLeagues.viewerId, viewerId),
             ),
           )
+    }),
+  )
+
+/** The race on a Matchup sheet: this period's score points, oldest first. */
+export const getMatchupRace = createServerFn({ method: 'GET' })
+  .validator((data: { leagueId: string }) =>
+    z.object({ leagueId: z.string().max(300) }).parse(data),
+  )
+  .handler(({ data }) =>
+    withViewer(async ({ db, viewerId }): Promise<Array<RacePoint>> => {
+      // Only the Viewer's own league, and only its current period.
+      const league = await db
+        .select({ matchup: fantasyLeagues.matchup })
+        .from(fantasyLeagues)
+        .where(
+          and(
+            eq(fantasyLeagues.id, data.leagueId),
+            eq(fantasyLeagues.viewerId, viewerId),
+          ),
+        )
+        .get()
+      const period = league?.matchup?.matchupPeriod
+      if (period === undefined) return []
+      return db
+        .select({
+          at: fantasyScorePoints.at,
+          mine: fantasyScorePoints.mine,
+          opponent: fantasyScorePoints.opponent,
+        })
+        .from(fantasyScorePoints)
+        .where(
+          and(
+            eq(fantasyScorePoints.leagueRowId, data.leagueId),
+            eq(fantasyScorePoints.matchupPeriod, period),
+          ),
+        )
+        .orderBy(asc(fantasyScorePoints.at))
     }),
   )
 

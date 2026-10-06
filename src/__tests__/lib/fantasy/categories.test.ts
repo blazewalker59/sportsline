@@ -4,6 +4,7 @@ import basketball from '../../fixtures/fantasy/basketball-category-matchup.json'
 import type { WireLeague } from '@/lib/fantasy/matchup'
 import {
   addStats,
+  categoryLean,
   categoryValue,
   formatCategory,
   innings,
@@ -103,5 +104,70 @@ describe('category Matchups (from ESPN payloads dreamteam reads)', () => {
     expect(addStats({ 1: 2, 0: 4 }, { 1: 1, 0: 3 })).toEqual({ 1: 3, 0: 7 })
     expect(categoryValue('baseball', 2, { 1: 3, 0: 7 })).toBeCloseTo(3 / 7)
     expect(innings(16)).toBe('5.1')
+  })
+})
+
+describe('how far a category leans', () => {
+  it('leans toward the leader by the margin, flipped where lower wins', () => {
+    expect(
+      categoryLean({
+        reverse: false,
+        leader: 'mine',
+        mineValue: 31,
+        opponentValue: 25,
+      }),
+    ).toBeCloseTo(Math.sqrt(6 / 31))
+    expect(
+      categoryLean({
+        reverse: false,
+        leader: 'opponent',
+        mineValue: 10,
+        opponentValue: 11,
+      }),
+    ).toBeCloseTo(-Math.sqrt(1 / 11))
+    // ERA 2.49 vs 4.09: lower wins, so it leans the Viewer's way.
+    expect(
+      categoryLean({
+        reverse: true,
+        leader: 'mine',
+        mineValue: 2.49,
+        opponentValue: 4.09,
+      }),
+    ).toBeGreaterThan(0.6)
+  })
+
+  it('is even for ties, a minimum for close calls, full for no contest', () => {
+    expect(
+      categoryLean({
+        reverse: false,
+        leader: 'tie',
+        mineValue: 30,
+        opponentValue: 30,
+      }),
+    ).toBe(0)
+    expect(
+      categoryLean({
+        reverse: false,
+        leader: 'mine',
+        mineValue: 0.482,
+        opponentValue: 0.4815,
+      }),
+    ).toBeCloseTo(0.12)
+    expect(
+      categoryLean({
+        reverse: false,
+        leader: 'mine',
+        mineValue: 4,
+        opponentValue: null,
+      }),
+    ).toBe(1)
+    expect(categoryLean({ reverse: false, leader: null })).toBe(0)
+  })
+
+  it('carries raw values from scoring', () => {
+    const league = baseball as unknown as WireLeague
+    const view = readMatchup('baseball', league, homeOf(league))!
+    const runs = view.categories!.find((c) => c.label === 'R')!
+    expect([runs.mineValue, runs.opponentValue]).toEqual([31, 25])
   })
 })
