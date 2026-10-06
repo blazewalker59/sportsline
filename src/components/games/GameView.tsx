@@ -4,9 +4,9 @@
  * so it never feels like a new screen.
  */
 
-import { GameFlow } from './GameFlow'
 import type { GameSummary } from '@/lib/model/timeline'
 import type { GameBox } from '@/lib/model/types'
+import { GameFlow } from '@/components/charts/lazy'
 import { Sheet } from '@/components/chat/Sheet'
 import { TeamLogo, TeamMark } from '@/components/brand/TeamMark'
 import { FollowButton } from '@/components/follows/FollowButton'

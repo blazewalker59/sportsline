@@ -5,7 +5,6 @@
 
 import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
-import { OddsChart } from './OddsChart'
 import { PredictionGames } from './PredictionGames'
 import type {
   ChangeDisplay,
@@ -14,6 +13,7 @@ import type {
 } from '@/lib/kalshi/server'
 import type { Progress } from '@/lib/kalshi/props'
 import type { GameSummary } from '@/lib/model/timeline'
+import { OddsChart } from '@/components/charts/lazy'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { Sheet } from '@/components/chat/Sheet'

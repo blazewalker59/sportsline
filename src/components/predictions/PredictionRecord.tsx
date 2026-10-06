@@ -5,14 +5,13 @@
  */
 
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { CalibrationChart } from './CalibrationChart'
-import { RecordTrend } from './RecordTrend'
 import type {
   Calibration,
   Line,
   PredictionRecord,
   Range,
 } from '@/lib/kalshi/record'
+import { CalibrationChart, RecordTrend } from '@/components/charts/lazy'
 import { buildRecord, calibrationOf, winRate } from '@/lib/kalshi/record'
 import { usePredictionRecord } from '@/lib/kalshi/usePredictions'
 import { cn } from '@/lib/utils'
