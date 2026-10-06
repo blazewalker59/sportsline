@@ -382,3 +382,16 @@ textarea,
     opacity: 1;
   }
 }
+
+/* TanStack Charts: tooltips (portaled anywhere) follow the app's theme. */
+:root {
+  --ts-chart-tooltip-background: var(--surface);
+  --ts-chart-tooltip-color: var(--foreground);
+}
+.ts-chart-tooltip {
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  font-size: 12px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}

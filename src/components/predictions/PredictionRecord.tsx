@@ -5,6 +5,7 @@
  */
 
 import { Fragment, useEffect, useMemo, useState } from 'react'
+import { RecordTrend } from './RecordTrend'
 import type { Line, PredictionRecord, Range } from '@/lib/kalshi/record'
 import { buildRecord, winRate } from '@/lib/kalshi/record'
 import { usePredictionRecord } from '@/lib/kalshi/usePredictions'
@@ -179,7 +180,7 @@ function RecordBody({ record: r }: { record: PredictionRecord }) {
         <Stat label="Avg stake" value={usd(t.avgStake)} />
       </div>
 
-      {r.days.length > 1 && <Trend days={r.days} />}
+      {r.days.length > 1 && <RecordTrend days={r.days} />}
 
       {r.insights.length > 0 && (
         <ul className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface px-3 py-2.5">
@@ -262,94 +263,6 @@ function Stat({
       </span>
       {sub && <span className="text-[11px] text-muted">{sub}</span>}
     </div>
-  )
-}
-
-/** Daily volume as bars; realized P&L, running, as a line over them. */
-function Trend({ days }: { days: PredictionRecord['days'] }) {
-  const width = 320
-  const height = 88
-  const pad = 4
-  const maxStake = Math.max(...days.map((d) => d.staked), 1)
-  let running = 0
-  const cumulative = days.map((d) => (running += d.pnl))
-  const lo = Math.min(0, ...cumulative)
-  const hi = Math.max(0, ...cumulative)
-  const span = hi - lo || 1
-  const slot = (width - pad * 2) / days.length
-  const y = (v: number) => pad + (height - pad * 2) * (1 - (v - lo) / span)
-  const line = cumulative
-    .map(
-      (v, i) =>
-        `${i === 0 ? 'M' : 'L'}${(pad + slot * (i + 0.5)).toFixed(1)},${y(v).toFixed(1)}`,
-    )
-    .join(' ')
-  const end = cumulative.at(-1) ?? 0
-  const label = (s: string) =>
-    new Date(`${s}T12:00:00`).toLocaleDateString([], {
-      month: 'short',
-      day: 'numeric',
-    })
-  return (
-    <figure className="rounded-xl border border-border bg-surface px-3 py-2.5">
-      <figcaption className="mb-1 flex items-baseline justify-between text-[11px] text-muted">
-        <span>
-          <span className="mr-1 inline-block size-2 rounded-sm bg-accent/40 align-middle" />
-          Daily volume
-        </span>
-        <span>
-          <span
-            className={cn(
-              'mr-1 inline-block h-0.5 w-3 align-middle',
-              end >= 0 ? 'bg-scoring' : 'bg-live',
-            )}
-          />
-          Running P&L{' '}
-          <span className={cn('font-semibold', tone(end))}>{signed(end)}</span>
-        </span>
-      </figcaption>
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        className="h-24 w-full"
-        preserveAspectRatio="none"
-        role="img"
-        aria-label={`Volume over ${days.length} days; running profit and loss ends at ${signed(end)}`}
-      >
-        {days.map((d, i) => {
-          const h = ((height - pad * 2) * d.staked) / maxStake
-          return (
-            <rect
-              key={d.day}
-              x={pad + slot * i + slot * 0.15}
-              y={height - pad - h}
-              width={slot * 0.7}
-              height={h}
-              rx={1.5}
-              className="fill-accent/35"
-            />
-          )
-        })}
-        <line
-          x1={pad}
-          x2={width - pad}
-          y1={y(0)}
-          y2={y(0)}
-          className="stroke-border"
-          strokeDasharray="3 3"
-        />
-        <path
-          d={line}
-          fill="none"
-          strokeWidth={2}
-          vectorEffect="non-scaling-stroke"
-          className={end >= 0 ? 'stroke-scoring' : 'stroke-live'}
-        />
-      </svg>
-      <div className="mt-0.5 flex justify-between text-[10px] text-muted">
-        <span>{label(days[0].day)}</span>
-        <span>{label(days.at(-1)!.day)}</span>
-      </div>
-    </figure>
   )
 }
 
