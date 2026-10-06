@@ -58,11 +58,27 @@ export async function syncDay(
   const results = await Promise.allSettled(
     ACTIVE_LEAGUES.map((league) => syncLeague(env, league, sportsDay, now)),
   )
-  for (const r of results) {
-    if (r.status === 'rejected')
-      await reportError(env, 'schedule', r.reason, { sportsDay })
+  for (const [i, r] of results.entries()) {
+    const league = ACTIVE_LEAGUES[i]
+    if (r.status === 'fulfilled') {
+      rateLimitedSince.delete(league)
+      continue
+    }
+    // A rate limit clears itself (the next minute tries again): only one
+    // that lasts is worth reporting.
+    if (RATE_LIMITED.test(String(r.reason))) {
+      const since = rateLimitedSince.get(league) ?? now.getTime()
+      rateLimitedSince.set(league, since)
+      if (now.getTime() - since < RATE_LIMIT_GRACE_MS) continue
+    }
+    await reportError(env, 'schedule', r.reason, { sportsDay })
   }
 }
+
+const RATE_LIMITED = /\b429\b/
+const RATE_LIMIT_GRACE_MS = 15 * 60_000
+/** When each League's schedule source started answering 429 (this isolate). */
+const rateLimitedSince = new Map<League, number>()
 
 /** One League's schedule for one Sports Day (a Team page opening an old Game). */
 export async function syncLeague(

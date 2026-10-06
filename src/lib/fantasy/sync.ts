@@ -83,7 +83,10 @@ export async function discover(
   viewerId: string,
   session: EspnSession,
 ): Promise<number> {
-  const found = discoverLeagues(await fanProfile(session))
+  const profile = await fanProfile(session)
+  // No fan profile under this SWID: leagues come from pasted URLs instead.
+  if (profile === null) console.warn('ESPN has no fan profile', { viewerId })
+  const found = discoverLeagues(profile)
   const now = new Date()
   for (const l of found) {
     await db

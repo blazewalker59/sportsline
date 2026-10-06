@@ -46,13 +46,24 @@ async function get<T>(url: string, session: EspnSession | null): Promise<T> {
   return (await res.json()) as T
 }
 
-/** The Viewer's fan profile, which lists their Fantasy leagues. */
-export function fanProfile(session: EspnSession): Promise<unknown> {
-  const id = bracedSwid(session.swid).replace(/[{}]/g, '')
-  return get(
-    `https://fan.api.espn.com/apis/v2/fans/${id}?displayEvents=true&displayNow=true&context=fantasy&source=espn&lang=en&region=us`,
-    session,
-  )
+/**
+ * The Viewer's fan profile, which lists their Fantasy leagues; null when
+ * ESPN has no profile under their SWID ("fan not found"). ESPN's own site
+ * asks with the braced SWID, so that's tried first, then the bare GUID.
+ */
+export async function fanProfile(session: EspnSession): Promise<unknown> {
+  const braced = bracedSwid(session.swid)
+  for (const id of [encodeURIComponent(braced), braced.replace(/[{}]/g, '')]) {
+    try {
+      return await get(
+        `https://fan.api.espn.com/apis/v2/fans/${id}?displayEvents=true&displayNow=true&context=fantasy&source=espn&lang=en&region=us`,
+        session,
+      )
+    } catch (error) {
+      if (!(error instanceof EspnError && error.status === 404)) throw error
+    }
+  }
+  return null
 }
 
 /** A league's teams, Lineups, this period's Matchups and settings. */

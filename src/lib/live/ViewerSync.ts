@@ -11,11 +11,12 @@
  */
 
 import { DurableObject } from 'cloudflare:workers'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import type { CloudflareEnv } from '@/lib/db'
 import { dbFromD1 } from '@/lib/db'
 import {
   espnAccounts,
+  jobRuns,
   kalshiAccounts,
   predictions,
   sleeperAccounts,
@@ -80,12 +81,32 @@ export class ViewerSync extends DurableObject<CloudflareEnv> {
       ...(connected.espn ? (['espn'] as const) : []),
       ...(connected.sleeper ? (['sleeper'] as const) : []),
     ]
-    // Nothing connected (or everything disconnected): stop until started.
-    if (wanted.length === 0) return
-
     const tasks =
       (await this.ctx.storage.get<Partial<Record<Task, TaskState>>>('tasks')) ??
       {}
+    // A task that's paused (no open Predictions, an account disconnected)
+    // leaves the health page, so it isn't reported as stale while idle.
+    // Cleared once each time the set of paused tasks changes.
+    const paused = (Object.keys(EVERY) as Array<Task>).filter(
+      (t) => !wanted.includes(t),
+    )
+    if ((await this.ctx.storage.get<string>('paused')) !== paused.join()) {
+      if (paused.length > 0)
+        await dbFromD1(this.env.DB)
+          .delete(jobRuns)
+          .where(
+            inArray(
+              jobRuns.name,
+              paused.map((t) => `${t}:${viewerId}`),
+            ),
+          )
+      for (const t of paused) delete tasks[t]
+      await this.ctx.storage.put('tasks', tasks)
+      await this.ctx.storage.put('paused', paused.join())
+    }
+    // Nothing connected (or everything disconnected): stop until started.
+    if (wanted.length === 0) return
+
     const now = Date.now()
     for (const task of wanted) {
       const state = tasks[task] ?? { dueAt: 0, failures: 0 }
