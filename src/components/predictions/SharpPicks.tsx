@@ -7,6 +7,7 @@
  */
 
 import { useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import type { SharpPick } from '@/lib/sharp/server'
 import type { RecordEntry } from '@/lib/kalshi/record'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
@@ -95,30 +96,208 @@ export function SharpPicksSection() {
   )
 }
 
+/** "How picks work", drawn: the edge, the cut to five, the grades, the close. */
 function Explainer() {
   return (
-    <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface px-3 py-2.5 text-[13px] leading-relaxed text-muted">
-      <p>
-        Every morning we check Kalshi’s prices on the day’s NFL, NBA, MLB and
-        NHL games against the odds at sharp books like Pinnacle. When Kalshi is
-        cheaper than those books say it should be, even after Kalshi’s fee,
-        that’s an edge.
+    <ol className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <Step
+        n={1}
+        caption="Kalshi vs the sharp books. The gap after the fee is the edge."
+      >
+        <EdgeBar />
+      </Step>
+      <Step
+        n={2}
+        caption="Every NFL, NBA, MLB and NHL market, cut to the biggest edges."
+      >
+        <Funnel />
+      </Step>
+      <Step
+        n={3}
+        caption="Some days Kalshi is priced about right, so picks are Thin."
+      >
+        <GradeScale />
+      </Step>
+      <Step
+        n={4}
+        caption="Kalshi moving toward the pick before the game: a good pick, win or lose."
+      >
+        <CloseLine />
+      </Step>
+    </ol>
+  )
+}
+
+function Step({
+  n,
+  caption,
+  children,
+}: {
+  n: number
+  caption: string
+  children: ReactNode
+}) {
+  return (
+    <li className="flex flex-col gap-2 rounded-xl border border-border bg-surface px-3 py-2.5">
+      <div className="min-h-16">{children}</div>
+      <p className="flex gap-1.5 text-[12px] leading-snug text-muted">
+        <span className="font-bold text-foreground">{n}</span>
+        {caption}
       </p>
-      <p>
-        The five biggest edges make the list, no more than one per game or two
-        per sport. The combo is two or three of the likelier picks from
-        different games.
-      </p>
-      <p>
-        Strong means 3+ points of edge, Edge is 1–3, Thin is under 1. Some days
-        Kalshi is priced about right, so expect Thin picks.
-      </p>
-      <p>
-        Judge picks by the closing price, not a week of wins and losses. If
-        Kalshi keeps moving toward our picks before games start, they’re good
-        picks.
-      </p>
+    </li>
+  )
+}
+
+/** 44¢ on Kalshi, 2¢ fee, 48% fair: +2 pts of edge, on a 38–54% track. */
+function EdgeBar() {
+  const at = (p: number) => `${((p - 0.38) / 0.16) * 100}%`
+  const span = (p: number) => `${(p / 0.16) * 100}%`
+  return (
+    <div className="pt-1 text-[11px] tabular-nums">
+      <div className="relative h-4 font-semibold">
+        <span
+          className="absolute -translate-x-full pr-1.5"
+          style={{ left: at(0.44) }}
+        >
+          Kalshi 44¢
+        </span>
+        <span
+          className="absolute pl-1.5 text-scoring"
+          style={{ left: at(0.48) }}
+        >
+          Fair 48%
+        </span>
+      </div>
+      <div className="relative mt-1 h-2.5 rounded-full bg-notice">
+        <span
+          className="absolute inset-y-0 bg-muted/50"
+          style={{ left: at(0.44), width: span(0.02) }}
+        />
+        <span
+          className="absolute inset-y-0 bg-scoring"
+          style={{ left: at(0.46), width: span(0.02) }}
+        />
+        {[0.44, 0.48].map((p) => (
+          <span
+            key={p}
+            className="absolute -top-0.5 h-3.5 w-0.5 -translate-x-1/2 rounded bg-foreground"
+            style={{ left: at(p) }}
+          />
+        ))}
+      </div>
+      <div className="mt-2 flex justify-center gap-3 text-muted">
+        <span className="flex items-center gap-1">
+          <span className="h-2 w-3 rounded-sm bg-muted/50" />
+          2¢ fee
+        </span>
+        <span className="flex items-center gap-1 font-semibold text-scoring">
+          <span className="h-2 w-3 rounded-sm bg-scoring" />
+          +2 pts edge
+        </span>
+      </div>
     </div>
+  )
+}
+
+function Funnel() {
+  const rows = [
+    { label: '~600 prices', width: '100%', className: 'bg-notice' },
+    { label: 'priced vs fair', width: '72%', className: 'bg-accent/20' },
+    {
+      label: '5 picks + combo',
+      width: '44%',
+      className: 'bg-accent text-white',
+    },
+  ]
+  return (
+    <div className="flex flex-col items-center gap-1 text-[11px] font-semibold">
+      {rows.map((r) => (
+        <span
+          key={r.label}
+          className={cn('rounded-md py-1 text-center', r.className)}
+          style={{ width: r.width }}
+        >
+          {r.label}
+        </span>
+      ))}
+      <span className="mt-0.5 flex gap-1 text-[10px] font-normal text-muted">
+        <span className="rounded bg-notice px-1.5 py-0.5">1 per game</span>
+        <span className="rounded bg-notice px-1.5 py-0.5">2 per sport</span>
+      </span>
+    </div>
+  )
+}
+
+function GradeScale() {
+  const bands = [
+    { grade: 'thin' as const, range: 'under 1 pt', bar: 'bg-muted/40' },
+    { grade: 'edge' as const, range: '1–3 pts', bar: 'bg-accent' },
+    { grade: 'strong' as const, range: '3+ pts', bar: 'bg-emerald-500' },
+  ]
+  return (
+    <div className="grid grid-cols-3 gap-1 pt-2">
+      {bands.map((b) => (
+        <span key={b.grade} className="flex flex-col items-center gap-1.5">
+          <span className={cn('h-2.5 w-full rounded-full', b.bar)} />
+          <GradeChip grade={b.grade} />
+          <span className="text-[10px] whitespace-nowrap text-muted tabular-nums">
+            {b.range}
+          </span>
+        </span>
+      ))}
+    </div>
+  )
+}
+
+/** The pick at 44¢; Kalshi at 47¢ by the start: beat the close by 3. */
+function CloseLine() {
+  const path = [44, 44.5, 44, 45.5, 46, 45.5, 47]
+  const x = (i: number) => 8 + (i / (path.length - 1)) * 184
+  const y = (c: number) => 52 - ((c - 43) / 5) * 44
+  return (
+    <svg
+      viewBox="0 0 200 60"
+      className="h-16 w-full overflow-visible text-[9px]"
+      role="img"
+      aria-label="Picked at 44 cents, closed at 47 cents"
+    >
+      <line
+        x1={8}
+        x2={192}
+        y1={y(44)}
+        y2={y(44)}
+        className="stroke-muted/40"
+        strokeDasharray="3 3"
+      />
+      <polyline
+        points={path.map((c, i) => `${x(i)},${y(c)}`).join(' ')}
+        fill="none"
+        className="stroke-scoring"
+        strokeWidth={2}
+        strokeLinejoin="round"
+      />
+      <circle cx={x(0)} cy={y(44)} r={3.5} className="fill-foreground" />
+      <circle
+        cx={x(path.length - 1)}
+        cy={y(47)}
+        r={3.5}
+        className="fill-scoring"
+      />
+      <text x={x(0)} y={y(44) + 12} className="fill-muted">
+        pick 44¢
+      </text>
+      <text
+        x={x(path.length - 1)}
+        y={y(47) - 7}
+        textAnchor="end"
+        className="fill-scoring font-semibold"
+      >
+        close 47¢ · +3
+      </text>
+      <text x={192} y={y(44) + 12} textAnchor="end" className="fill-muted">
+        game starts
+      </text>
+    </svg>
   )
 }
 
