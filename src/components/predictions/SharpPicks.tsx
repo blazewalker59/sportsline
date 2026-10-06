@@ -97,23 +97,26 @@ export function SharpPicksSection() {
 
 function Explainer() {
   return (
-    <div className="rounded-xl border border-border bg-surface px-3 py-2.5 text-[13px] leading-relaxed text-muted">
+    <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface px-3 py-2.5 text-[13px] leading-relaxed text-muted">
       <p>
-        Each morning, every Kalshi winner, spread and total for the day’s NFL,
-        NBA, MLB and NHL games is priced against a <b>fair price</b>: the sharp
-        books (Pinnacle, Novig, Polymarket, BetOnline, DraftKings) with their
-        margins taken out, weighted toward the sharpest. A pick’s <b>edge</b> is
-        the fair chance minus Kalshi’s price and fee.
+        Every morning we check Kalshi’s prices on the day’s NFL, NBA, MLB and
+        NHL games against the odds at sharp books like Pinnacle. When Kalshi is
+        cheaper than those books say it should be, even after Kalshi’s fee,
+        that’s an edge.
       </p>
-      <p className="mt-1.5">
-        The five best by expected value per dollar go out, at most two per sport
-        and one per game, mixing market types; the combo joins likely legs from
-        different games. <b>Strong</b> is 3+ points of edge, <b>Edge</b> 1–3,{' '}
-        <b>Thin</b> the best of a fairly priced day.
+      <p>
+        The five biggest edges make the list, no more than one per game or two
+        per sport. The combo is two or three of the likelier picks from
+        different games.
       </p>
-      <p className="mt-1.5">
-        The truest test is the <b>closing price</b>: picks that keep beating
-        where Kalshi closes are sharp, whatever a few results say.
+      <p>
+        Strong means 3+ points of edge, Edge is 1–3, Thin is under 1. Some days
+        Kalshi is priced about right, so expect Thin picks.
+      </p>
+      <p>
+        Judge picks by the closing price, not a week of wins and losses. If
+        Kalshi keeps moving toward our picks before games start, they’re good
+        picks.
       </p>
     </div>
   )
