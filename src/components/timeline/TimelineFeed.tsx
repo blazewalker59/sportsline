@@ -1,5 +1,6 @@
 /**
- * The Timeline's feed: the catch-up card, what's live (typing), then the
+ * The Timeline's feed: the Sharp picks banner (Predictions Scope), the
+ * catch-up card, what's live (typing), then the
  * plays as chat entries with the read divider; and under them the error,
  * empty and "Earlier plays" states.
  */
@@ -9,6 +10,7 @@ import { Cluster, TypingRow, TypingSummary } from './FeedRows'
 import type { FeedEntry, Typing } from '@/lib/timeline/chat'
 import type { GameSummary } from '@/lib/model/timeline'
 import type { CatchUp } from '@/lib/timeline/catchup'
+import { SharpPicksBanner } from '@/components/predictions/SharpPicks'
 import { Notice, ReadDivider } from '@/components/chat/ChatParts'
 import { vtName } from '@/lib/timeline/gameLink'
 import { cn } from '@/lib/utils'
@@ -26,6 +28,7 @@ export function TimelineFeed({
   newCount,
   onRecap,
   onLive,
+  sharpPicks = false,
 }: {
   entries: ReadonlyArray<FeedEntry>
   typing: Array<{ typing: Typing; game: GameSummary }>
@@ -40,6 +43,8 @@ export function TimelineFeed({
   newCount: number
   onRecap: () => void
   onLive: () => void
+  /** Lead with the day's Sharp picks banner (the Predictions Scope). */
+  sharpPicks?: boolean
 }) {
   return (
     <ol
@@ -49,6 +54,11 @@ export function TimelineFeed({
       )}
       aria-busy={loading}
     >
+      {sharpPicks && (
+        <li>
+          <SharpPicksBanner />
+        </li>
+      )}
       {recap && readAt && (
         <li style={{ viewTransitionName: 'catchup' }}>
           <CatchUpCard catchUp={recap} readAt={readAt} onOpen={onRecap} />

@@ -77,7 +77,7 @@ export function SharpPicksBanner() {
     }
   }
   return (
-    <section className="mt-2 overflow-hidden rounded-2xl border border-accent/40 bg-surface">
+    <section className="overflow-hidden rounded-2xl border border-accent/40 bg-surface">
       <div className="flex items-center">
         <button
           type="button"
@@ -118,7 +118,7 @@ export function SharpPicksBanner() {
         </button>
       </div>
       {open && (
-        <div className="max-h-[55vh] overflow-y-auto border-t border-border">
+        <div className="border-t border-border">
           <SharpPicksList picks={data.picks} flush />
           <Link
             to="/predictions"
@@ -420,21 +420,11 @@ function GradeChip({ grade }: { grade: SharpPick['grade'] }) {
   )
 }
 
-/** Where the pick stands, in a word or two. */
+/** Where the pick stands: its start time, then live, then the result. */
 function statusOf(p: SharpPick): { text: string; tone: 'good' | 'bad' | null } {
   if (p.result === 'won') return { text: 'Won', tone: 'good' }
   if (p.result === 'lost') return { text: 'Lost', tone: 'bad' }
-  if (p.closingPrice !== null)
-    return p.closingPrice > p.price
-      ? {
-          text: `Beat close ${pts(p.closingPrice - p.price).replace(' pts', '')}`,
-          tone: 'good',
-        }
-      : { text: 'Missed close', tone: 'bad' }
-  if (p.currentEdge !== null && p.currentEdge < 0)
-    return { text: 'Edge gone', tone: 'bad' }
-  if (p.currentPrice !== null && p.currentPrice !== p.price)
-    return { text: `Now ${cents(p.currentPrice)}`, tone: null }
+  if (Date.now() >= Date.parse(p.startsAt)) return { text: 'Live', tone: null }
   return { text: clockTime(p.startsAt), tone: null }
 }
 

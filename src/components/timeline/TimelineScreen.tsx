@@ -259,6 +259,7 @@ function Timeline({
           newCount={newCount}
           onRecap={() => setRecapOpen(true)}
           onLive={() => setLiveOpen(true)}
+          sharpPicks={scope === 'predictions' && !gameId}
         />
       </FantasyTagsProvider>
 
