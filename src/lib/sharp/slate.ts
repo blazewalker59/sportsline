@@ -80,14 +80,14 @@ function singleRow(
 }
 
 /**
- * Build and store today's slate (once a day). Returns how many picks went
- * out; 0 when there's no slate to make (no Games, or no Kalshi account to
- * read prices with).
+ * Build and store today's slate (once a day). Returns whether today has
+ * one now; false when there's nothing to pick from yet (no Games, or no
+ * priced Kalshi markets), so the Scheduler tries again later.
  */
 export async function publishSlate(
   env: CloudflareEnv,
   now: Date,
-): Promise<number> {
+): Promise<boolean> {
   const db = dbFromD1(env.DB)
   const day = sportsDayOf(now)
   const existing = await db
@@ -95,11 +95,11 @@ export async function publishSlate(
     .from(sharpPicks)
     .where(eq(sharpPicks.day, day))
     .get()
-  if (existing) return 0
+  if (existing) return true
   const refs = (await loadGames(db, day, day)).filter(
     (g) => g.status === 'scheduled',
   )
-  if (refs.length === 0) return 0
+  if (refs.length === 0) return false
   const account = await serviceAccount(env, db)
   if (!account) throw new Error('No admin Kalshi account to read prices with')
 
@@ -133,7 +133,7 @@ export async function publishSlate(
     now: now.getTime(),
   })
   const picks = selectPicks(pool)
-  if (picks.length === 0) return 0
+  if (picks.length === 0) return false
   const at = now.toISOString()
   const rows: Array<PickRow> = picks.map((c, i) => singleRow(day, i + 1, c, at))
   const combo = selectCombo(pool)
@@ -180,7 +180,7 @@ export async function publishSlate(
   for (const r of rows)
     await db.insert(sharpPicks).values(r).onConflictDoNothing()
   await announce(env, rows)
-  return rows.length
+  return true
 }
 
 /** The morning push: the slate is out, led by its best pick. */

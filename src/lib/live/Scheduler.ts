@@ -51,6 +51,7 @@ const SWEEP_EVERY_MS = 10 * MINUTE
 const STALE_DUE_KEY = 'staleDueAt'
 const SHARP_DAY_KEY = 'sharpDay'
 const SHARP_RETRY_KEY = 'sharpRetryAt'
+const SHARP_EMPTY_KEY = 'sharpEmptyTries'
 const SHARP_RECHECK_KEY = 'sharpRecheckDueAt'
 const SHARP_RECHECK_EVERY_MS = 15 * MINUTE
 
@@ -132,7 +133,22 @@ export class Scheduler extends DurableObject<CloudflareEnv> {
     const run = await runJob(this.env, 'sharp-slate', 24 * 60 * MINUTE, () =>
       publishSlate(this.env, new Date(now)),
     )
-    if (run.ok) await this.ctx.storage.put(SHARP_DAY_KEY, day)
+    if (run.ok && run.value) {
+      await this.ctx.storage.put(SHARP_DAY_KEY, day)
+      await this.ctx.storage.delete(SHARP_EMPTY_KEY)
+      return
+    }
+    // Nothing to pick from yet (markets not open, a source down): try
+    // again hourly, three times at most, since each try spends Odds API
+    // credits.
+    if (!run.ok) return
+    const tries =
+      ((await this.ctx.storage.get<number>(SHARP_EMPTY_KEY)) ?? 0) + 1
+    await this.ctx.storage.put(SHARP_EMPTY_KEY, tries)
+    if (tries >= 3) {
+      await this.ctx.storage.put(SHARP_DAY_KEY, day)
+      await this.ctx.storage.delete(SHARP_EMPTY_KEY)
+    } else await this.ctx.storage.put(SHARP_RETRY_KEY, now + 60 * MINUTE)
   }
 
   /** Keep every Viewer with a connected account syncing (idempotent). */
