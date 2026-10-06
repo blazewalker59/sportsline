@@ -41,6 +41,13 @@ describe('Player overviews', () => {
       opponent: 'New York Mets',
       result: 'W',
       line: '6.0 IP · 8 K · 1 ER',
+      value: 8,
+    })
+    // A pitcher's form is strikeouts; no season count here, so no average.
+    expect(o?.form).toEqual({
+      label: 'K',
+      average: null,
+      averageLabel: 'Season avg',
     })
   })
 
@@ -58,6 +65,7 @@ describe('Player overviews', () => {
           homeRoadFlag: 'H',
           goals: 1,
           assists: 1,
+          points: 2,
           shots: 4,
           toi: '20:00',
         },
@@ -65,7 +73,63 @@ describe('Player overviews', () => {
     })
     expect(o.season?.title).toBe('2026-27 Season')
     expect(o.season?.stats.find((s) => s.label === 'G')?.value).toBe('2')
-    expect(o.recent[0]).toMatchObject({ opponent: 'SEA', home: true })
+    expect(o.recent[0]).toMatchObject({ opponent: 'SEA', home: true, value: 2 })
+    // A skater's form is points, against their season points per game.
+    expect(o.form).toEqual({
+      label: 'P',
+      average: 3,
+      averageLabel: 'Season avg',
+    })
+  })
+
+  it('takes the headline stat from ESPN’s game log, and skips empty ones', async () => {
+    const log = (names: Array<string>, rows: Array<Array<string>>) => ({
+      gameLog: {
+        statistics: [
+          {
+            labels: names.map((n) => n.slice(0, 3).toUpperCase()),
+            names,
+            events: rows.map((stats, i) => ({ eventId: String(i), stats })),
+          },
+        ],
+        events: Object.fromEntries(
+          rows.map((_, i) => [
+            String(i),
+            { opponent: { abbreviation: 'PIT' } },
+          ]),
+        ),
+      },
+    })
+    const wr = await espnAthleteOverview('football/nfl', '1', null, <T>() =>
+      Promise.resolve(
+        log(
+          ['receptions', 'receivingYards'],
+          [
+            ['5', '96'],
+            ['2', '32'],
+          ],
+        ) as T,
+      ),
+    )
+    expect(wr?.recent.map((g) => g.value)).toEqual([96, 32])
+    expect(wr?.form).toEqual({
+      label: 'Rec yds',
+      average: 64,
+      averageLabel: '2-game avg',
+    })
+    // A kicker's empty receiving log draws nothing.
+    const k = await espnAthleteOverview('football/nfl', '2', null, <T>() =>
+      Promise.resolve(
+        log(
+          ['receptions', 'receivingYards'],
+          [
+            ['0', '0'],
+            ['0', '0'],
+          ],
+        ) as T,
+      ),
+    )
+    expect(k?.form).toBeNull()
   })
 
   it('groups ESPN’s mixed stat lines by category', async () => {

@@ -9,6 +9,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useCallback, useMemo, useState } from 'react'
 import { OpenPlayer } from './playerSheet'
+import { PlayerForm } from './PlayerForm'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { LineupPlayer } from '@/lib/fantasy/matchup'
 import type { PlayerLine } from '@/lib/players/detail'
@@ -244,7 +245,7 @@ export function PlayerDetailSections({
           )}
           {overview?.season && <SeasonSection season={overview.season} />}
           {overview && overview.recent.length > 0 && (
-            <RecentSection recent={overview.recent} />
+            <RecentSection recent={overview.recent} form={overview.form} />
           )}
           {overview && overview.news.length > 0 && (
             <NewsSection news={overview.news} />
@@ -471,9 +472,16 @@ function SeasonSection({
   )
 }
 
-function RecentSection({ recent }: { recent: PlayerOverview['recent'] }) {
+function RecentSection({
+  recent,
+  form,
+}: {
+  recent: PlayerOverview['recent']
+  form: PlayerOverview['form']
+}) {
   return (
     <Section title="Recent games">
+      {form && <PlayerForm form={form} recent={recent} />}
       <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
         {recent.map((g, i) => (
           <li key={i} className="flex items-center gap-3 px-3 py-2 text-sm">

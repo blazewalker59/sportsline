@@ -737,6 +737,14 @@ export function parsePlayerOverview(r: MlbPlayerStats): PlayerOverview | null {
     )
   const season = of('season')?.splits?.[0]?.stat
   const log = of('gameLog')?.splits ?? []
+  // The form chart's stat: a hitter's total bases, a pitcher's strikeouts.
+  const formKey = pitcher ? 'strikeOuts' : 'totalBases'
+  const num = (v: string | number | undefined) => {
+    const n = Number(v)
+    return v === undefined || !Number.isFinite(n) ? null : n
+  }
+  const seasonTotal = num(season?.[formKey])
+  const games = num(season?.gamesPlayed)
   return {
     season: season
       ? {
@@ -759,7 +767,16 @@ export function parsePlayerOverview(r: MlbPlayerStats): PlayerOverview | null {
         line: pitcher
           ? `${g.stat?.inningsPitched ?? 0} IP · ${g.stat?.strikeOuts ?? 0} K · ${g.stat?.earnedRuns ?? 0} ER`
           : `${g.stat?.hits ?? 0}-${g.stat?.atBats ?? 0} · ${g.stat?.homeRuns ?? 0} HR · ${g.stat?.rbi ?? 0} RBI`,
+        value: num(g.stat?.[formKey]),
       })),
+    form:
+      log.length > 0
+        ? {
+            label: pitcher ? 'K' : 'TB',
+            average: seasonTotal !== null && games ? seasonTotal / games : null,
+            averageLabel: 'Season avg',
+          }
+        : null,
     next: null,
     news: [],
     note: null,

@@ -733,7 +733,21 @@ export function parsePlayerLanding(d: NhlPlayerLanding): PlayerOverview {
       line: goalie
         ? `${pct(g.savePctg)} SV% · ${g.goalsAgainst ?? 0} GA`
         : `${g.goals ?? 0} G · ${g.assists ?? 0} A · ${g.shots ?? 0} SOG · ${g.toi ?? ''} TOI`,
+      // The form chart's stat: a skater's points, a goalie's save %.
+      value: (goalie ? g.savePctg : g.points) ?? null,
     })),
+    form:
+      (d.last5Games ?? []).length > 0
+        ? {
+            label: goalie ? 'SV%' : 'P',
+            average: goalie
+              ? (season?.savePctg ?? null)
+              : season?.points !== undefined && season.gamesPlayed
+                ? season.points / season.gamesPlayed
+                : null,
+            averageLabel: 'Season avg',
+          }
+        : null,
     next: null,
     news: [],
     note: null,

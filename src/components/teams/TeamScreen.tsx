@@ -7,6 +7,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
+import { TeamResults } from './TeamResults'
 import type { RosterPlayer, TeamGame, TeamPage } from '@/lib/teams/server'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
@@ -45,6 +46,7 @@ export function TeamScreen({ teamId }: { teamId: string }) {
       ) : (
         <>
           <TeamHeader page={data} canFollow={Boolean(viewerState?.viewer)} />
+          <TeamResults page={data} />
           <div className="mb-5 empty:hidden">
             <PredictionsSection teamId={data.team.id} />
           </div>

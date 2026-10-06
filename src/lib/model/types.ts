@@ -226,7 +226,19 @@ export interface PlayerOverview {
     result: string | null
     score: string | null
     line: string
+    /** The game's headline stat (form.label), for the form chart. */
+    value: number | null
   }>
+  /**
+   * What the form chart shows: the headline stat ("Rec yds", "PTS", "K")
+   * and its season per-game average (or the recent games' mean).
+   */
+  form: {
+    label: string
+    average: number | null
+    /** "Season avg" or "5-game avg". */
+    averageLabel: string
+  } | null
   next: { date: string; opponent: string; home: boolean } | null
   news: Array<{
     headline: string

@@ -395,3 +395,17 @@ textarea,
   line-height: 1.45;
   font-variant-numeric: tabular-nums;
 }
+
+/*
+  Two teams' lines on one chart (games/GameFlow): each team's color for
+  the current theme, chosen in lib/games/flowColors (set inline as
+  --team-away-light/-dark and --team-home-light/-dark).
+*/
+.team-lines {
+  --team-away: var(--team-away-light);
+  --team-home: var(--team-home-light);
+}
+.dark .team-lines {
+  --team-away: var(--team-away-dark);
+  --team-home: var(--team-home-dark);
+}

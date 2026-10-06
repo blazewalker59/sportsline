@@ -4,6 +4,7 @@
  * so it never feels like a new screen.
  */
 
+import { GameFlow } from './GameFlow'
 import type { GameSummary } from '@/lib/model/timeline'
 import type { GameBox } from '@/lib/model/types'
 import { Sheet } from '@/components/chat/Sheet'
@@ -32,6 +33,7 @@ export function BoxSheet({
         ))}
       </div>
       {box && <Linescore box={box} game={game} />}
+      <GameFlow game={game} />
       <BoxTables box={box} game={game} />
     </Sheet>
   )
