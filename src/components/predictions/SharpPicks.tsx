@@ -7,6 +7,7 @@
  */
 
 import { useMemo, useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import type { SharpPick } from '@/lib/sharp/server'
 import type { RecordEntry } from '@/lib/kalshi/record'
@@ -16,6 +17,8 @@ import { CalibrationChart } from '@/components/charts/lazy'
 import { calibrationOf } from '@/lib/kalshi/record'
 import { picksRecord } from '@/lib/sharp/record'
 import { useSharpHistory, useSharpSlate } from '@/lib/sharp/useSharp'
+import { bannerVisible, kalshiEventUrl, slateSummary } from '@/lib/sharp/view'
+import { sportsDayOf } from '@/lib/model/sportsDay'
 import { cn } from '@/lib/utils'
 
 const cents = (p: number) => `${Math.round(p * 100)}¢`
@@ -42,9 +45,123 @@ const GRADES = {
   thin: { label: 'Thin', className: 'bg-notice text-muted' },
 } as const
 
-/** A Kalshi page for the market's series (its events are listed there). */
-function kalshiUrl(ticker: string): string {
-  return `https://kalshi.com/markets/${ticker.split('-')[0].toLowerCase()}`
+const DISMISSED_KEY = 'sportsline:sharp-banner-dismissed'
+
+function readDismissed(): string | null {
+  try {
+    return localStorage.getItem(DISMISSED_KEY)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * On the Timeline's Predictions Scope: "Sharp picks available" for today's
+ * slate, dismissable for the day; open, the picks in line.
+ */
+export function SharpPicksBanner() {
+  const slate = useSharpSlate()
+  const [dismissed, setDismissed] = useState(readDismissed)
+  const [open, setOpen] = useState(false)
+  const data = slate.data
+  const today = sportsDayOf(new Date())
+  if (!data || data.day !== today || !bannerVisible(data.day, dismissed))
+    return null
+  const summary = slateSummary(data.picks)
+  const dismiss = () => {
+    setDismissed(data.day)
+    try {
+      localStorage.setItem(DISMISSED_KEY, data.day)
+    } catch {
+      // Private mode: it stays dismissed for this visit only.
+    }
+  }
+  return (
+    <section className="mt-2 overflow-hidden rounded-2xl border border-accent/40 bg-surface">
+      <div className="flex items-center">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left"
+        >
+          <span className="size-2 shrink-0 rounded-full bg-accent" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-bold">
+              Sharp picks available
+            </span>
+            <span className="block truncate text-[11px] text-muted">
+              {summary.singles} picks
+              {summary.hasCombo && ' + combo'}
+              {summary.strong > 0 && ` · ${summary.strong} strong`}
+              {summary.best &&
+                ` · best ${summary.best.title} ${pts(summary.best.edge)}`}
+            </span>
+          </span>
+          <span
+            className={cn(
+              'text-muted transition-transform',
+              open && 'rotate-180',
+            )}
+            aria-hidden
+          >
+            ▾
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={dismiss}
+          aria-label="Dismiss sharp picks for today"
+          className="self-stretch px-3 text-muted hover:text-foreground"
+        >
+          ✕
+        </button>
+      </div>
+      {open && (
+        <div className="max-h-[55vh] overflow-y-auto border-t border-border">
+          <SharpPicksList picks={data.picks} flush />
+          <Link
+            to="/predictions"
+            className="block border-t border-border px-3 py-2 text-center text-xs font-semibold text-accent"
+          >
+            Record and how picks work ›
+          </Link>
+        </div>
+      )}
+    </section>
+  )
+}
+
+/** The slate: one compact row per pick, then the combo; tap a row for more. */
+export function SharpPicksList({
+  picks,
+  flush = false,
+}: {
+  picks: ReadonlyArray<SharpPick>
+  /** Inside another card: no border of its own. */
+  flush?: boolean
+}) {
+  const singles = picks.filter((p) => p.kind === 'single')
+  const combo = picks.find((p) => p.kind === 'combo')
+  return (
+    <ol
+      className={cn(
+        'divide-y divide-border',
+        !flush && 'overflow-hidden rounded-xl border border-border bg-surface',
+      )}
+    >
+      {singles.map((p) => (
+        <li key={p.id}>
+          <PickRow pick={p} />
+        </li>
+      ))}
+      {combo && (
+        <li>
+          <ComboRow pick={combo} />
+        </li>
+      )}
+    </ol>
+  )
 }
 
 export function SharpPicksSection() {
@@ -52,10 +169,8 @@ export function SharpPicksSection() {
   const [explain, setExplain] = useState(false)
   if (slate.isPending) return null
   const data = slate.data
-  const singles = data?.picks.filter((p) => p.kind === 'single') ?? []
-  const combo = data?.picks.find((p) => p.kind === 'combo')
   return (
-    <section className="flex flex-col gap-3">
+    <section className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-xs font-bold tracking-wide text-muted uppercase">
           Sharp picks
@@ -80,16 +195,7 @@ export function SharpPicksSection() {
           The first slate comes out at 10am Eastern.
         </p>
       ) : (
-        <>
-          <ol className="flex flex-col gap-2">
-            {singles.map((p) => (
-              <li key={p.id}>
-                <PickCard pick={p} />
-              </li>
-            ))}
-          </ol>
-          {combo && <ComboCard pick={combo} />}
-        </>
+        <SharpPicksList picks={data.picks} />
       )}
       <PicksRecord />
     </section>
@@ -314,195 +420,178 @@ function GradeChip({ grade }: { grade: SharpPick['grade'] }) {
   )
 }
 
-/** Where the pick stands now: edge left, closing price, or the result. */
-function Status({ pick: p }: { pick: SharpPick }) {
-  if (p.result === 'won' || p.result === 'lost')
-    return (
-      <span
-        className={cn(
-          'font-semibold',
-          p.result === 'won'
-            ? 'text-emerald-600 dark:text-emerald-400'
-            : 'text-live',
-        )}
-      >
-        {p.result === 'won' ? 'Won' : 'Lost'}
-        {p.closingPrice !== null &&
-          ` · closed ${cents(p.closingPrice)} (${pts(p.closingPrice - p.price)} vs pick)`}
-      </span>
-    )
+/** Where the pick stands, in a word or two. */
+function statusOf(p: SharpPick): { text: string; tone: 'good' | 'bad' | null } {
+  if (p.result === 'won') return { text: 'Won', tone: 'good' }
+  if (p.result === 'lost') return { text: 'Lost', tone: 'bad' }
   if (p.closingPrice !== null)
-    return (
-      <span>
-        Underway · closed at {cents(p.closingPrice)}{' '}
-        <span
-          className={cn(
-            'font-semibold',
-            p.closingPrice > p.price
-              ? 'text-emerald-600 dark:text-emerald-400'
-              : 'text-live',
-          )}
-        >
-          {p.closingPrice > p.price ? 'beat the close' : 'missed the close'}
-        </span>
-      </span>
-    )
-  if (p.currentPrice !== null && p.currentEdge !== null)
-    return p.currentEdge < 0 ? (
-      <span className="font-semibold text-live">
-        Edge gone · now {cents(p.currentPrice)}
-      </span>
-    ) : (
-      <span>
-        Now {cents(p.currentPrice)} · {pts(p.currentEdge)} left
-      </span>
-    )
-  return <span>Starts {clockTime(p.startsAt)}</span>
+    return p.closingPrice > p.price
+      ? {
+          text: `Beat close ${pts(p.closingPrice - p.price).replace(' pts', '')}`,
+          tone: 'good',
+        }
+      : { text: 'Missed close', tone: 'bad' }
+  if (p.currentEdge !== null && p.currentEdge < 0)
+    return { text: 'Edge gone', tone: 'bad' }
+  if (p.currentPrice !== null && p.currentPrice !== p.price)
+    return { text: `Now ${cents(p.currentPrice)}`, tone: null }
+  return { text: clockTime(p.startsAt), tone: null }
 }
 
-function PickCard({ pick: p }: { pick: SharpPick }) {
+function StatusText({ pick }: { pick: SharpPick }) {
+  const s = statusOf(pick)
   return (
-    <article className="rounded-xl border border-border bg-surface px-3 py-2.5">
-      <header className="flex items-center gap-2 text-[11px] text-muted">
-        <span className="font-bold text-foreground">#{p.rank}</span>
-        {p.league && <LeagueLogo league={p.league} size={14} />}
-        <span className="truncate">
-          {p.gameLabel} · {clockTime(p.startsAt)}
-        </span>
-        <span className="ml-auto">
-          <GradeChip grade={p.grade} />
-        </span>
-      </header>
-      <div className="mt-1 flex items-end justify-between gap-3">
-        <span className="min-w-0">
-          <span className="block text-lg leading-tight font-bold">
-            {p.title}
-          </span>
-          <span className="text-[11px] text-muted">
-            {p.marketKind ? KIND_NAMES[p.marketKind] : ''} · Kalshi{' '}
-            {p.side?.toUpperCase()}
-          </span>
-        </span>
-        <span className="shrink-0 text-right tabular-nums">
-          <span className="block text-lg leading-tight font-bold">
-            {cents(p.price)}
-          </span>
-          <span className="text-[11px] text-muted">fair {pct1(p.fair)}</span>
-        </span>
-      </div>
-      <p className="mt-1.5 flex flex-wrap items-baseline justify-between gap-x-3 text-[12px] tabular-nums">
-        <span
-          className={cn(
-            'font-semibold',
-            p.edge > 0
-              ? 'text-emerald-600 dark:text-emerald-400'
-              : 'text-muted',
-          )}
-        >
-          {pts(p.edge)} edge after {cents(p.fee)} fee ·{' '}
-          {(p.evPerDollar * 100).toFixed(1)}% per $
-        </span>
-        <span className="text-muted">
-          <Status pick={p} />
-        </span>
-      </p>
-      <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted">
-        {p.sources.map((s) => (
-          <span
-            key={s.source}
-            className="rounded bg-notice px-1.5 py-0.5 tabular-nums"
-          >
-            {SOURCE_NAMES[s.source] ?? s.source}{' '}
-            {pct1(p.side === 'no' ? 1 - s.prob : s.prob)}
-          </span>
-        ))}
-        {p.marketTicker && (
-          <a
-            href={kalshiUrl(p.marketTicker)}
-            target="_blank"
-            rel="noreferrer"
-            className="ml-auto font-semibold text-accent"
-          >
-            Kalshi ↗
-          </a>
-        )}
-      </div>
-    </article>
+    <span
+      className={cn(
+        'shrink-0',
+        s.tone === 'good' &&
+          'font-semibold text-emerald-600 dark:text-emerald-400',
+        s.tone === 'bad' && 'font-semibold text-live',
+      )}
+    >
+      {s.text}
+    </span>
   )
 }
 
-function ComboCard({ pick: p }: { pick: SharpPick }) {
+/** The grade and the edge in one chip: "Strong +3.1". */
+function EdgeChip({ pick: p }: { pick: SharpPick }) {
   return (
-    <article className="rounded-xl border border-accent/40 bg-surface px-3 py-2.5">
-      <header className="flex items-center gap-2 text-[11px] text-muted">
-        <span className="rounded bg-accent/15 px-1.5 py-0.5 font-bold text-accent">
-          Combo
+    <span
+      className={cn(
+        'shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-bold tabular-nums',
+        GRADES[p.grade].className,
+      )}
+    >
+      {GRADES[p.grade].label}{' '}
+      {(p.edge >= 0 ? '+' : '−') + Math.abs(p.edge * 100).toFixed(1)}
+    </span>
+  )
+}
+
+function KalshiLink({ ticker }: { ticker: string }) {
+  return (
+    <a
+      href={kalshiEventUrl(ticker)}
+      target="_blank"
+      rel="noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      className="rounded-lg bg-accent px-3 py-1.5 text-xs font-bold text-white"
+    >
+      Open in Kalshi
+    </a>
+  )
+}
+
+function PickRow({ pick: p }: { pick: SharpPick }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full flex-col gap-0.5 px-3 py-2 text-left"
+      >
+        <span className="flex items-center gap-2">
+          {p.league && <LeagueLogo league={p.league} size={14} />}
+          <span className="truncate text-sm font-bold">{p.title}</span>
+          <span className="truncate text-[11px] text-muted">{p.gameLabel}</span>
+          <span className="ml-auto">
+            <EdgeChip pick={p} />
+          </span>
         </span>
-        <span>{p.legs?.length ?? 0} legs, different games</span>
-        <span className="ml-auto">
-          <GradeChip grade={p.grade} />
+        <span className="flex items-baseline gap-2 text-[12px] tabular-nums">
+          <span className="min-w-0 flex-1 truncate text-muted">
+            Kalshi <b className="text-foreground">{cents(p.price)}</b> · sharp
+            books <b className="text-foreground">{pct1(p.fair)}</b>
+          </span>
+          <StatusText pick={p} />
         </span>
-      </header>
-      <ul className="mt-2 divide-y divide-border">
-        {(p.legs ?? []).map((l) => (
-          <li
-            key={l.marketTicker + l.side}
-            className="flex items-center gap-2 py-1.5 text-sm"
-          >
-            <LeagueLogo league={l.league} size={14} />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate font-semibold">{l.title}</span>
-              <span className="block truncate text-[11px] text-muted">
-                {l.gameLabel} · {clockTime(l.startsAt)}
+      </button>
+      {open && (
+        <div className="flex flex-col gap-2 px-3 pb-2.5 text-[12px] text-muted tabular-nums">
+          <p>
+            {cents(p.price)} + {cents(p.fee)} fee = {cents(p.price + p.fee)} for
+            something the books give a {pct1(p.fair)} chance:{' '}
+            <b className="text-foreground">{pts(p.edge)}</b>.{' '}
+            {p.marketKind && KIND_NAMES[p.marketKind]}, Kalshi{' '}
+            {p.side?.toUpperCase()}, {clockTime(p.startsAt)}.
+          </p>
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+            {p.sources.map((s) => (
+              <span key={s.source} className="rounded bg-notice px-1.5 py-0.5">
+                {SOURCE_NAMES[s.source] ?? s.source}{' '}
+                {pct1(p.side === 'no' ? 1 - s.prob : s.prob)}
               </span>
-            </span>
-            <span className="text-right text-[12px] tabular-nums">
-              <span className="block font-semibold">
-                {l.result === 'won' ? '✓ ' : l.result === 'lost' ? '✕ ' : ''}
-                {cents(l.price)}
+            ))}
+            {p.marketTicker && (
+              <span className="ml-auto">
+                <KalshiLink ticker={p.marketTicker} />
               </span>
-              <span className="text-muted">fair {pct1(l.fair)}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
-      <div className="mt-2 grid grid-cols-3 gap-2 text-center tabular-nums">
-        <span>
-          <span className="block text-base font-bold">{pct1(p.fair)}</span>
-          <span className="text-[10px] text-muted uppercase">Fair</span>
-        </span>
-        <span>
-          <span className="block text-base font-bold">{cents(p.price)}</span>
-          <span className="text-[10px] text-muted uppercase">
-            Legs multiply
-          </span>
-        </span>
-        <span>
-          <span className="block text-base font-bold text-emerald-600 dark:text-emerald-400">
-            {cents(p.worthItUnder ?? 0)}
-          </span>
-          <span className="text-[10px] text-muted uppercase">
-            Worth it under
-          </span>
-        </span>
-      </div>
-      <p className="mt-1.5 text-[11px] text-muted">
-        Kalshi quotes combos on request: build it there and take it if the quote
-        is under {cents(p.worthItUnder ?? 0)}.
-        {p.result && (
-          <span
-            className={cn(
-              'ml-1 font-semibold',
-              p.result === 'won'
-                ? 'text-emerald-600 dark:text-emerald-400'
-                : 'text-live',
             )}
-          >
-            {p.result === 'won' ? 'Won.' : 'Lost.'}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ComboRow({ pick: p }: { pick: SharpPick }) {
+  const [open, setOpen] = useState(false)
+  const legs = p.legs ?? []
+  return (
+    <div className="bg-accent/5">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full flex-col gap-0.5 px-3 py-2 text-left"
+      >
+        <span className="flex items-center gap-2">
+          <span className="text-sm font-bold">Combo</span>
+          <span className="min-w-0 flex-1 truncate text-[11px] text-muted">
+            {legs.map((l) => l.title).join(' + ')}
           </span>
-        )}
-      </p>
-    </article>
+          <EdgeChip pick={p} />
+        </span>
+        <span className="flex items-baseline gap-2 text-[12px] tabular-nums">
+          <span className="min-w-0 flex-1 truncate text-muted">
+            Take it under{' '}
+            <b className="text-foreground">{cents(p.worthItUnder ?? 0)}</b> ·
+            sharp books <b className="text-foreground">{pct1(p.fair)}</b>
+          </span>
+          {p.result && <StatusText pick={p} />}
+        </span>
+      </button>
+      {open && (
+        <div className="px-3 pb-2.5 text-[12px] text-muted tabular-nums">
+          <ul className="flex flex-col gap-1">
+            {legs.map((l) => (
+              <li
+                key={l.marketTicker + l.side}
+                className="flex items-center gap-2"
+              >
+                <LeagueLogo league={l.league} size={12} />
+                <span className="min-w-0 flex-1 truncate">
+                  <b className="text-foreground">{l.title}</b> {l.gameLabel}
+                </span>
+                <span>
+                  {l.result === 'won' ? '✓ ' : l.result === 'lost' ? '✕ ' : ''}
+                  {cents(l.price)} · {pct1(l.fair)}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1.5">
+            Kalshi prices combos when you build one. The legs cost{' '}
+            {cents(p.price)} multiplied; the books give all of them a{' '}
+            {pct1(p.fair)} chance, so any quote under{' '}
+            {cents(p.worthItUnder ?? 0)} is worth taking.
+          </p>
+        </div>
+      )}
+    </div>
   )
 }
 

@@ -21,6 +21,7 @@ import {
   PredictionStrip,
   PredictionSummary,
 } from '@/components/predictions/PredictionParts'
+import { SharpPicksBanner } from '@/components/predictions/SharpPicks'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { withViewTransition } from '@/lib/viewTransition'
 import { cn } from '@/lib/utils'
@@ -148,6 +149,7 @@ export function TimelineTop({
                   display={display}
                   onOpen={onPrediction}
                 />
+                <SharpPicksBanner />
               </>
             ) : (
               <>
