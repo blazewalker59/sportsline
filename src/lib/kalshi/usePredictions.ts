@@ -5,6 +5,7 @@ import {
   connectKalshi,
   disconnectKalshi,
   getKalshiConnection,
+  getPredictionDetail,
   getPredictionRecord,
   getPredictions,
   setChangeDisplay,
@@ -91,6 +92,19 @@ export function useSetChangeDisplay() {
 }
 
 /** Every Prediction made, for the Record (built per range on the device). */
+/**
+ * One Prediction's whole odds history and the plays in its Games, for its
+ * sheet; refreshed with the odds (a point a minute) while it's open.
+ */
+export function usePredictionDetail(id: string) {
+  return useQuery({
+    queryKey: ['prediction-detail', id],
+    queryFn: () => getPredictionDetail({ data: { id } }),
+    refetchInterval: REFRESH_MS,
+    staleTime: REFRESH_MS / 2,
+  })
+}
+
 export function usePredictionRecord() {
   const connection = useKalshiConnection()
   return useQuery({

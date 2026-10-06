@@ -5,6 +5,7 @@
 
 import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
+import { OddsChart } from './OddsChart'
 import { PredictionGames } from './PredictionGames'
 import type {
   ChangeDisplay,
@@ -478,15 +479,10 @@ export function PredictionSheet({
                 </span>
               )}
             </span>
-            <Sparkline
-              points={p.history}
-              entry={p.entryChance}
-              width={120}
-              height={40}
-            />
           </span>
         )}
       </header>
+      <OddsChart predictionId={p.id} />
       <dl className="grid grid-cols-3 gap-2 rounded-xl border border-border bg-surface p-3 text-center text-xs text-muted">
         <div>
           <dt>Contracts</dt>

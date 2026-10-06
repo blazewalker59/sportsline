@@ -23,6 +23,11 @@ export interface RecordEntry {
   /** When it was made (Kalshi's first fill), else first seen. */
   madeAt: string
   settledAt: string | null
+  /**
+   * The chance they bought in at: what they paid per contract (the
+   * implied chance of their side). Null when it can't be known.
+   */
+  entryChance?: number | null
   legs: Array<RecordLeg>
 }
 
@@ -64,6 +69,107 @@ export function inRange(e: RecordEntry, range: Range): boolean {
     (!range.from || t >= range.from.getTime()) &&
     (!range.to || t < range.to.getTime())
   )
+}
+
+/** Bets bought in at a similar chance, and how often they actually won. */
+export interface CalibrationBucket {
+  /** The bucket's span of entry chances (0–1). */
+  from: number
+  to: number
+  /** The average chance they bought in at. */
+  implied: number
+  /** How often they won (0–1). */
+  actual: number
+  won: number
+  count: number
+}
+
+export interface Calibration {
+  buckets: Array<CalibrationBucket>
+  /**
+   * Wins above (or below) what the odds implied, as a share of bets: the
+   * average of won (1 or 0) minus the entry chance. +0.06 means they won
+   * six points more often than the market priced them to.
+   */
+  edge: number | null
+  count: number
+}
+
+/** A bucket with fewer bets than this joins its neighbor. */
+const MIN_BUCKET = 3
+const BUCKET_WIDTH = 0.1
+
+/**
+ * "Are you beating the odds?": settled, won-or-lost Predictions in the
+ * range, bucketed by the chance they were bought at (tenths, with thin
+ * buckets merged into their neighbors), each with its actual win rate.
+ */
+export function calibrationOf(
+  all: ReadonlyArray<RecordEntry>,
+  range: Range,
+): Calibration {
+  const decided = all.filter(
+    (e): e is RecordEntry & { entryChance: number } =>
+      inRange(e, range) &&
+      (e.result === 'won' || e.result === 'lost') &&
+      typeof e.entryChance === 'number' &&
+      e.entryChance > 0 &&
+      e.entryChance < 1,
+  )
+  if (decided.length === 0) return { buckets: [], edge: null, count: 0 }
+  // Tenths first…
+  const tenths = Array.from({ length: 10 }, (_, i) => ({
+    from: i * BUCKET_WIDTH,
+    to: (i + 1) * BUCKET_WIDTH,
+    entries: [] as Array<RecordEntry & { entryChance: number }>,
+  }))
+  for (const e of decided)
+    tenths[Math.min(9, Math.floor(e.entryChance / BUCKET_WIDTH))].entries.push(
+      e,
+    )
+  // …then thin ones merged forward, and a thin last one into the one before.
+  const merged: typeof tenths = []
+  let open: (typeof tenths)[number] | null = null
+  for (const t of tenths) {
+    if (t.entries.length === 0 && !open) continue
+    open = open
+      ? { from: open.from, to: t.to, entries: [...open.entries, ...t.entries] }
+      : t
+    if (open.entries.length >= MIN_BUCKET) {
+      merged.push(open)
+      open = null
+    }
+  }
+  if (open && open.entries.length > 0) {
+    const last = merged.pop()
+    merged.push(
+      last
+        ? {
+            from: last.from,
+            to: open.to,
+            entries: [...last.entries, ...open.entries],
+          }
+        : open,
+    )
+  }
+  const buckets = merged.map((b): CalibrationBucket => {
+    const won = b.entries.filter((e) => e.result === 'won').length
+    return {
+      from: b.from,
+      to: b.to,
+      implied:
+        b.entries.reduce((n, e) => n + e.entryChance, 0) / b.entries.length,
+      actual: won / b.entries.length,
+      won,
+      count: b.entries.length,
+    }
+  })
+  const edge =
+    decided.reduce(
+      (n, e) => n + (e.result === 'won' ? 1 : 0) - e.entryChance,
+      0,
+    ) / decided.length
+  return { buckets, edge, count: decided.length }
 }
 
 export interface Line {

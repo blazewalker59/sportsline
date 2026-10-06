@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { RecordEntry, RecordLeg } from '@/lib/kalshi/record'
-import { buildRecord, marketOf, sportOf } from '@/lib/kalshi/record'
+import {
+  buildRecord,
+  calibrationOf,
+  marketOf,
+  sportOf,
+} from '@/lib/kalshi/record'
 
 const leg = (
   series: string,
@@ -91,5 +96,66 @@ describe('a Record', () => {
     expect(r.totals.count).toBe(5)
     expect(r.totals.best?.pnl).toBe(100)
     expect(r.totals.worst?.pnl).toBe(-10)
+  })
+})
+
+describe('calibration', () => {
+  const all = { from: null, to: null }
+  const at = (
+    entryChance: number | null,
+    won: boolean,
+    over: Partial<RecordEntry> = {},
+  ) => entry({ entryChance, result: won ? 'won' : 'lost', ...over })
+
+  it('buckets bets by the chance they were bought at, with actual win rates', () => {
+    const c = calibrationOf(
+      [
+        at(0.22, false),
+        at(0.25, true),
+        at(0.28, false),
+        at(0.62, true),
+        at(0.65, true),
+        at(0.68, false),
+      ],
+      all,
+    )
+    expect(c.count).toBe(6)
+    expect(c.buckets.map((b) => [b.count, b.won])).toEqual([
+      [3, 1],
+      [3, 2],
+    ])
+    expect(c.buckets[0].from).toBeCloseTo(0.2)
+    expect(c.buckets[1].to).toBeCloseTo(0.7)
+    expect(c.buckets[0].implied).toBeCloseTo(0.25)
+    expect(c.buckets[0].actual).toBeCloseTo(1 / 3)
+    // Won 3 of 6 at an average implied 45%: +5 points.
+    expect(c.edge).toBeCloseTo(0.5 - 0.45)
+  })
+
+  it('merges thin buckets so none rests on a bet or two', () => {
+    const c = calibrationOf(
+      [at(0.05, false), at(0.15, false), at(0.18, true), at(0.95, true)],
+      all,
+    )
+    expect(c.buckets.map((b) => b.count)).toEqual([4])
+  })
+
+  it('leaves out open, void and unpriced bets, and respects the range', () => {
+    const c = calibrationOf(
+      [
+        at(0.5, true),
+        entry({ status: 'open', result: null, entryChance: 0.5 }),
+        entry({ result: 'void', entryChance: 0.5 }),
+        at(null, true),
+        at(0.5, false, { madeAt: '2026-08-01T18:00:00Z' }),
+      ],
+      { from: new Date('2026-09-01T00:00:00Z'), to: null },
+    )
+    expect(c.count).toBe(1)
+    expect(calibrationOf([], all)).toEqual({
+      buckets: [],
+      edge: null,
+      count: 0,
+    })
   })
 })

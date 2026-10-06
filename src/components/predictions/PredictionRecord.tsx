@@ -5,9 +5,15 @@
  */
 
 import { Fragment, useEffect, useMemo, useState } from 'react'
+import { CalibrationChart } from './CalibrationChart'
 import { RecordTrend } from './RecordTrend'
-import type { Line, PredictionRecord, Range } from '@/lib/kalshi/record'
-import { buildRecord, winRate } from '@/lib/kalshi/record'
+import type {
+  Calibration,
+  Line,
+  PredictionRecord,
+  Range,
+} from '@/lib/kalshi/record'
+import { buildRecord, calibrationOf, winRate } from '@/lib/kalshi/record'
 import { usePredictionRecord } from '@/lib/kalshi/usePredictions'
 import { cn } from '@/lib/utils'
 
@@ -70,6 +76,10 @@ export function PredictionRecordSection() {
   }, [key, custom])
   const record = useMemo(
     () => (history.data ? buildRecord(history.data, range) : null),
+    [history.data, range],
+  )
+  const calibration = useMemo(
+    () => (history.data ? calibrationOf(history.data, range) : null),
     [history.data, range],
   )
 
@@ -143,13 +153,19 @@ export function PredictionRecordSection() {
           No predictions in this range.
         </p>
       ) : (
-        <RecordBody record={record} />
+        <RecordBody record={record} calibration={calibration} />
       )}
     </section>
   )
 }
 
-function RecordBody({ record: r }: { record: PredictionRecord }) {
+function RecordBody({
+  record: r,
+  calibration,
+}: {
+  record: PredictionRecord
+  calibration: Calibration | null
+}) {
   const t = r.totals
   return (
     <>
@@ -181,6 +197,10 @@ function RecordBody({ record: r }: { record: PredictionRecord }) {
       </div>
 
       {r.days.length > 1 && <RecordTrend days={r.days} />}
+
+      {calibration && calibration.count > 0 && (
+        <CalibrationChart calibration={calibration} />
+      )}
 
       {r.insights.length > 0 && (
         <ul className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface px-3 py-2.5">
