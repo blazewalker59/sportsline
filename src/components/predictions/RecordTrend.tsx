@@ -12,6 +12,8 @@ import { scaleLinear } from '@tanstack/charts/scales/linear'
 import { tooltip } from '@tanstack/charts/tooltip'
 import { useMemo } from 'react'
 import type { PredictionRecord } from '@/lib/kalshi/record'
+import { CHART_COLORS, ChartCard } from '@/components/charts/ChartCard'
+import { shortDate, signedUsd, usd } from '@/components/charts/format'
 import { cn } from '@/lib/utils'
 
 interface DayRow {
@@ -22,31 +24,18 @@ interface DayRow {
   running: number
 }
 
-const usd = (n: number, signed = false) =>
-  `${signed ? (n > 0.004 ? '+' : n < -0.004 ? '−' : '') : ''}$${Math.abs(
-    n,
-  ).toLocaleString(undefined, {
-    maximumFractionDigits: Math.abs(n) >= 100 ? 0 : 2,
-  })}`
-
-const dayLabel = (day: string) =>
-  new Date(`${day}T12:00:00`).toLocaleDateString([], {
-    month: 'short',
-    day: 'numeric',
-  })
-
 export function RecordTrend({ days }: { days: PredictionRecord['days'] }) {
   const rows = useMemo(() => {
     let running = 0
     return days.map((d): DayRow => ({
-      label: dayLabel(d.day),
+      label: shortDate(d.day),
       staked: d.staked,
       pnl: d.pnl,
       running: (running += d.pnl),
     }))
   }, [days])
   const end = rows.at(-1)?.running ?? 0
-  const lineColor = end >= 0 ? 'var(--color-scoring)' : 'var(--color-live)'
+  const lineColor = end >= 0 ? CHART_COLORS.good : CHART_COLORS.bad
 
   const definition = useMemo(
     () =>
@@ -56,7 +45,7 @@ export function RecordTrend({ days }: { days: PredictionRecord['days'] }) {
             id: 'volume',
             x: 'label',
             y: 'staked',
-            fill: 'var(--color-accent)',
+            fill: CHART_COLORS.accent,
             fillOpacity: 0.35,
             radius: 2,
           }),
@@ -90,7 +79,7 @@ export function RecordTrend({ days }: { days: PredictionRecord['days'] }) {
             scale: scaleLinear,
             nice: true,
             side: 'right',
-            axis: { ticks: { format: (v: number) => usd(v, true) } },
+            axis: { ticks: { format: (v: number) => signedUsd(v) } },
           },
         },
         focus: 'group-x',
@@ -102,8 +91,8 @@ export function RecordTrend({ days }: { days: PredictionRecord['days'] }) {
             return [
               row.label,
               `Staked ${usd(row.staked)}`,
-              `Day P&L ${usd(row.pnl, true)}`,
-              `Running ${usd(row.running, true)}`,
+              `Day P&L ${signedUsd(row.pnl)}`,
+              `Running ${signedUsd(row.running)}`,
             ].join('\n')
           },
         },
@@ -112,36 +101,28 @@ export function RecordTrend({ days }: { days: PredictionRecord['days'] }) {
   )
 
   return (
-    <figure className="rounded-xl border border-border bg-surface px-2 py-2.5 text-muted">
-      <figcaption className="mb-1 flex items-baseline justify-between px-1 text-[11px]">
-        <span>
-          <span className="mr-1 inline-block size-2 rounded-sm bg-accent/40 align-middle" />
-          Daily volume
+    <ChartCard
+      legend={[
+        { label: 'Daily volume', color: CHART_COLORS.accent },
+        { label: 'Running P&L', color: lineColor, shape: 'line' },
+      ]}
+      headline={
+        <span
+          className={cn(
+            'font-semibold',
+            end > 0.004 ? 'text-scoring' : end < -0.004 ? 'text-live' : '',
+          )}
+        >
+          {signedUsd(end)}
         </span>
-        <span>
-          <span
-            className={cn(
-              'mr-1 inline-block h-0.5 w-3 align-middle',
-              end >= 0 ? 'bg-scoring' : 'bg-live',
-            )}
-          />
-          Running P&L{' '}
-          <span
-            className={cn(
-              'font-semibold',
-              end > 0.004 ? 'text-scoring' : end < -0.004 ? 'text-live' : '',
-            )}
-          >
-            {usd(end, true)}
-          </span>
-        </span>
-      </figcaption>
+      }
+    >
       <Chart
         definition={definition}
         height={150}
         initialWidth={340}
-        ariaLabel={`Volume over ${rows.length} days; running profit and loss ends at ${usd(end, true)}`}
+        ariaLabel={`Volume over ${rows.length} days; running profit and loss ends at ${signedUsd(end)}`}
       />
-    </figure>
+    </ChartCard>
   )
 }
