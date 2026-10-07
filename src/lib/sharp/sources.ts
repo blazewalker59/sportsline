@@ -8,6 +8,7 @@
 import { aliasedTable, and, eq, gte, inArray, lte } from 'drizzle-orm'
 import { devig, impliedFromAmerican } from './engine'
 import type { FairSource, LineKey, Quote } from './engine'
+import type { Final } from './form'
 import type { Database } from '@/lib/db'
 import type { League } from '@/lib/model/types'
 import { games, teams } from '@/lib/db/schema'
@@ -321,4 +322,37 @@ export function polyMarketQuotes(
     return [quote({ kind: 'total', teamId: null, line: m.line }, prob)]
   }
   return []
+}
+
+// ─── Form ───────────────────────────────────────────────────────────────────
+
+/** The Teams' finals over the days given, for their recent form. */
+export async function loadFinals(
+  db: Database,
+  teamIds: ReadonlyArray<string>,
+  fromDay: string,
+  toDay: string,
+): Promise<Array<Final>> {
+  if (teamIds.length === 0) return []
+  const rows = await db
+    .select({
+      homeTeamId: games.homeTeamId,
+      awayTeamId: games.awayTeamId,
+      homeScore: games.homeScore,
+      awayScore: games.awayScore,
+      startsAt: games.startsAt,
+    })
+    .from(games)
+    .where(
+      and(
+        inArray(games.league, [...SHARP_LEAGUES]),
+        eq(games.status, 'final'),
+        gte(games.sportsDay, fromDay),
+        lte(games.sportsDay, toDay),
+      ),
+    )
+  const wanted = new Set(teamIds)
+  return rows.filter(
+    (r) => wanted.has(r.homeTeamId) || wanted.has(r.awayTeamId),
+  )
 }

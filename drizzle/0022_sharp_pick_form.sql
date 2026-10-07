@@ -1,0 +1,1 @@
+ALTER TABLE `sharp_picks` ADD `form` text;

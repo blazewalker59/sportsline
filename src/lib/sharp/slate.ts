@@ -15,8 +15,14 @@ import {
   selectCombo,
   selectPicks,
 } from './engine'
+import { FORM_LOOKBACK_DAYS, formOf, teamForms } from './form'
 import { kalshiOffers, serviceAccount } from './kalshi'
-import { loadGames, oddsApiQuotes, polymarketQuotes } from './sources'
+import {
+  loadFinals,
+  loadGames,
+  oddsApiQuotes,
+  polymarketQuotes,
+} from './sources'
 import type { Candidate, Quote } from './engine'
 import type { CloudflareEnv } from '@/lib/db'
 import { dbFromD1 } from '@/lib/db'
@@ -75,6 +81,7 @@ function singleRow(
     evPerDollar: c.evPerDollar,
     grade: c.grade,
     sources: c.sources,
+    form: c.form,
     createdAt: at,
   }
 }
@@ -128,10 +135,26 @@ export async function publishSlate(
     await reportError(env, 'sharp', error, { source: 'polymarket' })
   }
   const offers = await kalshiOffers(env, account, db, refs, new Set([day]))
-  const pool = candidates(offers, fairPrices(quotes), {
-    ...DEFAULT_RULES,
-    now: now.getTime(),
-  })
+  // Each Team's recent form, from our own finals.
+  const forms = teamForms(
+    await loadFinals(
+      db,
+      refs.flatMap((g) => [g.home.id, g.away.id]),
+      shiftSportsDay(day, -FORM_LOOKBACK_DAYS),
+      shiftSportsDay(day, -1),
+    ),
+    now.getTime(),
+  )
+  const gameOf = new Map(refs.map((g) => [g.gameId, g]))
+  const pool = candidates(
+    offers,
+    fairPrices(quotes),
+    { ...DEFAULT_RULES, now: now.getTime() },
+    (o) => {
+      const game = gameOf.get(o.key.gameId)
+      return game ? formOf(o, game, forms) : null
+    },
+  )
   const picks = selectPicks(pool)
   if (picks.length === 0) return false
   const at = now.toISOString()
@@ -169,6 +192,7 @@ export async function publishSlate(
         startsAt: l.startsAt,
         fair: l.fair,
         price: l.price,
+        form: l.form,
         currentPrice: null,
         closingPrice: null,
         result: null,

@@ -12,6 +12,7 @@
  * - total: more than `line` scored.
  */
 
+import type { PickForm } from './form'
 import type { League } from '@/lib/model/types'
 
 export type MarketKind = 'moneyline' | 'spread' | 'total'
@@ -162,6 +163,8 @@ export interface Candidate extends KalshiOffer {
   evPerDollar: number
   grade: Grade
   sources: Fair['sources']
+  /** What the Teams' recent form says about it (null: too few Games). */
+  form: PickForm | null
 }
 
 export interface Rules {
@@ -180,22 +183,64 @@ export const DEFAULT_RULES: Omit<Rules, 'now'> = {
   // Low enough that a fairly priced day still fills five (graded thin).
   minEdge: -0.03,
   maxSpread: 0.06,
-  minPrice: 0.15,
-  maxPrice: 0.9,
+  // Nothing near a lock: an 85¢ "sure thing" risks a lot to win a little.
+  minPrice: 0.2,
+  maxPrice: 0.8,
   minLeadMs: 20 * 60_000,
 }
 
-/** Price every offer against its fair price; keep the trustworthy edges. */
+/** Form this far against a pick (lean) leaves it out. */
+export const MAX_FORM_AGAINST = 0.15
+/** What full form backing is worth in the ranking (per dollar). */
+export const FORM_WEIGHT = 0.03
+
+/** How a candidate ranks: its value, nudged by the Teams' form. */
+export const scoreOf = (c: Candidate) =>
+  c.evPerDollar + FORM_WEIGHT * (c.form?.lean ?? 0)
+
+/**
+ * Each Game's main spread and total: of the lines both Kalshi and the fair
+ * price have, the one nearest even money. Alt lines up and down the ladder
+ * are priced thinly (often by one source), so their edges are mostly noise.
+ */
+function mainLines(
+  offers: ReadonlyArray<KalshiOffer>,
+  fair: ReadonlyMap<string, Fair>,
+): Map<string, number> {
+  const best = new Map<string, { line: number; off: number }>()
+  for (const o of offers) {
+    if (o.key.kind === 'moneyline' || o.key.line === null) continue
+    const f = fair.get(lineId(o.key))
+    if (!f) continue
+    const id = `${o.key.gameId}|${o.key.kind}`
+    const off = Math.abs(f.prob - 0.5)
+    const was = best.get(id)
+    if (!was || off < was.off) best.set(id, { line: o.key.line, off })
+  }
+  return new Map([...best].map(([id, b]) => [id, b.line]))
+}
+
+/**
+ * Price every offer against its fair price; keep the trustworthy edges on
+ * main lines that the Teams' form doesn't argue against.
+ */
 export function candidates(
   offers: ReadonlyArray<KalshiOffer>,
   fair: ReadonlyMap<string, Fair>,
   rules: Rules,
+  formFor: (o: KalshiOffer) => PickForm | null = () => null,
 ): Array<Candidate> {
+  const main = mainLines(offers, fair)
   return offers.flatMap((o) => {
     const f = fair.get(lineId(o.key))
     if (!f) return []
     // Trust a fair price only with a sharp source in it.
     if (!f.sources.some((s) => SHARP.has(s.source))) return []
+    if (
+      o.key.kind !== 'moneyline' &&
+      main.get(`${o.key.gameId}|${o.key.kind}`) !== o.key.line
+    )
+      return []
     if (Date.parse(o.startsAt) - rules.now < rules.minLeadMs) return []
     if (o.price < rules.minPrice || o.price > rules.maxPrice) return []
     if (o.bid !== null && o.price - o.bid > rules.maxSpread) return []
@@ -203,6 +248,8 @@ export function candidates(
     const fee = kalshiFee(o.price)
     const edge = fairSide - o.price - fee
     if (edge < rules.minEdge) return []
+    const form = formFor(o)
+    if (form && form.lean < -MAX_FORM_AGAINST) return []
     return [
       {
         ...o,
@@ -212,22 +259,23 @@ export function candidates(
         evPerDollar: edge / (o.price + fee),
         grade: gradeOf(edge),
         sources: f.sources,
+        form,
       },
     ]
   })
 }
 
 /**
- * The day's five: the best expected value per dollar, no two from one
- * Game, at most two per League and two per kind of market, so the slate
- * mixes sports and market types. Relaxes the mix rules (never the
+ * The day's five: the best expected value per dollar (nudged by form), no
+ * two from one Game, at most two per League and two per kind of market, so
+ * the slate mixes sports and market types. Relaxes the mix rules (never the
  * one-per-Game rule) when they'd leave it short.
  */
 export function selectPicks(
   pool: ReadonlyArray<Candidate>,
   count = 5,
 ): Array<Candidate> {
-  const ranked = [...pool].sort((a, b) => b.evPerDollar - a.evPerDollar)
+  const ranked = [...pool].sort((a, b) => scoreOf(b) - scoreOf(a))
   const pick = (
     perLeague: number,
     perKind: number,
@@ -264,8 +312,9 @@ export interface ComboPick {
 
 /**
  * The day's combo (always one): two or three legs from different Games,
- * likely each (≥ 45% fair) and each priced below fair, chosen to make the
- * fair combined chance beat what the legs cost together by the most.
+ * likely each (≥ 45% fair) and each priced below fair, the biggest edges
+ * (nudged by form) first, so the fair combined chance beats what the legs
+ * cost together by the most.
  * Kalshi prices a combo on request, so `worthItUnder` is the line to
  * compare its quote with.
  */
@@ -275,7 +324,12 @@ export function selectCombo(
 ): ComboPick | null {
   const ranked = [...pool]
     .filter((c) => c.fair >= 0.45)
-    .sort((a, b) => b.edge - a.edge)
+    .sort(
+      (a, b) =>
+        b.edge +
+        FORM_WEIGHT * (b.form?.lean ?? 0) -
+        (a.edge + FORM_WEIGHT * (a.form?.lean ?? 0)),
+    )
   const chosen: Array<Candidate> = []
   for (const c of ranked) {
     if (chosen.length >= legs) break

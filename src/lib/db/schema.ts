@@ -639,10 +639,17 @@ export const sharpPicks = sqliteTable(
       startsAt: string
       fair: number
       price: number
+      /** Absent on legs published before form was read. */
+      form?: { lean: number; note: string } | null
       currentPrice: number | null
       closingPrice: number | null
       result: 'won' | 'lost' | null
     }> | null>(),
+    /** A single: what the Teams' recent form says (null: too few Games). */
+    form: text('form', { mode: 'json' }).$type<{
+      lean: number
+      note: string
+    } | null>(),
     /** The combo: the most worth paying for it on Kalshi. */
     worthItUnder: real('worth_it_under'),
     /** Re-checked through the day: Kalshi's price now and the edge left. */

@@ -148,7 +148,7 @@ A Viewer's Predictions over a range (7 days, 30 days, a custom range or all time
 _Avoid_: stats, history (the list of Predictions), performance
 
 **Sharp pick**:
-One of the day's five Kalshi offers priced furthest below its Fair price, after Kalshi's fee, across NFL, NBA, MLB and NHL winners, spreads and totals; with one combo of two or three likely legs from different Games. Published each morning for every Viewer, then followed to its Closing line value and result. Not a Prediction: nobody has bet it until a Viewer does.
+One of the day's five Kalshi offers priced furthest below its Fair price, after Kalshi's fee, across NFL, NBA, MLB and NHL winners and main-line spreads and totals, that the Teams' Form doesn't argue against; with one combo of two or three likely legs from different Games. Published each morning for every Viewer, then followed to its Closing line value and result. Not a Prediction: nobody has bet it until a Viewer does.
 _Avoid_: tip, lock, best bet
 
 **Fair price**:
@@ -158,6 +158,10 @@ _Avoid_: true odds, consensus line
 **Edge**:
 A Sharp pick's Fair price minus what it costs on Kalshi, price plus fee, in percentage points. Graded strong (3 or more), edge (1 to 3) or thin (less: the best of a fairly priced day).
 _Avoid_: value, EV (expected value per dollar is the Edge divided by the cost)
+
+**Form**:
+How a Team has played lately: its record and average margin over the last week, or its last three Games when that's fewer (an NFL week). It backs a Sharp pick when the Team it's on has been outplaying the other (or, for a total, when their recent games ran over or under the line), and leaves out a pick it clearly argues against.
+_Avoid_: trend, streak, momentum
 
 **Closing line value**:
 How far Kalshi's price moved toward a Sharp pick by the time its Game started, in percentage points. Picks that keep beating the close are sharp, whatever a handful of results say.

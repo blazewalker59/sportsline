@@ -87,6 +87,38 @@ describe('finding edges', () => {
     expect(
       candidates([offer({ price: 0.05, bid: 0.04 })], fair, rules),
     ).toEqual([])
+    // Near-locks are out too: 85¢ risks a lot to win a little.
+    expect(
+      candidates(
+        [offer({ price: 0.85, bid: 0.84 })],
+        fairPrices([{ key: key('g1'), source: 'pinnacle', prob: 0.95 }]),
+        rules,
+      ),
+    ).toEqual([])
+  })
+
+  it('takes spreads and totals on the main line only', () => {
+    const at = (line: number): LineKey => ({ ...key('g1', 'spread'), line })
+    const ladder = fairPrices([
+      { key: at(1.5), source: 'polymarket', prob: 0.68 },
+      { key: at(3.5), source: 'pinnacle', prob: 0.52 },
+      { key: at(6.5), source: 'polymarket', prob: 0.38 },
+    ])
+    const offers = [1.5, 3.5, 6.5].map((line) =>
+      offer({ ticker: `S${line}`, key: at(line), price: 0.3, bid: 0.29 }),
+    )
+    // Every rung looks underpriced; only the one near even money counts.
+    expect(candidates(offers, ladder, rules).map((c) => c.ticker)).toEqual([
+      'S3.5',
+    ])
+  })
+
+  it('leaves out an edge recent form argues against', () => {
+    const against = { lean: -0.4, note: 'cold' }
+    const backs = { lean: 0.4, note: 'hot' }
+    expect(candidates([offer({})], fair, rules, () => against)).toEqual([])
+    const [c] = candidates([offer({})], fair, rules, () => backs)
+    expect(c.form).toEqual(backs)
   })
 })
 
@@ -114,6 +146,7 @@ const cand = (
     evPerDollar: ev,
     grade: 'edge',
     sources: [],
+    form: null,
   }) as Candidate
 
 describe('choosing the slate', () => {
@@ -131,6 +164,15 @@ describe('choosing the slate', () => {
     // Two NFL and two spreads fill those caps; the fifth relaxes the
     // market mix (never one-per-Game), so MLB's spread joins.
     expect(picks).toEqual(['g1:a', 'g2', 'g5', 'g6', 'g4'])
+  })
+
+  it('lets form decide between close edges', () => {
+    const cold = { ...cand('g1', 'nfl', 'spread', 0.05), form: null }
+    const hot = {
+      ...cand('g2', 'nba', 'total', 0.04),
+      form: { lean: 0.8, note: 'hot' },
+    }
+    expect(selectPicks([cold, hot], 1).map((p) => p.ticker)).toEqual(['g2'])
   })
 
   it('builds the combo from likely legs in different Games', () => {

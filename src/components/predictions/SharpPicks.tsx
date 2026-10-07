@@ -214,7 +214,7 @@ function Explainer() {
       </Step>
       <Step
         n={2}
-        caption="Every NFL, NBA, MLB and NHL market, cut to the biggest edges."
+        caption="Main lines only, cut to the biggest edges that recent form doesn't argue against."
       >
         <Funnel />
       </Step>
@@ -327,8 +327,9 @@ function Funnel() {
         </span>
       ))}
       <span className="mt-0.5 flex gap-1 text-[10px] font-normal text-muted">
+        <span className="rounded bg-notice px-1.5 py-0.5">main lines</span>
+        <span className="rounded bg-notice px-1.5 py-0.5">form</span>
         <span className="rounded bg-notice px-1.5 py-0.5">1 per game</span>
-        <span className="rounded bg-notice px-1.5 py-0.5">2 per sport</span>
       </span>
     </div>
   )
@@ -508,6 +509,26 @@ function PickRow({ pick: p }: { pick: SharpPick }) {
             {p.marketKind && KIND_NAMES[p.marketKind]}, Kalshi{' '}
             {p.side?.toUpperCase()}, {clockTime(p.startsAt)}.
           </p>
+          {p.form && (
+            <p>
+              <b
+                className={cn(
+                  p.form.lean > 0.05
+                    ? 'text-scoring'
+                    : p.form.lean < -0.05
+                      ? 'text-live'
+                      : 'text-foreground',
+                )}
+              >
+                {p.form.lean > 0.05
+                  ? 'Form backs it'
+                  : p.form.lean < -0.05
+                    ? 'Form leans against'
+                    : 'Form is even'}
+              </b>
+              : {p.form.note}
+            </p>
+          )}
           <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
             {p.sources.map((s) => (
               <span key={s.source} className="rounded bg-notice px-1.5 py-0.5">
