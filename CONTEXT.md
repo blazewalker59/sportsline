@@ -218,3 +218,11 @@ _Avoid_: notification settings, preferences
 **Viewer**:
 A person signed in to Sportsline, who owns a set of Follows. Sportsline is only for Viewers: a signed-out visitor sees the landing page and nothing else.
 _Avoid_: user, account, member
+
+**Agent**:
+An AI assistant (Grok, Claude, a Viewer's own bot) that reads Sportsline on a Viewer's behalf through its MCP server, with an API token the Viewer created (docs/adr/0007). It sees what that Viewer can and does nothing a token's scope doesn't allow: today, only reading Sharp picks and their record.
+_Avoid_: bot, integration, app
+
+**API token**:
+The secret a Viewer gives an Agent, shown once when made and revocable any time. It acts as that Viewer within its scope (read only, for now).
+_Avoid_: API key (that's Kalshi's), password

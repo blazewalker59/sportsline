@@ -3,7 +3,8 @@
  * Custom Cloudflare Worker entry (same shape as dreamteam).
  *
  * Serves Better Auth (`/api/auth/*`), the health check, logo copies
- * (`/logo`) and the LiveHub WebSocket (`/live`) directly; everything else falls through to TanStack
+ * (`/logo`), the LiveHub WebSocket (`/live`) and the MCP server for Agents
+ * (`/mcp`) directly; everything else falls through to TanStack
  * Start inside a per-request context carrying the env. Also exports the
  * Durable Object classes, and keeps the Scheduler loop running
  * (docs/adr/0001, "Scheduling").
@@ -18,6 +19,7 @@ import { getAuth } from '@/lib/auth/server'
 import { canonicalRedirect } from '@/lib/canonical'
 import { serverRequestContext } from '@/lib/db'
 import { LIVE_PATH } from '@/lib/live/LiveHub'
+import { MCP_PATH, serveMcp } from '@/lib/agents/endpoint'
 import { LOGO_PATH, serveLogo } from '@/lib/logoProxy'
 import { reportError } from '@/lib/ops/errors'
 
@@ -93,6 +95,9 @@ export default {
         return new Response('Sign in required', { status: 401 })
       return env.LIVE_HUB.get(env.LIVE_HUB.idFromName('global')).fetch(request)
     }
+
+    // Agents sign in with an API token, not a session (docs/adr/0007).
+    if (url.pathname === MCP_PATH) return serveMcp(request, env)
 
     if (url.pathname.startsWith('/api/auth')) {
       return getAuth(env, url.origin).handler(request)

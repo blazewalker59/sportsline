@@ -663,3 +663,26 @@ export const sharpPicks = sqliteTable(
   },
   (table) => [index('sharp_picks_day_idx').on(table.day)],
 )
+
+// ─── Agents (docs/adr/0007) ─────────────────────────────────────────────────
+
+/** A Viewer's API token for an Agent: only its SHA-256 hash is kept. */
+export const apiTokens = sqliteTable(
+  'api_tokens',
+  {
+    id: text('id').primaryKey(),
+    viewerId: text('viewer_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    /** What the Viewer called it ("Grok"). */
+    name: text('name').notNull(),
+    tokenHash: text('token_hash').notNull().unique(),
+    /** The token's first characters, to tell tokens apart on screen. */
+    prefix: text('prefix').notNull(),
+    scopes: text('scopes', { mode: 'json' }).$type<Array<'read'>>().notNull(),
+    createdAt: text('created_at').notNull(),
+    lastUsedAt: text('last_used_at'),
+    revokedAt: text('revoked_at'),
+  },
+  (table) => [index('api_tokens_viewer_idx').on(table.viewerId)],
+)

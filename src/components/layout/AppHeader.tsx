@@ -167,6 +167,13 @@ function AccountButton() {
                 hint="What each feed notifies you about"
                 onPick={() => setOpen(false)}
               />
+              <MenuItem
+                to="/agents"
+                icon="agents"
+                label="Agents"
+                hint="Let an AI agent read your picks"
+                onPick={() => setOpen(false)}
+              />
               {data.isAdmin && (
                 <MenuItem
                   to="/admin"
@@ -222,6 +229,7 @@ type IconName =
   | 'predictions'
   | 'fantasy'
   | 'alerts'
+  | 'agents'
   | 'health'
   | 'signOut'
 
@@ -232,6 +240,7 @@ const ICON_TONES: Record<IconName, string> = {
   predictions: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
   fantasy: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
   alerts: 'bg-sky-500/15 text-sky-600 dark:text-sky-400',
+  agents: 'bg-violet-500/15 text-violet-600 dark:text-violet-400',
   health: 'bg-red-500/15 text-red-600 dark:text-red-400',
   signOut: 'bg-live/10 text-live',
 }
@@ -252,6 +261,12 @@ const ICON_PATHS: Record<IconName, React.ReactNode> = {
   ),
   alerts: (
     <path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0" />
+  ),
+  agents: (
+    <>
+      <rect x="5" y="8" width="14" height="11" rx="3" />
+      <path d="M12 8V4M9.5 13h.01M14.5 13h.01M3 13v2M21 13v2" />
+    </>
   ),
   health: <path d="M3 12h4l2-5 4 10 2-5h6" />,
   signOut: <path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10" />,
@@ -289,6 +304,7 @@ function MenuItem({
     | '/predictions'
     | '/fantasy'
     | '/alerts'
+    | '/agents'
     | '/admin'
   icon: IconName
   label: string
