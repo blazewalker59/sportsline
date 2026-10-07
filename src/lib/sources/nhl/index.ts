@@ -22,6 +22,12 @@ import type { SourceAdapter } from '@/lib/model/types'
 
 const WEB = 'https://api-web.nhle.com/v1'
 const STATS = 'https://api.nhle.com/stats/rest/en'
+/**
+ * Each poll is two calls (Plays and box score), and NHL.com answers 429 to
+ * Workers polling a full slate every 5s; 10s halves that and stays within
+ * docs/adr/0001's 5–10s behind.
+ */
+const LIVE_POLL_SECONDS = 10
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetchWithRetry(url, {
@@ -49,7 +55,7 @@ export const nhlAdapter: SourceAdapter = {
         () => null,
       ),
     ])
-    return parseGame(pbp, box)
+    return { ...parseGame(pbp, box), pollHintSeconds: LIVE_POLL_SECONDS }
   },
   async roster() {
     // Season bios list every player with their current team in a few calls;

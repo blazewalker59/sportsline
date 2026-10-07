@@ -19,6 +19,7 @@ import { PlayerSheetProvider } from '@/components/players/PlayerProfile'
 import { Landing } from '@/components/landing/Landing'
 import { useViewer } from '@/lib/viewer/useViewer'
 import { sendClientError, useClientErrors } from '@/lib/ops/useClientErrors'
+import { isStaleBuild, reloadForNewBuild } from '@/lib/ops/staleBuild'
 
 interface MyRouterContext {
   queryClient: QueryClient
@@ -84,7 +85,11 @@ function Gate() {
 
 /** A screen threw: say so, report it, offer a way back. */
 function Crashed({ error }: { error: unknown }) {
-  useEffect(() => sendClientError(error, 'render'), [error])
+  useEffect(() => {
+    // A tab left open across a deploy: reload into the new build.
+    if (isStaleBuild(error) && reloadForNewBuild()) return
+    sendClientError(error, 'render')
+  }, [error])
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-background px-6 text-center">
       <p className="text-lg font-bold">Something went wrong</p>

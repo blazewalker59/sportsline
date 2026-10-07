@@ -40,6 +40,34 @@ export function nextPollDelay(
   }
 }
 
+const RETRY_SECONDS = 30
+const RATE_LIMITED_RETRY_SECONDS = 60
+/** A Source's rate limit clears itself; only one that lasts this long is reported. */
+export const RATE_LIMIT_GRACE_MS = 15 * 60_000
+
+/** Did a Source answer 429 (Too Many Requests)? */
+export function isRateLimited(error: unknown): boolean {
+  return /\b429\b/.test(String(error))
+}
+
+/**
+ * After a failed poll: when to try again, and whether the failure is worth
+ * reporting. `rateLimitedSince` is when the current run of 429s began, or
+ * null when this failure isn't one.
+ */
+export function retryAfterFailure(
+  rateLimitedSince: number | null,
+  now: number,
+): { delayMs: number; report: boolean } {
+  if (rateLimitedSince === null) {
+    return { delayMs: RETRY_SECONDS * 1000, report: true }
+  }
+  return {
+    delayMs: RATE_LIMITED_RETRY_SECONDS * 1000,
+    report: now - rateLimitedSince >= RATE_LIMIT_GRACE_MS,
+  }
+}
+
 const SCHEDULE_INTERVAL_MS = 60_000
 
 /** The Scheduler's next run: the next whole minute after `now`, epoch ms. */

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { nextPollDelay } from '@/lib/live/pacing'
+import {
+  isRateLimited,
+  nextPollDelay,
+  retryAfterFailure,
+} from '@/lib/live/pacing'
 
 const now = new Date('2026-10-01T23:00:00Z')
 
@@ -23,5 +27,29 @@ describe('nextPollDelay', () => {
 
   it('stops for Games that are not close to starting', () => {
     expect(nextPollDelay('scheduled', '2026-10-02T02:00:00Z', now)).toBeNull()
+  })
+})
+
+describe('retryAfterFailure', () => {
+  const t = Date.parse('2026-10-06T23:00:00Z')
+
+  it('retries other failures in 30s and reports them', () => {
+    expect(retryAfterFailure(null, t)).toEqual({
+      delayMs: 30_000,
+      report: true,
+    })
+  })
+
+  it('waits out a rate limit a minute at a time, reporting only once it lasts 15 minutes', () => {
+    expect(retryAfterFailure(t, t)).toEqual({ delayMs: 60_000, report: false })
+    expect(retryAfterFailure(t, t + 14 * 60_000).report).toBe(false)
+    expect(retryAfterFailure(t, t + 15 * 60_000).report).toBe(true)
+  })
+})
+
+describe('isRateLimited', () => {
+  it('spots a 429 in a Source error', () => {
+    expect(isRateLimited(new Error('NHL 429 for https://x/1'))).toBe(true)
+    expect(isRateLimited(new Error('NHL 500 for https://x/4290'))).toBe(false)
   })
 })

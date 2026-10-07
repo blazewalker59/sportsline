@@ -10,7 +10,7 @@ import { DurableObject } from 'cloudflare:workers'
 import { eq, inArray, sql } from 'drizzle-orm'
 import { diffItems, fingerprint } from './diff'
 import { resolve } from './identity'
-import { nextPollDelay } from './pacing'
+import { isRateLimited, nextPollDelay, retryAfterFailure } from './pacing'
 import { itemRow, toTimelineItem } from './rows'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { SeenItem } from './diff'
@@ -35,10 +35,11 @@ const GAME_KEY = 'game'
 const SEEN_PREFIX = 'seen:'
 const ERRORS_KEY = 'errors'
 const POLLED_KEY = 'polled'
+/** When the Source started answering 429, while it still is. */
+const RATE_LIMITED_KEY = 'rateLimitedSince'
 const ALERT_LOG_KEY = 'alertLog'
 const ALERT_WINDOW_MS = 15 * 60_000
 const ALERTS_PER_WINDOW = 6
-const RETRY_MS = 30_000
 /** Give up after this many consecutive failed polls; the cron re-wakes live Games. */
 const MAX_CONSECUTIVE_ERRORS = 20
 // D1 caps bound parameters per statement at 100.
@@ -87,6 +88,7 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
       const snapshot = await sourceFor(game.league).snapshot(game.sourceGameId)
       await this.apply(game, snapshot)
       await this.ctx.storage.put(ERRORS_KEY, 0)
+      await this.ctx.storage.delete(RATE_LIMITED_KEY)
       delay = nextPollDelay(
         snapshot.status,
         snapshot.startsAt,
@@ -96,11 +98,22 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
     } catch (error) {
       const errors = ((await this.ctx.storage.get<number>(ERRORS_KEY)) ?? 0) + 1
       await this.ctx.storage.put(ERRORS_KEY, errors)
-      await reportError(this.env, 'live-game', error, {
-        gameId: game.gameId,
-        errors,
-      })
-      delay = errors >= MAX_CONSECUTIVE_ERRORS ? null : RETRY_MS
+      let rateLimitedSince: number | null = null
+      if (isRateLimited(error)) {
+        rateLimitedSince =
+          (await this.ctx.storage.get<number>(RATE_LIMITED_KEY)) ?? Date.now()
+        await this.ctx.storage.put(RATE_LIMITED_KEY, rateLimitedSince)
+      } else {
+        await this.ctx.storage.delete(RATE_LIMITED_KEY)
+      }
+      const retry = retryAfterFailure(rateLimitedSince, Date.now())
+      if (retry.report) {
+        await reportError(this.env, 'live-game', error, {
+          gameId: game.gameId,
+          errors,
+        })
+      }
+      delay = errors >= MAX_CONSECUTIVE_ERRORS ? null : retry.delayMs
     }
     if (delay !== null) await this.ctx.storage.setAlarm(Date.now() + delay)
   }

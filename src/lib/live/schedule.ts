@@ -6,7 +6,7 @@
 
 import { and, eq, inArray, notInArray, sql } from 'drizzle-orm'
 import { chunk, resolve } from './identity'
-import { WARMUP_MINUTES } from './pacing'
+import { RATE_LIMIT_GRACE_MS, WARMUP_MINUTES, isRateLimited } from './pacing'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { CloudflareEnv } from '@/lib/db'
 import type { League, ScheduledGame } from '@/lib/model/types'
@@ -66,7 +66,7 @@ export async function syncDay(
     }
     // A rate limit clears itself (the next minute tries again): only one
     // that lasts is worth reporting.
-    if (RATE_LIMITED.test(String(r.reason))) {
+    if (isRateLimited(r.reason)) {
       const since = rateLimitedSince.get(league) ?? now.getTime()
       rateLimitedSince.set(league, since)
       if (now.getTime() - since < RATE_LIMIT_GRACE_MS) continue
@@ -75,8 +75,6 @@ export async function syncDay(
   }
 }
 
-const RATE_LIMITED = /\b429\b/
-const RATE_LIMIT_GRACE_MS = 15 * 60_000
 /** When each League's schedule source started answering 429 (this isolate). */
 const rateLimitedSince = new Map<League, number>()
 

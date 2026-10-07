@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { reportClientError } from './server'
+import { isStaleBuild, reloadForNewBuild } from './staleBuild'
 
 /** Send one browser error to the server's reporter; never throws. */
 export function sendClientError(error: unknown, kind: string): void {
@@ -24,13 +25,21 @@ export function useClientErrors(enabled: boolean): void {
     if (!enabled) return
     const onError = (e: ErrorEvent) =>
       sendClientError(e.error ?? e.message, 'error')
-    const onRejection = (e: PromiseRejectionEvent) =>
+    const onRejection = (e: PromiseRejectionEvent) => {
+      if (isStaleBuild(e.reason) && reloadForNewBuild()) return
       sendClientError(e.reason, 'rejection')
+    }
+    // Vite's own signal that a preloaded chunk is gone after a deploy.
+    const onPreloadError = (e: Event) => {
+      if (reloadForNewBuild()) e.preventDefault()
+    }
     window.addEventListener('error', onError)
     window.addEventListener('unhandledrejection', onRejection)
+    window.addEventListener('vite:preloadError', onPreloadError)
     return () => {
       window.removeEventListener('error', onError)
       window.removeEventListener('unhandledrejection', onRejection)
+      window.removeEventListener('vite:preloadError', onPreloadError)
     }
   }, [enabled])
 }
