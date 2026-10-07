@@ -30,8 +30,9 @@ export function kalshiTeamKey(name?: string, teamName?: string): string {
 
 /**
  * Does our Team's name fit Kalshi's? Any of Kalshi's location ("Miami
- * (FL)" read as "Miami"), nickname ("WAS Commanders" read as
- * "Commanders") or mascot alone. Loose on purpose: a Game also has to
+ * (FL)" read as "Miami"), nickname whole ("White Sox", where the location
+ * is "Chicago WS") or after an abbreviation ("WAS Commanders" read as
+ * "Commanders"), or mascot alone. Loose on purpose: a Game also has to
  * match on League, day and the other team.
  */
 export function teamMatches(kalshiKey: string, ourName: string): boolean {
@@ -42,6 +43,7 @@ export function teamMatches(kalshiKey: string, ourName: string): boolean {
   const candidates = [
     location,
     plain(location),
+    plain(teamName),
     words.slice(1).join(' '),
     words.at(-1) ?? '',
   ]

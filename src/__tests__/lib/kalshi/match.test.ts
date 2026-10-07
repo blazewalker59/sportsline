@@ -22,6 +22,11 @@ describe('matching Kalshi to our data', () => {
       teamMatches(kalshiTeamKey('Memphis', 'MEM Tigers'), 'Memphis Tigers'),
     ).toBe(true)
     expect(teamMatches(was, 'Indianapolis Colts')).toBe(false)
+    // A location Kalshi abbreviates, and a nickname too short to stand alone.
+    const cws = kalshiTeamKey('Chicago WS', 'White Sox')
+    expect(teamMatches(cws, 'Chicago White Sox')).toBe(true)
+    expect(teamMatches(cws, 'Boston Red Sox')).toBe(false)
+    expect(teamMatches(cws, 'Chicago Cubs')).toBe(false)
     // Parentheticals and abbreviated schools.
     expect(
       teamMatches(
