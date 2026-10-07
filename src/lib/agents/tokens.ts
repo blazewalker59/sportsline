@@ -14,7 +14,7 @@ const SHOWN_CHARS = 10
 /** Don't rewrite last_used_at more often than this. */
 const TOUCH_EVERY_MS = 60_000
 
-export type TokenScope = 'read'
+export type TokenScope = 'read' | 'trade'
 
 /** A new random token: "sl_" and 32 random bytes, base64url. */
 export function newToken(): string {
@@ -48,6 +48,7 @@ export async function createToken(
   db: Database,
   viewerId: string,
   name: string,
+  scopes: Array<TokenScope> = ['read'],
   now = new Date(),
 ): Promise<{ id: string; token: string }> {
   const token = newToken()
@@ -58,10 +59,18 @@ export async function createToken(
     name,
     tokenHash: await hashToken(token),
     prefix: token.slice(0, SHOWN_CHARS),
-    scopes: ['read'],
+    scopes,
     createdAt: now.toISOString(),
   })
   return { id, token }
+}
+
+export interface Caller {
+  tokenId: string
+  /** What the Viewer called the token: how its Agent is named to them. */
+  agentName: string
+  viewerId: string
+  scopes: Array<TokenScope>
 }
 
 /** Whose token this is and what it may do, or null if unknown or revoked. */
@@ -69,7 +78,7 @@ export async function verifyToken(
   db: Database,
   token: string,
   now = new Date(),
-): Promise<{ viewerId: string; scopes: Array<TokenScope> } | null> {
+): Promise<Caller | null> {
   const row = await db
     .select()
     .from(apiTokens)
@@ -88,5 +97,10 @@ export async function verifyToken(
       .set({ lastUsedAt: now.toISOString() })
       .where(eq(apiTokens.id, row.id))
   }
-  return { viewerId: row.viewerId, scopes: row.scopes }
+  return {
+    tokenId: row.id,
+    agentName: row.name,
+    viewerId: row.viewerId,
+    scopes: row.scopes,
+  }
 }

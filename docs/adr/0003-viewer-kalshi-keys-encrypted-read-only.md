@@ -10,3 +10,4 @@ We considered keeping a single owner's key as a Worker secret (never in the data
 - Rotating `KALSHI_ENCRYPTION_KEY` makes every stored key unreadable: Viewers would reconnect.
 - Kalshi's own market data (prices, games, players, combo legs) is public and read without any key; only portfolio reads are signed.
 - If Kalshi's site can't create read-only keys, connecting isn't possible until it can (or this decision is revisited).
+- Trading for Agents uses a second, separate key that can trade but never move money (docs/adr/0008). The connection here stays read-only.

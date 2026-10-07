@@ -4,7 +4,7 @@
  * JSON-RPC message per POST, answered with JSON.
  */
 
-import { INSTRUCTIONS, sportslineTools } from './tools'
+import { INSTRUCTIONS, TRADE_INSTRUCTIONS, sportslineTools } from './tools'
 import { handleMcp, parseError } from './mcp'
 import { bearerToken, verifyToken } from './tokens'
 import type { CloudflareEnv } from '@/lib/db'
@@ -53,7 +53,13 @@ export async function serveMcp(
   }
 
   try {
-    const reply = await handleMcp(message, sportslineTools(db), INSTRUCTIONS)
+    const reply = await handleMcp(
+      message,
+      sportslineTools(env, db, caller),
+      caller.scopes.includes('trade')
+        ? `${INSTRUCTIONS} ${TRADE_INSTRUCTIONS}`
+        : INSTRUCTIONS,
+    )
     return reply === null
       ? new Response(null, { status: 202 })
       : Response.json(reply)

@@ -3,9 +3,8 @@
  * (Bun's), a real token, and JSON-RPC over Requests. Bun only.
  */
 
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { isBun, sqliteDb } from '../../helpers/sqliteDb'
 import type { CloudflareEnv } from '@/lib/db'
 import type * as Db from '@/lib/db'
 import type { serveMcp as ServeMcp } from '@/lib/agents/endpoint'
@@ -17,30 +16,9 @@ vi.mock('@/lib/db', async (original) => ({
 }))
 vi.mock('@/lib/ops/errors', () => ({ reportError: () => Promise.resolve() }))
 
-const isBun = Boolean(process.versions.bun)
 const URL_ = 'https://sportsline.dev/mcp'
 const env = { DB: {} } as CloudflareEnv
 let token = ''
-
-async function freshDb() {
-  // Hidden from Vite's import analysis: Node has no bun:sqlite.
-  const bunSqlite = 'bun:sqlite'
-  const { Database } = await import(/* @vite-ignore */ bunSqlite)
-  const { drizzle } = await import('drizzle-orm/bun-sqlite')
-  const schema = await import('@/lib/db/schema')
-  const sqlite = new Database(':memory:')
-  const dir = join(process.cwd(), 'drizzle')
-  const journal = JSON.parse(
-    readFileSync(join(dir, 'meta/_journal.json'), 'utf8'),
-  ) as { entries: Array<{ tag: string }> }
-  for (const { tag } of journal.entries) {
-    const sql = readFileSync(join(dir, `${tag}.sql`), 'utf8')
-    for (const statement of sql.split('--> statement-breakpoint')) {
-      if (statement.trim()) sqlite.run(statement)
-    }
-  }
-  return { sqlite, db: drizzle(sqlite, { schema }) }
-}
 
 function post(body: unknown, headers: Record<string, string> = {}) {
   return new Request(URL_, {
@@ -58,7 +36,7 @@ describe.skipIf(!isBun)('/mcp', () => {
   let serveMcp: typeof ServeMcp
 
   beforeAll(async () => {
-    const { sqlite, db } = await freshDb()
+    const { sqlite, db } = await sqliteDb()
     state.db = db
     sqlite.run(
       "INSERT INTO user (id,name,email,email_verified,created_at,updated_at) VALUES ('u1','Test','t@example.com',1,0,0)",

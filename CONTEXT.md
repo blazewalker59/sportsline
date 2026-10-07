@@ -220,9 +220,17 @@ A person signed in to Sportsline, who owns a set of Follows. Sportsline is only 
 _Avoid_: user, account, member
 
 **Agent**:
-An AI assistant (Grok, Claude, a Viewer's own bot) that reads Sportsline on a Viewer's behalf through its MCP server, with an API token the Viewer created (docs/adr/0007). It sees what that Viewer can and does nothing a token's scope doesn't allow: today, only reading Sharp picks and their record.
+An AI assistant (Grok, Claude, a Viewer's own bot) that uses Sportsline on a Viewer's behalf through its MCP server, with an API token the Viewer created (docs/adr/0007). It reads Sharp picks and their record and, if its token allows trading, makes Trade proposals; it never trades on its own.
 _Avoid_: bot, integration, app
 
 **API token**:
-The secret a Viewer gives an Agent, shown once when made and revocable any time. It acts as that Viewer within its scope (read only, for now).
+The secret a Viewer gives an Agent, shown once when made and revocable any time. It acts as that Viewer within its scope: read, or read and propose trades.
 _Avoid_: API key (that's Kalshi's), password
+
+**Trade proposal**:
+A Kalshi order an Agent asks a Viewer to make: buy or sell so many contracts of one side of a market, at a limit price. The Viewer is sent an Alert and approves or rejects it on the Agents page within 10 minutes; only an approved one, within their limits, is sent to Kalshi (docs/adr/0008).
+_Avoid_: trade, order (until it's placed), bet
+
+**Trade key**:
+A Viewer's second Kalshi key, used only to place the Trade proposals they approve: it can trade but never withdraw or transfer money. Separate from their Kalshi connection, which stays read-only.
+_Avoid_: trading account, write key

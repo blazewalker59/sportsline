@@ -679,10 +679,85 @@ export const apiTokens = sqliteTable(
     tokenHash: text('token_hash').notNull().unique(),
     /** The token's first characters, to tell tokens apart on screen. */
     prefix: text('prefix').notNull(),
-    scopes: text('scopes', { mode: 'json' }).$type<Array<'read'>>().notNull(),
+    /** `read` always; `trade` lets its Agent propose Kalshi orders. */
+    scopes: text('scopes', { mode: 'json' })
+      .$type<Array<'read' | 'trade'>>()
+      .notNull(),
     createdAt: text('created_at').notNull(),
     lastUsedAt: text('last_used_at'),
     revokedAt: text('revoked_at'),
   },
   (table) => [index('api_tokens_viewer_idx').on(table.viewerId)],
+)
+
+/**
+ * A Viewer's Kalshi key for trading (docs/adr/0008), apart from the
+ * read-only connection: it may trade (`write::trade`) but never move money.
+ */
+export const kalshiTradeKeys = sqliteTable('kalshi_trade_keys', {
+  viewerId: text('viewer_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  keyId: text('key_id').notNull(),
+  keyType: text('key_type').$type<'rsa' | 'ed25519'>().notNull(),
+  /** AES-GCM ciphertext and IV of the PEM private key (base64). */
+  keyCiphertext: text('key_ciphertext').notNull(),
+  keyIv: text('key_iv').notNull(),
+  scopes: text('scopes', { mode: 'json' }).$type<Array<string>>().notNull(),
+  /** The most one approved order may cost, fees included (dollars). */
+  maxOrderDollars: real('max_order_dollars').notNull(),
+  /** The most approved orders may cost in a Sports Day (dollars). */
+  maxDailyDollars: real('max_daily_dollars').notNull(),
+  connectedAt: text('connected_at').notNull(),
+})
+
+/** An Agent's proposed Kalshi order: nothing is sent until the Viewer approves. */
+export const tradeProposals = sqliteTable(
+  'trade_proposals',
+  {
+    id: text('id').primaryKey(),
+    viewerId: text('viewer_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    /** The API token whose Agent proposed it (kept if the token is revoked). */
+    tokenId: text('token_id').notNull(),
+    agentName: text('agent_name').notNull(),
+    marketTicker: text('market_ticker').notNull(),
+    marketTitle: text('market_title').notNull(),
+    side: text('side').$type<'yes' | 'no'>().notNull(),
+    action: text('action').$type<'buy' | 'sell'>().notNull(),
+    count: integer('count').notNull(),
+    /** Worst price per contract the order may fill at, in cents. */
+    limitCents: integer('limit_cents').notNull(),
+    /** The most it can cost, fees included (dollars): what the caps count. */
+    maxCostDollars: real('max_cost_dollars').notNull(),
+    /** The Agent's reason, shown to the Viewer. */
+    note: text('note'),
+    status: text('status')
+      .$type<
+        | 'pending'
+        | 'rejected'
+        | 'cancelled'
+        | 'expired'
+        | 'placing'
+        | 'filled'
+        | 'partial'
+        | 'unfilled'
+        | 'failed'
+      >()
+      .notNull(),
+    createdAt: text('created_at').notNull(),
+    expiresAt: text('expires_at').notNull(),
+    decidedAt: text('decided_at'),
+    /** The Sports Day it was approved on, for the daily cap. */
+    approvedDay: text('approved_day'),
+    orderId: text('order_id'),
+    filledCount: real('filled_count'),
+    avgPriceDollars: real('avg_price_dollars'),
+    feesDollars: real('fees_dollars'),
+    error: text('error'),
+  },
+  (table) => [
+    index('trade_proposals_viewer_idx').on(table.viewerId, table.createdAt),
+  ],
 )

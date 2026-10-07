@@ -1,5 +1,6 @@
 /**
- * Kalshi's Trade API, read-only (docs/adr/0003). Every request is signed
+ * Kalshi's Trade API: reads (docs/adr/0003), and placing an order a
+ * Viewer approved (docs/adr/0008). Every request is signed
  * with a Viewer's key, market data (prices, games, players, combo legs)
  * included: Kalshi rejects unsigned requests from Cloudflare's shared
  * addresses with 429, while signed ones count against that Viewer's own
@@ -70,6 +71,43 @@ export async function signedGet<T>(
   return read<T>(res, path)
 }
 
+/**
+ * A signed write (docs/adr/0008: only placing an approved order). Never
+ * retried: a lost reply could mean the order went through.
+ */
+export async function signedPost<T>(
+  account: KalshiAccount,
+  path: string,
+  body: unknown,
+): Promise<T> {
+  await pace()
+  const timestamp = String(Date.now())
+  const signature = await signMessage(
+    account.signer,
+    `${timestamp}POST${PREFIX}${path}`,
+  )
+  const res = await fetch(`${KALSHI_HOST}${PREFIX}${path}`, {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      'content-type': 'application/json',
+      'KALSHI-ACCESS-KEY': account.keyId,
+      'KALSHI-ACCESS-TIMESTAMP': timestamp,
+      'KALSHI-ACCESS-SIGNATURE': signature,
+    },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    // Kalshi explains a rejected order in its body (e.g. insufficient balance).
+    const detail = await res.text().catch(() => '')
+    throw new KalshiError(
+      res.status,
+      `Kalshi ${res.status} for ${path}${detail ? `: ${detail.slice(0, 300)}` : ''}`,
+    )
+  }
+  return (await res.json()) as T
+}
+
 // ─── Shapes (loose: every field may be absent) ─────────────────────────────
 
 export interface KalshiApiKey {
@@ -121,6 +159,8 @@ export interface KalshiMarket {
   result?: string
   yes_bid_dollars?: string
   yes_ask_dollars?: string
+  no_bid_dollars?: string
+  no_ask_dollars?: string
   last_price_dollars?: string
   custom_strike?: Record<string, string>
   floor_strike?: number

@@ -14,15 +14,12 @@ The tools today: `get_sharp_picks` (a day's slate, default today's) and `get_sha
 - **A plain REST API.** Simple, but every agent would need a custom tool written for it; MCP is what agents already speak.
 - **The MCP TypeScript SDK.** Complete, but its HTTP transport assumes long-lived sessions and Node; three methods by hand fit a Worker better and are easy to test.
 
-## Trading, later
+## Trading
 
-ADR 0003 refuses Kalshi keys that can trade, and nothing here changes that. If agents are to trade, a new ADR should decide it, along these lines:
-- a separate `trade` scope a Viewer grants a token explicitly, and a separate trade-capable Kalshi key, kept apart from the read-only one;
-- an agent's order is only a proposal: nothing reaches Kalshi until the Viewer approves it in the app (or from an Alert), with limit orders only and per-order and daily dollar caps;
-- every proposal, approval and fill kept in an audit log the Viewer can see.
+Decided in docs/adr/0008: a `trade` scope on the token, a separate trade-capable Kalshi key, and the Viewer's approval of every order.
 
 ## Consequences
 
-- A leaked token reads that Viewer's Sharp picks until revoked; it can't trade, and the database alone never reveals one.
+- A leaked read token reads that Viewer's Sharp picks until revoked; a leaked trade token can also propose orders, which still need the Viewer's approval. The database alone never reveals a token.
 - Tokens are long-lived: a Viewer should revoke ones they stop using. `last_used_at` shows which.
 - Clients that only do OAuth (claude.ai connectors) can't connect yet.
