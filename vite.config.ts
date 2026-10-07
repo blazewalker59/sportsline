@@ -18,6 +18,10 @@ const config = defineConfig({
     globals: true,
     environment: 'node',
     include: ['src/__tests__/**/*.test.{ts,tsx}'],
+    // Bun reports `__esModule` on every ESM namespace, so Vitest's CJS
+    // interop mistakes packages like zod for CJS and swaps in their
+    // `default` (dropping `z`). Bun does its own CJS interop natively.
+    deps: { interopDefault: !process.versions.bun },
   },
   plugins: [
     tsconfigPaths(),
