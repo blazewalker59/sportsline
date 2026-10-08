@@ -12,6 +12,7 @@ import { SPENDING, spentOn, statusOf } from './proposal'
 import { createToken } from './tokens'
 import { CAP_LIMITS } from './caps'
 import type { TradeProposal } from './proposal'
+import type { TrendPickRow, TrendStats } from '@/lib/sharp/trendRecord'
 import { KalshiError, apiKeys } from '@/lib/kalshi/client'
 import { importSigningKey } from '@/lib/kalshi/keys'
 import { isTradeOnly } from '@/lib/kalshi/scopes'
@@ -20,6 +21,7 @@ import { getCloudflareEnv } from '@/lib/db'
 import { apiTokens, kalshiTradeKeys, tradeProposals } from '@/lib/db/schema'
 import { sportsDayOf } from '@/lib/model/sportsDay'
 import { withViewer } from '@/lib/viewer/session'
+import { viewerTrendRecord } from '@/lib/sharp/trendRecord'
 
 /** Enough for a few Agents; more is likely tokens nobody revoked. */
 const MAX_ACTIVE_TOKENS = 10
@@ -272,3 +274,23 @@ export const rejectTradeProposal = createServerFn({ method: 'POST' })
       await closeTrade(db, viewerId, data.id, 'rejected')
     }),
   )
+
+// ─── find_bet record (docs/adr/0009) ────────────────────────────────────────
+
+export interface BetRecordView {
+  stats: TrendStats
+  recent: Array<TrendPickRow>
+}
+
+/** What came of find_bet's picks: placed or not, and how they did. */
+export const getBetRecord = createServerFn({ method: 'GET' }).handler(() =>
+  withViewer(async ({ db, viewerId }): Promise<BetRecordView> => {
+    const { stats, picks } = await viewerTrendRecord(db, viewerId)
+    return {
+      stats,
+      recent: [...picks]
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .slice(0, 15),
+    }
+  }),
+)

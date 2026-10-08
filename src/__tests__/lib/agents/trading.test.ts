@@ -149,11 +149,13 @@ describe.skipIf(!isBun)('Agent trading', () => {
     expect(names(await call(readToken, 'tools/list'))).toEqual([
       'get_sharp_picks',
       'find_bet',
+      'get_bet_record',
       'get_sharp_record',
     ])
     expect(names(await call(tradeToken, 'tools/list'))).toEqual([
       'get_sharp_picks',
       'find_bet',
+      'get_bet_record',
       'get_sharp_record',
       'get_market',
       'propose_trade',

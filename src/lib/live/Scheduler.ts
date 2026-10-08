@@ -31,6 +31,7 @@ import { reportError } from '@/lib/ops/errors'
 import { isStale, runJob } from '@/lib/ops/jobs'
 import { ACTIVE_LEAGUES } from '@/lib/sources'
 import { publishDue, publishSlate, recheckSlate } from '@/lib/sharp/slate'
+import { trackTrendPicks } from '@/lib/sharp/trendRecord'
 import { sportsDayOf } from '@/lib/model/sportsDay'
 
 const MINUTE = 60_000
@@ -53,6 +54,7 @@ const SHARP_DAY_KEY = 'sharpDay'
 const SHARP_RETRY_KEY = 'sharpRetryAt'
 const SHARP_EMPTY_KEY = 'sharpEmptyTries'
 const SHARP_RECHECK_KEY = 'sharpRecheckDueAt'
+const TREND_TRACK_KEY = 'trendTrackDueAt'
 const SHARP_RECHECK_EVERY_MS = 15 * MINUTE
 
 export class Scheduler extends DurableObject<CloudflareEnv> {
@@ -93,6 +95,12 @@ export class Scheduler extends DurableObject<CloudflareEnv> {
     await this.daily(SHARP_RECHECK_KEY, SHARP_RECHECK_EVERY_MS, () =>
       runJob(env, 'sharp-recheck', SHARP_RECHECK_EVERY_MS, () =>
         recheckSlate(env, new Date()),
+      ),
+    )
+    // find_bet's Trend picks (docs/adr/0009): placed? settled?
+    await this.daily(TREND_TRACK_KEY, SHARP_RECHECK_EVERY_MS, () =>
+      runJob(env, 'trend-picks', SHARP_RECHECK_EVERY_MS, () =>
+        trackTrendPicks(env, new Date()),
       ),
     )
     await this.daily(SWEEP_DUE_KEY, SWEEP_EVERY_MS, () =>

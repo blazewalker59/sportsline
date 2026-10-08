@@ -761,3 +761,82 @@ export const tradeProposals = sqliteTable(
     index('trade_proposals_viewer_idx').on(table.viewerId, table.createdAt),
   ],
 )
+
+/** Each time an Agent asks find_bet (docs/adr/0009), answered or not. */
+export const betRequests = sqliteTable(
+  'bet_requests',
+  {
+    id: text('id').primaryKey(),
+    viewerId: text('viewer_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    tokenId: text('token_id').notNull(),
+    agentName: text('agent_name').notNull(),
+    /** What was asked: Team, League, day, how many, surprise. */
+    ask: text('ask', { mode: 'json' })
+      .$type<{
+        team?: string
+        league?: string | null
+        day?: string
+        count: number
+        surprise?: boolean
+      }>()
+      .notNull(),
+    games: integer('games').notNull(),
+    picks: integer('picks').notNull(),
+    /** Why nothing came back, when nothing did. */
+    reason: text('reason'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    index('bet_requests_viewer_idx').on(table.viewerId, table.createdAt),
+  ],
+)
+
+/**
+ * A Trend pick find_bet answered with, followed until it settles: whether
+ * the Viewer placed it (on Kalshi after it was suggested) and its result.
+ */
+export const trendPicks = sqliteTable(
+  'trend_picks',
+  {
+    /** "<request id>:<rank>". */
+    id: text('id').primaryKey(),
+    requestId: text('request_id')
+      .notNull()
+      .references(() => betRequests.id, { onDelete: 'cascade' }),
+    viewerId: text('viewer_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    rank: integer('rank').notNull(),
+    marketTicker: text('market_ticker').notNull(),
+    side: text('side').$type<'yes' | 'no'>().notNull(),
+    marketKind: text('market_kind')
+      .$type<'moneyline' | 'spread' | 'total'>()
+      .notNull(),
+    title: text('title').notNull(),
+    gameLabel: text('game_label').notNull(),
+    league: text('league').$type<League>().notNull(),
+    gameId: text('game_id').notNull(),
+    startsAt: text('starts_at').notNull(),
+    /** Kalshi's price when suggested, the blended fair, our trend's own. */
+    price: real('price').notNull(),
+    fair: real('fair').notNull(),
+    trendChance: real('trend_chance').notNull(),
+    edge: real('edge').notNull(),
+    /** When the Viewer bought it, and how: an Agent's approved proposal or on Kalshi. */
+    placedAt: text('placed_at'),
+    placedVia: text('placed_via').$type<'agent' | 'kalshi'>(),
+    placedContracts: real('placed_contracts'),
+    placedCost: real('placed_cost'),
+    /** Profit or loss on what was placed, once settled (dollars). */
+    pnl: real('pnl'),
+    result: text('result').$type<'won' | 'lost' | 'void'>(),
+    settledAt: text('settled_at'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    index('trend_picks_viewer_idx').on(table.viewerId, table.createdAt),
+    index('trend_picks_market_idx').on(table.marketTicker, table.side),
+  ],
+)

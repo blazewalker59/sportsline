@@ -23,6 +23,7 @@ import { picksRecord } from '@/lib/sharp/record'
 import { kalshiEventUrl } from '@/lib/sharp/view'
 import { sportsDayOf } from '@/lib/model/sportsDay'
 import { findBets } from '@/lib/sharp/onDemand'
+import { recordRequest, viewerTrendRecord } from '@/lib/sharp/trendRecord'
 import { leagueFrom } from '@/lib/sharp/lookup'
 
 export const INSTRUCTIONS =
@@ -317,14 +318,18 @@ function readTools(
       }),
       call: async ({ team, league, day, count, surprise }) => {
         const asLeague = !league && team ? leagueFrom(team) : null
-        const answer = await findBets(env, db, caller.viewerId, {
+        const ask = {
           team: asLeague ? undefined : team,
           league: league ?? asLeague,
           day,
           count,
           surprise,
-        })
+        }
+        const answer = await findBets(env, db, caller.viewerId, ask)
+        // Every ask is kept, so the record can say what came of its picks.
+        const requestId = await recordRequest(db, caller, ask, answer)
         return {
+          requestId,
           games: answer.games.map((g) => ({
             game: `${g.away.name} @ ${g.home.name}`,
             league: g.league,
@@ -334,6 +339,37 @@ function readTools(
           reason: answer.reason,
           method:
             "Trend picks: each Team's last 7 days of results (or last 3 games), shrunk toward average, give an expected margin and total; that chance is blended 35/65 with Kalshi's own price. Not the sharp books.",
+        }
+      },
+    }),
+    tool({
+      name: 'get_bet_record',
+      title: 'find_bet record',
+      description:
+        'What came of find_bet: how many bets were asked for, how many picks were offered, how many the Viewer placed on Kalshi (themselves or through an approved trade proposal) after they were suggested, and how those placed picks did (won, lost, pending, win rate, profit or loss), with how the skipped picks turned out for comparison. Recent picks are listed with their status.',
+      input: z.object({
+        recent: z.number().int().min(0).max(50).default(10),
+      }),
+      call: async ({ recent }) => {
+        const record = await viewerTrendRecord(db, caller.viewerId)
+        return {
+          ...record.stats,
+          winRatePct: points(record.stats.winRate),
+          recentPicks: [...record.picks]
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+            .slice(0, recent)
+            .map((p) => ({
+              pick: p.title,
+              game: p.gameLabel,
+              suggestedAt: p.createdAt,
+              priceCents: cents(p.price),
+              edgePoints: points(p.edge),
+              placed: p.placedAt !== null,
+              placedVia: p.placedVia,
+              placedCost: p.placedCost,
+              result: p.result ?? 'pending',
+              pnl: p.pnl,
+            })),
         }
       },
     }),
