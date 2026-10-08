@@ -25,12 +25,15 @@ import {
 } from './sources'
 import type { Candidate, Quote } from './engine'
 import type { CloudflareEnv } from '@/lib/db'
+import type { PriceDisplay } from '@/lib/model/price'
 import { dbFromD1 } from '@/lib/db'
+import { formatPrice } from '@/lib/model/price'
 import {
   alertSettings,
   kalshiAccounts,
   pushSubscriptions,
   sharpPicks,
+  viewerSettings,
 } from '@/lib/db/schema'
 import { markets } from '@/lib/kalshi/client'
 import { dollars } from '@/lib/kalshi/markets'
@@ -219,6 +222,7 @@ async function announce(env: CloudflareEnv, rows: ReadonlyArray<PickRow>) {
       p256dh: pushSubscriptions.p256dh,
       auth: pushSubscriptions.auth,
       level: alertSettings.predictions,
+      priceDisplay: viewerSettings.priceDisplay,
     })
     .from(pushSubscriptions)
     .innerJoin(
@@ -229,21 +233,31 @@ async function announce(env: CloudflareEnv, rows: ReadonlyArray<PickRow>) {
       alertSettings,
       eq(alertSettings.viewerId, pushSubscriptions.viewerId),
     )
+    .leftJoin(
+      viewerSettings,
+      eq(viewerSettings.viewerId, pushSubscriptions.viewerId),
+    )
   const top = rows[0]
   const strong = rows.filter(
     (r) => r.kind === 'single' && r.grade === 'strong',
   ).length
-  const message = JSON.stringify({
-    title: `SHARP PICKS · ${rows.filter((r) => r.kind === 'single').length} picks${rows.some((r) => r.kind === 'combo') ? ' + combo' : ''}`,
-    body: `#1 ${top.title} (${top.gameLabel}) · ${(top.edge * 100).toFixed(1)} pts edge at ${Math.round(top.price * 100)}¢${strong > 0 ? ` · ${strong} strong` : ''}`,
-    url: '/predictions',
-    tag: 'sharp-picks',
-    final: false,
-  })
+  // Each Viewer sees the price as they choose (cents or multiplier).
+  const message = (display: PriceDisplay) =>
+    JSON.stringify({
+      title: `SHARP PICKS · ${rows.filter((r) => r.kind === 'single').length} picks${rows.some((r) => r.kind === 'combo') ? ' + combo' : ''}`,
+      body: `#1 ${top.title} (${top.gameLabel}) · ${(top.edge * 100).toFixed(1)} pts edge at ${formatPrice(top.price, display)}${strong > 0 ? ` · ${strong} strong` : ''}`,
+      url: '/predictions',
+      tag: 'sharp-picks',
+      final: false,
+    })
   await Promise.allSettled(
     devices
       .filter((d) => d.level !== 'off')
-      .map((d) => sendPush(d, message, keys, { topic: 'sharp' })),
+      .map((d) =>
+        sendPush(d, message(d.priceDisplay ?? 'cents'), keys, {
+          topic: 'sharp',
+        }),
+      ),
   )
 }
 

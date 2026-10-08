@@ -1,8 +1,9 @@
 /**
  * What an Agent can do with Sportsline: read Sharp picks and their record
  * (docs/adr/0007) and, with a `trade` token, propose Kalshi orders for the
- * Viewer to approve (docs/adr/0008). Prices are in cents, chances and
- * edges in percentage points, as the app shows them.
+ * Viewer to approve (docs/adr/0008). Prices come as the Viewer chose to see
+ * them: cents, or a payout multiplier after Kalshi's fee. Chances and
+ * edges are in percentage points, as the app shows them.
  */
 
 import { z } from 'zod'
@@ -16,6 +17,7 @@ import type { Caller } from './tokens'
 import type { TradeProposal } from './proposal'
 import type { CloudflareEnv, Database } from '@/lib/db'
 import type { TrendPick } from '@/lib/sharp/onDemand'
+import type { PriceDisplay } from '@/lib/model/price'
 import { loadAccount } from '@/lib/kalshi/account'
 import { market as fetchMarket } from '@/lib/kalshi/client'
 import { pickHistory, slateOn } from '@/lib/sharp/queries'
@@ -25,9 +27,18 @@ import { sportsDayOf } from '@/lib/model/sportsDay'
 import { findBets } from '@/lib/sharp/onDemand'
 import { recordRequest, viewerTrendRecord } from '@/lib/sharp/trendRecord'
 import { leagueFrom } from '@/lib/sharp/lookup'
+import { maxCentsFor, payoutMultiplier } from '@/lib/model/price'
 
-export const INSTRUCTIONS =
-  "Sportsline publishes Sharp picks each morning from 10am Eastern: the day's five Kalshi offers priced furthest below a fair price from the sharp sportsbooks, after Kalshi's fee, plus one combo. Prices are in cents per $1 contract; fair chances, edges and closing line value are in percentage points. Grades: strong (edge 3+ points), edge (1–3), thin (less: the best of a fairly priced day). Picks are information, not advice: read get_sharp_record before trusting them."
+const UNITS: Record<PriceDisplay, string> = {
+  cents:
+    'Prices are in cents per $1 contract (fields ending Cents); the Viewer reads prices as cents.',
+  multiplier:
+    "The Viewer reads prices as payout multipliers: what $1 staked pays back if it wins, after Kalshi's fee (fields ending Multiplier; 1.79x is a 54-cent contract plus its 2-cent fee). Quote prices to them that way.",
+}
+
+export function instructions(display: PriceDisplay): string {
+  return `Sportsline publishes Sharp picks each morning from 10am Eastern: the day's five Kalshi offers priced furthest below a fair price from the sharp sportsbooks, after Kalshi's fee, plus one combo. ${UNITS[display]} Fair chances, edges and closing line value are in percentage points. Grades: strong (edge 3+ points), edge (1–3), thin (less: the best of a fairly priced day). Picks are information, not advice: read get_sharp_record before trusting them.`
+}
 
 export const TRADE_INSTRUCTIONS =
   'This token may also propose Kalshi trades (get_market, propose_trade, get_trades, cancel_trade). A proposal is only a request: the Viewer approves or rejects each one in Sportsline, within 10 minutes, and their dollar limits apply. Never tell the Viewer a trade was made until get_trades shows it filled.'
@@ -37,8 +48,29 @@ const cents = (dollars: number | null) =>
 const points = (fraction: number | null) =>
   fraction === null ? null : Math.round(fraction * 1000) / 10
 
+/**
+ * A price in the Viewer's unit, its name saying which: `priceCents: 54` or
+ * `priceMultiplier: 1.79` (what $1 pays back, after the fee). Pure.
+ */
+export function priceField(
+  display: PriceDisplay,
+  name: string,
+  dollars: number | null,
+): Record<string, number | null> {
+  return display === 'multiplier'
+    ? {
+        [`${name}Multiplier`]:
+          dollars === null || !(dollars > 0) ? null : payoutMultiplier(dollars),
+      }
+    : { [`${name}Cents`]: cents(dollars) }
+}
+
+/** Kalshi's fee, in cents: only shown with cents (a multiplier includes it). */
+const feeField = (display: PriceDisplay, fee: number) =>
+  display === 'cents' ? { feeCents: cents(fee) } : {}
+
 /** A pick as an Agent reads it. Pure. */
-export function agentPick(p: SharpPick) {
+export function agentPick(p: SharpPick, display: PriceDisplay = 'cents') {
   return {
     rank: p.rank,
     kind: p.kind,
@@ -47,8 +79,8 @@ export function agentPick(p: SharpPick) {
     league: p.league,
     startsAt: p.startsAt,
     grade: p.grade,
-    priceCents: cents(p.price),
-    feeCents: cents(p.fee),
+    ...priceField(display, 'price', p.price),
+    ...feeField(display, p.fee),
     fairPct: points(p.fair),
     edgePoints: points(p.edge),
     evPerDollarPct: points(p.evPerDollar),
@@ -61,7 +93,13 @@ export function agentPick(p: SharpPick) {
           kalshiUrl: p.marketTicker ? kalshiEventUrl(p.marketTicker) : null,
         }
       : {
-          worthItUnderCents: cents(p.worthItUnder),
+          // The worst combo quote worth taking: under this price, or
+          // paying at least this multiple.
+          ...priceField(
+            display,
+            display === 'multiplier' ? 'worthItAtLeast' : 'worthItUnder',
+            p.worthItUnder,
+          ),
           legs: (p.legs ?? []).map((l) => ({
             pick: l.title,
             game: l.gameLabel,
@@ -70,7 +108,7 @@ export function agentPick(p: SharpPick) {
             side: l.side,
             marketTicker: l.marketTicker,
             kalshiUrl: kalshiEventUrl(l.marketTicker),
-            priceCents: cents(l.price),
+            ...priceField(display, 'price', l.price),
             fairPct: points(l.fair),
             result: l.result,
           })),
@@ -79,15 +117,15 @@ export function agentPick(p: SharpPick) {
       source: s.source,
       fairPct: points(s.prob),
     })),
-    nowCents: cents(p.currentPrice),
+    ...priceField(display, 'now', p.currentPrice),
     edgeNowPoints: points(p.currentEdge),
-    closingCents: cents(p.closingPrice),
+    ...priceField(display, 'closing', p.closingPrice),
     result: p.result,
   }
 }
 
 /** A trend pick as an Agent reads it. Pure. */
-export function agentTrendPick(p: TrendPick) {
+export function agentTrendPick(p: TrendPick, display: PriceDisplay = 'cents') {
   return {
     pick: p.title,
     game: p.gameLabel,
@@ -97,8 +135,8 @@ export function agentTrendPick(p: TrendPick) {
     marketKind: p.key.kind,
     marketTicker: p.ticker,
     kalshiUrl: kalshiEventUrl(p.ticker),
-    priceCents: cents(p.price),
-    feeCents: cents(p.fee),
+    ...priceField(display, 'price', p.price),
+    ...feeField(display, p.fee),
     trendChancePct: points(p.trendChance),
     fairPct: points(p.fair),
     edgePoints: points(p.edge),
@@ -127,40 +165,50 @@ export function agentLine(l: PickLine) {
 }
 
 /** A trade proposal as an Agent reads it. Pure. */
-export function agentTrade(p: TradeProposal, now: number) {
+export function agentTrade(
+  p: TradeProposal,
+  now: number,
+  display: PriceDisplay = 'cents',
+) {
   return {
     id: p.id,
     status: statusOf(p, now),
-    order: describeOrder(p),
+    order: describeOrder(p, display),
     market: p.marketTitle,
     marketTicker: p.marketTicker,
     side: p.side,
     action: p.action,
     count: p.count,
+    // The order's own limit is always cents, as Kalshi takes it.
     limitCents: p.limitCents,
+    ...(display === 'multiplier' && p.action === 'buy'
+      ? { limitMultiplier: payoutMultiplier(p.limitCents / 100) }
+      : {}),
     maxCostDollars: p.maxCostDollars,
     note: p.note,
     proposedAt: p.createdAt,
     expiresAt: p.expiresAt,
     decidedAt: p.decidedAt,
     filledCount: p.filledCount,
-    avgPriceCents: cents(p.avgPriceDollars),
+    ...priceField(display, 'avgPrice', p.avgPriceDollars),
     feesDollars: p.feesDollars,
     error: p.error,
   }
 }
 
-const cent = (dollars: string | undefined) =>
-  dollars === undefined ? null : cents(Number(dollars))
+const dollarsOf = (d: string | undefined) =>
+  d === undefined ? null : Number(d)
+const cent = (d: string | undefined) => cents(dollarsOf(d))
 
 export function sportslineTools(
   env: CloudflareEnv,
   db: Database,
   caller: Caller,
+  display: PriceDisplay = 'cents',
 ): Array<McpTool> {
-  const read = readTools(env, db, caller)
+  const read = readTools(env, db, caller, display)
   return caller.scopes.includes('trade')
-    ? [...read, ...tradeTools(env, db, caller)]
+    ? [...read, ...tradeTools(env, db, caller, display)]
     : read
 }
 
@@ -168,13 +216,14 @@ function tradeTools(
   env: CloudflareEnv,
   db: Database,
   caller: Caller,
+  display: PriceDisplay,
 ): Array<McpTool> {
   return [
     tool({
       name: 'get_market',
       title: 'Kalshi market',
       description:
-        "A Kalshi market's current prices (YES and NO bid and ask, last trade, in cents), status and close time. Check it before proposing a trade.",
+        "A Kalshi market's current prices, status and close time. In cents: YES and NO bid and ask, and the last trade. As multipliers: what buying YES or NO now pays per $1, after the fee. Check it before proposing a trade.",
       input: z.object({
         marketTicker: z
           .string()
@@ -199,11 +248,19 @@ function tradeTools(
           noMeans: m.no_sub_title ?? null,
           status: m.status ?? null,
           tradable: m.status === 'active',
-          yesBidCents: cent(m.yes_bid_dollars),
-          yesAskCents: cent(m.yes_ask_dollars),
-          noBidCents: cent(m.no_bid_dollars),
-          noAskCents: cent(m.no_ask_dollars),
-          lastCents: cent(m.last_price_dollars),
+          ...(display === 'multiplier'
+            ? {
+                ...priceField(display, 'buyYes', dollarsOf(m.yes_ask_dollars)),
+                ...priceField(display, 'buyNo', dollarsOf(m.no_ask_dollars)),
+                ...priceField(display, 'last', dollarsOf(m.last_price_dollars)),
+              }
+            : {
+                yesBidCents: cent(m.yes_bid_dollars),
+                yesAskCents: cent(m.yes_ask_dollars),
+                noBidCents: cent(m.no_bid_dollars),
+                noAskCents: cent(m.no_ask_dollars),
+                lastCents: cent(m.last_price_dollars),
+              }),
           closesAt: m.close_time ?? null,
         }
       },
@@ -212,7 +269,7 @@ function tradeTools(
       name: 'propose_trade',
       title: 'Propose a Kalshi trade',
       description:
-        "Propose a Kalshi order for the Viewer to approve. Nothing is traded until they approve it in Sportsline (they're sent an Alert); a proposal lapses after 10 minutes. Orders are limit orders that fill what they can at once and cancel the rest. Buy: pay at most limitCents a contract. Sell: closes contracts the Viewer holds, for at least limitCents. The Viewer's per-order and daily dollar limits apply. Returns the proposal; check it with get_trades.",
+        "Propose a Kalshi order for the Viewer to approve. Nothing is traded until they approve it in Sportsline (they're sent an Alert); a proposal lapses after 10 minutes. Orders are limit orders that fill what they can at once and cancel the rest. Buy: pay at most limitCents a contract, or give minMultiplier instead (only fill where $1 pays back at least that, after the fee). Sell: closes contracts the Viewer holds, for at least limitCents. The Viewer's per-order and daily dollar limits apply. Returns the proposal; check it with get_trades.",
       input: z.object({
         marketTicker: z.string().min(3).max(120),
         side: z.enum(['yes', 'no']),
@@ -223,8 +280,17 @@ function tradeTools(
           .int()
           .min(1)
           .max(99)
+          .optional()
           .describe(
             'Worst acceptable price per contract for this side, in cents.',
+          ),
+        minMultiplier: z
+          .number()
+          .min(1.01)
+          .max(100)
+          .optional()
+          .describe(
+            'Buys only, instead of limitCents: the least $1 may pay back, after the fee (e.g. 1.8).',
           ),
         note: z
           .string()
@@ -232,8 +298,31 @@ function tradeTools(
           .optional()
           .describe('Why: shown to the Viewer when they decide.'),
       }),
-      call: async (input) =>
-        agentTrade(await proposeTrade(env, db, caller, input), Date.now()),
+      call: async ({ minMultiplier, limitCents, ...input }) => {
+        let limit = limitCents
+        if (minMultiplier !== undefined) {
+          if (input.action === 'sell') {
+            throw new Error(
+              'Give a sell limitCents: a multiplier is for buying.',
+            )
+          }
+          const c = maxCentsFor(minMultiplier)
+          if (c === null) {
+            throw new Error(
+              `No Kalshi price pays ${minMultiplier}x after the fee.`,
+            )
+          }
+          limit = limitCents === undefined ? c : Math.min(c, limitCents)
+        }
+        if (limit === undefined) {
+          throw new Error('Give limitCents, or minMultiplier for a buy.')
+        }
+        return agentTrade(
+          await proposeTrade(env, db, caller, { ...input, limitCents: limit }),
+          Date.now(),
+          display,
+        )
+      },
     }),
     tool({
       name: 'get_trades',
@@ -246,7 +335,7 @@ function tradeTools(
         const now = Date.now()
         return {
           trades: (await recentTrades(db, caller.viewerId)).map((p) =>
-            agentTrade(p, now),
+            agentTrade(p, now, display),
           ),
         }
       },
@@ -259,7 +348,7 @@ function tradeTools(
       call: async ({ id }) => {
         const row = await closeTrade(db, caller.viewerId, id, 'cancelled')
         if (!row) throw new Error('No pending proposal with that id.')
-        return agentTrade(row, Date.now())
+        return agentTrade(row, Date.now(), display)
       },
     }),
   ]
@@ -269,6 +358,7 @@ function readTools(
   env: CloudflareEnv,
   db: Database,
   caller: Caller,
+  display: PriceDisplay,
 ): Array<McpTool> {
   return [
     tool({
@@ -288,7 +378,10 @@ function readTools(
       call: async ({ day }) => {
         const slate = await slateOn(db, day ?? sportsDayOf(new Date()))
         if (!slate) return { day: null, picks: [] }
-        return { day: slate.day, picks: slate.picks.map(agentPick) }
+        return {
+          day: slate.day,
+          picks: slate.picks.map((p) => agentPick(p, display)),
+        }
       },
     }),
     tool({
@@ -335,7 +428,7 @@ function readTools(
             league: g.league,
             startsAt: g.startsAt,
           })),
-          picks: answer.picks.map(agentTrendPick),
+          picks: answer.picks.map((p) => agentTrendPick(p, display)),
           reason: answer.reason,
           method:
             "Trend picks: each Team's last 7 days of results (or last 3 games), shrunk toward average, give an expected margin and total; that chance is blended 35/65 with Kalshi's own price. Not the sharp books.",
@@ -362,7 +455,7 @@ function readTools(
               pick: p.title,
               game: p.gameLabel,
               suggestedAt: p.createdAt,
-              priceCents: cents(p.price),
+              ...priceField(display, 'price', p.price),
               edgePoints: points(p.edge),
               placed: p.placedAt !== null,
               placedVia: p.placedVia,

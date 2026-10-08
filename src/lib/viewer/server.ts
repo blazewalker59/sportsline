@@ -15,6 +15,7 @@ import type { Database } from '@/lib/db'
 import type { ViewerFollow } from '@/lib/model/timeline'
 import type { League } from '@/lib/model/types'
 import type { LeagueSettings } from '@/lib/model/leagues'
+import type { PriceDisplay } from '@/lib/model/price'
 import { requireViewer } from '@/lib/viewer/session'
 import { getCloudflareEnv, getDb } from '@/lib/db'
 import {
@@ -23,6 +24,7 @@ import {
   players,
   readMarkers,
   teams,
+  viewerSettings,
 } from '@/lib/db/schema'
 import { LEAGUES } from '@/lib/model/types'
 import {
@@ -32,6 +34,7 @@ import {
 } from '@/lib/model/leagues'
 import { startViewerSync } from '@/lib/live/startViewerSync'
 import { isAdmin, reportError } from '@/lib/ops/errors'
+import { priceDisplayOf } from '@/lib/viewer/prefs'
 
 export type { ViewerProfile } from './session'
 
@@ -56,6 +59,8 @@ export interface ViewerState {
   leagues: LeagueSettings
   /** Sees the health page (docs/adr/0005). */
   isAdmin?: boolean
+  /** Kalshi prices as cents or as a payout multiplier. */
+  priceDisplay?: PriceDisplay
 }
 
 const LEAGUE_LABELS: Record<League, string> = {
@@ -174,7 +179,7 @@ export const getViewerState = createServerFn({ method: 'GET' }).handler(
       }
     keepSyncing(viewer.id)
     const db = getDb()
-    const [entries, marker, arrangement] = await Promise.all([
+    const [entries, marker, arrangement, priceDisplay] = await Promise.all([
       followEntries(db, viewer.id),
       db
         .select({ readAt: readMarkers.readAt })
@@ -186,6 +191,7 @@ export const getViewerState = createServerFn({ method: 'GET' }).handler(
         .from(leagueSettings)
         .where(eq(leagueSettings.viewerId, viewer.id))
         .get(),
+      priceDisplayOf(db, viewer.id),
     ])
     return {
       viewer,
@@ -193,9 +199,28 @@ export const getViewerState = createServerFn({ method: 'GET' }).handler(
       readAt: marker?.readAt ?? null,
       leagues: normalizeLeagueSettings(arrangement),
       isAdmin: isAdmin(getCloudflareEnv(), viewer.email),
+      priceDisplay,
     }
   },
 )
+
+/** Show Kalshi prices as cents or as a payout multiplier, everywhere. */
+export const setPriceDisplay = createServerFn({ method: 'POST' })
+  .validator((data: { display: string }) =>
+    z.object({ display: z.enum(['cents', 'multiplier']) }).parse(data),
+  )
+  .handler(({ data }) =>
+    withViewer(async ({ db, viewerId }) => {
+      await db
+        .insert(viewerSettings)
+        .values({ viewerId, priceDisplay: data.display })
+        .onConflictDoUpdate({
+          target: viewerSettings.viewerId,
+          set: { priceDisplay: data.display },
+        })
+      return data.display
+    }),
+  )
 
 /** Save how the Viewer arranges Leagues; returns the normalized settings. */
 export const setLeagueSettings = createServerFn({ method: 'POST' })

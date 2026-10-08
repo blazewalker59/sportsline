@@ -19,6 +19,8 @@ import { picksRecord } from '@/lib/sharp/record'
 import { useSharpHistory, useSharpSlate } from '@/lib/sharp/useSharp'
 import { bannerVisible, kalshiEventUrl, slateSummary } from '@/lib/sharp/view'
 import { sportsDayOf } from '@/lib/model/sportsDay'
+import { formatPrice } from '@/lib/model/price'
+import { usePriceDisplay } from '@/lib/viewer/useViewer'
 import { cn } from '@/lib/utils'
 
 const cents = (p: number) => `${Math.round(p * 100)}¢`
@@ -476,6 +478,7 @@ function KalshiLink({ ticker }: { ticker: string }) {
 
 function PickRow({ pick: p }: { pick: SharpPick }) {
   const [open, setOpen] = useState(false)
+  const display = usePriceDisplay()
   return (
     <div>
       <button
@@ -494,8 +497,9 @@ function PickRow({ pick: p }: { pick: SharpPick }) {
         </span>
         <span className="flex items-baseline gap-2 text-[12px] tabular-nums">
           <span className="min-w-0 flex-1 truncate text-muted">
-            Kalshi <b className="text-foreground">{cents(p.price)}</b> · sharp
-            books <b className="text-foreground">{pct1(p.fair)}</b>
+            Kalshi{' '}
+            <b className="text-foreground">{formatPrice(p.price, display)}</b> ·
+            sharp books <b className="text-foreground">{pct1(p.fair)}</b>
           </span>
           <StatusText pick={p} />
         </span>
@@ -503,8 +507,10 @@ function PickRow({ pick: p }: { pick: SharpPick }) {
       {open && (
         <div className="flex flex-col gap-2 px-3 pb-2.5 text-[12px] text-muted tabular-nums">
           <p>
-            {cents(p.price)} + {cents(p.fee)} fee = {cents(p.price + p.fee)} for
-            something the books give a {pct1(p.fair)} chance:{' '}
+            {display === 'multiplier'
+              ? `Pays ${formatPrice(p.price, display)} after the fee (${cents(p.price)} + ${cents(p.fee)})`
+              : `${cents(p.price)} + ${cents(p.fee)} fee = ${cents(p.price + p.fee)}`}{' '}
+            for something the books give a {pct1(p.fair)} chance:{' '}
             <b className="text-foreground">{pts(p.edge)}</b>.{' '}
             {p.marketKind && KIND_NAMES[p.marketKind]}, Kalshi{' '}
             {p.side?.toUpperCase()}, {clockTime(p.startsAt)}.
@@ -550,6 +556,8 @@ function PickRow({ pick: p }: { pick: SharpPick }) {
 
 function ComboRow({ pick: p }: { pick: SharpPick }) {
   const [open, setOpen] = useState(false)
+  const display = usePriceDisplay()
+  const worth = formatPrice(p.worthItUnder ?? 0, display)
   const legs = p.legs ?? []
   return (
     <div className="bg-accent/5">
@@ -568,9 +576,10 @@ function ComboRow({ pick: p }: { pick: SharpPick }) {
         </span>
         <span className="flex items-baseline gap-2 text-[12px] tabular-nums">
           <span className="min-w-0 flex-1 truncate text-muted">
-            Take it under{' '}
-            <b className="text-foreground">{cents(p.worthItUnder ?? 0)}</b> ·
-            sharp books <b className="text-foreground">{pct1(p.fair)}</b>
+            {display === 'multiplier' ? 'Take it at' : 'Take it under'}{' '}
+            <b className="text-foreground">{worth}</b>
+            {display === 'multiplier' ? ' or more' : ''} · sharp books{' '}
+            <b className="text-foreground">{pct1(p.fair)}</b>
           </span>
           {p.result && <StatusText pick={p} />}
         </span>
@@ -589,16 +598,18 @@ function ComboRow({ pick: p }: { pick: SharpPick }) {
                 </span>
                 <span>
                   {l.result === 'won' ? '✓ ' : l.result === 'lost' ? '✕ ' : ''}
-                  {cents(l.price)} · {pct1(l.fair)}
+                  {formatPrice(l.price, display)} · {pct1(l.fair)}
                 </span>
               </li>
             ))}
           </ul>
           <p className="mt-1.5">
-            Kalshi prices combos when you build one. The legs cost{' '}
-            {cents(p.price)} multiplied; the books give all of them a{' '}
-            {pct1(p.fair)} chance, so any quote under{' '}
-            {cents(p.worthItUnder ?? 0)} is worth taking.
+            Kalshi prices combos when you build one. The books give all the legs
+            a {pct1(p.fair)} chance, so any quote{' '}
+            {display === 'multiplier'
+              ? `paying ${worth} or more`
+              : `under ${worth} (the legs cost ${cents(p.price)} multiplied)`}{' '}
+            is worth taking.
           </p>
         </div>
       )}

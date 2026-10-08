@@ -840,3 +840,15 @@ export const trendPicks = sqliteTable(
     index('trend_picks_market_idx').on(table.marketTicker, table.side),
   ],
 )
+
+/** A Viewer's display settings. */
+export const viewerSettings = sqliteTable('viewer_settings', {
+  viewerId: text('viewer_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  /** Kalshi prices as cents (54¢) or what they pay per $1, after the fee (1.79x). */
+  priceDisplay: text('price_display')
+    .$type<'cents' | 'multiplier'>()
+    .notNull()
+    .default('cents'),
+})

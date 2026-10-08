@@ -5,7 +5,9 @@ import {
   markRead,
   setFollow,
   setLeagueSettings,
+  setPriceDisplay,
 } from './server'
+import type { PriceDisplay } from '@/lib/model/price'
 import type { Follow, TimelineItem, ViewerFollow } from '@/lib/model/timeline'
 import type { FollowEntry, ViewerState } from './server'
 import type { LeagueSettings } from '@/lib/model/leagues'
@@ -126,4 +128,23 @@ export function useReadMarkerWriter(
       document.removeEventListener('visibilitychange', onVisibility)
     }
   }, [enabled])
+}
+
+/** How the Viewer wants Kalshi prices shown (cents until they choose). */
+export function usePriceDisplay(): PriceDisplay {
+  return useViewer().data?.priceDisplay ?? 'cents'
+}
+
+export function useSetPriceDisplay() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (display: PriceDisplay) =>
+      setPriceDisplay({ data: { display } }),
+    onMutate: (display) => {
+      queryClient.setQueryData<ViewerState>(VIEWER_KEY, (old) =>
+        old ? { ...old, priceDisplay: display } : old,
+      )
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: VIEWER_KEY }),
+  })
 }

@@ -15,6 +15,7 @@ import {
 } from './PredictionParts'
 import { PredictionRecordSection } from './PredictionRecord'
 import { SharpPicksSection } from './SharpPicks'
+import { PriceDisplayToggle } from './PriceDisplayToggle'
 import type { ChangeDisplay, PredictionView } from '@/lib/kalshi/server'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { timeAgo, useNow } from '@/components/timeline/format'
@@ -205,6 +206,7 @@ function Connected() {
           ))}
         </span>
       </section>
+      <PriceDisplayToggle />
 
       <PredictionSummary
         predictions={open}

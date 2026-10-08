@@ -4,12 +4,13 @@
  * JSON-RPC message per POST, answered with JSON.
  */
 
-import { INSTRUCTIONS, TRADE_INSTRUCTIONS, sportslineTools } from './tools'
+import { TRADE_INSTRUCTIONS, instructions, sportslineTools } from './tools'
 import { handleMcp, parseError } from './mcp'
 import { bearerToken, verifyToken } from './tokens'
 import type { CloudflareEnv } from '@/lib/db'
 import { dbFromD1 } from '@/lib/db'
 import { reportError } from '@/lib/ops/errors'
+import { priceDisplayOf } from '@/lib/viewer/prefs'
 
 export const MCP_PATH = '/mcp'
 const MAX_BODY_BYTES = 64 * 1024
@@ -53,12 +54,14 @@ export async function serveMcp(
   }
 
   try {
+    // Prices come as the Viewer chose to see them (cents or multiplier).
+    const display = await priceDisplayOf(db, caller.viewerId)
     const reply = await handleMcp(
       message,
-      sportslineTools(env, db, caller),
+      sportslineTools(env, db, caller, display),
       caller.scopes.includes('trade')
-        ? `${INSTRUCTIONS} ${TRADE_INSTRUCTIONS}`
-        : INSTRUCTIONS,
+        ? `${instructions(display)} ${TRADE_INSTRUCTIONS}`
+        : instructions(display),
     )
     return reply === null
       ? new Response(null, { status: 202 })

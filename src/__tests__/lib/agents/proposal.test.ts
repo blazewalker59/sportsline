@@ -38,6 +38,9 @@ describe('trade proposals', () => {
     expect(describeOrder({ ...base, action: 'sell', side: 'no' })).toBe(
       'Sell 10 NO for at least 54¢',
     )
+    expect(describeOrder(base, 'multiplier')).toBe(
+      'Buy 10 YES paying 1.79x or more',
+    )
   })
 
   it('lapse when nobody decides in time', () => {

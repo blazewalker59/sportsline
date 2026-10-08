@@ -25,6 +25,7 @@ import { sportsDayOf } from '@/lib/model/sportsDay'
 import { reportError } from '@/lib/ops/errors'
 import { vapidKeys } from '@/lib/push/deliver'
 import { sendPush } from '@/lib/push/webpush'
+import { priceDisplayOf } from '@/lib/viewer/prefs'
 
 /** Prices move: a proposal not decided in this long lapses. */
 export const PROPOSAL_TTL_MS = 10 * 60_000
@@ -175,9 +176,10 @@ async function notifyProposal(
     .select()
     .from(pushSubscriptions)
     .where(eq(pushSubscriptions.viewerId, p.viewerId))
+  const display = await priceDisplayOf(db, p.viewerId)
   const message = JSON.stringify({
     title: `${p.agentName} wants to trade`,
-    body: `${describeOrder(p)}: ${p.marketTitle}. Up to $${p.maxCostDollars.toFixed(2)}. Approve within 10 minutes.`,
+    body: `${describeOrder(p, display)}: ${p.marketTitle}. Up to $${p.maxCostDollars.toFixed(2)}. Approve within 10 minutes.`,
     url: '/agents',
     tag: `trade-${p.id}`,
   })

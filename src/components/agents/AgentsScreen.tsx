@@ -13,9 +13,11 @@ import type {
   TradingState,
 } from '@/lib/agents/server'
 import { AppHeader } from '@/components/layout/AppHeader'
+import { PriceDisplayToggle } from '@/components/predictions/PriceDisplayToggle'
 import { timeAgo, useNow } from '@/components/timeline/format'
 import { CAP_LIMITS, DEFAULT_CAPS } from '@/lib/agents/caps'
 import { describeOrder } from '@/lib/agents/proposal'
+import { formatPrice } from '@/lib/model/price'
 import {
   approveTradeProposal,
   connectTradeKey,
@@ -28,7 +30,7 @@ import {
   revokeApiToken,
   setTradeCaps,
 } from '@/lib/agents/server'
-import { useViewer } from '@/lib/viewer/useViewer'
+import { usePriceDisplay, useViewer } from '@/lib/viewer/useViewer'
 import { cn } from '@/lib/utils'
 
 const TOKENS_KEY = ['api-tokens']
@@ -68,6 +70,7 @@ function Signed() {
         read today’s Sharp picks and their record and, if you allow it, propose
         Kalshi trades that you approve one by one.
       </p>
+      <PriceDisplayToggle />
       {pending && pending.length > 0 && <Pending trades={pending} />}
       <Tokens tradingReady={Boolean(trading.data?.key)} />
       {trading.data && <Trading state={trading.data} />}
@@ -253,6 +256,7 @@ function Tokens({ tradingReady }: { tradingReady: boolean }) {
 // ─── Proposals waiting on you ───────────────────────────────────────────────
 
 function Pending({ trades }: { trades: Array<TradeView> }) {
+  const display = usePriceDisplay()
   const queryClient = useQueryClient()
   const now = useNow(5_000)
   const refresh = () => queryClient.invalidateQueries({ queryKey: TRADING_KEY })
@@ -280,7 +284,7 @@ function Pending({ trades }: { trades: Array<TradeView> }) {
             <p className="text-xs text-muted">
               {t.agentName} proposes · {Math.ceil(left / 60_000)} min left
             </p>
-            <p className="font-semibold">{describeOrder(t)}</p>
+            <p className="font-semibold">{describeOrder(t, display)}</p>
             <p>{t.marketTitle}</p>
             <p className="font-mono text-[11px] text-muted">{t.marketTicker}</p>
             {t.note && (
@@ -300,7 +304,7 @@ function Pending({ trades }: { trades: Array<TradeView> }) {
                 onClick={() => {
                   if (
                     confirm(
-                      `${describeOrder(t)}\n${t.marketTitle}\n\nSend this order to Kalshi now?`,
+                      `${describeOrder(t, display)}\n${t.marketTitle}\n\nSend this order to Kalshi now?`,
                     )
                   )
                     approve.mutate(t.id)
@@ -587,6 +591,7 @@ const STATUS_TEXT: Record<TradeView['status'], string> = {
 }
 
 function History({ trades }: { trades: Array<TradeView> }) {
+  const display = usePriceDisplay()
   const now = useNow()
   if (trades.length === 0) return null
   return (
@@ -597,7 +602,7 @@ function History({ trades }: { trades: Array<TradeView> }) {
           className="flex flex-col gap-0.5 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm"
         >
           <span className="flex items-baseline justify-between gap-2">
-            <span className="font-semibold">{describeOrder(t)}</span>
+            <span className="font-semibold">{describeOrder(t, display)}</span>
             <span
               className={cn(
                 'shrink-0 text-xs font-semibold',
@@ -615,7 +620,7 @@ function History({ trades }: { trades: Array<TradeView> }) {
           <span className="text-xs text-muted">
             {t.agentName} · {timeAgo(t.createdAt, now)}
             {t.filledCount
-              ? ` · ${t.filledCount} at ${Math.round((t.avgPriceDollars ?? 0) * 100)}¢, fees ${money(t.feesDollars ?? 0)}`
+              ? ` · ${t.filledCount} at ${formatPrice(t.avgPriceDollars ?? 0, display)}, fees ${money(t.feesDollars ?? 0)}`
               : ''}
           </span>
           {t.error && <span className="text-xs text-live">{t.error}</span>}
@@ -628,6 +633,7 @@ function History({ trades }: { trades: Array<TradeView> }) {
 // ─── find_bet record ────────────────────────────────────────────────────────
 
 function BetRecord() {
+  const display = usePriceDisplay()
   const record = useQuery({
     queryKey: ['bet-record'],
     queryFn: () => getBetRecord(),
@@ -698,7 +704,7 @@ function BetRecord() {
               </span>
             </span>
             <span className="text-xs text-muted">
-              {Math.round(p.price * 100)}¢ · suggested{' '}
+              {formatPrice(p.price, display)} · suggested{' '}
               {timeAgo(p.createdAt, now)} ·{' '}
               {p.placedAt
                 ? `placed${p.placedVia === 'agent' ? ' by agent' : ''}${p.placedCost ? ` (${money(p.placedCost)})` : ''}`

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SharpPick } from '@/lib/sharp/queries'
-import { agentPick } from '@/lib/agents/tools'
+import { agentPick, priceField } from '@/lib/agents/tools'
 
 const single: SharpPick = {
   id: '2026-10-07:1',
@@ -56,5 +56,28 @@ describe('agentPick', () => {
       'kalshiUrl',
       expect.stringMatching(/^https:\/\/kalshi\.com\//),
     )
+  })
+})
+
+describe('prices in the Viewer’s unit', () => {
+  it('name their unit, and drop the fee a multiplier already counts', () => {
+    const p = agentPick(single, 'multiplier')
+    expect(p).toMatchObject({
+      priceMultiplier: 1.79,
+      nowMultiplier: 1.72,
+      closingMultiplier: null,
+    })
+    expect(p).not.toHaveProperty('priceCents')
+    expect(p).not.toHaveProperty('feeCents')
+    expect(agentPick(single)).toMatchObject({ priceCents: 54, feeCents: 2 })
+  })
+
+  it('reads a combo threshold as the least it should pay', () => {
+    expect(priceField('multiplier', 'worthItAtLeast', 0.25)).toEqual({
+      worthItAtLeastMultiplier: 3.7,
+    })
+    expect(priceField('cents', 'worthItUnder', 0.25)).toEqual({
+      worthItUnderCents: 25,
+    })
   })
 })

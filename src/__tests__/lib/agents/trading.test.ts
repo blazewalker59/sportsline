@@ -299,4 +299,35 @@ describe.skipIf(!isBun)('Agent trading', () => {
     expect(await trading.closeTrade(db, 'u2', p, 'rejected')).toBeNull()
     expect(state.placed).toHaveLength(0)
   })
+
+  it('speaks in multipliers when the Viewer reads prices that way', async () => {
+    sqlite.run(
+      "INSERT INTO viewer_settings (viewer_id, price_display) VALUES ('u1','multiplier')",
+    )
+    const init = (await call(tradeToken, 'initialize', {
+      protocolVersion: '2025-06-18',
+    })) as { result?: { instructions?: string } }
+    expect(init.result?.instructions).toMatch(/payout multipliers/)
+
+    const { limitCents: _, ...byMultiplier } = ORDER
+    const r = await propose({ ...byMultiplier, minMultiplier: 1.79 })
+    // At least 1.79x after the fee: a 54¢ limit.
+    expect(r.result?.structuredContent).toMatchObject({
+      limitCents: 54,
+      limitMultiplier: 1.79,
+      order: 'Buy 10 YES paying 1.79x or more',
+    })
+    expect(JSON.parse(state.pushes.at(-1)!).body).toMatch(
+      /paying 1\.79x or more/,
+    )
+
+    const sell = await propose({
+      ...byMultiplier,
+      action: 'sell',
+      minMultiplier: 1.5,
+    })
+    expect(sell.result?.content?.[0].text).toMatch(/multiplier is for buying/)
+    const neither = await propose(byMultiplier)
+    expect(neither.result?.content?.[0].text).toMatch(/Give limitCents/)
+  })
 })

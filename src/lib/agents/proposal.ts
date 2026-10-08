@@ -5,6 +5,8 @@
  */
 
 import type { tradeProposals } from '@/lib/db/schema'
+import type { PriceDisplay } from '@/lib/model/price'
+import { formatPrice } from '@/lib/model/price'
 
 export type TradeProposal = typeof tradeProposals.$inferSelect
 type Status = TradeProposal['status']
@@ -44,11 +46,17 @@ export function statusOf(p: TradeProposal, now: number): Status {
     : p.status
 }
 
-/** The order in words: "Buy 10 YES at up to 54¢", "Sell 10 NO for at least 60¢". Pure. */
+/**
+ * The order in words: "Buy 10 YES at up to 54¢" (or, as a multiplier,
+ * "Buy 10 YES paying 1.79x or more"); "Sell 10 NO for at least 60¢". Pure.
+ */
 export function describeOrder(
   p: Pick<TradeProposal, 'action' | 'count' | 'side' | 'limitCents'>,
+  display: PriceDisplay = 'cents',
 ): string {
-  const verb = p.action === 'buy' ? 'Buy' : 'Sell'
-  const bound = p.action === 'buy' ? 'at up to' : 'for at least'
-  return `${verb} ${p.count} ${p.side.toUpperCase()} ${bound} ${p.limitCents}¢`
+  const what = `${p.count} ${p.side.toUpperCase()}`
+  if (p.action === 'sell') return `Sell ${what} for at least ${p.limitCents}¢`
+  return display === 'multiplier'
+    ? `Buy ${what} paying ${formatPrice(p.limitCents / 100, display)} or more`
+    : `Buy ${what} at up to ${p.limitCents}¢`
 }
