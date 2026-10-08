@@ -234,3 +234,7 @@ _Avoid_: trade, order (until it's placed), bet
 **Trade key**:
 A Viewer's second Kalshi key, used only to place the Trade proposals they approve: it can trade but never withdraw or transfer money. Separate from their Kalshi connection, which stays read-only.
 _Avoid_: trading account, write key
+
+**Trend pick**:
+A Kalshi offer an Agent asks for on demand ("a good bet on the Avs game"), priced against Sportsline's own trends rather than the sharp books: each Team's recent margins and totals, shrunk toward average and blended with Kalshi's price (docs/adr/0009). Weaker than a Sharp pick, and labelled so.
+_Avoid_: sharp pick (it isn't one), lock, tip

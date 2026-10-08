@@ -177,6 +177,11 @@ export interface Rules {
   maxPrice: number
   /** A pick must start at least this long from now. */
   minLeadMs: number
+  /**
+   * Trust a fair price only with a sharp source in it (default). Off for
+   * trend picks, whose fair price is our own (src/lib/sharp/trends.ts).
+   */
+  requireSharp?: boolean
 }
 
 export const DEFAULT_RULES: Omit<Rules, 'now'> = {
@@ -235,7 +240,11 @@ export function candidates(
     const f = fair.get(lineId(o.key))
     if (!f) return []
     // Trust a fair price only with a sharp source in it.
-    if (!f.sources.some((s) => SHARP.has(s.source))) return []
+    if (
+      rules.requireSharp !== false &&
+      !f.sources.some((s) => SHARP.has(s.source))
+    )
+      return []
     if (
       o.key.kind !== 'moneyline' &&
       main.get(`${o.key.gameId}|${o.key.kind}`) !== o.key.line

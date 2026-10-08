@@ -15,12 +15,15 @@ import type { PickLine } from '@/lib/sharp/record'
 import type { Caller } from './tokens'
 import type { TradeProposal } from './proposal'
 import type { CloudflareEnv, Database } from '@/lib/db'
+import type { TrendPick } from '@/lib/sharp/onDemand'
 import { loadAccount } from '@/lib/kalshi/account'
 import { market as fetchMarket } from '@/lib/kalshi/client'
 import { pickHistory, slateOn } from '@/lib/sharp/queries'
 import { picksRecord } from '@/lib/sharp/record'
 import { kalshiEventUrl } from '@/lib/sharp/view'
 import { sportsDayOf } from '@/lib/model/sportsDay'
+import { findBets } from '@/lib/sharp/onDemand'
+import { leagueFrom } from '@/lib/sharp/lookup'
 
 export const INSTRUCTIONS =
   "Sportsline publishes Sharp picks each morning from 10am Eastern: the day's five Kalshi offers priced furthest below a fair price from the sharp sportsbooks, after Kalshi's fee, plus one combo. Prices are in cents per $1 contract; fair chances, edges and closing line value are in percentage points. Grades: strong (edge 3+ points), edge (1–3), thin (less: the best of a fairly priced day). Picks are information, not advice: read get_sharp_record before trusting them."
@@ -82,6 +85,32 @@ export function agentPick(p: SharpPick) {
   }
 }
 
+/** A trend pick as an Agent reads it. Pure. */
+export function agentTrendPick(p: TrendPick) {
+  return {
+    pick: p.title,
+    game: p.gameLabel,
+    league: p.league,
+    startsAt: p.startsAt,
+    side: p.side,
+    marketKind: p.key.kind,
+    marketTicker: p.ticker,
+    kalshiUrl: kalshiEventUrl(p.ticker),
+    priceCents: cents(p.price),
+    feeCents: cents(p.fee),
+    trendChancePct: points(p.trendChance),
+    fairPct: points(p.fair),
+    edgePoints: points(p.edge),
+    value:
+      p.edge >= 0.01
+        ? 'value: our trends favor it after the fee'
+        : p.edge > 0
+          ? 'slight: barely ahead of the fee'
+          : 'none: the least bad on offer, priced against us',
+    trend: p.form?.note ?? null,
+  }
+}
+
 /** A line of the record as an Agent reads it. Pure. */
 export function agentLine(l: PickLine) {
   return {
@@ -128,7 +157,7 @@ export function sportslineTools(
   db: Database,
   caller: Caller,
 ): Array<McpTool> {
-  const read = readTools(db)
+  const read = readTools(env, db, caller)
   return caller.scopes.includes('trade')
     ? [...read, ...tradeTools(env, db, caller)]
     : read
@@ -235,7 +264,11 @@ function tradeTools(
   ]
 }
 
-function readTools(db: Database): Array<McpTool> {
+function readTools(
+  env: CloudflareEnv,
+  db: Database,
+  caller: Caller,
+): Array<McpTool> {
   return [
     tool({
       name: 'get_sharp_picks',
@@ -255,6 +288,53 @@ function readTools(db: Database): Array<McpTool> {
         const slate = await slateOn(db, day ?? sportsDayOf(new Date()))
         if (!slate) return { day: null, picks: [] }
         return { day: slate.day, picks: slate.picks.map(agentPick) }
+      },
+    }),
+    tool({
+      name: 'find_bet',
+      title: 'Find a bet',
+      description:
+        "A good bet on demand, for a Team's next game or a League's games today or tomorrow: Kalshi's offers (winner, main spread, total) priced against our own trends, each Team's recent margins and totals from Sportsline's game history, blended with Kalshi's price. For 'a good bet on the Avs game' pass team 'Avs'; for 'a good NBA bet tonight' pass league 'nba' and day 'today'. These trend picks are weaker than the daily Sharp picks (get_sharp_picks), which use the sharp sportsbooks: say so, and pass on each pick's value and trend note. surprise picks at random among the offers the trends favor.",
+      input: z.object({
+        team: z
+          .string()
+          .min(2)
+          .max(40)
+          .optional()
+          .describe(
+            'City, nickname, abbreviation or shorthand: Avs, Avalanche, Colorado, COL.',
+          ),
+        league: z
+          .enum(['nfl', 'nba', 'mlb', 'nhl'])
+          .optional()
+          .describe('Or a sport word in team, like "hockey".'),
+        day: z
+          .enum(['today', 'tomorrow'])
+          .optional()
+          .describe("Default: the Team's next game, or today for a League."),
+        count: z.number().int().min(1).max(5).default(3),
+        surprise: z.boolean().default(false),
+      }),
+      call: async ({ team, league, day, count, surprise }) => {
+        const asLeague = !league && team ? leagueFrom(team) : null
+        const answer = await findBets(env, db, caller.viewerId, {
+          team: asLeague ? undefined : team,
+          league: league ?? asLeague,
+          day,
+          count,
+          surprise,
+        })
+        return {
+          games: answer.games.map((g) => ({
+            game: `${g.away.name} @ ${g.home.name}`,
+            league: g.league,
+            startsAt: g.startsAt,
+          })),
+          picks: answer.picks.map(agentTrendPick),
+          reason: answer.reason,
+          method:
+            "Trend picks: each Team's last 7 days of results (or last 3 games), shrunk toward average, give an expected margin and total; that chance is blended 35/65 with Kalshi's own price. Not the sharp books.",
+        }
       },
     }),
     tool({
