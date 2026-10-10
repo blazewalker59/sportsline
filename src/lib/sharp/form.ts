@@ -11,8 +11,11 @@ import type { League } from '@/lib/model/types'
 /** Form covers the last week, or a Team's last few Games if that's fewer. */
 export const FORM_DAYS = 7
 export const FORM_MIN_GAMES = 3
-/** How far back to look for those few Games (a weekly NFL schedule). */
-export const FORM_LOOKBACK_DAYS = 21
+/**
+ * How far back to look for those few Games: a weekly football schedule,
+ * with room for a bye week.
+ */
+export const FORM_LOOKBACK_DAYS = 28
 
 export interface Final {
   homeTeamId: string

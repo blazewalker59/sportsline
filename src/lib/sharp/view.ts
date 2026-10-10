@@ -1,15 +1,33 @@
 /** Sharp picks as the app shows them: Kalshi links, the banner. Pure. */
 
 /**
- * The Kalshi page for a market's event, in the form Kalshi itself links
- * (`/markets/{series}/{slug}/{event}`), which its app opens from a link;
- * a bare series page doesn't. Kalshi resolves the event from the last
- * part, so the slug only needs to be present.
+ * The Kalshi page for a market's Game, as Kalshi's app shares it
+ * (`/markets/kxncaafgame/indiana-vs-nebraska/KXNCAAFGAME-26OCT10INDNEB`):
+ * the Game's winner event, which opens on Kalshi's usual game view with its
+ * spreads and totals beside it, even for a spread or total pick. The slug
+ * comes from Kalshi's title for the Game ("Indiana vs Nebraska"); picks
+ * stored before titles were read get a placeholder, which still resolves.
  */
-export function kalshiEventUrl(marketTicker: string): string {
-  const [series, date] = marketTicker.toLowerCase().split('-')
-  const event = date ? `${series}-${date}` : series
-  return `https://kalshi.com/markets/${series}/game/${event}`
+export function kalshiEventUrl(
+  marketTicker: string,
+  gameTitle?: string | null,
+): string {
+  const [series, date] = marketTicker.toUpperCase().split('-')
+  const game = series.replace(/(SPREAD|TOTAL)$/, 'GAME')
+  const event = date ? `${game}-${date}` : game
+  const slug = (gameTitle && kalshiSlug(gameTitle)) || 'game'
+  return `https://kalshi.com/markets/${game.toLowerCase()}/${slug}/${event}`
+}
+
+/** "Morehead St. vs Dayton" → "morehead-st-vs-dayton". */
+export function kalshiSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/[\s-]+/g, '-')
 }
 
 export interface SlateSummary {

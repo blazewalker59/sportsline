@@ -9,14 +9,16 @@ import {
   candidates,
   lineId,
   scoreOf,
+  selectCombo,
   selectPicks,
 } from './engine'
 import { FORM_LOOKBACK_DAYS, formOf, teamForms } from './form'
 import { kalshiOffers, serviceAccount } from './kalshi'
 import { gamesFor } from './lookup'
-import { SHARP_LEAGUES, loadFinals, loadGames } from './sources'
+import { TREND_LEAGUES, loadFinals, loadGames } from './sources'
 import { leagueTotals, trendFair } from './trends'
-import type { Candidate } from './engine'
+import type { Candidate, ComboPick } from './engine'
+import type { Slate } from './lookup'
 import type { GameRef } from './sources'
 import type { CloudflareEnv, Database } from '@/lib/db'
 import type { League } from '@/lib/model/types'
@@ -28,7 +30,11 @@ export interface BetAsk {
   league?: League | null
   /** Today, tomorrow, or (unset) the next day with a matching Game. */
   day?: 'today' | 'tomorrow'
+  /** Only Games kicking off in this window ("the noon slate"). */
+  slate?: Slate
   count: number
+  /** A combo of this many legs, from different Games, instead of singles. */
+  legs?: number
   /** Pick at random among the offers our trends favor, not the very best. */
   surprise?: boolean
 }
@@ -38,12 +44,27 @@ export interface TrendPick extends Candidate {
   trendChance: number
 }
 
+export interface TrendCombo extends Omit<ComboPick, 'legs'> {
+  legs: Array<TrendPick>
+}
+
 export interface BetAnswer {
   /** The Games the ask matched, soonest first. */
   games: Array<GameRef>
+  /** The singles, or a combo's legs. */
   picks: Array<TrendPick>
+  /** The combo, when legs were asked for and enough Games had one. */
+  combo: TrendCombo | null
   /** Why there's nothing to show, when there isn't. */
   reason: string | null
+}
+
+const LEAGUE_NAMES: Record<League, string> = {
+  nfl: 'NFL',
+  nba: 'NBA',
+  mlb: 'MLB',
+  nhl: 'NHL',
+  cfb: 'college football',
 }
 
 /** Show nothing priced this far against us, even as a least-bad pick. */
@@ -60,10 +81,9 @@ export async function findBets(
   const today = sportsDayOf(now)
   const tomorrow = shiftSportsDay(today, 1)
   const leadMs = DEFAULT_RULES.minLeadMs
-  const upcoming = (await loadGames(db, today, tomorrow)).filter(
+  const upcoming = (await loadGames(db, today, tomorrow, TREND_LEAGUES)).filter(
     (g) =>
       g.status === 'scheduled' &&
-      SHARP_LEAGUES.includes(g.league) &&
       Date.parse(g.startsAt) - now.getTime() >= leadMs,
   )
   const matched = gamesFor(upcoming, ask).sort(
@@ -79,22 +99,30 @@ export async function findBets(
           ? sportsDayOf(new Date(matched[0].startsAt))
           : today
   const games = matched.filter((g) => sportsDayOf(new Date(g.startsAt)) === day)
+  const none = (reason: string): BetAnswer => ({
+    games,
+    picks: [],
+    combo: null,
+    reason,
+  })
+  const slate = ask.slate ? ` in the ${ask.slate} slate` : ''
   if (games.length === 0) {
-    return {
-      games: [],
-      picks: [],
-      reason: ask.team
-        ? `No upcoming game for “${ask.team}”${ask.day ? ` ${ask.day}` : ' today or tomorrow'} that hasn’t started.`
-        : `No ${ask.league?.toUpperCase() ?? ''} games ${ask.day ?? 'today'} that haven’t started.`,
-    }
+    return none(
+      ask.team
+        ? `No upcoming game for “${ask.team}”${slate}${ask.day ? ` ${ask.day}` : ' today or tomorrow'} that hasn’t started.`
+        : `No ${ask.league ? LEAGUE_NAMES[ask.league] : ''} games${slate} ${ask.day ?? 'today'} that haven’t started.`,
+    )
+  }
+  if (ask.legs && games.length < 2) {
+    return none(
+      `Only one game${slate} ${ask.day ?? 'today'} that hasn’t started: a combo needs legs from different games.`,
+    )
   }
 
   const account =
     (await loadAccount(env, viewerId)) ?? (await serviceAccount(env, db))
   const offers = await kalshiOffers(env, account, db, games, new Set([day]))
-  if (offers.length === 0) {
-    return { games, picks: [], reason: 'Kalshi has no open markets on it yet.' }
-  }
+  if (offers.length === 0) return none('Kalshi has no open markets on it yet.')
 
   const leagueOf = new Map(
     games.flatMap((g) => [
@@ -107,6 +135,7 @@ export async function findBets(
     [...leagueOf.keys()],
     shiftSportsDay(day, -FORM_LOOKBACK_DAYS),
     shiftSportsDay(day, -1),
+    TREND_LEAGUES,
   )
   const forms = teamForms(finals, now.getTime())
   const { fair, model } = trendFair(
@@ -121,12 +150,9 @@ export async function findBets(
     ),
   )
   if (fair.size === 0) {
-    return {
-      games,
-      picks: [],
-      reason:
-        'Not enough recent games stored for these teams to read a trend (at least 3 each).',
-    }
+    return none(
+      'Not enough recent games stored for these teams to read a trend (at least 3 each).',
+    )
   }
 
   const gameOf = new Map(games.map((g) => [g.gameId, g]))
@@ -149,15 +175,30 @@ export async function findBets(
     return { ...c, trendChance: c.side === 'yes' ? p : 1 - p }
   }
   if (pool.length === 0) {
-    return {
-      games,
-      picks: [],
-      reason:
-        'Nothing on Kalshi is priced fairly enough to suggest (prices 20–80¢, tight spreads, main lines).',
-    }
+    return none(
+      'Nothing on Kalshi is priced fairly enough to suggest (prices 20–80¢, tight spreads, main lines).',
+    )
   }
 
   const bets = distinctBets(pool, gameOf)
+  if (ask.legs) {
+    const combo = selectCombo(bets, ask.legs)
+    if (!combo) {
+      return none(
+        'Too few games have a leg our trends rate as likely (45%+) for a combo.',
+      )
+    }
+    const legs = combo.legs.map(withTrend)
+    return {
+      games,
+      picks: legs,
+      combo: { ...combo, legs },
+      reason:
+        legs.length < ask.legs
+          ? `Only ${legs.length} games had a leg worth adding, so this is a ${legs.length}-leg combo.`
+          : null,
+    }
+  }
   let picks: Array<Candidate>
   if (ask.surprise) {
     // Any offer our trends favor; failing that, the best there is.
@@ -172,7 +213,7 @@ export async function findBets(
   } else {
     picks = selectPicks(bets, ask.count)
   }
-  return { games, picks: picks.map(withTrend), reason: null }
+  return { games, picks: picks.map(withTrend), combo: null, reason: null }
 }
 
 /**

@@ -141,6 +141,8 @@ export interface KalshiOffer {
   /** "Packers win", "Over 47.5": what the pick says. */
   title: string
   gameLabel: string
+  /** Kalshi's own title for the Game ("Indiana vs Nebraska"), for its link. */
+  gameTitle?: string | null
 }
 
 /**

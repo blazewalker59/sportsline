@@ -1,25 +1,45 @@
 import { describe, expect, it } from 'vitest'
-import { bannerVisible, kalshiEventUrl, slateSummary } from '@/lib/sharp/view'
+import {
+  bannerVisible,
+  kalshiEventUrl,
+  kalshiSlug,
+  slateSummary,
+} from '@/lib/sharp/view'
 
 describe('kalshiEventUrl', () => {
-  it('links a winner market to its event page', () => {
-    expect(kalshiEventUrl('KXNFLGAME-26OCT05KCJAX-KC')).toBe(
-      'https://kalshi.com/markets/kxnflgame/game/kxnflgame-26oct05kcjax',
+  it("links to the Game the way Kalshi's app shares it", () => {
+    expect(
+      kalshiEventUrl('KXNCAAFGAME-26OCT10INDNEB-IND', 'Indiana vs Nebraska'),
+    ).toBe(
+      'https://kalshi.com/markets/kxncaafgame/indiana-vs-nebraska/KXNCAAFGAME-26OCT10INDNEB',
     )
   })
 
-  it('drops a spread or total strike from the event', () => {
-    expect(kalshiEventUrl('KXNBASPREAD-26OCT05NYKPHI-NYK5')).toBe(
-      'https://kalshi.com/markets/kxnbaspread/game/kxnbaspread-26oct05nykphi',
+  it("opens a spread or total pick on its Game's winner event", () => {
+    expect(
+      kalshiEventUrl(
+        'KXNBASPREAD-26OCT05NYKPHI-NYK5',
+        'New York vs Philadelphia',
+      ),
+    ).toBe(
+      'https://kalshi.com/markets/kxnbagame/new-york-vs-philadelphia/KXNBAGAME-26OCT05NYKPHI',
     )
     expect(kalshiEventUrl('KXMLBTOTAL-26OCT071800LADATL-8')).toBe(
-      'https://kalshi.com/markets/kxmlbtotal/game/kxmlbtotal-26oct071800ladatl',
+      'https://kalshi.com/markets/kxmlbgame/game/KXMLBGAME-26OCT071800LADATL',
     )
+  })
+
+  it("slugs Kalshi's titles", () => {
+    expect(kalshiSlug('Morehead St. vs Dayton')).toBe('morehead-st-vs-dayton')
+    expect(kalshiSlug('PHI Eagles vs JAC Jaguars')).toBe(
+      'phi-eagles-vs-jac-jaguars',
+    )
+    expect(kalshiSlug('Texas A&M vs Missouri')).toBe('texas-am-vs-missouri')
   })
 
   it('falls back to the series for a bare ticker', () => {
     expect(kalshiEventUrl('KXNHLGAME')).toBe(
-      'https://kalshi.com/markets/kxnhlgame/game/kxnhlgame',
+      'https://kalshi.com/markets/kxnhlgame/game/KXNHLGAME',
     )
   })
 })

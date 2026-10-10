@@ -236,8 +236,12 @@ A Viewer's second Kalshi key, used only to place the Trade proposals they approv
 _Avoid_: trading account, write key
 
 **Trend pick**:
-A Kalshi offer an Agent asks for on demand ("a good bet on the Avs game"), priced against Sportsline's own trends rather than the sharp books: each Team's recent margins and totals, shrunk toward average and blended with Kalshi's price (docs/adr/0009). Weaker than a Sharp pick, and labelled so.
+A Kalshi offer an Agent asks for on demand ("a good bet on the Avs game"), priced against Sportsline's own trends rather than the sharp books: each Team's recent margins and totals, shrunk toward average and blended with Kalshi's price (docs/adr/0009). Covers college football as well as the four Leagues Sharp picks cover. An ask can narrow to one Slate, or ask for a combo of 2–6 legs from different Games. Weaker than a Sharp pick, and labelled so.
 _Avoid_: sharp pick (it isn't one), lock, tip
+
+**Slate**:
+A day's Games by kickoff window, Eastern: early (before 11am), noon (to 2:30pm), afternoon (to 6pm), evening (to 9:30pm) and late. Named for college football Saturdays ("the noon slate"), but any League's Games fall into one.
+_Avoid_: window, time slot
 
 **Price display**:
 How a Viewer reads Kalshi prices, everywhere Sportsline shows one (Sharp picks, the Agents page, Alerts) and in what their Agents are told: cents (54¢, what a contract costs) or a payout multiplier (1.79x, what $1 pays back if it wins, after Kalshi's fee). Chances, edges and win rates stay percentages.

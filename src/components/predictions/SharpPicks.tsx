@@ -462,10 +462,16 @@ function EdgeChip({ pick: p }: { pick: SharpPick }) {
   )
 }
 
-function KalshiLink({ ticker }: { ticker: string }) {
+function KalshiLink({
+  ticker,
+  gameTitle,
+}: {
+  ticker: string
+  gameTitle?: string | null
+}) {
   return (
     <a
-      href={kalshiEventUrl(ticker)}
+      href={kalshiEventUrl(ticker, gameTitle)}
       target="_blank"
       rel="noreferrer"
       onClick={(e) => e.stopPropagation()}
@@ -544,7 +550,7 @@ function PickRow({ pick: p }: { pick: SharpPick }) {
             ))}
             {p.marketTicker && (
               <span className="ml-auto">
-                <KalshiLink ticker={p.marketTicker} />
+                <KalshiLink ticker={p.marketTicker} gameTitle={p.gameTitle} />
               </span>
             )}
           </div>
@@ -600,6 +606,15 @@ function ComboRow({ pick: p }: { pick: SharpPick }) {
                   {l.result === 'won' ? '✓ ' : l.result === 'lost' ? '✕ ' : ''}
                   {formatPrice(l.price, display)} · {pct1(l.fair)}
                 </span>
+                <a
+                  href={kalshiEventUrl(l.marketTicker, l.gameTitle)}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`Open ${l.gameLabel} in Kalshi`}
+                  className="shrink-0 font-bold text-accent"
+                >
+                  Kalshi
+                </a>
               </li>
             ))}
           </ul>

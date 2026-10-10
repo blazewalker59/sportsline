@@ -618,6 +618,8 @@ export const sharpPicks = sqliteTable(
     marketKind: text('market_kind').$type<'moneyline' | 'spread' | 'total'>(),
     title: text('title').notNull(),
     gameLabel: text('game_label').notNull(),
+    /** Kalshi's title for a single's Game ("Indiana vs Nebraska"), for its link. */
+    gameTitle: text('game_title'),
     /** Fair chance of the pick (the combo's: its legs multiplied). */
     fair: real('fair').notNull(),
     /** Kalshi's price when published (the combo's: its legs multiplied). */
@@ -635,6 +637,8 @@ export const sharpPicks = sqliteTable(
       side: 'yes' | 'no'
       title: string
       gameLabel: string
+      /** Kalshi's title for the leg's Game; absent on older legs. */
+      gameTitle?: string | null
       league: League
       startsAt: string
       fair: number
@@ -772,13 +776,15 @@ export const betRequests = sqliteTable(
       .references(() => user.id, { onDelete: 'cascade' }),
     tokenId: text('token_id').notNull(),
     agentName: text('agent_name').notNull(),
-    /** What was asked: Team, League, day, how many, surprise. */
+    /** What was asked: Team, League, day, Slate, how many, combo legs, surprise. */
     ask: text('ask', { mode: 'json' })
       .$type<{
         team?: string
         league?: string | null
         day?: string
+        slate?: string
         count: number
+        legs?: number
         surprise?: boolean
       }>()
       .notNull(),

@@ -15,6 +15,7 @@ const single: SharpPick = {
   marketKind: 'moneyline',
   title: 'EDM win',
   gameLabel: 'EDM @ ANA',
+  gameTitle: 'Edmonton vs Anaheim',
   fair: 0.585,
   price: 0.54,
   fee: 0.02,
@@ -54,7 +55,7 @@ describe('agentPick', () => {
     })
     expect(agentPick(single)).toHaveProperty(
       'kalshiUrl',
-      expect.stringMatching(/^https:\/\/kalshi\.com\//),
+      'https://kalshi.com/markets/kxnhlgame/edmonton-vs-anaheim/KXNHLGAME-26OCT07EDMANA',
     )
   })
 })

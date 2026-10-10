@@ -3,12 +3,12 @@
 Agents (docs/adr/0007) get asks like "a good bet on the Avs game" or "a good NBA bet tonight". The daily Sharp picks (docs/adr/0006) answer what's best across a whole day, priced once a morning against the sharp sportsbooks through The Odds API's free tier. Pricing every ask the same way would spend about 3 of the 500 monthly credits per league each time. So on-demand picks use a fair price we can compute for free, from Sportsline's own game history.
 
 **The trend model** (`src/lib/sharp/trends.ts`, pure):
-- **Form:** each Team's form is the same as a Sharp pick's: average margin and average total over its last 7 days of finals, or its last 3 games within 21 days when that's fewer. A Team with fewer than 3 games gets no trend.
+- **Form:** each Team's form is the same as a Sharp pick's: average margin and average total over its last 7 days of finals, or its last 3 games within 28 days when that's fewer (a weekly football schedule with a bye). A Team with fewer than 3 games gets no trend.
 - **Shrinking:** a week of scores is mostly noise, so a Team's form counts n / (n + 6) of itself (6 games count half). The rest is the League's average.
 - **Expectations:**
-  - expected home margin = home rating − away rating + a home edge (NFL 1.5 points, NBA 2.3, MLB 0.2 runs, NHL 0.15 goals);
+  - expected home margin = home rating − away rating + a home edge (NFL 1.5 points, college football 2.5, NBA 2.3, MLB 0.2 runs, NHL 0.15 goals);
   - expected total = the average of both Teams' shrunk totals.
-- **Chances:** each Line's chance comes from a normal curve around those expectations. The margin spreads by NFL 13.5, NBA 12.5, MLB 4.2, NHL 2.4. The total spreads by NFL 13.5, NBA 18, MLB 4.4, NHL 2.3.
+- **Chances:** each Line's chance comes from a normal curve around those expectations. The margin spreads by NFL 13.5, college football 16, NBA 12.5, MLB 4.2, NHL 2.4. The total spreads by NFL 13.5, college football 16, NBA 18, MLB 4.4, NHL 2.3.
 - **Blending:** the fair price is 35% that chance and 65% Kalshi's own price (the middle of its YES bid and ask). The market knows injuries, lineups and much more than a week of finals; the blend keeps a trend from claiming edges out of noise. It can only lean against Kalshi's price.
 
 **Picking** reuses the Sharp pick engine with the sharp-source rule switched off (`requireSharp: false`):
@@ -18,12 +18,17 @@ Agents (docs/adr/0007) get asks like "a good bet on the Avs game" or "a good NBA
 
 Equivalent bets collapse into one, the best-valued: on a winner market, "COL win" and "ANA lose". For one Game, the best of its markets come back. For several Games, the slate's selection gives one per Game with a mix of Leagues and markets. A `surprise` ask picks at random among the offers the trends favor.
 
+**Combos.** An ask for `legs` (2–6) gets one combo instead of singles, built as the daily Sharp combo is: one leg a Game, each 45%+ likely by the blended fair price, biggest edges first. It comes with the legs' prices multiplied (roughly Kalshi's quote), the combined fair chance, and the worst quote worth taking. Kalshi prices a combo only when it's built, so the Viewer builds it there; Agents can't propose one. Its legs are recorded as the ask's picks.
+
 **The ask** is structured, and the Agent fills it from what was said:
 - a Team, by city, nickname, abbreviation or fans' shorthand ("Avs", "Habs", "Sixers");
-- and/or a League (or a sport word);
-- and a day (today or tomorrow).
+- and/or a League (or a sport word; "college football" is college, not the NFL);
+- a day (today or tomorrow);
+- and a Slate: the Games kicking off in one Eastern window (early before 11am, noon to 2:30pm, afternoon to 6pm, evening to 9:30pm, late after), so "the noon slate" means college football's noon kickoffs.
 
-Without a day, a Team's next game is used, and a League's games today. Kalshi's offers are read as the Sharp picks read them: with the Viewer's read-only key, or the admin's.
+Without a day, a Team's next game is used, and a League's games today.
+
+College football is covered too, though not by the Sharp picks (The Odds API and Polymarket aren't read for it). Its Games are the ones Sportsline covers (CONTEXT.md, "League"), so a Team's trend counts only its stored games: an opponent from outside the covered conferences often has too few for a pick. Kalshi's offers are read as the Sharp picks read them: with the Viewer's read-only key, or the admin's.
 
 The tool is `find_bet`. Every pick comes with its trend note (records and margins), our trend's own chance, the blended fair price and edge, and a plain value label: value, slight, or none (the least bad on offer). The tool's description tells the Agent these are weaker than Sharp picks and to say so.
 

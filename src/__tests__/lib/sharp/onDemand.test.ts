@@ -234,6 +234,155 @@ describe.skipIf(!isBun)('findBets', () => {
     expect(a.picks[0].edge).toBeGreaterThan(0)
   })
 
+  describe('college football', () => {
+    // Saturday 10 Oct 2026, 9am Eastern.
+    const SATURDAY = new Date('2026-10-10T13:00:00Z')
+
+    beforeEach(() => {
+      // Three noon games and a 3:30 one; the home sides won by 14s on
+      // each of the last three Saturdays, the visitors lost by 14s.
+      const kickoffs = [
+        [
+          'ala',
+          'Alabama Crimson Tide',
+          'ALA',
+          'vandy',
+          'Vanderbilt Commodores',
+          'VAN',
+          '16:00',
+        ],
+        [
+          'osu',
+          'Ohio State Buckeyes',
+          'OSU',
+          'pur',
+          'Purdue Boilermakers',
+          'PUR',
+          '16:00',
+        ],
+        [
+          'clem',
+          'Clemson Tigers',
+          'CLEM',
+          'bc',
+          'Boston College Eagles',
+          'BC',
+          '16:45',
+        ],
+        [
+          'tex',
+          'Texas Longhorns',
+          'TEX',
+          'ku',
+          'Kansas Jayhawks',
+          'KU',
+          '19:30',
+        ],
+      ]
+      for (const [
+        home,
+        homeName,
+        homeAbbr,
+        away,
+        awayName,
+        awayAbbr,
+        at,
+      ] of kickoffs) {
+        team(home, 'cfb', homeName, homeAbbr)
+        team(away, 'cfb', awayName, awayAbbr)
+        team(`${home}-foe`, 'cfb', `${homeName} Foe`, 'HF')
+        team(`${away}-foe`, 'cfb', `${awayName} Foe`, 'AF')
+        for (const day of ['2026-09-19', '2026-09-26', '2026-10-03']) {
+          addGame({
+            league: 'cfb',
+            day,
+            startsAt: `${day}T19:30:00Z`,
+            status: 'final',
+            home,
+            away: `${home}-foe`,
+            homeScore: 35,
+            awayScore: 21,
+          })
+          addGame({
+            league: 'cfb',
+            day,
+            startsAt: `${day}T19:30:00Z`,
+            status: 'final',
+            home: `${away}-foe`,
+            away,
+            homeScore: 35,
+            awayScore: 21,
+          })
+        }
+        addGame({
+          id: `${home}-next`,
+          league: 'cfb',
+          day: '2026-10-10',
+          startsAt: `2026-10-10T${at}:00Z`,
+          status: 'scheduled',
+          home,
+          away,
+        })
+      }
+    })
+
+    it('makes a 3-leg combo from the noon slate', async () => {
+      const a = await findBets(
+        env,
+        db,
+        'u1',
+        { league: 'cfb', day: 'today', slate: 'noon', count: 3, legs: 3 },
+        SATURDAY,
+      )
+      expect(a.reason).toBeNull()
+      expect(a.games.map((g) => g.gameId).sort()).toEqual([
+        'ala-next',
+        'clem-next',
+        'osu-next',
+      ])
+      expect(state.offersFor.sort()).toEqual([
+        'ala-next',
+        'clem-next',
+        'osu-next',
+      ])
+      expect(a.combo?.legs).toHaveLength(3)
+      expect(a.picks).toEqual(a.combo?.legs)
+      // One leg a game, each backing the home side the trends favor.
+      expect(new Set(a.picks.map((p) => p.key.gameId)).size).toBe(3)
+      expect(a.picks.map((p) => p.title).sort()).toEqual([
+        'BC lose',
+        'PUR lose',
+        'VAN lose',
+      ])
+      expect(a.combo?.fair).toBeCloseTo(a.picks.reduce((n, p) => n * p.fair, 1))
+    })
+
+    it('says so when a slate has too few games for the combo', async () => {
+      const a = await findBets(
+        env,
+        db,
+        'u1',
+        { league: 'cfb', day: 'today', slate: 'afternoon', count: 3, legs: 3 },
+        SATURDAY,
+      )
+      expect(a).toMatchObject({
+        picks: [],
+        combo: null,
+        reason: expect.stringMatching(/Only one game in the afternoon slate/),
+      })
+      const late = await findBets(
+        env,
+        db,
+        'u1',
+        { league: 'cfb', day: 'today', slate: 'late', count: 3 },
+        SATURDAY,
+      )
+      expect(late.reason).toMatch(
+        /No college football games in the late slate today/,
+      )
+    })
+  })
+
   it("won't suggest a game about to start", async () => {
     const late = new Date('2026-10-08T23:15:00Z')
     const a = await findBets(

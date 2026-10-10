@@ -16,7 +16,7 @@ import {
   selectPicks,
 } from './engine'
 import { FORM_LOOKBACK_DAYS, formOf, teamForms } from './form'
-import { kalshiOffers, serviceAccount } from './kalshi'
+import { kalshiOffers, serviceAccount, titlesForMarkets } from './kalshi'
 import {
   loadFinals,
   loadGames,
@@ -77,6 +77,7 @@ function singleRow(
     marketKind: c.key.kind,
     title: c.title,
     gameLabel: c.gameLabel,
+    gameTitle: c.gameTitle ?? null,
     fair: c.fair,
     price: c.price,
     fee: c.fee,
@@ -191,6 +192,7 @@ export async function publishSlate(
         side: l.side,
         title: l.title,
         gameLabel: l.gameLabel,
+        gameTitle: l.gameTitle ?? null,
         league: l.league,
         startsAt: l.startsAt,
         fair: l.fair,
@@ -315,6 +317,17 @@ export async function recheckSlate(
   const byTicker = new Map(
     (await markets(account, tickers)).map((m) => [m.ticker, m]),
   )
+  // Picks published before Games' titles were read get them for their links.
+  const titles = await titlesForMarkets(
+    account,
+    open.flatMap((p) =>
+      p.kind === 'combo'
+        ? (p.legs ?? []).filter((l) => !l.gameTitle).map((l) => l.marketTicker)
+        : p.marketTicker && !p.gameTitle
+          ? [p.marketTicker]
+          : [],
+    ),
+  )
   const started = (startsAt: string) => now.getTime() >= Date.parse(startsAt)
   const settled = (ticker: string, side: 'yes' | 'no') => {
     const r = byTicker.get(ticker)?.result
@@ -328,6 +341,8 @@ export async function recheckSlate(
       const prices = m ? sidePrices(m, p.side) : null
       const result = settled(p.marketTicker, p.side)
       const set: Partial<PickRow> = { checkedAt: at }
+      if (!p.gameTitle && titles.has(p.marketTicker))
+        set.gameTitle = titles.get(p.marketTicker)
       if (!started(p.startsAt) && prices) {
         set.currentPrice = prices.ask
         set.currentEdge = p.fair - prices.ask - kalshiFee(prices.ask)
@@ -346,6 +361,7 @@ export async function recheckSlate(
         const prices = m ? sidePrices(m, l.side) : null
         return {
           ...l,
+          gameTitle: l.gameTitle ?? titles.get(l.marketTicker) ?? null,
           currentPrice:
             !started(l.startsAt) && prices ? prices.ask : l.currentPrice,
           closingPrice:

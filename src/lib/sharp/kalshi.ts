@@ -1,8 +1,9 @@
 /**
  * The day's Kalshi game markets for Sharp picks, as offers on our Lines
  * (docs/adr/0006): winners, spreads (a ladder of "wins by over") and
- * totals for the four Leagues. Read with a service account, because
- * Kalshi only answers signed requests from Cloudflare (docs/adr/0003).
+ * totals for the four Leagues and college football. Read with a service
+ * account, because Kalshi only answers signed requests from Cloudflare
+ * (docs/adr/0003).
  * Server only.
  */
 
@@ -20,25 +21,21 @@ import { dollars } from '@/lib/kalshi/markets'
 import { gameFor } from '@/lib/kalshi/matching'
 import { adminEmails } from '@/lib/ops/errors'
 
-const SERIES: Array<{ series: string; league: League; kind: MarketKind }> = [
-  ...(['NFL', 'NBA', 'MLB', 'NHL'] as const).flatMap((l) => [
-    {
-      series: `KX${l}GAME`,
-      league: l.toLowerCase() as League,
-      kind: 'moneyline' as const,
-    },
-    {
-      series: `KX${l}SPREAD`,
-      league: l.toLowerCase() as League,
-      kind: 'spread' as const,
-    },
-    {
-      series: `KX${l}TOTAL`,
-      league: l.toLowerCase() as League,
-      kind: 'total' as const,
-    },
-  ]),
+/** Each League's name in Kalshi's series tickers. */
+const KALSHI_LEAGUE: Array<[string, League]> = [
+  ['NFL', 'nfl'],
+  ['NBA', 'nba'],
+  ['MLB', 'mlb'],
+  ['NHL', 'nhl'],
+  ['NCAAF', 'cfb'],
 ]
+
+const SERIES: Array<{ series: string; league: League; kind: MarketKind }> =
+  KALSHI_LEAGUE.flatMap(([l, league]) => [
+    { series: `KX${l}GAME`, league, kind: 'moneyline' as const },
+    { series: `KX${l}SPREAD`, league, kind: 'spread' as const },
+    { series: `KX${l}TOTAL`, league, kind: 'total' as const },
+  ])
 
 const MONTHS = 'JANFEBMARAPRMAYJUNJULAUGSEPOCTNOVDEC'
 
@@ -94,6 +91,67 @@ async function openMarkets(
   return out
 }
 
+/** Kalshi's own title for each Game, by its event's date and teams. */
+async function gameTitles(
+  account: KalshiAccount | null,
+  series: string,
+): Promise<Map<string, string>> {
+  const titles = new Map<string, string>()
+  let cursor = ''
+  for (let page = 0; page < 5; page++) {
+    const path = `/events?series_ticker=${series}&status=open&limit=200${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`
+    type Page = {
+      events?: Array<{ event_ticker: string; title?: string }>
+      cursor?: string
+    }
+    const r: Page = account
+      ? await signedGet<Page>(account, path)
+      : ((await (
+          await fetch(`${KALSHI_HOST}/trade-api/v2${path}`)
+        ).json()) as Page)
+    for (const e of r.events ?? []) {
+      const at = e.event_ticker.split('-')[1]
+      // "Indiana vs Nebraska: Spread" is the same Game.
+      const title = e.title?.replace(/:.*$/, '').trim()
+      if (at && title) titles.set(at, title)
+    }
+    cursor = r.cursor ?? ''
+    if (!cursor) break
+  }
+  return titles
+}
+
+/**
+ * Kalshi's titles for the Games of these markets, by market ticker: for
+ * picks published before titles were read. One call a Game; a Game whose
+ * title can't be read is left out.
+ */
+export async function titlesForMarkets(
+  account: KalshiAccount,
+  marketTickers: ReadonlyArray<string>,
+): Promise<Map<string, string>> {
+  const eventOf = (ticker: string) => {
+    const [series, date] = ticker.toUpperCase().split('-')
+    return date ? `${series.replace(/(SPREAD|TOTAL)$/, 'GAME')}-${date}` : null
+  }
+  const byEvent = new Map<string, string | null>()
+  for (const ticker of marketTickers) {
+    const event = eventOf(ticker)
+    if (!event || byEvent.has(event)) continue
+    const r = await signedGet<{ event?: { title?: string } }>(
+      account,
+      `/events/${event}`,
+    ).catch(() => null)
+    byEvent.set(event, r?.event?.title?.replace(/:.*$/, '').trim() || null)
+  }
+  const out = new Map<string, string>()
+  for (const ticker of marketTickers) {
+    const title = byEvent.get(eventOf(ticker) ?? '')
+    if (title) out.set(ticker, title)
+  }
+  return out
+}
+
 /** Our Game for an event: by the teams in its ticker, else by its milestone. */
 async function gameOf(
   env: CloudflareEnv,
@@ -137,8 +195,16 @@ export async function kalshiOffers(
 ): Promise<Array<KalshiOffer>> {
   const offers: Array<KalshiOffer> = []
   const resolved = new Map<string, GameRef | null>()
+  const gameTitlesOf = new Map<League, Map<string, string>>()
   for (const { series, league, kind } of SERIES) {
     if (!refs.some((g) => g.league === league)) continue
+    if (!gameTitlesOf.has(league)) {
+      // Titles only make links nicer: a failed read isn't fatal.
+      gameTitlesOf.set(
+        league,
+        await gameTitles(account, series).catch(() => new Map()),
+      )
+    }
     for (const m of await openMarkets(account, series)) {
       const parsed = parseEventTicker(m.event_ticker)
       if (!parsed || !days.has(parsed.day)) continue
@@ -168,6 +234,9 @@ export async function kalshiOffers(
         startsAt: game.startsAt,
         volume: Number((m as { volume_fp?: string }).volume_fp ?? 0),
         gameLabel: label,
+        gameTitle:
+          gameTitlesOf.get(league)?.get(m.event_ticker.split('-')[1] ?? '') ??
+          null,
       }
       const titles =
         kind === 'moneyline'

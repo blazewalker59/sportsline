@@ -84,7 +84,7 @@ describe.skipIf(!isBun)('following find_bet', () => {
       db,
       caller,
       { team: 'Leafs', count: 3 },
-      { games: [], picks: [], reason: 'No upcoming game' },
+      { games: [], picks: [], combo: null, reason: 'No upcoming game' },
       new Date('2026-10-08T15:00:00Z'),
     )
     await rec.recordRequest(
@@ -97,6 +97,7 @@ describe.skipIf(!isBun)('following find_bet', () => {
           pickOf('A', 'yes', '2026-10-09T02:00:00Z'),
           pickOf('B', 'no', '2026-10-09T02:00:00Z'),
         ],
+        combo: null,
         reason: null,
       },
       new Date('2026-10-08T15:00:00Z'),
@@ -123,6 +124,7 @@ describe.skipIf(!isBun)('following find_bet', () => {
           pickOf('B', 'no', '2026-10-09T02:00:00Z'),
           pickOf('C', 'yes', '2026-10-09T02:00:00Z'),
         ],
+        combo: null,
         reason: null,
       },
       suggested,

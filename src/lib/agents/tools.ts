@@ -16,7 +16,7 @@ import type { PickLine } from '@/lib/sharp/record'
 import type { Caller } from './tokens'
 import type { TradeProposal } from './proposal'
 import type { CloudflareEnv, Database } from '@/lib/db'
-import type { TrendPick } from '@/lib/sharp/onDemand'
+import type { TrendCombo, TrendPick } from '@/lib/sharp/onDemand'
 import type { PriceDisplay } from '@/lib/model/price'
 import { loadAccount } from '@/lib/kalshi/account'
 import { market as fetchMarket } from '@/lib/kalshi/client'
@@ -26,7 +26,7 @@ import { kalshiEventUrl } from '@/lib/sharp/view'
 import { sportsDayOf } from '@/lib/model/sportsDay'
 import { findBets } from '@/lib/sharp/onDemand'
 import { recordRequest, viewerTrendRecord } from '@/lib/sharp/trendRecord'
-import { leagueFrom } from '@/lib/sharp/lookup'
+import { SLATES, leagueFrom } from '@/lib/sharp/lookup'
 import { maxCentsFor, payoutMultiplier } from '@/lib/model/price'
 
 const UNITS: Record<PriceDisplay, string> = {
@@ -90,7 +90,9 @@ export function agentPick(p: SharpPick, display: PriceDisplay = 'cents') {
           side: p.side,
           marketKind: p.marketKind,
           marketTicker: p.marketTicker,
-          kalshiUrl: p.marketTicker ? kalshiEventUrl(p.marketTicker) : null,
+          kalshiUrl: p.marketTicker
+            ? kalshiEventUrl(p.marketTicker, p.gameTitle)
+            : null,
         }
       : {
           // The worst combo quote worth taking: under this price, or
@@ -107,7 +109,7 @@ export function agentPick(p: SharpPick, display: PriceDisplay = 'cents') {
             startsAt: l.startsAt,
             side: l.side,
             marketTicker: l.marketTicker,
-            kalshiUrl: kalshiEventUrl(l.marketTicker),
+            kalshiUrl: kalshiEventUrl(l.marketTicker, l.gameTitle),
             ...priceField(display, 'price', l.price),
             fairPct: points(l.fair),
             result: l.result,
@@ -134,7 +136,7 @@ export function agentTrendPick(p: TrendPick, display: PriceDisplay = 'cents') {
     side: p.side,
     marketKind: p.key.kind,
     marketTicker: p.ticker,
-    kalshiUrl: kalshiEventUrl(p.ticker),
+    kalshiUrl: kalshiEventUrl(p.ticker, p.gameTitle),
     ...priceField(display, 'price', p.price),
     ...feeField(display, p.fee),
     trendChancePct: points(p.trendChance),
@@ -147,6 +149,29 @@ export function agentTrendPick(p: TrendPick, display: PriceDisplay = 'cents') {
           ? 'slight: barely ahead of the fee'
           : 'none: the least bad on offer, priced against us',
     trend: p.form?.note ?? null,
+  }
+}
+
+/**
+ * A trend combo as an Agent reads it: the legs' prices multiplied, roughly
+ * what Kalshi will quote for it, and the worst quote worth taking. Pure.
+ */
+export function agentTrendCombo(
+  c: TrendCombo,
+  display: PriceDisplay = 'cents',
+) {
+  return {
+    legs: c.legs.length,
+    fairPct: points(c.fair),
+    ...priceField(display, 'legsTogether', c.impliedPrice),
+    edgePoints: points(c.edge),
+    ...priceField(
+      display,
+      display === 'multiplier' ? 'worthItAtLeast' : 'worthItUnder',
+      c.worthItUnder,
+    ),
+    howToPlace:
+      "Build it on Kalshi as a combo from the legs' markets; Kalshi quotes the combo's price then. Take it only at the worth-it price or better. propose_trade can't place combos.",
   }
 }
 
@@ -388,7 +413,7 @@ function readTools(
       name: 'find_bet',
       title: 'Find a bet',
       description:
-        "A good bet on demand, for a Team's next game or a League's games today or tomorrow: Kalshi's offers (winner, main spread, total) priced against our own trends, each Team's recent margins and totals from Sportsline's game history, blended with Kalshi's price. For 'a good bet on the Avs game' pass team 'Avs'; for 'a good NBA bet tonight' pass league 'nba' and day 'today'. These trend picks are weaker than the daily Sharp picks (get_sharp_picks), which use the sharp sportsbooks: say so, and pass on each pick's value and trend note. surprise picks at random among the offers the trends favor.",
+        "A good bet on demand, for a Team's next game or a League's games today or tomorrow, optionally one kickoff slate, as singles or a combo: Kalshi's offers (winner, main spread, total) priced against our own trends, each Team's recent margins and totals from Sportsline's game history, blended with Kalshi's price. For 'a good bet on the Avs game' pass team 'Avs'; for 'a good NBA bet tonight' pass league 'nba' and day 'today'; for 'a 3-leg college football combo for the noon slate' pass league 'cfb', day 'today', slate 'noon' and legs 3. College football covers games with an ACC, Big 12, Big Ten or SEC team, Notre Dame or a ranked team. These trend picks are weaker than the daily Sharp picks (get_sharp_picks), which use the sharp sportsbooks: say so, and pass on each pick's value and trend note. surprise picks at random among the offers the trends favor.",
       input: z.object({
         team: z
           .string()
@@ -399,23 +424,48 @@ function readTools(
             'City, nickname, abbreviation or shorthand: Avs, Avalanche, Colorado, COL.',
           ),
         league: z
-          .enum(['nfl', 'nba', 'mlb', 'nhl'])
+          .enum(['nfl', 'nba', 'mlb', 'nhl', 'cfb'])
           .optional()
-          .describe('Or a sport word in team, like "hockey".'),
+          .describe(
+            'cfb is college football. Or a sport word in team, like "hockey" or "college football".',
+          ),
         day: z
           .enum(['today', 'tomorrow'])
           .optional()
           .describe("Default: the Team's next game, or today for a League."),
-        count: z.number().int().min(1).max(5).default(3),
+        slate: z
+          .enum(SLATES)
+          .optional()
+          .describe(
+            'Only games kicking off in this Eastern window: early (before 11am), noon (11am–2:30pm), afternoon (2:30–6pm, college football’s 3:30 window), evening (6–9:30pm, prime time), late (after 9:30pm).',
+          ),
+        count: z
+          .number()
+          .int()
+          .min(1)
+          .max(5)
+          .default(3)
+          .describe('How many singles. Ignored for a combo.'),
+        legs: z
+          .number()
+          .int()
+          .min(2)
+          .max(6)
+          .optional()
+          .describe(
+            'Asks for a combo of this many legs instead of singles, each from a different game.',
+          ),
         surprise: z.boolean().default(false),
       }),
-      call: async ({ team, league, day, count, surprise }) => {
+      call: async ({ team, league, day, slate, count, legs, surprise }) => {
         const asLeague = !league && team ? leagueFrom(team) : null
         const ask = {
           team: asLeague ? undefined : team,
           league: league ?? asLeague,
           day,
+          slate,
           count,
+          legs,
           surprise,
         }
         const answer = await findBets(env, db, caller.viewerId, ask)
@@ -429,6 +479,9 @@ function readTools(
             startsAt: g.startsAt,
           })),
           picks: answer.picks.map((p) => agentTrendPick(p, display)),
+          ...(answer.combo
+            ? { combo: agentTrendCombo(answer.combo, display) }
+            : {}),
           reason: answer.reason,
           method:
             "Trend picks: each Team's last 7 days of results (or last 3 games), shrunk toward average, give an expected margin and total; that chance is blended 35/65 with Kalshi's own price. Not the sharp books.",

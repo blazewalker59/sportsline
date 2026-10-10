@@ -17,6 +17,11 @@ import { fetchWithRetry } from '@/lib/sources/pool'
 
 /** The Leagues Sharp picks cover: the four major American sports. */
 export const SHARP_LEAGUES: ReadonlyArray<League> = ['nfl', 'nba', 'mlb', 'nhl']
+/**
+ * The Leagues trend picks cover: college football too, whose fair price
+ * needs only Kalshi and our own finals, not the sharp books.
+ */
+export const TREND_LEAGUES: ReadonlyArray<League> = [...SHARP_LEAGUES, 'cfb']
 
 export interface GameRef {
   gameId: string
@@ -32,6 +37,7 @@ export async function loadGames(
   db: Database,
   fromDay: string,
   toDay: string,
+  leagues: ReadonlyArray<League> = SHARP_LEAGUES,
 ): Promise<Array<GameRef>> {
   const home = aliasedTable(teams, 'home')
   const away = aliasedTable(teams, 'away')
@@ -42,7 +48,7 @@ export async function loadGames(
     .innerJoin(away, eq(away.id, games.awayTeamId))
     .where(
       and(
-        inArray(games.league, [...SHARP_LEAGUES]),
+        inArray(games.league, [...leagues]),
         gte(games.sportsDay, fromDay),
         lte(games.sportsDay, toDay),
       ),
@@ -332,6 +338,7 @@ export async function loadFinals(
   teamIds: ReadonlyArray<string>,
   fromDay: string,
   toDay: string,
+  leagues: ReadonlyArray<League> = SHARP_LEAGUES,
 ): Promise<Array<Final>> {
   if (teamIds.length === 0) return []
   const rows = await db
@@ -345,7 +352,7 @@ export async function loadFinals(
     .from(games)
     .where(
       and(
-        inArray(games.league, [...SHARP_LEAGUES]),
+        inArray(games.league, [...leagues]),
         eq(games.status, 'final'),
         gte(games.sportsDay, fromDay),
         lte(games.sportsDay, toDay),
