@@ -71,7 +71,8 @@ describe.skipIf(!isBun)('discovering leagues on a manual sync', () => {
   })
 
   it('reports both providers and still resolves', async () => {
-    const { discoverConnectedLeagues } = await import('@/lib/fantasy/server')
+    const { discoverConnectedLeagues } =
+      await import('@/lib/fantasy/discoverNow')
     const { errorEvents } = await import('@/lib/db/schema')
     const db = state.db as Db.Database
     await expect(discoverConnectedLeagues(env, db, 'u1')).resolves.toEqual({

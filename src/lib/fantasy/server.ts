@@ -7,25 +7,15 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, asc, desc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { EspnError, bracedSwid, fanProfile } from './client'
+import { discoverConnectedLeagues } from './discoverNow'
 import { leagueFromUrl } from './discovery'
 import { seasonOf } from './sports'
-import {
-  discover,
-  leagueRowId,
-  loadSession,
-  syncAccount,
-  syncLeague,
-} from './sync'
-import { sleeperState, sleeperUser } from './sleeper/client'
-import {
-  discover as discoverSleeper,
-  sleeperLeagueRowId,
-  syncAccount as syncSleeper,
-} from './sleeper/sync'
+import { leagueRowId, loadSession, syncAccount, syncLeague } from './sync'
+import { sleeperUser } from './sleeper/client'
+import { sleeperLeagueRowId, syncAccount as syncSleeper } from './sleeper/sync'
 import type { MatchupView } from './matchup'
 import type { RacePoint } from './race'
 import type { FantasySport } from './sports'
-import type { CloudflareEnv, Database } from '@/lib/db'
 import { getCloudflareEnv } from '@/lib/db'
 import {
   espnAccounts,
@@ -156,36 +146,6 @@ export const disconnectEspn = createServerFn({ method: 'POST' }).handler(() =>
     await db.delete(espnAccounts).where(eq(espnAccounts.viewerId, viewerId))
   }),
 )
-
-/**
- * Look for new leagues on a manual sync. A failed lookup is reported (it
- * shows on the health page) and does not stop the leagues already stored.
- */
-export async function discoverConnectedLeagues(
-  env: CloudflareEnv,
-  db: Database,
-  viewerId: string,
-): Promise<{ espn: boolean; sleeper: boolean }> {
-  const session = await loadSession(env, viewerId)
-  if (session) {
-    await discover(db, viewerId, session).catch((error: unknown) =>
-      reportError(env, 'espn', error, { viewerId, step: 'discovery' }),
-    )
-  }
-  const sleeper = await db
-    .select()
-    .from(sleeperAccounts)
-    .where(eq(sleeperAccounts.viewerId, viewerId))
-    .get()
-  if (sleeper) {
-    await sleeperState()
-      .then((state) => discoverSleeper(db, viewerId, sleeper.userId, state))
-      .catch((error: unknown) =>
-        reportError(env, 'sleeper', error, { viewerId, step: 'discovery' }),
-      )
-  }
-  return { espn: session !== null, sleeper: sleeper !== undefined }
-}
 
 export const syncFantasyNow = createServerFn({ method: 'POST' }).handler(() =>
   withViewer(async ({ db, viewerId }) => {
