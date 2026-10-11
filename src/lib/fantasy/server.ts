@@ -25,6 +25,7 @@ import {
 import type { MatchupView } from './matchup'
 import type { RacePoint } from './race'
 import type { FantasySport } from './sports'
+import type { CloudflareEnv, Database } from '@/lib/db'
 import { getCloudflareEnv } from '@/lib/db'
 import {
   espnAccounts,
@@ -156,25 +157,43 @@ export const disconnectEspn = createServerFn({ method: 'POST' }).handler(() =>
   }),
 )
 
+/**
+ * Look for new leagues on a manual sync. A failed lookup is reported (it
+ * shows on the health page) and does not stop the leagues already stored.
+ */
+export async function discoverConnectedLeagues(
+  env: CloudflareEnv,
+  db: Database,
+  viewerId: string,
+): Promise<{ espn: boolean; sleeper: boolean }> {
+  const session = await loadSession(env, viewerId)
+  if (session) {
+    await discover(db, viewerId, session).catch((error: unknown) =>
+      reportError(env, 'espn', error, { viewerId, step: 'discovery' }),
+    )
+  }
+  const sleeper = await db
+    .select()
+    .from(sleeperAccounts)
+    .where(eq(sleeperAccounts.viewerId, viewerId))
+    .get()
+  if (sleeper) {
+    await sleeperState()
+      .then((state) => discoverSleeper(db, viewerId, sleeper.userId, state))
+      .catch((error: unknown) =>
+        reportError(env, 'sleeper', error, { viewerId, step: 'discovery' }),
+      )
+  }
+  return { espn: session !== null, sleeper: sleeper !== undefined }
+}
+
 export const syncFantasyNow = createServerFn({ method: 'POST' }).handler(() =>
   withViewer(async ({ db, viewerId }) => {
     const env = getCloudflareEnv()
-    // A manual sync also looks for new leagues, on every connection.
-    const session = await loadSession(env, viewerId)
-    if (session) await discover(db, viewerId, session).catch(() => 0)
-    const sleeper = await db
-      .select()
-      .from(sleeperAccounts)
-      .where(eq(sleeperAccounts.viewerId, viewerId))
-      .get()
-    if (sleeper) {
-      await sleeperState()
-        .then((state) => discoverSleeper(db, viewerId, sleeper.userId, state))
-        .catch(() => 0)
-    }
+    const connected = await discoverConnectedLeagues(env, db, viewerId)
     const [espn, sleeperCount] = await Promise.all([
-      session ? syncAccount(env, viewerId) : 0,
-      sleeper ? syncSleeper(env, viewerId) : 0,
+      connected.espn ? syncAccount(env, viewerId) : 0,
+      connected.sleeper ? syncSleeper(env, viewerId) : 0,
     ])
     return espn + sleeperCount
   }),

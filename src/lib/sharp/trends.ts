@@ -17,7 +17,7 @@ export const TREND_WEIGHT = 0.35
 /** A Team's form counts n / (n + this) of itself: 6 games count half. */
 const SHRINK_GAMES = 6
 /** Fewer Games than this and a Team's trend isn't read. */
-export const MIN_TREND_GAMES = 3
+const MIN_TREND_GAMES = 3
 
 /** How much one Game's final margin varies around what's expected. */
 const MARGIN_SD: Record<League, number> = {
@@ -44,7 +44,7 @@ const HOME_EDGE: Record<League, number> = {
   cfb: 2.5,
 }
 /** A typical Game's total, when too few finals are stored to measure it. */
-export const TYPICAL_TOTAL: Record<League, number> = {
+const TYPICAL_TOTAL: Record<League, number> = {
   nfl: 45,
   nba: 228,
   mlb: 8.8,

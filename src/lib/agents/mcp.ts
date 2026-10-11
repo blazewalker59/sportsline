@@ -15,7 +15,7 @@ const PROTOCOL_VERSIONS = [
   '2024-11-05',
 ]
 
-export const SERVER_INFO = { name: 'sportsline', version: '1.0.0' }
+const SERVER_INFO = { name: 'sportsline', version: '1.0.0' }
 
 export interface McpTool<TInput extends z.ZodType = z.ZodType> {
   name: string

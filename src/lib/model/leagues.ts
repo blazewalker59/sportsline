@@ -9,12 +9,12 @@ import { LEAGUES } from './types'
 import type { League } from './types'
 
 /** College football's major conferences (CONTEXT.md, "Conference"). */
-export const CONFERENCES = ['sec', 'big10', 'big12', 'acc'] as const
+const CONFERENCES = ['sec', 'big10', 'big12', 'acc'] as const
 export type Conference = (typeof CONFERENCES)[number]
 
 /** College football groupings with their own Scope. */
-export const CFB_GROUPS = ['top25', ...CONFERENCES] as const
-export type CfbGroup = (typeof CFB_GROUPS)[number]
+const CFB_GROUPS = ['top25', ...CONFERENCES] as const
+type CfbGroup = (typeof CFB_GROUPS)[number]
 
 /** Anything with a place on the Scope row. */
 export type RowItem = League | CfbGroup

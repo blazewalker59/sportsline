@@ -136,7 +136,7 @@ function leadGame(p: PredictionView): GameSummary | null {
  * A stat prop's count against its line: "212 / 300 rec yds", filling as it
  * climbs, a check once the line is reached.
  */
-export function PropProgress({
+function PropProgress({
   progress,
   compact,
 }: {

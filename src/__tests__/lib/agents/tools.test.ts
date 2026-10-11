@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { SharpPick } from '@/lib/sharp/queries'
-import { agentPick, priceField } from '@/lib/agents/tools'
+import type { Caller } from '@/lib/agents/tokens'
+import type { CloudflareEnv, Database } from '@/lib/db'
+import { agentPick, priceField, sportslineTools } from '@/lib/agents/tools'
 
 const single: SharpPick = {
   id: '2026-10-07:1',
@@ -33,6 +35,30 @@ const single: SharpPick = {
   result: null,
   createdAt: '2026-10-07T14:00:00Z',
 }
+
+describe('find_bet wording', () => {
+  it('keeps the wire name and calls the offer a trend pick', () => {
+    const caller: Caller = {
+      tokenId: 't',
+      agentName: 'Grok',
+      viewerId: 'v',
+      scopes: ['read'],
+    }
+    const tools = sportslineTools({} as CloudflareEnv, {} as Database, caller)
+    const find = tools.find((t) => t.name === 'find_bet')
+    const record = tools.find((t) => t.name === 'get_bet_record')
+    expect(find).toMatchObject({
+      name: 'find_bet',
+      title: 'Find a trend pick',
+    })
+    expect(find?.description.startsWith('A trend pick on demand')).toBe(true)
+    expect(record).toMatchObject({
+      name: 'get_bet_record',
+      title: 'Trend pick record',
+    })
+    expect(record?.description).not.toContain('bets')
+  })
+})
 
 describe('agentPick', () => {
   it('reads prices in cents and chances in points, with the Kalshi link', () => {

@@ -6,8 +6,7 @@
  */
 
 export { Breakdown } from './Breakdown'
-export { injuryLabel, injuryTone, shortName } from './format'
+export { injuryLabel, injuryTone } from './format'
 export { MatchupSheet } from './MatchupSheet'
-export { FantasyStrip, MatchupCard } from './MatchupStrip'
+export { FantasyStrip } from './MatchupStrip'
 export { FantasyTag, FantasyTagsProvider } from './tags'
-export type { FantasySide } from './tags'

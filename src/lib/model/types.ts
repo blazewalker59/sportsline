@@ -10,7 +10,7 @@ import type { Conference } from './leagues'
 export const LEAGUES = ['mlb', 'nba', 'nfl', 'cfb', 'nhl'] as const
 export type League = (typeof LEAGUES)[number]
 
-export const SIGNIFICANCES = ['scoring', 'notable', 'routine'] as const
+const SIGNIFICANCES = ['scoring', 'notable', 'routine'] as const
 export type Significance = (typeof SIGNIFICANCES)[number]
 
 export type Side = 'away' | 'home'
@@ -109,7 +109,7 @@ export interface Situation {
  * segment plus stat tables per side. `TPlayer` is how a row names its player: a
  * SourceRef from the adapter, a Sportsline id once stored.
  */
-export interface Box<TPlayer> {
+interface Box<TPlayer> {
   linescore: {
     segments: Array<string>
     away: Array<number | null>
@@ -121,7 +121,7 @@ export interface Box<TPlayer> {
   tables: Array<BoxTable<TPlayer>>
 }
 
-export interface BoxTable<TPlayer> {
+interface BoxTable<TPlayer> {
   side: Side
   title: string
   columns: Array<string>
@@ -173,13 +173,13 @@ export interface ScheduledGame {
 }
 
 /** A League's Teams and their identity, as a Team page asks a Source. */
-export interface SourceTeamRef {
+interface SourceTeamRef {
   sourceId: string
   abbreviation: string
 }
 
 /** A Player as a Source's roster lists them. */
-export interface SourcePlayer extends SourceRef {
+interface SourcePlayer extends SourceRef {
   /** Source id of the Team they currently play for, if any. */
   teamSourceId: string | null
   position: string | null

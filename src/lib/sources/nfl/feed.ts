@@ -5,42 +5,30 @@
  * Loose on purpose; every field is treated as possibly absent.
  */
 
+import type {
+  EspnCompetitor,
+  EspnScoreboard,
+  EspnStatus,
+  EspnTeams,
+} from '../espn/common'
+
+export type {
+  EspnCompetitor,
+  EspnScoreboard as NflScoreboard,
+  EspnStatus,
+  EspnTeams as NflTeams,
+}
+
 interface Ref {
   $ref?: string
 }
 
-export interface EspnStatus {
-  period?: number
-  displayClock?: string
-  type?: { name?: string; state?: 'pre' | 'in' | 'post'; detail?: string }
-}
-
-export interface EspnCompetitor {
-  id: string
-  homeAway: 'home' | 'away'
-  score?: string
-  team: {
-    id: string
-    abbreviation?: string
-    displayName?: string
-    name?: string
-    /** College football only: the team's conference (scoreboard)… */
-    conferenceId?: string
-    /** …or its group (game summary). */
-    groups?: { id?: string }
-  }
-  linescores?: Array<{ displayValue?: string }>
-  /** College football rankings: the summary's `rank`, the scoreboard's curatedRank (99 when unranked). */
-  rank?: number
-  curatedRank?: { current?: number }
-}
-
-export interface EspnDrivePlay {
+interface EspnDrivePlay {
   id: string
   wallclock?: string
 }
 
-export interface EspnDrive {
+interface EspnDrive {
   id: string
   description?: string
   displayResult?: string
@@ -48,7 +36,7 @@ export interface EspnDrive {
   plays?: Array<EspnDrivePlay>
 }
 
-export interface EspnBoxStatistics {
+interface EspnBoxStatistics {
   name: string
   labels?: Array<string>
   athletes?: Array<{
@@ -75,7 +63,7 @@ export interface NflSummary {
   }
 }
 
-export interface NflDownDistance {
+interface NflDownDistance {
   down?: number
   distance?: number
   downDistanceText?: string
@@ -104,25 +92,6 @@ export interface NflCorePlay {
 
 export interface NflCorePlays {
   items?: Array<NflCorePlay>
-}
-
-export interface NflScoreboard {
-  events?: Array<{
-    id: string
-    date: string
-    status?: EspnStatus
-    competitions?: Array<{ competitors?: Array<EspnCompetitor> }>
-  }>
-}
-
-export interface NflTeams {
-  sports?: Array<{
-    leagues?: Array<{
-      teams?: Array<{
-        team: { id: string; abbreviation?: string; displayName?: string }
-      }>
-    }>
-  }>
 }
 
 export interface NflRoster {

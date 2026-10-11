@@ -150,7 +150,7 @@ export interface MlbFeed {
   }
 }
 
-export interface MlbScheduleGame {
+interface MlbScheduleGame {
   gamePk: number
   gameDate: string
   officialDate: string
@@ -179,7 +179,7 @@ export interface MlbPeople {
   }>
 }
 
-export interface MlbBoxPlayer {
+interface MlbBoxPlayer {
   person: PersonRef
   position?: { abbreviation?: string }
   battingOrder?: string | null

@@ -17,8 +17,8 @@ import {
 import type { FantasyLeagueView } from './server'
 import { useViewer } from '@/lib/viewer/useViewer'
 
-export const ESPN_KEY = ['espn-connection'] as const
-export const FANTASY_KEY = ['fantasy'] as const
+const ESPN_KEY = ['espn-connection'] as const
+const FANTASY_KEY = ['fantasy'] as const
 /** Matchups refresh on the server every two minutes. */
 const REFRESH_MS = 60_000
 
@@ -32,7 +32,7 @@ export function useEspnConnection() {
   })
 }
 
-export const SLEEPER_KEY = ['sleeper-connection'] as const
+const SLEEPER_KEY = ['sleeper-connection'] as const
 
 export function useSleeperConnection() {
   const { data: viewerState } = useViewer()

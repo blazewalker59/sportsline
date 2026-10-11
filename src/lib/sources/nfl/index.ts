@@ -1,6 +1,6 @@
 /** NFL Source adapter: ESPN's public site and core APIs. */
 
-import { fetchWithRetry, mapPool } from '../pool'
+import { ROSTER_CONCURRENCY, getJson as jsonFrom, mapPool } from '../pool'
 import { fetchTeamSchedule } from '../espn/common'
 import { espnAthleteOverview } from '../espn/athlete'
 import { parseGame, parseRoster, parseScoreboard } from './parse'
@@ -15,17 +15,7 @@ import type { SourceAdapter } from '@/lib/model/types'
 
 const SITE = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl'
 const CORE = 'https://sports.core.api.espn.com/v2/sports/football/leagues/nfl'
-
-/** Roster calls in flight at once: a burst of every team gets rate-limited. */
-const ROSTER_CONCURRENCY = 6
-
-async function getJson<T>(url: string): Promise<T> {
-  const res = await fetchWithRetry(url, {
-    headers: { accept: 'application/json' },
-  })
-  if (!res.ok) throw new Error(`ESPN ${res.status} for ${url}`)
-  return (await res.json()) as T
-}
+const getJson = jsonFrom('ESPN')
 
 export const nflAdapter: SourceAdapter = {
   league: 'nfl',

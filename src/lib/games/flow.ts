@@ -21,7 +21,7 @@ export interface FlowScore {
   score: number
 }
 
-export interface FlowSegment {
+interface FlowSegment {
   x: number
   /** "Q2", "3", "P2", "OT". */
   label: string

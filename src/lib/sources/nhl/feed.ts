@@ -8,7 +8,7 @@ interface Localized {
   default?: string
 }
 
-export interface NhlPeriod {
+interface NhlPeriod {
   number: number
   periodType?: 'REG' | 'OT' | 'SO'
 }

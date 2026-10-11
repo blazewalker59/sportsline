@@ -62,7 +62,7 @@ export default [
     rules: {
       '@typescript-eslint/no-unnecessary-condition': 'off',
       '@typescript-eslint/require-await': 'warn',
-      'no-shadow': 'warn',
+      'no-shadow': 'error',
       '@typescript-eslint/no-unnecessary-type-assertion': 'off',
     },
   },

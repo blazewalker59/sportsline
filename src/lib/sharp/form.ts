@@ -9,8 +9,8 @@ import type { KalshiOffer } from './engine'
 import type { League } from '@/lib/model/types'
 
 /** Form covers the last week, or a Team's last few Games if that's fewer. */
-export const FORM_DAYS = 7
-export const FORM_MIN_GAMES = 3
+const FORM_DAYS = 7
+const FORM_MIN_GAMES = 3
 /**
  * How far back to look for those few Games: a weekly football schedule,
  * with room for a bye week.

@@ -135,7 +135,7 @@ export function SharpPicksBanner() {
 }
 
 /** The slate: one compact row per pick, then the combo; tap a row for more. */
-export function SharpPicksList({
+function SharpPicksList({
   picks,
   flush = false,
 }: {

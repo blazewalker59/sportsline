@@ -6,7 +6,7 @@
 
 import type { League } from '@/lib/model/types'
 
-export const FANTASY_SPORTS = ['football', 'basketball', 'baseball'] as const
+const FANTASY_SPORTS = ['football', 'basketball', 'baseball'] as const
 export type FantasySport = (typeof FANTASY_SPORTS)[number]
 
 interface SportConfig {

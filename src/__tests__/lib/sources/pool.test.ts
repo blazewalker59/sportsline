@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fetchWithRetry, mapPool } from '@/lib/sources/pool'
+import { fetchWithRetry, getJson, mapPool } from '@/lib/sources/pool'
 
 describe('mapPool', () => {
   it('keeps order and never exceeds the limit', async () => {
@@ -55,5 +55,34 @@ describe('fetchWithRetry', () => {
     vi.stubGlobal('fetch', notFound)
     expect((await fetchWithRetry('https://x')).status).toBe(404)
     expect(notFound).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('getJson', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('retries a 429, then parses the JSON', async () => {
+    const responses = [
+      new Response('', { status: 429, headers: { 'retry-after': '0.001' } }),
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    ]
+    const fetchMock = vi.fn(() => Promise.resolve(responses.shift()!))
+    vi.stubGlobal('fetch', fetchMock)
+    const read = getJson('NHL')
+    await expect(read<{ ok: boolean }>('https://x')).resolves.toEqual({
+      ok: true,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('names the source when the response is not ok', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response('', { status: 404 }))),
+    )
+    const read = getJson('MLB StatsAPI')
+    await expect(read('https://statsapi.mlb.com/api/x')).rejects.toThrow(
+      'MLB StatsAPI 404 for https://statsapi.mlb.com/api/x',
+    )
   })
 })

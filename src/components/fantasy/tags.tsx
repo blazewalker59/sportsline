@@ -8,7 +8,7 @@ import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { TimelineItem } from '@/lib/model/timeline'
 import { cn } from '@/lib/utils'
 
-export type FantasySide = 'mine' | 'opponent'
+type FantasySide = 'mine' | 'opponent'
 
 /** Our Player id → whose Starter they are, in the Viewer's Matchups. */
 const FantasyTags = createContext<ReadonlyMap<string, FantasySide> | null>(null)

@@ -1,6 +1,6 @@
 /** NHL Source adapter: NHL.com (api-web.nhle.com) plus its stats API. */
 
-import { fetchWithRetry } from '../pool'
+import { getJson as jsonFrom } from '../pool'
 import {
   parseClubSchedule,
   parseGame,
@@ -28,14 +28,7 @@ const STATS = 'https://api.nhle.com/stats/rest/en'
  * docs/adr/0001's 5–10s behind.
  */
 const LIVE_POLL_SECONDS = 10
-
-async function getJson<T>(url: string): Promise<T> {
-  const res = await fetchWithRetry(url, {
-    headers: { accept: 'application/json' },
-  })
-  if (!res.ok) throw new Error(`NHL ${res.status} for ${url}`)
-  return (await res.json()) as T
-}
+const getJson = jsonFrom('NHL')
 
 export const nhlAdapter: SourceAdapter = {
   league: 'nhl',

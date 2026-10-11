@@ -19,7 +19,7 @@ import { LEAGUES } from '@/lib/model/types'
 import { sourceFor } from '@/lib/sources'
 import { reportError } from '@/lib/ops/errors'
 
-export interface TeamProfile {
+interface TeamProfile {
   id: string
   name: string
   abbreviation: string

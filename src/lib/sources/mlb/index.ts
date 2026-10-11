@@ -1,5 +1,6 @@
 /** MLB Source adapter: MLB StatsAPI (statsapi.mlb.com). */
 
+import { getJson as jsonFrom } from '../pool'
 import {
   parseFeed,
   parsePlayerOverview,
@@ -16,12 +17,7 @@ import type {
 import type { SourceAdapter } from '@/lib/model/types'
 
 const BASE = 'https://statsapi.mlb.com/api'
-
-async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { headers: { accept: 'application/json' } })
-  if (!res.ok) throw new Error(`MLB StatsAPI ${res.status} for ${url}`)
-  return (await res.json()) as T
-}
+const getJson = jsonFrom('MLB StatsAPI')
 
 export const mlbAdapter: SourceAdapter = {
   league: 'mlb',

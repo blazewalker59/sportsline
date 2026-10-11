@@ -87,7 +87,7 @@ const SEGMENT_END_OFFSET = 9_995
 const START_SEQUENCE = -1
 const FINAL_SEQUENCE = 1_000_000_000
 
-export function isActionPlayType(eventType: string): boolean {
+function isActionPlayType(eventType: string): boolean {
   return (
     ACTION_PLAY_TYPES.has(eventType) ||
     ACTION_PLAY_PREFIXES.some((prefix) => eventType.startsWith(prefix))
@@ -114,7 +114,7 @@ function halfLabel(half: 'top' | 'bottom' | undefined, inning: number): string {
   return `${half === 'bottom' ? 'Bot' : 'Top'} ${ordinal(inning)}`
 }
 
-export function mapStatus(status: MlbStatus): GameStatus {
+function mapStatus(status: MlbStatus): GameStatus {
   const detailed = status.detailedState ?? ''
   if (/postponed|cancelled/i.test(detailed)) return 'postponed'
   switch (status.abstractGameState) {
@@ -590,7 +590,7 @@ export function parseSchedule(schedule: MlbSchedule): Array<ScheduledGame> {
  * framed like ESPN's), with MLB's generic silhouette as a fallback. The
  * usual 2:3 portrait crops at the chin in a round avatar.
  */
-export function mlbHeadshot(id: number): string {
+function mlbHeadshot(id: number): string {
   return `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:silo:current.png/w_120,q_auto:best/v1/people/${id}/headshot/silo/current`
 }
 

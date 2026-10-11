@@ -8,11 +8,6 @@ import { kalshiFee } from '@/lib/sharp/engine'
 
 export type PriceDisplay = 'cents' | 'multiplier'
 
-export const PRICE_DISPLAYS: ReadonlyArray<PriceDisplay> = [
-  'cents',
-  'multiplier',
-]
-
 /** What one contract at this price pays per $1, fee included (2 decimals). */
 export function payoutMultiplier(price: number): number {
   return Math.round((1 / (price + kalshiFee(price))) * 100) / 100

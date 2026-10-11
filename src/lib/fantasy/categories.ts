@@ -261,7 +261,7 @@ export function formatCategory(
   return (DEFS[sport][statId]?.format ?? whole)(value)
 }
 
-export type Leader = 'mine' | 'opponent' | 'tie'
+type Leader = 'mine' | 'opponent' | 'tie'
 
 export interface CategoryResult extends LeagueCategory {
   mine: string

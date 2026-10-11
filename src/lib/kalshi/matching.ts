@@ -24,6 +24,7 @@ import {
 } from '@/lib/db/schema'
 import { shiftSportsDay, sportsDayOf } from '@/lib/model/sportsDay'
 import { syncLeague } from '@/lib/live/schedule'
+import { reportError } from '@/lib/ops/errors'
 
 /** Look again for a Game we couldn't match after this long. */
 const RECHECK_MS = 30 * 60_000
@@ -129,7 +130,14 @@ export async function gameFor(
     if (!gameId && ahead < LOOKAHEAD_DAYS * 86_400_000) {
       // Not stored yet (a future day, or one never browsed): store that
       // day's schedule for the League, then look again.
-      await syncLeague(env, league, day, new Date(now)).catch(() => {})
+      await syncLeague(env, league, day, new Date(now)).catch(
+        (error: unknown) =>
+          reportError(env, 'kalshi', error, {
+            step: 'schedule',
+            league,
+            sportsDay: day,
+          }),
+      )
       gameId = await find()
     }
   }

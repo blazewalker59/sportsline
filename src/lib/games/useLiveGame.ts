@@ -11,11 +11,11 @@ import { useHubSocket } from '@/lib/timeline/useHubSocket'
 
 const BOX_REFRESH_MS = 20_000
 
-export function gameKey(gameId: string) {
+function gameKey(gameId: string) {
   return ['game', gameId] as const
 }
 
-export function applyGameEvents(
+function applyGameEvents(
   detail: GameDetail,
   events: ReadonlyArray<TimelineEvent>,
 ): GameDetail {

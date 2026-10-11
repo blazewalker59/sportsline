@@ -36,8 +36,6 @@ import { startViewerSync } from '@/lib/live/startViewerSync'
 import { isAdmin, reportError } from '@/lib/ops/errors'
 import { priceDisplayOf } from '@/lib/viewer/prefs'
 
-export type { ViewerProfile } from './session'
-
 /** A Follow with what the UI needs to show it. */
 export interface FollowEntry {
   follow: ViewerFollow

@@ -33,7 +33,7 @@ function SideRow({
   )
 }
 
-export function MatchupCard({
+function MatchupCard({
   league,
   selected,
   onSelect,

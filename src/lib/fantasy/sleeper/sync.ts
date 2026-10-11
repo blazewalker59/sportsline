@@ -4,7 +4,7 @@
  * Scheduler, and when a Viewer connects or syncs.
  */
 
-import { and, eq, isNull, lt, or } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { storeMatchup } from '../sync'
 import {
   SleeperError,
@@ -92,7 +92,7 @@ async function weekData(state: SleeperState): Promise<WeekData> {
 }
 
 /** Read one league's Matchup this week and store it. */
-export async function syncLeague(
+async function syncLeague(
   db: Database,
   row: typeof fantasyLeagues.$inferSelect,
   userId: string,
@@ -222,25 +222,4 @@ export async function syncAccount(
       .where(eq(sleeperAccounts.viewerId, viewerId))
     throw error
   }
-}
-
-/** Accounts due a sync, oldest first. */
-export async function accountsDue(
-  env: Pick<CloudflareEnv, 'DB'>,
-  everyMs: number,
-  limit: number,
-): Promise<Array<string>> {
-  const cutoff = new Date(Date.now() - everyMs).toISOString()
-  const rows = await dbFromD1(env.DB)
-    .select({ viewerId: sleeperAccounts.viewerId })
-    .from(sleeperAccounts)
-    .where(
-      or(
-        isNull(sleeperAccounts.syncedAt),
-        lt(sleeperAccounts.syncedAt, cutoff),
-      ),
-    )
-    .orderBy(sleeperAccounts.syncedAt)
-    .limit(limit)
-  return rows.map((r) => r.viewerId)
 }

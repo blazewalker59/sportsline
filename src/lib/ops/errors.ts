@@ -101,7 +101,7 @@ export async function reportError(
 }
 
 /** Push the admins' devices (the health page opens from it). */
-export async function notifyAdmins(
+async function notifyAdmins(
   env: OpsEnv,
   message: { title: string; body: string },
 ): Promise<void> {
