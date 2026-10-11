@@ -184,7 +184,10 @@ describe('worker routing', () => {
   it('answers /health and starts the scheduler', async () => {
     const ok = await get('https://sportsline.test/health')
     expect(ok.status).toBe(200)
-    expect(await ok.json()).toEqual({ ok: true })
+    expect(await ok.json()).toEqual({
+      ok: true,
+      ...(__SPORTSLINE_VERSION__ ? { version: __SPORTSLINE_VERSION__ } : {}),
+    })
     expect(state.ensure).toBe(1)
 
     state.dbFail = true
