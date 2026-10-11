@@ -11,7 +11,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { aliasedTable, and, eq, gte, inArray, lte, or } from 'drizzle-orm'
 import { z } from 'zod'
 import type { GameSummary, TeamRef } from '@/lib/model/timeline'
-import type { League, ScheduledGame } from '@/lib/model/types'
+import type { League, ScheduledGame, SourceTeam } from '@/lib/model/types'
 import { requireViewer } from '@/lib/viewer/session'
 import { teamColors } from '@/lib/brand/teamColors'
 import { getDb } from '@/lib/db'
@@ -37,6 +37,36 @@ export function matchupWindow(
 }
 
 /**
+ * A Game belongs to this window when its Sports Day does, or when the
+ * kickoff's Sports Day does. Monday night is 00:15 UTC Tuesday; a row
+ * stored on that UTC date still counts. A Tuesday afternoon game does not.
+ */
+export function countsInMatchupWindow(
+  game: { sportsDay: string; startsAt: string },
+  window: { from: string; to: string },
+): boolean {
+  if (game.sportsDay >= window.from && game.sportsDay <= window.to) return true
+  const day = sportsDayOf(new Date(game.startsAt))
+  return day >= window.from && day <= window.to
+}
+
+/**
+ * Sports Days to read from the Source for a football week: the whole
+ * window, plus the next calendar day. That extra day is the UTC date of
+ * a Monday night kickoff, and a Saturday game the scheduler missed is
+ * still this week.
+ */
+export function sourceDays(window: {
+  from: string
+  to: string
+}): Array<string> {
+  const last = shiftSportsDay(window.to, 1)
+  const days: Array<string> = []
+  for (let d = window.from; d <= last; d = shiftSportsDay(d, 1)) days.push(d)
+  return days
+}
+
+/**
  * One Game a Team: one live now first; then, in football, its Game this
  * week; elsewhere today's, else the next.
  */
@@ -50,67 +80,123 @@ export function pickGame(
 }
 
 export const getMatchupGames = createServerFn({ method: 'GET' })
-  .validator((data: { league: string; teamIds: Array<string> }) =>
-    z
-      .object({
-        league: z.enum(LEAGUES),
-        teamIds: z.array(z.string().max(200)).max(40),
-      })
-      .parse(data),
+  .validator(
+    (data: {
+      league: string
+      teamIds: Array<string>
+      abbrevs?: Array<string>
+    }) =>
+      z
+        .object({
+          league: z.enum(LEAGUES),
+          teamIds: z.array(z.string().max(200)).max(80),
+          abbrevs: z.array(z.string().max(8)).max(80).optional(),
+        })
+        .parse(data),
   )
   .handler(async ({ data }): Promise<Array<GameSummary>> => {
     await requireViewer()
     const ids = [...new Set(data.teamIds)]
-    if (ids.length === 0) return []
+    const abbrevs = [
+      ...new Set((data.abbrevs ?? []).map((a) => a.toUpperCase())),
+    ]
+    if (ids.length === 0 && abbrevs.length === 0) return []
     const db = getDb()
     const today = sportsDayOf(new Date())
-    const { from, to } = matchupWindow(data.league, today)
+    const window = matchupWindow(data.league, today)
+    const football = data.league === 'nfl'
+    // Monday night's UTC date is the day after the window's Monday.
+    const through = football ? shiftSportsDay(window.to, 1) : window.to
     const away = aliasedTable(teams, 'away')
     const home = aliasedTable(teams, 'home')
-    const stored = (
-      await db
+    const inWindow = and(
+      eq(games.league, data.league),
+      gte(games.sportsDay, window.from),
+      lte(games.sportsDay, through),
+    )
+    const load = (teamWhere: ReturnType<typeof or>) =>
+      db
         .select({ game: games, away, home })
         .from(games)
         .innerJoin(away, eq(away.id, games.awayTeamId))
         .innerJoin(home, eq(home.id, games.homeTeamId))
-        .where(
-          and(
-            eq(games.league, data.league),
-            gte(games.sportsDay, from),
-            lte(games.sportsDay, to),
+        .where(and(inWindow, teamWhere))
+    const loaded = [
+      ...(ids.length > 0
+        ? await load(
             or(inArray(games.awayTeamId, ids), inArray(games.homeTeamId, ids)),
-          ),
-        )
-    ).map((r) => toGameSummary(r.game, r.away, r.home))
+          )
+        : []),
+      ...(abbrevs.length > 0
+        ? await load(
+            or(
+              inArray(away.abbreviation, abbrevs),
+              inArray(home.abbreviation, abbrevs),
+            ),
+          )
+        : []),
+    ]
+    const seenGame = new Set<string>()
+    const stored = loaded.flatMap((r) => {
+      if (seenGame.has(r.game.id)) return []
+      seenGame.add(r.game.id)
+      const summary = toGameSummary(r.game, r.away, r.home)
+      return countsInMatchupWindow(summary, window) ? [summary] : []
+    })
 
-    const has = (g: GameSummary, id: string) =>
+    const hasId = (g: GameSummary, id: string) =>
       g.awayTeam.id === id || g.homeTeam.id === id
-    const missing = ids.filter((id) => !stored.some((g) => has(g, id)))
+    const hasAbbrev = (g: GameSummary, abbr: string) =>
+      g.awayTeam.abbreviation.toUpperCase() === abbr ||
+      g.homeTeam.abbreviation.toUpperCase() === abbr
+    const missingIds = ids.filter((id) => !stored.some((g) => hasId(g, id)))
+    const missingAbbrevs = abbrevs.filter(
+      (abbr) => !stored.some((g) => hasAbbrev(g, abbr)),
+    )
     const ahead: Array<GameSummary> = []
-    if (missing.length > 0) {
+    if (missingIds.length > 0 || missingAbbrevs.length > 0) {
       // Days not stored yet: read them from the Source.
       const adapter = sourceFor(data.league)
       const days: Array<string> = []
-      for (let d = shiftSportsDay(today, 1); d <= to; d = shiftSportsDay(d, 1))
-        days.push(d)
-      const scheduled = (
+      if (football) days.push(...sourceDays(window))
+      else
+        for (
+          let d = shiftSportsDay(today, 1);
+          d <= window.to;
+          d = shiftSportsDay(d, 1)
+        )
+          days.push(d)
+      const raw = (
         await Promise.all(
           days.map((d) =>
             adapter.schedule(d).catch((): Array<ScheduledGame> => []),
           ),
         )
       ).flat()
-      const refs = await teamRefs(
+      const seenSource = new Set<string>()
+      const scheduled = raw.filter((g) => {
+        if (seenSource.has(g.sourceGameId)) return false
+        seenSource.add(g.sourceGameId)
+        return !football || countsInMatchupWindow(g, window)
+      })
+      const refs = await resolveSides(
         db,
         adapter.source,
         data.league,
-        scheduled.flatMap((g) => [g.away.sourceId, g.home.sourceId]),
+        scheduled.flatMap((g) => [g.away, g.home]),
       )
       for (const g of scheduled) {
         const a = refs.get(g.away.sourceId)
         const h = refs.get(g.home.sourceId)
-        if (!a || !h || !missing.some((id) => id === a.id || id === h.id))
-          continue
+        if (!a || !h) continue
+        const wanted =
+          missingIds.some((id) => id === a.id || id === h.id) ||
+          missingAbbrevs.some(
+            (abbr) =>
+              abbr === a.abbreviation.toUpperCase() ||
+              abbr === h.abbreviation.toUpperCase(),
+          )
+        if (!wanted) continue
         ahead.push({
           id: `src:${g.sourceGameId}`,
           league: g.league,
@@ -125,7 +211,16 @@ export const getMatchupGames = createServerFn({ method: 'GET' })
       }
     }
     const all = [...stored, ...ahead]
-    return ids.flatMap((id) => pickGame(all.filter((g) => has(g, id))) ?? [])
+    const picked = new Map<string, GameSummary>()
+    for (const id of ids) {
+      const g = pickGame(all.filter((game) => hasId(game, id)))
+      if (g) picked.set(g.id, g)
+    }
+    for (const abbr of abbrevs) {
+      const g = pickGame(all.filter((game) => hasAbbrev(game, abbr)))
+      if (g) picked.set(g.id, g)
+    }
+    return [...picked.values()]
   })
 
 /** Our Teams for Source ids, as Game cards show them. */
@@ -158,6 +253,58 @@ async function teamRefs(
         name: r.team.name,
         colors: teamColors(r.team.league, r.team.name),
       })
+  }
+  return out
+}
+
+/**
+ * A scheduled side as a card shows it. Prefer the stored Team (Source id,
+ * else abbreviation). Otherwise a stand-in from the Source, so a missing
+ * row cannot drop the Game.
+ */
+async function resolveSides(
+  db: ReturnType<typeof getDb>,
+  source: string,
+  league: League,
+  sides: ReadonlyArray<SourceTeam>,
+): Promise<Map<string, TeamRef & { name: string }>> {
+  const out = await teamRefs(
+    db,
+    source,
+    league,
+    sides.map((s) => s.sourceId),
+  )
+  const missing = sides.filter((s) => !out.has(s.sourceId))
+  const abbrevs = [...new Set(missing.map((s) => s.abbreviation))]
+  if (abbrevs.length > 0) {
+    const rows = await db
+      .select()
+      .from(teams)
+      .where(
+        and(eq(teams.league, league), inArray(teams.abbreviation, abbrevs)),
+      )
+    for (const s of missing) {
+      if (out.has(s.sourceId)) continue
+      const row = rows.find((r) => r.abbreviation === s.abbreviation)
+      if (!row) continue
+      out.set(s.sourceId, {
+        id: row.id,
+        abbreviation: row.abbreviation,
+        logoUrl: row.logoUrl,
+        name: row.name,
+        colors: teamColors(row.league, row.name),
+      })
+    }
+  }
+  for (const s of sides) {
+    if (out.has(s.sourceId)) continue
+    out.set(s.sourceId, {
+      id: `src:${s.sourceId}`,
+      abbreviation: s.abbreviation,
+      logoUrl: s.logoUrl,
+      name: s.name,
+      colors: teamColors(league, s.name),
+    })
   }
   return out
 }

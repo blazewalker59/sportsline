@@ -26,12 +26,21 @@ export function gameState(
   p: LineupPlayer,
   games: ReadonlyArray<GameSummary>,
 ): GameState | null {
-  if (!p.teamId) return null
-  const g = games.find(
-    (x) => x.awayTeam.id === p.teamId || x.homeTeam.id === p.teamId,
-  )
+  const abbrev = p.teamAbbrev?.toUpperCase() ?? null
+  const byAbbrev = (side: GameSummary['awayTeam']) =>
+    abbrev !== null && side.abbreviation.toUpperCase() === abbrev
+  const byId = p.teamId
+    ? games.find(
+        (x) => x.awayTeam.id === p.teamId || x.homeTeam.id === p.teamId,
+      )
+    : undefined
+  const g =
+    byId ??
+    (abbrev
+      ? games.find((x) => byAbbrev(x.awayTeam) || byAbbrev(x.homeTeam))
+      : undefined)
   if (!g) return null
-  const home = g.homeTeam.id === p.teamId
+  const home = byId ? g.homeTeam.id === p.teamId : byAbbrev(g.homeTeam)
   const live = g.status === 'live' || g.status === 'delayed'
   const upcoming = !live && g.status !== 'final'
   const status = live

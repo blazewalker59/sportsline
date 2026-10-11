@@ -31,14 +31,23 @@ export function MatchupSheet({
   const m = league.matchup!
   // Every Lineup Team's Game this matchup (a Thursday Final, a Monday
   // night kickoff), behind today's live ones.
-  const teamIds = [...m.mine.lineup, ...(m.opponent?.lineup ?? [])].flatMap(
-    (p) => (p.teamId ? [p.teamId] : []),
-  )
+  const lineup = [...m.mine.lineup, ...(m.opponent?.lineup ?? [])]
+  const teamIds = [
+    ...new Set(lineup.flatMap((p) => (p.teamId ? [p.teamId] : []))),
+  ]
+  const abbrevs = [
+    ...new Set(lineup.flatMap((p) => (p.teamAbbrev ? [p.teamAbbrev] : []))),
+  ]
   const week = useQuery({
-    queryKey: ['matchup-games', league.id, [...new Set(teamIds)].sort().join()],
+    queryKey: [
+      'matchup-games',
+      league.id,
+      [...teamIds].sort().join(),
+      [...abbrevs].sort().join(),
+    ],
     queryFn: () =>
       getMatchupGames({
-        data: { league: SPORTS[m.sport].league, teamIds },
+        data: { league: SPORTS[m.sport].league, teamIds, abbrevs },
       }),
     staleTime: 5 * 60_000,
   })
