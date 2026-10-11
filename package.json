@@ -46,7 +46,7 @@
     "@cloudflare/vite-plugin": "1.63.1",
     "@cloudflare/workers-types": "^4.20260628.1",
     "@tanstack/devtools-vite": "^0.3.11",
-    "@tanstack/eslint-config": "^0.3.4",
+    "@tanstack/eslint-config": "^0.4.0",
     "@tanstack/react-devtools": "^0.7.0",
     "@tanstack/react-query-devtools": "^5.84.2",
     "@tanstack/react-router-devtools": "^1.132.0",
