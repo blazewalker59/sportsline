@@ -50,7 +50,7 @@
     "@tanstack/react-devtools": "^0.7.0",
     "@tanstack/react-query-devtools": "^5.84.2",
     "@tanstack/react-router-devtools": "^1.132.0",
-    "@types/node": "^22.10.2",
+    "@types/node": "^26.6.4",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5",
