@@ -22,8 +22,7 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
     "paths": {
-      "@/*": ["./src/*"],
-      "@test/*": ["./src/__tests__/_setup/*"]
+      "@/*": ["./src/*"]
     }
   }
 }

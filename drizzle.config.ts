@@ -5,9 +5,9 @@ import { defineConfig } from 'drizzle-kit'
  *
  * Migrations are generated from src/lib/db/schema.ts into ./drizzle, then
  * applied to D1 with wrangler:
- *   bun db:generate
- *   bun db:migrate:local
- *   bun db:migrate:remote
+ *   bun run db:generate
+ *   bun run db:migrate:local
+ *   bun run db:migrate:remote
  */
 export default defineConfig({
   dialect: 'sqlite',
