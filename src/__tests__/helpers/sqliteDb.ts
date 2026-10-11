@@ -25,5 +25,25 @@ export async function sqliteDb() {
       if (statement.trim()) sqlite.run(statement)
     }
   }
-  return { sqlite, db: drizzle(sqlite, { schema }) }
+  const db = drizzle(sqlite, { schema })
+  // LiveGame and identity resolve write with D1's batch(). Bun's driver
+  // has the same statements; run them in order so those paths can execute.
+  return { sqlite, db: withBatch(db) }
+}
+
+type Runnable = { run: () => unknown }
+
+/** D1's `db.batch` on a Bun SQLite client: run each statement in order. */
+export function withBatch<T extends object>(
+  db: T,
+): T & { batch: (queries: Array<Runnable>) => Promise<Array<unknown>> } {
+  const batched = db as T & {
+    batch: (queries: Array<Runnable>) => Promise<Array<unknown>>
+  }
+  batched.batch = async (queries) => {
+    const results: Array<unknown> = []
+    for (const query of queries) results.push(await query.run())
+    return results
+  }
+  return batched
 }
