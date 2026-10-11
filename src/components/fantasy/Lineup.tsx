@@ -176,7 +176,7 @@ function PlayerCell({
         <GameStrip player={player} state={state} />
       ) : (
         byes &&
-        player.teamId && (
+        (player.teamId || player.teamAbbrev) && (
           <span className="block rounded-md border border-border/60 px-1.5 py-1 text-center text-[9px] leading-none font-semibold tracking-wide text-muted uppercase">
             Bye week
           </span>

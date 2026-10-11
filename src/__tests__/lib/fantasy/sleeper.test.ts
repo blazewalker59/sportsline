@@ -153,6 +153,8 @@ describe('reading a Sleeper Matchup', () => {
       positionId: 16,
     })
     expect(proTeamId('WAS')).toBe(28)
+    expect(proTeamId('BUF')).toBe(2)
+    expect(proTeamId('LAR')).toBe(14)
     expect(
       myRoster([theirs, { ...mine, owner_id: 'x', co_owners: ['me'] }], 'me')
         ?.roster_id,

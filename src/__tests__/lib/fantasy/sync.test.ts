@@ -329,6 +329,42 @@ describe.skipIf(!isBun)('ESPN fantasy sync', () => {
     expect(due).not.toContain('u2')
     expect(await sync.accountsDue(env, 60_000, 1)).toEqual(['u1'])
   })
+
+  it('maps a Sleeper NFL team by abbreviation when the Source id is missing', async () => {
+    sqlite.run(
+      "INSERT INTO teams (id,league,name,abbreviation,logo_url) VALUES ('tm_buf','nfl','Buffalo Bills','BUF',NULL)",
+    )
+    sqlite.run(
+      "INSERT INTO fantasy_leagues (id,viewer_id,sport,provider,league_id,season,name,updated_at) VALUES ('u1~football~s','u1','football','sleeper','L',2026,'Roll tide!','x')",
+    )
+    const row = (
+      await db.select().from((await import('@/lib/db/schema')).fantasyLeagues)
+    ).find((league) => league.id === 'u1~football~s')
+    await sync.storeMatchup(db, row!, sleeperAllen(), {
+      season: 2026,
+      teamId: 8,
+      lastError: null,
+    })
+    const matchup = JSON.parse(
+      String(
+        (
+          sqlite as unknown as {
+            query: (sql: string) => { get: () => { matchup: string } }
+          }
+        )
+          .query(
+            "SELECT matchup FROM fantasy_leagues WHERE id = 'u1~football~s'",
+          )
+          .get().matchup,
+      ),
+    ) as MatchupView
+    expect(matchup.mine.lineup[0]).toMatchObject({
+      name: 'Josh Allen',
+      proTeamId: 2,
+      teamId: 'tm_buf',
+      teamAbbrev: 'BUF',
+    })
+  })
 })
 
 function wireLeague() {
@@ -375,6 +411,41 @@ function wireLeague() {
         },
       },
     ],
+  }
+}
+
+function sleeperAllen(): MatchupView {
+  return {
+    sport: 'football',
+    leagueName: 'Roll tide!',
+    scoringType: 'H2H_POINTS',
+    matchupPeriod: 5,
+    scoringPeriod: 5,
+    mine: {
+      teamId: 8,
+      name: 'Blaze',
+      abbrev: 'BLZ',
+      logo: null,
+      record: null,
+      score: 0,
+      projected: null,
+      lineup: [
+        {
+          espnId: 4984,
+          name: 'Josh Allen',
+          slot: 'QB',
+          slotId: 0,
+          positionId: 1,
+          starter: true,
+          points: null,
+          projected: 22,
+          proTeamId: 2,
+          injury: null,
+          breakdown: [],
+        },
+      ],
+    },
+    opponent: null,
   }
 }
 

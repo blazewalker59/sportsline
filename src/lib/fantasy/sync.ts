@@ -20,7 +20,7 @@ import { shouldRecord } from './race'
 import { EspnError, fanProfile, leagueViews } from './client'
 import { discoverLeagues } from './discovery'
 import { liveProjected } from './liveProjection'
-import { matchupWindow } from './schedule'
+import { countsInMatchupWindow, matchupWindow } from './schedule'
 import { myTeamId, readMatchup } from './matchup'
 import { MLB_PRO_TEAMS, NFL_PRO_TEAMS, SPORTS, seasonOf } from './sports'
 import type { EspnSession } from './client'
@@ -40,7 +40,7 @@ import {
 } from '@/lib/db/schema'
 import { unseal } from '@/lib/kalshi/vault'
 import { normalizePlayerName } from '@/lib/kalshi/match'
-import { sportsDayOf } from '@/lib/model/sportsDay'
+import { shiftSportsDay, sportsDayOf } from '@/lib/model/sportsDay'
 import { reportError } from '@/lib/ops/errors'
 
 /** Look for new leagues this often. */
@@ -268,6 +268,28 @@ async function ourTeams(
       ),
     )
   for (const r of rows) out.set(Number(r.sourceId), r)
+  if (sport !== 'football') return out
+  // Sleeper's pro team id is ESPN's. When that Source id isn't mapped yet,
+  // the Team row is still there under its abbreviation (BUF, not a second id).
+  const missing = ids.filter((id) => !out.has(Number(id)))
+  const names = missing.flatMap((id) => {
+    const abbr = NFL_PRO_TEAMS[Number(id)]
+    return abbr ? [abbr] : []
+  })
+  if (names.length === 0) return out
+  const byAbbrev = await db
+    .select({
+      id: teams.id,
+      logoUrl: teams.logoUrl,
+      abbreviation: teams.abbreviation,
+    })
+    .from(teams)
+    .where(and(eq(teams.league, 'nfl'), inArray(teams.abbreviation, names)))
+  for (const id of missing) {
+    const abbr = NFL_PRO_TEAMS[Number(id)]
+    const row = byAbbrev.find((r) => r.abbreviation === abbr)
+    if (row) out.set(Number(id), row)
+  }
   return out
 }
 
@@ -414,21 +436,24 @@ async function projectLive(db: Database, view: MatchupView): Promise<void> {
             home: games.homeTeamId,
             status: games.status,
             situation: games.situation,
+            sportsDay: games.sportsDay,
+            startsAt: games.startsAt,
           })
           .from(games)
           .where(
             and(
               eq(games.league, 'nfl'),
               gte(games.sportsDay, from),
-              lte(games.sportsDay, to),
+              lte(games.sportsDay, shiftSportsDay(to, 1)),
               or(
                 inArray(games.awayTeamId, teamIds),
                 inArray(games.homeTeamId, teamIds),
               ),
             ),
           )
+  const counted = rows.filter((r) => countsInMatchupWindow(r, { from, to }))
   const gameOf = (p: LineupPlayer) => {
-    const g = rows.find((r) => r.away === p.teamId || r.home === p.teamId)
+    const g = counted.find((r) => r.away === p.teamId || r.home === p.teamId)
     return g
       ? { status: g.status, segmentLabel: g.situation?.segmentLabel ?? null }
       : undefined

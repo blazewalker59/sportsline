@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { GameSummary } from '@/lib/model/timeline'
-import { matchupWindow, pickGame } from '@/lib/fantasy/schedule'
+import {
+  countsInMatchupWindow,
+  matchupWindow,
+  pickGame,
+  sourceDays,
+} from '@/lib/fantasy/schedule'
 
 describe('a Matchup’s window', () => {
   it('is the NFL week, Tuesday to Monday, for football', () => {
@@ -12,6 +17,11 @@ describe('a Matchup’s window', () => {
     // Tuesday starts the next week.
     expect(matchupWindow('nfl', '2026-10-06').from).toBe('2026-10-06')
     expect(matchupWindow('nfl', '2026-10-05').from).toBe('2026-09-29')
+    // Sunday 11 October 2026, the week in progress: through Monday the 12th.
+    expect(matchupWindow('nfl', '2026-10-11')).toEqual({
+      from: '2026-10-06',
+      to: '2026-10-12',
+    })
   })
 
   it('is today and the next few days for daily scoring', () => {
@@ -19,6 +29,66 @@ describe('a Matchup’s window', () => {
       from: '2026-10-04',
       to: '2026-10-08',
     })
+  })
+})
+
+describe('Monday night in the football window', () => {
+  // Week of Sunday 11 October 2026. Bills at Rams kicks off 8:15pm Eastern
+  // Monday, which is 00:15 UTC Tuesday.
+  const week = { from: '2026-10-06', to: '2026-10-12' }
+
+  it('counts a Monday night kickoff stored on its UTC date', () => {
+    expect(
+      countsInMatchupWindow(
+        { sportsDay: '2026-10-13', startsAt: '2026-10-13T00:15:00Z' },
+        week,
+      ),
+    ).toBe(true)
+    expect(
+      countsInMatchupWindow(
+        { sportsDay: '2026-10-12', startsAt: '2026-10-13T00:15:00Z' },
+        week,
+      ),
+    ).toBe(true)
+  })
+
+  it('counts Thursday and Saturday, and not next Thursday', () => {
+    expect(
+      countsInMatchupWindow(
+        { sportsDay: '2026-10-08', startsAt: '2026-10-09T00:15:00Z' },
+        week,
+      ),
+    ).toBe(true)
+    expect(
+      countsInMatchupWindow(
+        { sportsDay: '2026-10-10', startsAt: '2026-10-10T17:00:00Z' },
+        week,
+      ),
+    ).toBe(true)
+    expect(
+      countsInMatchupWindow(
+        { sportsDay: '2026-10-15', startsAt: '2026-10-16T00:15:00Z' },
+        week,
+      ),
+    ).toBe(false)
+  })
+
+  it('rejects a Tuesday afternoon game on the extra calendar day', () => {
+    expect(
+      countsInMatchupWindow(
+        { sportsDay: '2026-10-13', startsAt: '2026-10-13T20:00:00Z' },
+        week,
+      ),
+    ).toBe(false)
+  })
+
+  it('reads the whole week from the Source, plus the UTC date after Monday', () => {
+    const days = sourceDays(week)
+    expect(days[0]).toBe('2026-10-06')
+    expect(days).toContain('2026-10-08')
+    expect(days).toContain('2026-10-10')
+    expect(days).toContain('2026-10-12')
+    expect(days.at(-1)).toBe('2026-10-13')
   })
 })
 
