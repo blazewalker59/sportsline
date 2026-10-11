@@ -1,7 +1,7 @@
 {
   "name": "Sportsline",
   "short_name": "Sportsline",
-  "description": "Live play-by-play across MLB, NBA, NFL and NHL",
+  "description": "Live play-by-play across MLB, NBA, NFL, NHL, and college football, with Predictions, Fantasy, and Agents",
   "id": "/",
   "start_url": "/",
   "scope": "/",

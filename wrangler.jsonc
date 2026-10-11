@@ -6,8 +6,12 @@
   // built bundle as wrangler's positional script arg, which overrides `main`:
   //   wrangler deploy dist/server/index.js --env production
   //
-  // There is no staging environment. Bindings and settings are NOT inherited
-  // into named environments, so the production env repeats them.
+  // There is no staging environment. Bindings and vars are not inherited by
+  // named environments, so production repeats d1_databases, durable_objects,
+  // and vars. `name` is repeated too: omitting it publishes
+  // `sportsline-production` instead of `sportsline`. workers_dev,
+  // observability, triggers, migrations, assets, and compatibility settings
+  // are inherited from the top level.
   "name": "sportsline",
   "compatibility_date": "2025-09-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -58,8 +62,8 @@
       "name": "sportsline",
       // Production is sportsline.dev (a Custom Domain, declared here so every
       // deploy keeps it, as dreamteam does). www and workers.dev stay on but
-      // redirect to it (src/server.ts, CANONICAL_HOST).
-      "workers_dev": true,
+      // redirect to it (src/server.ts, CANONICAL_HOST). workers_dev is
+      // inherited from the top level so the workers.dev host stays on.
       "routes": [
         {
           "pattern": "sportsline.dev",
@@ -80,11 +84,6 @@
         // The admin: sees /admin and is pushed about errors (docs/adr/0005).
         "ADMIN_EMAILS": "blazewalker59@gmail.com",
       },
-      "observability": {
-        "logs": {
-          "enabled": true,
-        },
-      },
       "d1_databases": [
         {
           "binding": "DB",
@@ -93,9 +92,6 @@
           "migrations_dir": "drizzle",
         },
       ],
-      "triggers": {
-        "crons": [],
-      },
       "durable_objects": {
         "bindings": [
           { "name": "LIVE_GAME", "class_name": "LiveGame" },

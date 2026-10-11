@@ -1,9 +1,11 @@
 name: CI/CD
 
-# Same pipeline shape as dreamteam:
+# One gate: `bun run ci` (format, lint, types, db:check, tests, build).
+# Local `bun run ci` and `bun run ship` call that same script. `ship` and the
+# deploy job then run `bun run deploy` (remote D1 migrations, then wrangler).
 #
-#   PR:            checks + test (gate only)
-#   push to main:  checks(+artifact) + test ─ deploy (reuses the build)
+#   PR:            ci (gate only)
+#   push to main:  ci (+artifact) ─ deploy (reuses the build)
 #
 # There is no staging: merges to main deploy straight to production.
 on:
@@ -19,7 +21,7 @@ concurrency:
 
 jobs:
   checks:
-    name: Lint / Types / Build
+    name: CI
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -33,12 +35,8 @@ jobs:
           restore-keys: |
             bun-${{ runner.os }}-
       - run: bun install --frozen-lockfile
-      - name: Lint
-        run: bun --bun run check
-      - name: Type check
-        run: bun --bun run typecheck
-      - name: Build
-        run: bun --bun run build
+      - name: Check, test, and build
+        run: bun run ci
       - name: Upload build artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v7
@@ -47,27 +45,10 @@ jobs:
           path: dist/
           retention-days: 1
 
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.4.2
-      - uses: actions/cache@v6
-        with:
-          path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            bun-${{ runner.os }}-
-      - run: bun install --frozen-lockfile
-      - run: bun --bun run test:run
-
   deploy:
     name: Deploy to Cloudflare Workers
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [checks, test]
+    needs: [checks]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -88,17 +69,12 @@ jobs:
         with:
           name: dist
           path: dist/
-      # Worker secrets (BETTER_AUTH_SECRET, BETTER_AUTH_URL, GOOGLE_CLIENT_ID,
-      # GOOGLE_CLIENT_SECRET) are set out-of-band with `wrangler secret put`.
-      # Migrations go first, so new code never queries columns that don't
-      # exist yet; a failure here stops the deploy.
-      - name: Apply D1 migrations
-        run: bunx wrangler d1 migrations apply sportsline-db --remote --env production
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      - name: Deploy
-        run: bunx wrangler deploy dist/server/index.js --config wrangler.jsonc --env production
+      # Secrets (see README and .env.example) are set out-of-band with
+      # `wrangler secret put`. Migrations go first, so new code never queries
+      # columns that don't exist yet; a failure here stops the deploy.
+      # Same command as `bun run deploy` / `bun run ship`.
+      - name: Apply D1 migrations and deploy
+        run: bun run deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

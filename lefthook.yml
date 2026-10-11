@@ -1,10 +1,13 @@
 # Lefthook git hooks configuration
 # Docs: https://lefthook.dev/configuration/
 #
-# Runs formatting, linting, and type checking before each commit.
+# Formats staged files and lints them with `eslint --max-warnings 0` before
+# each commit. It does not typecheck: `tsc` needs the whole project, and that
+# runs in `bun run ci` (local, `ship`, and GitHub Actions), along with the
+# schema check, tests, and the build.
 # Install hooks: bunx lefthook install
 #
-# Only checks staged files for faster commits. Full project check runs in CI.
+# Only checks staged files for faster commits.
 
 pre-commit:
   no_stash: true
@@ -14,4 +17,4 @@ pre-commit:
       run: bunx prettier --check {staged_files}
     - name: lint
       glob: '*.{ts,tsx}'
-      run: bunx eslint {staged_files}
+      run: bunx eslint --max-warnings 0 {staged_files}

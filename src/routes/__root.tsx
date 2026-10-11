@@ -5,11 +5,8 @@ import {
   createRootRouteWithContext,
   useRouterState,
 } from '@tanstack/react-router'
-import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
-import { TanStackDevtools } from '@tanstack/react-devtools'
 
-import { useEffect } from 'react'
-import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
+import { useEffect, useState } from 'react'
 
 import appCss from '../styles.css?url'
 import { THEME_BOOT, THEME_COLOR_BOOT } from '../lib/theme'
@@ -46,7 +43,8 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       { name: 'mobile-web-app-capable', content: 'yes' },
       {
         name: 'description',
-        content: 'Live play-by-play across MLB, NBA, NFL and NHL.',
+        content:
+          'Live play-by-play across MLB, NBA, NFL, NHL, and college football, with Predictions, Fantasy, and Agents.',
       },
     ],
     links: [
@@ -122,6 +120,41 @@ function Splash() {
   )
 }
 
+/**
+ * Router and query inspectors. Loaded only in dev: the dynamic import sits
+ * behind `import.meta.env.DEV`, which the production build replaces with
+ * `false`, so the panels (and their nested seroval) stay out of the bundle.
+ */
+function Devtools() {
+  const [node, setNode] = useState<React.ReactNode>(null)
+  useEffect(() => {
+    let cancelled = false
+    void Promise.all([
+      import('@tanstack/react-devtools'),
+      import('@tanstack/react-router-devtools'),
+      import('../integrations/tanstack-query/devtools'),
+    ]).then(([devtools, routerDevtools, queryDevtools]) => {
+      if (cancelled) return
+      setNode(
+        <devtools.TanStackDevtools
+          config={{ position: 'bottom-right' }}
+          plugins={[
+            {
+              name: 'Tanstack Router',
+              render: <routerDevtools.TanStackRouterDevtoolsPanel />,
+            },
+            queryDevtools.default,
+          ]}
+        />,
+      )
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  return node
+}
+
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
     // The boot script sets the theme class before hydration, so the
@@ -134,16 +167,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {children}
-        <TanStackDevtools
-          config={{ position: 'bottom-right' }}
-          plugins={[
-            {
-              name: 'Tanstack Router',
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-            TanStackQueryDevtools,
-          ]}
-        />
+        {import.meta.env.DEV ? <Devtools /> : null}
         <Scripts />
       </body>
     </html>

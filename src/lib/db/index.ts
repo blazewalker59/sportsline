@@ -17,6 +17,20 @@ import type { LiveHub } from '@/lib/live/LiveHub'
 import type { Scheduler } from '@/lib/live/Scheduler'
 import type { ViewerSync } from '@/lib/live/ViewerSync'
 
+/**
+ * Bindings, public vars, and secrets on the Worker.
+ *
+ * Bindings (wrangler.jsonc; repeated under env.production, because Wrangler
+ * does not inherit them): DB, LIVE_GAME, LIVE_HUB, SCHEDULER, VIEWER_SYNC.
+ *
+ * Public vars (wrangler.jsonc env.production.vars, not secrets):
+ * CANONICAL_HOST, VAPID_PUBLIC_KEY, VAPID_SUBJECT, ADMIN_EMAILS.
+ *
+ * Secrets (`wrangler secret put <NAME> --env production`; names and local
+ * placeholders in .env.example, copied to .dev.vars): BETTER_AUTH_SECRET,
+ * BETTER_AUTH_URL, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
+ * KALSHI_ENCRYPTION_KEY, ESPN_ENCRYPTION_KEY, ODDS_API_KEY, VAPID_PRIVATE_JWK.
+ */
 export interface CloudflareEnv {
   DB: D1Database
   LIVE_GAME: DurableObjectNamespace<LiveGame>
