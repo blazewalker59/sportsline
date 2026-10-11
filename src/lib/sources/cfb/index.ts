@@ -7,7 +7,7 @@
 
 import { fetchTeamSchedule, top25 } from '../espn/common'
 import { parseGame, parseRoster, parseScoreboard } from '../nfl/parse'
-import { fetchWithRetry, mapPool } from '../pool'
+import { ROSTER_CONCURRENCY, getJson as jsonFrom, mapPool } from '../pool'
 import { espnAthleteOverview } from '../espn/athlete'
 import type {
   NflCorePlays,
@@ -24,27 +24,12 @@ const CORE =
   'https://sports.core.api.espn.com/v2/sports/football/leagues/college-football'
 
 /** ESPN group ids: ACC, Big 12, Big Ten, SEC. */
-export const COVERED_CONFERENCES: ReadonlySet<string> = new Set([
-  '1',
-  '4',
-  '5',
-  '8',
-])
+const COVERED_CONFERENCES: ReadonlySet<string> = new Set(['1', '4', '5', '8'])
 /** Independents covered on their own: Notre Dame. */
-export const COVERED_TEAMS: ReadonlySet<string> = new Set(['87'])
+const COVERED_TEAMS: ReadonlySet<string> = new Set(['87'])
 /** ESPN's FBS group, for the scoreboard. */
 const FBS = '80'
-
-/** Roster calls in flight at once: a burst of every team gets rate-limited. */
-const ROSTER_CONCURRENCY = 6
-
-async function getJson<T>(url: string): Promise<T> {
-  const res = await fetchWithRetry(url, {
-    headers: { accept: 'application/json' },
-  })
-  if (!res.ok) throw new Error(`ESPN ${res.status} for ${url}`)
-  return (await res.json()) as T
-}
+const getJson = jsonFrom('ESPN')
 
 /** Does this game involve a covered team? */
 export function isCovered(

@@ -14,7 +14,7 @@ import { segmentDescription } from '@/lib/timeline/format'
 /** An item older than this when first seen is history, not news. */
 const STALE_MS = 15 * 60_000
 
-export type AlertSource = 'following' | 'prediction' | 'fantasy'
+type AlertSource = 'following' | 'prediction' | 'fantasy'
 
 /** How much each source sends (CONTEXT.md, "Alert level"). */
 export interface AlertLevels {

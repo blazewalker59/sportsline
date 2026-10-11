@@ -7,7 +7,7 @@
 
 export type Theme = 'light' | 'dark'
 
-export const THEME_KEY = 'sportsline.theme'
+const THEME_KEY = 'sportsline.theme'
 
 export function currentTheme(): Theme {
   return document.documentElement.classList.contains('dark') ? 'dark' : 'light'

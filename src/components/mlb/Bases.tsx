@@ -38,21 +38,3 @@ export function Bases({
     </svg>
   )
 }
-
-/** Outs as three dots. */
-export function Outs({ outs }: { outs: number }) {
-  return (
-    <span className="flex gap-0.5" role="img" aria-label={`${outs} out`}>
-      {[0, 1, 2].map((i) => (
-        <span
-          key={i}
-          className={
-            i < outs
-              ? 'size-1.5 rounded-full bg-foreground/80'
-              : 'size-1.5 rounded-full bg-border'
-          }
-        />
-      ))}
-    </span>
-  )
-}

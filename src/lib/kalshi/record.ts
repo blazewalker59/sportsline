@@ -63,7 +63,7 @@ export interface Range {
   to: Date | null
 }
 
-export function inRange(e: RecordEntry, range: Range): boolean {
+function inRange(e: RecordEntry, range: Range): boolean {
   const t = Date.parse(e.madeAt)
   return (
     (!range.from || t >= range.from.getTime()) &&
@@ -231,12 +231,12 @@ function comboSizeKey(e: RecordEntry): string {
   return n >= 6 ? '6+ legs' : `${n} legs`
 }
 
-export interface Streak {
+interface Streak {
   kind: 'won' | 'lost'
   length: number
 }
 
-export interface DayPoint {
+interface DayPoint {
   /** Local day, YYYY-MM-DD. */
   day: string
   staked: number
@@ -244,7 +244,7 @@ export interface DayPoint {
   pnl: number
 }
 
-export interface Insight {
+interface Insight {
   tone: 'good' | 'bad' | 'neutral'
   text: string
 }

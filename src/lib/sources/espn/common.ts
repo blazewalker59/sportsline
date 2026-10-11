@@ -4,7 +4,6 @@
  * the daily scoreboard.
  */
 
-import type { EspnCompetitor, EspnStatus, NflScoreboard } from '../nfl/feed'
 import type {
   GameStatus,
   League,
@@ -15,6 +14,53 @@ import type { Conference } from '@/lib/model/leagues'
 import { sportsDayOf } from '@/lib/model/sportsDay'
 
 export type EspnLeague = Extract<League, 'nfl' | 'cfb' | 'nba'>
+
+export interface EspnStatus {
+  period?: number
+  displayClock?: string
+  type?: { name?: string; state?: 'pre' | 'in' | 'post'; detail?: string }
+}
+
+export interface EspnCompetitor {
+  id: string
+  homeAway: 'home' | 'away'
+  score?: string
+  team: {
+    id: string
+    abbreviation?: string
+    displayName?: string
+    name?: string
+    /** College football only: the team's conference (scoreboard)… */
+    conferenceId?: string
+    /** …or its group (game summary). */
+    groups?: { id?: string }
+  }
+  linescores?: Array<{ displayValue?: string }>
+  /** College football rankings: the summary's `rank`, the scoreboard's curatedRank (99 when unranked). */
+  rank?: number
+  curatedRank?: { current?: number }
+}
+
+/** ESPN's site-API scoreboard, the same shape for NFL, college football and NBA. */
+export interface EspnScoreboard {
+  events?: Array<{
+    id: string
+    date: string
+    status?: EspnStatus
+    competitions?: Array<{ competitors?: Array<EspnCompetitor> }>
+  }>
+}
+
+/** ESPN's site-API team list, the same shape for NFL, college football and NBA. */
+export interface EspnTeams {
+  sports?: Array<{
+    leagues?: Array<{
+      teams?: Array<{
+        team: { id: string; abbreviation?: string; displayName?: string }
+      }>
+    }>
+  }>
+}
 
 export function mapStatus(status: EspnStatus | undefined): GameStatus {
   const name = status?.type?.name ?? ''
@@ -35,7 +81,7 @@ export function quarterLabel(period: number): string {
 }
 
 /** ESPN's dark-background logo, resized: the originals are ~100 KB PNGs. */
-export function espnLogo(path: string): string {
+function espnLogo(path: string): string {
   return `https://a.espncdn.com/combiner/i?img=${path}&w=80&h=80`
 }
 
@@ -166,7 +212,7 @@ export async function fetchTeamSchedule(
 }
 
 export function parseScoreboard(
-  scoreboard: NflScoreboard,
+  scoreboard: EspnScoreboard,
   league: EspnLeague,
 ): Array<ScheduledGame> {
   return (scoreboard.events ?? []).flatMap((e) => {

@@ -16,7 +16,7 @@ import { findGame, teamMatches } from '@/lib/kalshi/match'
 import { fetchWithRetry } from '@/lib/sources/pool'
 
 /** The Leagues Sharp picks cover: the four major American sports. */
-export const SHARP_LEAGUES: ReadonlyArray<League> = ['nfl', 'nba', 'mlb', 'nhl']
+const SHARP_LEAGUES: ReadonlyArray<League> = ['nfl', 'nba', 'mlb', 'nhl']
 /**
  * The Leagues trend picks cover: college football too, whose fair price
  * needs only Kalshi and our own finals, not the sharp books.
@@ -64,7 +64,7 @@ export async function loadGames(
 }
 
 /** Our Game for a source's two team names and start time. */
-export function matchGame(
+function matchGame(
   refs: ReadonlyArray<GameRef>,
   league: League,
   homeName: string,
@@ -161,7 +161,7 @@ export async function oddsApiQuotes(
 }
 
 /** One bookmaker's market, de-vigged, as Quotes on canonical Lines. */
-export function oddsMarketQuotes(
+function oddsMarketQuotes(
   game: GameRef,
   source: FairSource,
   market: string,
@@ -279,7 +279,7 @@ export async function polymarketQuotes(
   return quotes
 }
 
-export function polyMarketQuotes(
+function polyMarketQuotes(
   game: GameRef,
   m: NonNullable<PolyEvent['markets']>[number],
 ): Array<Quote> {

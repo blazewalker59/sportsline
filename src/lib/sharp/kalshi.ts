@@ -40,7 +40,7 @@ const SERIES: Array<{ series: string; league: League; kind: MarketKind }> =
 const MONTHS = 'JANFEBMARAPRMAYJUNJULAUGSEPOCTNOVDEC'
 
 /** "KXNBASPREAD-26OCT05NYKPHI" → its date ("2026-10-05") and teams ("NYKPHI"). */
-export function parseEventTicker(
+function parseEventTicker(
   eventTicker: string,
 ): { day: string; teams: string } | null {
   const m = /-(\d{2})([A-Z]{3})(\d{2})(?:\d{4})?([A-Z]+)$/.exec(eventTicker)

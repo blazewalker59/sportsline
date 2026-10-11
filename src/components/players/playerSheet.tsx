@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 export const OpenPlayer = createContext<(playerId: string) => void>(() => {})
 
 /** Open a Player's sheet over the current screen. */
-export function usePlayerSheet(): (playerId: string) => void {
+function usePlayerSheet(): (playerId: string) => void {
   return useContext(OpenPlayer)
 }
 

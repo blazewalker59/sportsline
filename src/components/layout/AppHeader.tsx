@@ -148,7 +148,7 @@ function AccountButton() {
                 to="/predictions"
                 icon="predictions"
                 label="Predictions"
-                hint="Kalshi bets and your record"
+                hint="Kalshi predictions and your record"
                 onPick={() => setOpen(false)}
               />
               <MenuItem

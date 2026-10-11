@@ -31,7 +31,7 @@ import {
  * Saturday's prices: 10 points made 51 Alerts from four Predictions; 20
  * points with a 20-minute rest made 11.
  */
-export const ODDS_SWING = 0.2
+const ODDS_SWING = 0.2
 const SWING_COOLDOWN_MS = 20 * 60_000
 /** Results older than this when first noticed aren't news. */
 const RESULT_FRESH_MS = 3 * 3_600_000

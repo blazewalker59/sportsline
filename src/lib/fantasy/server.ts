@@ -7,21 +7,12 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, asc, desc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { EspnError, bracedSwid, fanProfile } from './client'
+import { discoverConnectedLeagues } from './discoverNow'
 import { leagueFromUrl } from './discovery'
 import { seasonOf } from './sports'
-import {
-  discover,
-  leagueRowId,
-  loadSession,
-  syncAccount,
-  syncLeague,
-} from './sync'
-import { sleeperState, sleeperUser } from './sleeper/client'
-import {
-  discover as discoverSleeper,
-  sleeperLeagueRowId,
-  syncAccount as syncSleeper,
-} from './sleeper/sync'
+import { leagueRowId, loadSession, syncAccount, syncLeague } from './sync'
+import { sleeperUser } from './sleeper/client'
+import { sleeperLeagueRowId, syncAccount as syncSleeper } from './sleeper/sync'
 import type { MatchupView } from './matchup'
 import type { RacePoint } from './race'
 import type { FantasySport } from './sports'
@@ -159,22 +150,10 @@ export const disconnectEspn = createServerFn({ method: 'POST' }).handler(() =>
 export const syncFantasyNow = createServerFn({ method: 'POST' }).handler(() =>
   withViewer(async ({ db, viewerId }) => {
     const env = getCloudflareEnv()
-    // A manual sync also looks for new leagues, on every connection.
-    const session = await loadSession(env, viewerId)
-    if (session) await discover(db, viewerId, session).catch(() => 0)
-    const sleeper = await db
-      .select()
-      .from(sleeperAccounts)
-      .where(eq(sleeperAccounts.viewerId, viewerId))
-      .get()
-    if (sleeper) {
-      await sleeperState()
-        .then((state) => discoverSleeper(db, viewerId, sleeper.userId, state))
-        .catch(() => 0)
-    }
+    const connected = await discoverConnectedLeagues(env, db, viewerId)
     const [espn, sleeperCount] = await Promise.all([
-      session ? syncAccount(env, viewerId) : 0,
-      sleeper ? syncSleeper(env, viewerId) : 0,
+      connected.espn ? syncAccount(env, viewerId) : 0,
+      connected.sleeper ? syncSleeper(env, viewerId) : 0,
     ])
     return espn + sleeperCount
   }),

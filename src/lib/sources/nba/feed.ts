@@ -6,7 +6,7 @@
 
 import type { EspnCompetitor, EspnStatus } from '../nfl/feed'
 
-export interface NbaPlay {
+interface NbaPlay {
   id: string
   sequenceNumber?: string
   type?: { id?: string; text?: string }
@@ -24,7 +24,7 @@ export interface NbaPlay {
   coordinate?: { x?: number; y?: number }
 }
 
-export interface NbaBoxAthlete {
+interface NbaBoxAthlete {
   athlete: {
     id: string
     displayName?: string

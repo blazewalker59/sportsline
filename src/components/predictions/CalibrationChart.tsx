@@ -22,7 +22,7 @@ const FAIR = [
   { x: 1, y: 1 },
 ]
 
-/** The words around the chart: the Viewer's bets by default. */
+/** The words around the chart: the Viewer's predictions by default. */
 export interface CalibrationCopy {
   x: string
   y: string
@@ -31,18 +31,18 @@ export interface CalibrationCopy {
   versus: string
   /** "Bought at", "Fair at". */
   at: string
-  /** "settled bets", "settled picks". */
+  /** "settled predictions", "settled picks". */
   noun: string
   footnote: string
 }
 
-const BETS: CalibrationCopy = {
+const PREDICTIONS: CalibrationCopy = {
   x: 'Chance you bought in at',
   y: 'How often you won',
-  legend: 'Your bets, by price',
+  legend: 'Your predictions, by price',
   versus: 'the odds implied',
   at: 'Bought at',
-  noun: 'settled bets',
+  noun: 'settled predictions',
   footnote: 'Above the line, you beat the price.',
 }
 
@@ -55,7 +55,7 @@ function edgeText(edge: number, versus: string): string {
 
 export function CalibrationChart({
   calibration: c,
-  copy = BETS,
+  copy = PREDICTIONS,
 }: {
   calibration: Calibration
   copy?: CalibrationCopy

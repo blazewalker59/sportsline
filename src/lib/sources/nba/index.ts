@@ -1,31 +1,21 @@
 /** NBA Source adapter: ESPN's public site API. */
 
 import { fetchTeamSchedule, parseScoreboard } from '../espn/common'
-import { fetchWithRetry, mapPool } from '../pool'
+import { ROSTER_CONCURRENCY, getJson as jsonFrom, mapPool } from '../pool'
 import { espnAthleteOverview } from '../espn/athlete'
 import { parseGame, parseRoster } from './parse'
 import type { NbaRoster, NbaSummary } from './feed'
-import type { NflScoreboard, NflTeams } from '../nfl/feed'
+import type { EspnScoreboard, EspnTeams } from '../espn/common'
 import type { SourceAdapter } from '@/lib/model/types'
 
 const SITE = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba'
-
-/** Roster calls in flight at once: a burst of every team gets rate-limited. */
-const ROSTER_CONCURRENCY = 6
-
-async function getJson<T>(url: string): Promise<T> {
-  const res = await fetchWithRetry(url, {
-    headers: { accept: 'application/json' },
-  })
-  if (!res.ok) throw new Error(`ESPN ${res.status} for ${url}`)
-  return (await res.json()) as T
-}
+const getJson = jsonFrom('ESPN')
 
 export const nbaAdapter: SourceAdapter = {
   league: 'nba',
   source: 'espn-nba',
   async schedule(sportsDay) {
-    const scoreboard = await getJson<NflScoreboard>(
+    const scoreboard = await getJson<EspnScoreboard>(
       `${SITE}/scoreboard?dates=${sportsDay.replaceAll('-', '')}`,
     )
     return parseScoreboard(scoreboard, 'nba')
@@ -38,7 +28,7 @@ export const nbaAdapter: SourceAdapter = {
     )
   },
   async roster() {
-    const teams = await getJson<NflTeams>(`${SITE}/teams`)
+    const teams = await getJson<EspnTeams>(`${SITE}/teams`)
     const ids = (teams.sports?.[0]?.leagues?.[0]?.teams ?? []).map(
       (t) => t.team.id,
     )

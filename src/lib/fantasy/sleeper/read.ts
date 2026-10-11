@@ -137,7 +137,7 @@ const STAT_NAMES: Record<string, string> = {
   bonus_rec_yd_200: '200+ rec yds',
 }
 
-export function statLabel(key: string): string {
+function statLabel(key: string): string {
   return (
     STAT_NAMES[key] ??
     key.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase())

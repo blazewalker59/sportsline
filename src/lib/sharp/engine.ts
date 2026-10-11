@@ -33,7 +33,7 @@ export type FairSource =
   'pinnacle' | 'novig' | 'polymarket' | 'betonline' | 'draftkings'
 
 /** How much each source's price counts toward the fair price. */
-export const SOURCE_WEIGHT: Record<FairSource, number> = {
+const SOURCE_WEIGHT: Record<FairSource, number> = {
   pinnacle: 3,
   novig: 2,
   polymarket: 2,
@@ -150,9 +150,9 @@ export interface KalshiOffer {
  * edge (1–3), or thin (under 1, or the best of a fairly priced day). The
  * slate always has five; the grade says how sharp each is.
  */
-export type Grade = 'strong' | 'edge' | 'thin'
+type Grade = 'strong' | 'edge' | 'thin'
 
-export function gradeOf(edge: number): Grade {
+function gradeOf(edge: number): Grade {
   return edge >= 0.03 ? 'strong' : edge >= 0.01 ? 'edge' : 'thin'
 }
 
@@ -197,9 +197,9 @@ export const DEFAULT_RULES: Omit<Rules, 'now'> = {
 }
 
 /** Form this far against a pick (lean) leaves it out. */
-export const MAX_FORM_AGAINST = 0.15
+const MAX_FORM_AGAINST = 0.15
 /** What full form backing is worth in the ranking (per dollar). */
-export const FORM_WEIGHT = 0.03
+const FORM_WEIGHT = 0.03
 
 /** How a candidate ranks: its value, nudged by the Teams' form. */
 export const scoreOf = (c: Candidate) =>

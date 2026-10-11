@@ -114,7 +114,7 @@ function corner(
   }
 }
 
-export function positionOf(
+function positionOf(
   index: number,
   count: number,
 ): 'single' | 'first' | 'middle' | 'last' {
@@ -308,7 +308,7 @@ function PlayBubbleLink({
   )
 }
 
-export function FoldBubble({
+function FoldBubble({
   items,
   align,
   renderOpen,

@@ -57,7 +57,7 @@ const REAL_MS_PER_GAME_SECOND = 1_900
 const PERIOD_MS = 20 * 60 * REAL_MS_PER_GAME_SECOND
 const INTERMISSION_MS = 18 * 60_000
 
-export function mapStatus(
+function mapStatus(
   gameState: string | undefined,
   scheduleState: string | undefined,
 ): GameStatus {
@@ -87,7 +87,7 @@ export function periodLabel(period: {
   return ['1st', '2nd', '3rd'][period.number - 1] ?? `P${period.number}`
 }
 
-export function nhlLogo(abbreviation: string): string {
+function nhlLogo(abbreviation: string): string {
   return `https://assets.nhle.com/logos/nhl/svg/${abbreviation}_dark.svg`
 }
 

@@ -39,11 +39,11 @@ export type { Connection } from './useHubSocket'
 const STALE_MS = 30_000
 const ALL_PARAM = followsToParam(DEFAULT_FOLLOWS)
 
-export function timelineKey(sportsDay: string, followParam: string) {
+function timelineKey(sportsDay: string, followParam: string) {
   return ['timeline', sportsDay, followParam] as const
 }
 
-export function gamesKey(sportsDay: string) {
+function gamesKey(sportsDay: string) {
   return ['games', sportsDay] as const
 }
 

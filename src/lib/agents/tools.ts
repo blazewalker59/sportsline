@@ -127,7 +127,7 @@ export function agentPick(p: SharpPick, display: PriceDisplay = 'cents') {
 }
 
 /** A trend pick as an Agent reads it. Pure. */
-export function agentTrendPick(p: TrendPick, display: PriceDisplay = 'cents') {
+function agentTrendPick(p: TrendPick, display: PriceDisplay = 'cents') {
   return {
     pick: p.title,
     game: p.gameLabel,
@@ -156,10 +156,7 @@ export function agentTrendPick(p: TrendPick, display: PriceDisplay = 'cents') {
  * A trend combo as an Agent reads it: the legs' prices multiplied, roughly
  * what Kalshi will quote for it, and the worst quote worth taking. Pure.
  */
-export function agentTrendCombo(
-  c: TrendCombo,
-  display: PriceDisplay = 'cents',
-) {
+function agentTrendCombo(c: TrendCombo, display: PriceDisplay = 'cents') {
   return {
     legs: c.legs.length,
     fairPct: points(c.fair),
@@ -176,7 +173,7 @@ export function agentTrendCombo(
 }
 
 /** A line of the record as an Agent reads it. Pure. */
-export function agentLine(l: PickLine) {
+function agentLine(l: PickLine) {
   return {
     label: l.label,
     picks: l.picks,
@@ -190,7 +187,7 @@ export function agentLine(l: PickLine) {
 }
 
 /** A trade proposal as an Agent reads it. Pure. */
-export function agentTrade(
+function agentTrade(
   p: TradeProposal,
   now: number,
   display: PriceDisplay = 'cents',
@@ -411,9 +408,9 @@ function readTools(
     }),
     tool({
       name: 'find_bet',
-      title: 'Find a bet',
+      title: 'Find a trend pick',
       description:
-        "A good bet on demand, for a Team's next game or a League's games today or tomorrow, optionally one kickoff slate, as singles or a combo: Kalshi's offers (winner, main spread, total) priced against our own trends, each Team's recent margins and totals from Sportsline's game history, blended with Kalshi's price. For 'a good bet on the Avs game' pass team 'Avs'; for 'a good NBA bet tonight' pass league 'nba' and day 'today'; for 'a 3-leg college football combo for the noon slate' pass league 'cfb', day 'today', slate 'noon' and legs 3. College football covers games with an ACC, Big 12, Big Ten or SEC team, Notre Dame or a ranked team. These trend picks are weaker than the daily Sharp picks (get_sharp_picks), which use the sharp sportsbooks: say so, and pass on each pick's value and trend note. surprise picks at random among the offers the trends favor.",
+        "A trend pick on demand, for a Team's next game or a League's games today or tomorrow, optionally one kickoff slate, as singles or a combo: Kalshi's offers (winner, main spread, total) priced against our own trends, each Team's recent margins and totals from Sportsline's game history, blended with Kalshi's price. For 'a good bet on the Avs game' pass team 'Avs'; for 'a good NBA bet tonight' pass league 'nba' and day 'today'; for 'a 3-leg college football combo for the noon slate' pass league 'cfb', day 'today', slate 'noon' and legs 3. College football covers games with an ACC, Big 12, Big Ten or SEC team, Notre Dame or a ranked team. These trend picks are weaker than the daily Sharp picks (get_sharp_picks), which use the sharp sportsbooks: say so, and pass on each pick's value and trend note. surprise picks at random among the offers the trends favor.",
       input: z.object({
         team: z
           .string()
@@ -490,9 +487,9 @@ function readTools(
     }),
     tool({
       name: 'get_bet_record',
-      title: 'find_bet record',
+      title: 'Trend pick record',
       description:
-        'What came of find_bet: how many bets were asked for, how many picks were offered, how many the Viewer placed on Kalshi (themselves or through an approved trade proposal) after they were suggested, and how those placed picks did (won, lost, pending, win rate, profit or loss), with how the skipped picks turned out for comparison. Recent picks are listed with their status.',
+        'What came of find_bet: how many trend picks were asked for, how many were offered, how many the Viewer placed on Kalshi (themselves or through an approved trade proposal) after they were suggested, and how those placed picks did (won, lost, pending, win rate, profit or loss), with how the skipped picks turned out for comparison. Recent picks are listed with their status.',
       input: z.object({
         recent: z.number().int().min(0).max(50).default(10),
       }),

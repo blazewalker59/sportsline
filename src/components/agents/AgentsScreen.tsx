@@ -651,11 +651,11 @@ function BetRecord() {
   return (
     <section className="flex flex-col gap-3">
       <h2 className="text-xs font-bold tracking-wide text-muted uppercase">
-        Bets asked for
+        Trend picks asked for
       </h2>
       <p className="text-sm text-muted">
-        Every time an agent asks find_bet for a bet, and what came of its picks:
-        placed on Kalshi after they were suggested (by you or an approved
+        Every time an agent asks find_bet for a trend pick, and what came of its
+        picks: placed on Kalshi after they were suggested (by you or an approved
         trade), and how those did.
       </p>
       <div className="grid grid-cols-3 gap-2">

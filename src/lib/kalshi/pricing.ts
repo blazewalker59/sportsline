@@ -15,8 +15,7 @@ export interface Book {
 }
 
 /** No resting orders on either side: Kalshi's $0 bid / $1 ask. */
-export const isEmptyBook = (b: Book) =>
-  (b.yesBid ?? 0) <= 0 && (b.yesAsk ?? 1) >= 1
+const isEmptyBook = (b: Book) => (b.yesBid ?? 0) <= 0 && (b.yesAsk ?? 1) >= 1
 
 /** A market's YES chance (0–1) from its book, else its last trade. */
 export function bookChance(b: Book): number | null {

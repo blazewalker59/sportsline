@@ -5,7 +5,7 @@
  * directly, so they are rewrapped as PKCS#8; Ed25519 keys come as PKCS#8.
  */
 
-export type KeyType = 'rsa' | 'ed25519'
+type KeyType = 'rsa' | 'ed25519'
 
 export interface SigningKey {
   type: KeyType
@@ -33,7 +33,7 @@ function der(tag: number, body: ArrayLike<number>): Array<number> {
 }
 
 /** PKCS#1 RSAPrivateKey → PKCS#8 PrivateKeyInfo. */
-export function pkcs1ToPkcs8(pkcs1: Uint8Array): Uint8Array<ArrayBuffer> {
+function pkcs1ToPkcs8(pkcs1: Uint8Array): Uint8Array<ArrayBuffer> {
   const version = [0x02, 0x01, 0x00]
   // AlgorithmIdentifier { rsaEncryption, NULL }
   const algorithm = der(0x30, [

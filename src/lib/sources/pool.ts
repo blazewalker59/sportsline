@@ -4,6 +4,9 @@
  * gets NHL.com to answer 429.
  */
 
+/** Roster calls in flight at once: a burst of every team gets rate-limited. */
+export const ROSTER_CONCURRENCY = 6
+
 /** Map over items with at most `limit` calls in flight, keeping order. */
 export async function mapPool<T, TResult>(
   items: ReadonlyArray<T>,
@@ -48,5 +51,19 @@ export async function fetchWithRetry(
       retryAfter > 0 ? retryAfter * 1_000 : BASE_DELAY_MS * 2 ** (attempt - 1),
     )
     await sleep(delay)
+  }
+}
+
+/**
+ * GET JSON, retrying 429s and 5xxs. `source` names the API in the error
+ * (`ESPN 429 for https://…`). The reader is what shared ESPN helpers take.
+ */
+export function getJson(source: string): <T>(url: string) => Promise<T> {
+  return async <T>(url: string): Promise<T> => {
+    const res = await fetchWithRetry(url, {
+      headers: { accept: 'application/json' },
+    })
+    if (!res.ok) throw new Error(`${source} ${res.status} for ${url}`)
+    return (await res.json()) as T
   }
 }

@@ -18,7 +18,7 @@ import {
   teamLogo,
 } from '../espn/common'
 import type { NbaRoster, NbaSummary } from './feed'
-import type { NflTeams } from '../nfl/feed'
+import type { EspnTeams } from '../espn/common'
 import type {
   GameSnapshot,
   InvolvedPlayer,
@@ -326,7 +326,7 @@ function box(
 }
 
 export function parseRoster(
-  teams: NflTeams,
+  teams: EspnTeams,
   rosters: ReadonlyArray<{ teamId: string; roster: NbaRoster }>,
 ): SourceRoster {
   const list = teams.sports?.[0]?.leagues?.[0]?.teams ?? []

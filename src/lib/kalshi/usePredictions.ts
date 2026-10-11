@@ -14,8 +14,8 @@ import {
 import type { ChangeDisplay, KalshiConnection } from './server'
 import { useViewer } from '@/lib/viewer/useViewer'
 
-export const CONNECTION_KEY = ['kalshi-connection'] as const
-export const PREDICTIONS_KEY = ['predictions'] as const
+const CONNECTION_KEY = ['kalshi-connection'] as const
+const PREDICTIONS_KEY = ['predictions'] as const
 /** Odds refresh on the server each minute; check in a bit more often. */
 const REFRESH_MS = 30_000
 

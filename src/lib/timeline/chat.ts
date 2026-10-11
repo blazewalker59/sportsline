@@ -23,7 +23,7 @@ export type FeedEntry =
     }
 
 /** A run of this many Routine Plays (or more) folds into one "+N plays" bubble. */
-export const MIN_FOLD = 2
+const MIN_FOLD = 2
 
 /**
  * Group items (already in display order) into chat clusters: consecutive
@@ -275,7 +275,7 @@ export function typingFor(game: GameSummary): Typing | null {
 }
 
 /** Relative luminance (WCAG) of a `#rrggbb` color, 0–1; null if unparseable. */
-export function luminance(hex: string): number | null {
+function luminance(hex: string): number | null {
   const m = hex
     .replace('#', '')
     .match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i)
