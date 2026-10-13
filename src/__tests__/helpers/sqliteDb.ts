@@ -25,6 +25,14 @@ export async function sqliteDb() {
       if (statement.trim()) sqlite.run(statement)
     }
   }
+  // D1 rejects a statement binding more than 100 parameters; Bun allows
+  // thousands. Hold queries to D1's limit so tests catch an unchunked write.
+  const prepare = sqlite.prepare.bind(sqlite) as (sql: string) => unknown
+  sqlite.prepare = (sql: string) => {
+    const bound = sql.match(/\?/g)?.length ?? 0
+    if (bound > 100) throw new Error(`too many SQL variables (${bound})`)
+    return prepare(sql)
+  }
   const db = drizzle(sqlite, { schema })
   // LiveGame and identity resolve write with D1's batch(). Bun's driver
   // has the same statements; run them in order so those paths can execute.

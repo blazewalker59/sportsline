@@ -136,6 +136,38 @@ describe.skipIf(!isBun)('Kalshi sync', () => {
     expect(await sync.syncAccount(env, 'u1')).toEqual({ open: 0, settled: 0 })
   })
 
+  it('saves every Leg of a Combo too big for one D1 insert', async () => {
+    const legs = Array.from({ length: 15 }, (_, i) => ({
+      event_ticker: `E-L${i}`,
+      market_ticker: `L${i}`,
+      side: 'yes',
+    }))
+    for (const l of legs)
+      state.markets[l.market_ticker] = market(l.market_ticker)
+    state.markets.COMBO = { ...market('COMBO'), mve_selected_legs: legs }
+    state.positions = [
+      {
+        ticker: 'COMBO',
+        position_fp: '10000.00',
+        market_exposure_dollars: '25',
+      },
+    ]
+
+    await sync.syncAccount(env, 'u1')
+
+    expect(state.reports).toEqual([])
+    const count = (
+      sqlite as unknown as {
+        query: (sql: string) => { get: () => { n: number } }
+      }
+    )
+      .query(
+        "SELECT count(*) AS n FROM prediction_legs WHERE prediction_id = 'u1~COMBO'",
+      )
+      .get()
+    expect(count.n).toBe(15)
+  })
+
   it('saves open positions, settles new markets, closes what was sold, and dates them', async () => {
     sqlite.run(
       "INSERT INTO predictions (id,viewer_id,market_ticker,kind,side,title,contracts,cost,status,opened_at,updated_at) VALUES ('u1~SOLD','u1','SOLD','single','yes','Sold',1,1,'open','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z'),('u1~KNOWN','u1','KNOWN','single','yes','Known',1,1,'settled','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z'),('u1~GAP','u1','GAP','single','yes','Gap',4,2,'settled','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z')",

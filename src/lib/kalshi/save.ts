@@ -120,10 +120,12 @@ export async function savePrediction(
       playerId,
     })
   }
-  if (rows.length > 0) {
+  // Nine columns a row: 10 rows stay under D1's 100 bound parameters, so a
+  // big Combo saves every Leg instead of failing after its Prediction.
+  for (let i = 0; i < rows.length; i += 10) {
     await db
       .insert(predictionLegs)
-      .values(rows)
+      .values(rows.slice(i, i + 10))
       .onConflictDoUpdate({
         target: [predictionLegs.predictionId, predictionLegs.position],
         set: {
