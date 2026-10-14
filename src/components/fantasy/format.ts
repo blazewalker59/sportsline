@@ -26,18 +26,28 @@ export function dayRecord(categories: ReadonlyArray<CategoryResult>): string {
 }
 
 /**
- * A Matchup day's name: "Today", "Yesterday", else "Sat, Oct 11". Each
- * scoring period is a day, counted back from the Matchup's current one.
+ * A Matchup day's Sports Day: each scoring period is a day, counted from
+ * the Matchup's current one (today).
  */
+export function daySportsDay(
+  m: Pick<MatchupView, 'scoringPeriod'>,
+  scoringPeriod: number,
+  now: Date = new Date(),
+): string {
+  return shiftSportsDay(sportsDayOf(now), scoringPeriod - m.scoringPeriod)
+}
+
+/** A Matchup day's name: "Today", "Yesterday", "Tomorrow", else "Sat, Oct 11". */
 export function dayLabel(
   m: Pick<MatchupView, 'scoringPeriod'>,
   scoringPeriod: number,
   now: Date = new Date(),
 ): string {
-  const back = m.scoringPeriod - scoringPeriod
-  if (back === 0) return 'Today'
-  if (back === 1) return 'Yesterday'
-  const day = shiftSportsDay(sportsDayOf(now), -back)
+  const ahead = scoringPeriod - m.scoringPeriod
+  if (ahead === 0) return 'Today'
+  if (ahead === -1) return 'Yesterday'
+  if (ahead === 1) return 'Tomorrow'
+  const day = daySportsDay(m, scoringPeriod, now)
   return new Date(`${day}T12:00:00Z`).toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',

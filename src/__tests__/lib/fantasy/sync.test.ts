@@ -393,8 +393,8 @@ describe.skipIf(!isBun)('ESPN fantasy sync', () => {
       return Promise.resolve(league)
     }) as typeof client.leagueViews)
 
-    // Today comes from the stored Matchup, a day outside it isn't read,
-    // and nor is anyone else's league.
+    // Today comes from the stored Matchup, a day outside the Matchup
+    // isn't read, and nor is anyone else's league.
     expect(await sync.readDay(env, 'u1', 'u1~basketball~5', 85)).toBeNull()
     expect(await sync.readDay(env, 'u1', 'u1~basketball~5', 77)).toBeNull()
     expect(await sync.readDay(env, 'u2', 'u1~basketball~5', 84)).toBeNull()
@@ -405,6 +405,16 @@ describe.skipIf(!isBun)('ESPN fantasy sync', () => {
     expect(day?.scoringPeriod).toBe(84)
     expect(day?.categories.map((c) => c.label)).toContain('FG%')
     expect(day?.mine.length).toBeGreaterThan(0)
+
+    // A later day of the Matchup is read too (its Lineups are set ahead).
+    await db
+      .update(fantasyLeagues)
+      .set({ matchup: { ...view, scoringPeriod: 80 } })
+      .where(eq(fantasyLeagues.id, 'u1~basketball~5'))
+    expect(
+      (await sync.readDay(env, 'u1', 'u1~basketball~5', 83))?.scoringPeriod,
+    ).toBe(83)
+    expect(asked).toEqual([84, 83])
   })
 })
 

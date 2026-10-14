@@ -377,8 +377,8 @@ export function tally(results: ReadonlyArray<CategoryResult>): {
 
 /**
  * A Player's day in a category league, short: "2-4, HR, 2 RBI" or
- * "6.0 IP, 8 K, 1 ER" or "24 PTS, 8 REB". Only categories they moved, plus
- * the at-bats or innings that frame them.
+ * "6.0 IP, 8 K, 1 ER" or "9-17 FG, 24 PTS, 8 REB". Only categories they
+ * moved, plus the at-bats, innings or shots that frame them.
  */
 export function playerDayLine(
   sport: FantasySport,
@@ -393,6 +393,8 @@ export function playerDayLine(
   }
   if (sport === 'basketball' && v(s, 14) > 0)
     out.push({ label: 'FG', value: `${v(s, 13)}-${v(s, 14)}` })
+  if (sport === 'basketball' && v(s, 16) > 0)
+    out.push({ label: 'FT', value: `${v(s, 15)}-${v(s, 16)}` })
   for (const c of categories) {
     const def = DEFS[sport][c.statId]
     if (def?.compute) continue

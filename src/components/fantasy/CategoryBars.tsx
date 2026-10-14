@@ -2,9 +2,10 @@
  * A category league's Matchup at a glance: one row per category, the
  * Viewer's total on the left and their opponent's on the right, and a bar
  * from the middle that leans toward whoever leads, as far as the lead is
- * decisive (categoryLean). Each row's border is the leader's color (yellow
- * while tied), and under each total sits that side's figure for the day
- * being looked at. HTML rather than a chart: it reads as a table, framed
+ * decisive (categoryLean). A category someone leads carries an edge in
+ * their color on their side (left for the Viewer, right for the opponent;
+ * none while tied), and under each total sits that side's figure for the
+ * day being looked at. HTML rather than a chart: it reads as a table, framed
  * like the app's charts (ChartCard, CHART_COLORS).
  */
 
@@ -21,18 +22,14 @@ export interface CategoryDay {
   categories: ReadonlyArray<CategoryResult> | null
 }
 
-/** A row's border: the leader's color, yellow for a tie, none before. */
-function edge(leader: CategoryResult['leader']): {
-  className: string
-  style?: React.CSSProperties
-} {
-  if (leader === 'tie') return { className: 'border-yellow-500/80' }
-  if (leader === null) return { className: 'border-transparent' }
-  const color = leader === 'mine' ? CHART_COLORS.mine : CHART_COLORS.opponent
-  return {
-    className: '',
-    style: { borderColor: `color-mix(in srgb, ${color} 60%, transparent)` },
-  }
+/**
+ * A row's edge: the leader's color on the leader's side. Both sides keep
+ * a transparent edge, so every row's columns line up.
+ */
+function edge(leader: CategoryResult['leader']): React.CSSProperties {
+  if (leader === 'mine') return { borderLeftColor: CHART_COLORS.mine }
+  if (leader === 'opponent') return { borderRightColor: CHART_COLORS.opponent }
+  return {}
 }
 
 export function CategoryBars({
@@ -88,7 +85,6 @@ export function CategoryBars({
             const mine = c.leader === 'mine'
             const theirs = c.leader === 'opponent'
             const d = dayOf(c.statId)
-            const border = edge(c.leader)
             const dayFigure = (
               side: 'mine' | 'opponent',
               align: 'left' | 'right',
@@ -110,10 +106,9 @@ export function CategoryBars({
               <li
                 key={c.statId}
                 className={cn(
-                  'grid grid-cols-[3.75rem_minmax(0,1fr)_3.75rem] items-center gap-2 rounded-lg border-[1.5px] px-1.5 py-1',
-                  border.className,
+                  'grid grid-cols-[3.75rem_minmax(0,1fr)_3.75rem] items-center gap-2 rounded-sm border-x-[3px] border-transparent px-1.5 py-1',
                 )}
-                style={border.style}
+                style={edge(c.leader)}
               >
                 <span className="flex flex-col">
                   <span {...value(mine, theirs, CHART_COLORS.mine)}>

@@ -512,10 +512,10 @@ export async function syncLeague(
 }
 
 /**
- * One earlier day of a Viewer's category Matchup, read from ESPN on
- * demand (a day is final once it's over, so it isn't stored). Null when
- * the league isn't theirs, isn't a category league on ESPN, or the day
- * isn't an earlier day of its current Matchup.
+ * Another day of a Viewer's category Matchup, read from ESPN on demand
+ * and not stored (an earlier day is final; a later one has Lineups but no
+ * stats yet). Null when the league isn't theirs, isn't a category league
+ * on ESPN, or the day isn't another day of its current Matchup.
  */
 export async function readDay(
   env: Pick<CloudflareEnv, 'DB' | 'ESPN_ENCRYPTION_KEY'>,
@@ -534,7 +534,7 @@ export async function readDay(
   const m = row?.matchup
   if (!row || row.provider !== 'espn' || !m?.categories || row.teamId === null)
     return null
-  if (!m.days?.includes(scoringPeriod) || scoringPeriod >= m.scoringPeriod)
+  if (!m.days?.includes(scoringPeriod) || scoringPeriod === m.scoringPeriod)
     return null
   const session = await loadSession(env, viewerId)
   if (!session) return null

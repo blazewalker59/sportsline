@@ -414,7 +414,7 @@ export const getMatchupRace = createServerFn({ method: 'GET' })
     }),
   )
 
-/** An earlier day of a category Matchup, for stepping through its days. */
+/** Another day of a category Matchup, for stepping through its days. */
 export const getMatchupDay = createServerFn({ method: 'GET' })
   .validator((data: { leagueId: string; scoringPeriod: number }) =>
     z

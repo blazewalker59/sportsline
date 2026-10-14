@@ -146,6 +146,9 @@ function PlayerCell({
               </span>
             )}
           </span>
+          {player.dayLine && player.dayLine.length > 0 && (
+            <DayLineInline line={player.dayLine} right={right} />
+          )}
         </div>
         <button
           type="button"
@@ -239,6 +242,34 @@ function GameStrip({
       >
         {state.status}
       </span>
+    </span>
+  )
+}
+
+/**
+ * A category league Player's whole day under their name, so both sides'
+ * lines read without opening them: "9-17 FG · 2 3PM · 8 REB · 24 PTS".
+ */
+function DayLineInline({
+  line,
+  right,
+}: {
+  line: NonNullable<LineupPlayer['dayLine']>
+  right: boolean
+}) {
+  return (
+    <span
+      className={cn(
+        'mt-0.5 flex flex-wrap gap-x-1.5 text-[10px] leading-tight tabular-nums',
+        right && 'justify-end',
+      )}
+    >
+      {line.map((l) => (
+        <span key={l.label} className="whitespace-nowrap">
+          <span className="font-semibold text-foreground/85">{l.value}</span>{' '}
+          <span className="text-muted">{l.label}</span>
+        </span>
+      ))}
     </span>
   )
 }
