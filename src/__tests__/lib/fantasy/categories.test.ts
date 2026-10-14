@@ -9,6 +9,7 @@ import {
   formatCategory,
   innings,
   leagueCategories,
+  playerDayLine,
   scoreCategories,
   toStats,
 } from '@/lib/fantasy/categories'
@@ -138,6 +139,27 @@ describe('category Matchups (from ESPN payloads dreamteam reads)', () => {
         (c) => c.label,
       ),
     ).toEqual(['HR', 'R'])
+  })
+
+  it('lines a basketball day up with its shots: FG and FT makes-attempts', () => {
+    const cats = leagueCategories('basketball', [])
+    expect(
+      playerDayLine('basketball', cats, {
+        0: 24,
+        6: 8,
+        13: 9,
+        14: 17,
+        15: 4,
+        16: 5,
+        17: 2,
+      }),
+    ).toEqual([
+      { label: 'FG', value: '9-17' },
+      { label: 'FT', value: '4-5' },
+      { label: '3PM', value: '2' },
+      { label: 'REB', value: '8' },
+      { label: 'PTS', value: '24' },
+    ])
   })
 
   it('writes shooting percentages without a leading zero', () => {

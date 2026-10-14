@@ -10,7 +10,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { CategoryBars } from './CategoryBars'
 import { LineupRows } from './Lineup'
-import { dayLabel, pts, scoreText } from './format'
+import { dayLabel, daySportsDay, pts, scoreText } from './format'
 import type { CategoryDay } from './CategoryBars'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { LineupPlayer, MatchupSide } from '@/lib/fantasy/matchup'
@@ -60,20 +60,22 @@ export function MatchupSheet({
     [games, week.data],
   )
   const byeWeeks = m.sport === 'football' && week.isSuccess
-  // The Matchup's days so far (a category league), today last.
-  const days = m.categories
-    ? (m.days ?? [m.scoringPeriod]).filter((d) => d <= m.scoringPeriod)
-    : [m.scoringPeriod]
+  // Every day of the Matchup (a category league), first to last: today
+  // among them even before the first (ESPN's preseason day 0).
+  const days = [...new Set([...(m.days ?? []), m.scoringPeriod])].sort(
+    (a, b) => a - b,
+  )
   const [day, setDay] = useState(m.scoringPeriod)
   const today = day === m.scoringPeriod
   const at = days.indexOf(day)
-  // An earlier day is final, so it's read once.
+  // An earlier day is final, so it's read once; a later one's Lineups can
+  // still change.
   const past = useQuery({
     queryKey: ['matchup-day', league.id, day],
     queryFn: () =>
       getMatchupDay({ data: { leagueId: league.id, scoringPeriod: day } }),
     enabled: !today,
-    staleTime: Infinity,
+    staleTime: day < m.scoringPeriod ? Infinity : 5 * 60_000,
   })
   const label = dayLabel(m, day)
   const categoryDay: CategoryDay | undefined = today
@@ -87,8 +89,11 @@ export function MatchupSheet({
       : { mine: past.data?.mine ?? [], theirs: past.data?.opponent ?? [] }
   const starters = (l: Array<LineupPlayer>) => l.filter((p) => p.starter)
   const bench = (l: Array<LineupPlayer>) => l.filter((p) => !p.starter)
-  // Today's Games tell each Player's state; an earlier day's are over.
-  const dayGames = today ? allGames : []
+  // Each Player's Game that day: today's and the days ahead are loaded.
+  const sportsDay = daySportsDay(m, day)
+  const dayGames = today
+    ? allGames
+    : allGames.filter((g) => g.sportsDay === sportsDay)
   const side = (s: MatchupSide, align: 'left' | 'right') => (
     <span
       className={cn(
@@ -121,7 +126,7 @@ export function MatchupSheet({
           </span>
         )}
       </header>
-      {days.length > 1 && (
+      {m.categories && (
         <nav
           aria-label="Matchup day"
           className="flex items-center gap-1 rounded-xl border border-border bg-surface p-1"
@@ -140,7 +145,9 @@ export function MatchupSheet({
               {label}
             </span>
             <span className="text-[10.5px] text-muted tabular-nums">
-              Day {at + 1} of {m.days?.length ?? days.length}
+              {m.days?.includes(day)
+                ? `Day ${m.days.indexOf(day) + 1} of ${m.days.length}`
+                : 'Before the matchup'}
             </span>
           </span>
           <button
@@ -163,7 +170,7 @@ export function MatchupSheet({
         <p className="rounded-xl border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
           {past.isError
             ? 'Couldn’t read that day from ESPN.'
-            : `Loading ${label === 'Yesterday' ? 'yesterday' : label}’s lineups…`}
+            : `Loading ${label === 'Yesterday' || label === 'Tomorrow' ? label.toLowerCase() : label}’s lineups…`}
         </p>
       ) : (
         <>

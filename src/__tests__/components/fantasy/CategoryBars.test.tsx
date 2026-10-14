@@ -4,7 +4,7 @@ import basketball from '../../fixtures/fantasy/basketball-category-matchup.json'
 import type { CategoryResult } from '@/lib/fantasy/categories'
 import type { MatchupView, WireLeague } from '@/lib/fantasy/matchup'
 import { CategoryBars } from '@/components/fantasy/CategoryBars'
-import { dayLabel, dayRecord } from '@/components/fantasy/format'
+import { dayLabel, dayRecord, daySportsDay } from '@/components/fantasy/format'
 import { readMatchup } from '@/lib/fantasy/matchup'
 
 const view = (): MatchupView => {
@@ -22,7 +22,7 @@ const rows = (html: string) =>
   )
 
 describe('CategoryBars', () => {
-  it('marks each category’s leader with a border, a tie in yellow, never “tied”', () => {
+  it('edges a lead on the leader’s side, and leaves a tie unmarked', () => {
     const m = view()
     const tie = { ...m.categories![4], mine: '9', opponent: '9' }
     tie.leader = 'tie'
@@ -33,12 +33,21 @@ describe('CategoryBars', () => {
       <CategoryBars m={m} categories={categories} />,
     )
     expect(html).not.toMatch(/·\s*tied/)
+    expect(html).not.toContain('yellow')
     const byLabel = rows(html)
-    expect(byLabel[tie.label]).toContain('border-yellow-500')
+    expect(byLabel[tie.label]).not.toContain('border-left-color')
+    expect(byLabel[tie.label]).not.toContain('border-right-color')
     expect(byLabel[tie.label]).toContain('(tied)') // for screen readers only
-    const mine = m.categories!.find((c) => c.leader === 'mine')!
-    expect(byLabel[mine.label]).toContain('var(--color-accent)')
-    expect(byLabel[mine.label]).not.toContain('border-yellow-500')
+    const mine = categories.find((c) => c.leader === 'mine')!
+    expect(byLabel[mine.label]).toContain(
+      'border-left-color:var(--color-accent)',
+    )
+    expect(byLabel[mine.label]).not.toContain('border-right-color')
+    const theirs = categories.find((c) => c.leader === 'opponent')!
+    expect(byLabel[theirs.label]).toContain(
+      'border-right-color:var(--color-live)',
+    )
+    expect(byLabel[theirs.label]).not.toContain('border-left-color')
   })
 
   it('shows the matchup score and the day’s figures under each total', () => {
@@ -79,6 +88,9 @@ describe('Matchup days', () => {
     expect(dayLabel(m, 85, now)).toBe('Today')
     expect(dayLabel(m, 84, now)).toBe('Yesterday')
     expect(dayLabel(m, 82, now)).toBe('Sat, Oct 10')
+    expect(dayLabel(m, 86, now)).toBe('Tomorrow')
+    expect(dayLabel(m, 87, now)).toBe('Thu, Oct 15')
+    expect(daySportsDay(m, 86, now)).toBe('2026-10-14')
   })
 
   it('records a day’s categories won, lost and tied', () => {
