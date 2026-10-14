@@ -1,12 +1,17 @@
 # Version-update PRs. Dependabot security alerts are a repository setting
 # and are not enabled by this file.
+#
+# Version-update PRs are paused: open-pull-requests-limit: 0 stops Dependabot
+# from opening them. Remove those lines (default limit is 5) to re-enable.
 version: 2
 updates:
   - package-ecosystem: bun
     directory: /
     schedule:
       interval: weekly
+    open-pull-requests-limit: 0
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    open-pull-requests-limit: 0
