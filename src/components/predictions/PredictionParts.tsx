@@ -107,14 +107,27 @@ export function Sparkline({
   )
 }
 
-function LegDots({ legs }: { legs: ReadonlyArray<LegView> }) {
+/** Dots a Combo card shows before the rest collapse into "+K". */
+export const MAX_LEG_DOTS = 6
+
+/**
+ * A dot per Leg, colored by status. A big Combo (16 Legs) would run past the
+ * card's fixed width, so past MAX_LEG_DOTS the rest read as "+K".
+ */
+export function LegDots({ legs }: { legs: ReadonlyArray<LegView> }) {
+  const shown = legs.slice(0, MAX_LEG_DOTS)
+  const rest = legs.length - shown.length
   return (
-    <span className="flex gap-0.5" aria-hidden="true">
-      {legs.map((l, i) => (
+    <span
+      className="flex min-w-0 shrink items-center gap-0.5 overflow-hidden"
+      aria-hidden="true"
+    >
+      {shown.map((l, i) => (
         <span
           key={i}
+          data-leg-dot=""
           className={cn(
-            'size-1.5 rounded-full',
+            'size-1.5 shrink-0 rounded-full',
             l.status === 'won'
               ? 'bg-scoring'
               : l.status === 'lost'
@@ -123,6 +136,11 @@ function LegDots({ legs }: { legs: ReadonlyArray<LegView> }) {
           )}
         />
       ))}
+      {rest > 0 && (
+        <span className="shrink-0 text-[10px] leading-none tabular-nums">
+          +{rest}
+        </span>
+      )}
     </span>
   )
 }
@@ -220,7 +238,7 @@ export function PredictionCard({
             : 'border-border',
       )}
     >
-      <span className="flex items-center gap-1.5 text-[11px] font-semibold text-muted">
+      <span className="flex min-w-0 items-center gap-1.5 overflow-hidden text-[11px] font-semibold whitespace-nowrap text-muted">
         {p.kind === 'combo' ? (
           <>
             <span className="rounded bg-accent-soft px-1 text-accent">
