@@ -9,6 +9,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { CategoryBars } from './CategoryBars'
+import { CategoryLineup } from './CategoryLineup'
 import { LineupRows } from './Lineup'
 import { dayLabel, daySportsDay, pts, scoreText } from './format'
 import type { CategoryDay } from './CategoryBars'
@@ -172,6 +173,16 @@ export function MatchupSheet({
             ? 'Couldn’t read that day from ESPN.'
             : `Loading ${label === 'Yesterday' || label === 'Tomorrow' ? label.toLowerCase() : label}’s lineups…`}
         </p>
+      ) : m.categories ? (
+        <CategoryLineup
+          sport={m.sport}
+          categories={m.categories}
+          mine={m.mine}
+          opponent={m.opponent}
+          lineups={lineups}
+          games={dayGames}
+          knowsGames={day >= m.scoringPeriod && week.isSuccess}
+        />
       ) : (
         <>
           <section>
@@ -202,7 +213,7 @@ export function MatchupSheet({
       )}
       <p className="text-[11px] text-muted">
         {m.categories
-          ? 'Read from ESPN Fantasy: categories through yesterday plus today’s starters, refreshed every couple of minutes; the figure under each total is the day’s. Step through the matchup’s days with ‹ ›, and tap a player’s figure for their line that day.'
+          ? 'Read from ESPN Fantasy: categories through yesterday plus today’s starters, refreshed every couple of minutes; the figure under each total is the day’s. Step through the matchup’s days with ‹ ›; switch sides above the lineup, and scroll it sideways for every category.'
           : 'Read from ESPN Fantasy. Points refresh every couple of minutes; tap a player’s points for the breakdown.'}
       </p>
     </Sheet>

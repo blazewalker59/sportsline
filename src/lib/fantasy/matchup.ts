@@ -134,6 +134,8 @@ export interface LineupPlayer {
   }>
   /** Category leagues: their line today in the league's categories. */
   dayLine?: Array<{ label: string; value: string }> | null
+  /** Category leagues: their raw stats that day, by ESPN stat id. */
+  dayStats?: Stats | null
   /** Our Team, its logo and abbreviation (for D/ST, and the Game's state). */
   teamId?: string | null
   teamLogo?: string | null
@@ -230,6 +232,7 @@ function lineupOf(
     const stat = (source: number) => line(source)?.appliedTotal
     const actual = stat(0)
     const actualLine = line(0)
+    const day = dayStats(e, scoringPeriod)
     const slotId = e.lineupSlotId ?? 20
     return [
       {
@@ -254,9 +257,8 @@ function lineupOf(
             points: round(points),
           }))
           .sort((a, b) => Math.abs(b.points) - Math.abs(a.points)),
-        dayLine: categories
-          ? playerDayLine(sport, categories, dayStats(e, scoringPeriod))
-          : null,
+        dayLine: categories ? playerDayLine(sport, categories, day) : null,
+        dayStats: categories ? day : null,
       },
     ]
   })
