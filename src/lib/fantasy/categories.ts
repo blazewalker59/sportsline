@@ -265,6 +265,10 @@ export function categoryValue(
   return statId in s ? s[statId] : null
 }
 
+/** A category computed from others (AVG, ERA, FG%), not counted. */
+export const isRate = (sport: FantasySport, statId: number): boolean =>
+  DEFS[sport][statId]?.compute !== undefined
+
 export function formatCategory(
   sport: FantasySport,
   statId: number,
