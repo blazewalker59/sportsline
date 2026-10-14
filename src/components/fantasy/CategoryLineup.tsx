@@ -42,6 +42,7 @@ export function CategoryLineup({
   lineups,
   games,
   knowsGames,
+  summary = false,
 }: {
   sport: FantasySport
   categories: ReadonlyArray<LeagueCategory>
@@ -53,6 +54,11 @@ export function CategoryLineup({
   games: ReadonlyArray<GameSummary>
   /** The day's Games are all here: a Player without one isn't playing. */
   knowsGames: boolean
+  /**
+   * The whole matchup rather than a day: each Player's matchup line, the
+   * totals the matchup's, and those who haven't counted dimmed.
+   */
+  summary?: boolean
 }) {
   const [side, setSide] = useState<Side>('mine')
   const shown = side === 'mine' || !opponent ? lineups.mine : lineups.theirs
@@ -101,7 +107,7 @@ export function CategoryLineup({
           scope="row"
           className="sticky left-0 z-10 border-r border-b border-border bg-surface px-2 py-1.5 text-left font-normal"
         >
-          <PlayerLabel sport={sport} player={p} games={games} />
+          <PlayerLabel sport={sport} player={p} games={games} slot={!summary} />
         </th>
         {columns.map((c) => {
           const leads = p.starter && leaders.get(c.statId)?.has(p.espnId)
@@ -178,7 +184,7 @@ export function CategoryLineup({
                 scope="row"
                 className="sticky left-0 z-10 border-r border-b border-border bg-notice px-2 py-1.5 text-left text-[10px] tracking-wide uppercase"
               >
-                Starters
+                {summary ? 'Matchup' : 'Starters'}
               </th>
               {columns.map((c) => (
                 <td
@@ -205,10 +211,13 @@ function PlayerLabel({
   sport,
   player,
   games,
+  slot,
 }: {
   sport: FantasySport
   player: LineupPlayer
   games: ReadonlyArray<GameSummary>
+  /** Mark a Player who isn't starting with their slot (BN, IR). */
+  slot: boolean
 }) {
   const state = gameState(player, games)
   const position = player.positionId
@@ -264,7 +273,7 @@ function PlayerLabel({
           ) : (
             name
           )}
-          {!player.starter && (
+          {slot && !player.starter && (
             <span className="shrink-0 rounded bg-notice px-1 text-[8px] leading-tight font-bold text-muted uppercase">
               {player.slot === 'Bench' ? 'BN' : player.slot}
             </span>

@@ -85,4 +85,25 @@ describe('CategoryLineup', () => {
     )
     expect(order.indexOf('bench')).toBeGreaterThan(order.indexOf('totals'))
   })
+
+  it('sums the whole matchup in summary, without slot tags', () => {
+    const m = view()
+    const html = renderToStaticMarkup(
+      <CategoryLineup
+        sport="basketball"
+        categories={m.categories!}
+        mine={m.mine}
+        opponent={m.opponent}
+        lineups={{ mine: m.mine.summary!, theirs: m.opponent!.summary! }}
+        games={[]}
+        knowsGames={false}
+        summary
+      />,
+    )
+    expect(html).toContain('>Matchup</th>')
+    expect(html).not.toContain('>Starters</th>')
+    // Curry 145, Durant 140, Wembanyama 125.
+    expect(html).toContain('>410<')
+    expect(html).toContain('W. Wembanyama'.replace('W.', 'V.'))
+  })
 })

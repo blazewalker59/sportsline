@@ -15,6 +15,17 @@ export const pts = (n: number | null) => (n === null ? '—' : n.toFixed(1))
 export const scoreText = (m: MatchupView, n: number | null) =>
   m.categories ? (n === null ? '—' : String(n)) : pts(n)
 
+/**
+ * A side's categories won, lost and tied, from that side: "6–3", or
+ * "0–0–9" once any category is tied.
+ */
+export function sideRecord(m: MatchupView, side: 'mine' | 'opponent'): string {
+  const mine = m.mine.score
+  const theirs = m.opponent?.score ?? 0
+  const [won, lost] = side === 'mine' ? [mine, theirs] : [theirs, mine]
+  return `${won}–${lost}${m.ties ? `–${m.ties}` : ''}`
+}
+
 /** "6–3–1": categories won, lost and tied (from the Viewer's side). */
 export const categoryRecord = (m: MatchupView) =>
   `${m.mine.score}–${m.opponent?.score ?? 0}${m.ties ? `–${m.ties}` : ''}`

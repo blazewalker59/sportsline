@@ -11,7 +11,9 @@ import { useMemo, useState } from 'react'
 import { CategoryBars } from './CategoryBars'
 import { CategoryLineup } from './CategoryLineup'
 import { LineupRows } from './Lineup'
-import { dayLabel, daySportsDay, pts, scoreText } from './format'
+import { MatchupDays } from './MatchupDays'
+import { dayLabel, daySportsDay, pts, scoreText, sideRecord } from './format'
+import type { MatchupPart } from './MatchupDays'
 import type { CategoryDay } from './CategoryBars'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { LineupPlayer, MatchupSide } from '@/lib/fantasy/matchup'
@@ -66,35 +68,43 @@ export function MatchupSheet({
   const days = [...new Set([...(m.days ?? []), m.scoringPeriod])].sort(
     (a, b) => a - b,
   )
-  const [day, setDay] = useState(m.scoringPeriod)
+  const [part, setPart] = useState<MatchupPart>(m.scoringPeriod)
+  const summary = part === 'summary'
+  // The day in view; the summary keeps today's Games and lookups.
+  const day = summary ? m.scoringPeriod : part
   const today = day === m.scoringPeriod
-  const at = days.indexOf(day)
   // An earlier day is final, so it's read once; a later one's Lineups can
   // still change.
   const past = useQuery({
     queryKey: ['matchup-day', league.id, day],
     queryFn: () =>
       getMatchupDay({ data: { leagueId: league.id, scoringPeriod: day } }),
-    enabled: !today,
+    enabled: !today && !summary,
     staleTime: day < m.scoringPeriod ? Infinity : 5 * 60_000,
   })
   const label = dayLabel(m, day)
-  const categoryDay: CategoryDay | undefined = today
-    ? m.today
-      ? { label, categories: m.today }
-      : undefined
-    : { label, categories: past.data?.categories ?? null }
+  const categoryDay: CategoryDay | undefined = summary
+    ? undefined
+    : today
+      ? m.today
+        ? { label, categories: m.today }
+        : undefined
+      : { label, categories: past.data?.categories ?? null }
   const lineups: { mine: Array<LineupPlayer>; theirs: Array<LineupPlayer> } =
-    today
-      ? { mine: m.mine.lineup, theirs: m.opponent?.lineup ?? [] }
-      : { mine: past.data?.mine ?? [], theirs: past.data?.opponent ?? [] }
+    summary
+      ? { mine: m.mine.summary ?? [], theirs: m.opponent?.summary ?? [] }
+      : today
+        ? { mine: m.mine.lineup, theirs: m.opponent?.lineup ?? [] }
+        : { mine: past.data?.mine ?? [], theirs: past.data?.opponent ?? [] }
   const starters = (l: Array<LineupPlayer>) => l.filter((p) => p.starter)
   const bench = (l: Array<LineupPlayer>) => l.filter((p) => !p.starter)
   // Each Player's Game that day: today's and the days ahead are loaded.
   const sportsDay = daySportsDay(m, day)
-  const dayGames = today
-    ? allGames
-    : allGames.filter((g) => g.sportsDay === sportsDay)
+  const dayGames = summary
+    ? []
+    : today
+      ? allGames
+      : allGames.filter((g) => g.sportsDay === sportsDay)
   const side = (s: MatchupSide, align: 'left' | 'right') => (
     <span
       className={cn(
@@ -105,7 +115,9 @@ export function MatchupSheet({
       <span className="truncate text-sm font-semibold">{s.name}</span>
       {s.record && <span className="text-[11px] text-muted">{s.record}</span>}
       <span className="text-3xl leading-tight font-bold tabular-nums">
-        {scoreText(m, s.score)}
+        {m.categories
+          ? sideRecord(m, align === 'left' ? 'mine' : 'opponent')
+          : scoreText(m, s.score)}
       </span>
       {s.projected !== null && (
         <span className="text-xs text-muted tabular-nums">
@@ -128,46 +140,20 @@ export function MatchupSheet({
         )}
       </header>
       {m.categories && (
-        <nav
-          aria-label="Matchup day"
-          className="flex items-center gap-1 rounded-xl border border-border bg-surface p-1"
-        >
-          <button
-            type="button"
-            aria-label="Previous day"
-            disabled={at <= 0}
-            onClick={() => setDay(days[at - 1])}
-            className="size-9 rounded-lg text-xl leading-none font-semibold hover:bg-notice disabled:opacity-30 disabled:hover:bg-transparent"
-          >
-            ‹
-          </button>
-          <span className="flex flex-1 flex-col items-center leading-tight">
-            <span className="text-sm font-semibold" aria-live="polite">
-              {label}
-            </span>
-            <span className="text-[10.5px] text-muted tabular-nums">
-              {m.days?.includes(day)
-                ? `Day ${m.days.indexOf(day) + 1} of ${m.days.length}`
-                : 'Before the matchup'}
-            </span>
-          </span>
-          <button
-            type="button"
-            aria-label="Next day"
-            disabled={at >= days.length - 1}
-            onClick={() => setDay(days[at + 1])}
-            className="size-9 rounded-lg text-xl leading-none font-semibold hover:bg-notice disabled:opacity-30 disabled:hover:bg-transparent"
-          >
-            ›
-          </button>
-        </nav>
+        <MatchupDays
+          m={m}
+          days={days}
+          part={part}
+          onPart={setPart}
+          summary={m.mine.summary != null}
+        />
       )}
       {m.categories && m.categories.length > 0 ? (
         <CategoryBars m={m} categories={m.categories} day={categoryDay} />
       ) : (
         <MatchupRace leagueId={league.id} m={m} />
       )}
-      {!today && !past.data ? (
+      {!today && !summary && !past.data ? (
         <p className="rounded-xl border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
           {past.isError
             ? 'Couldn’t read that day from ESPN.'
@@ -181,7 +167,8 @@ export function MatchupSheet({
           opponent={m.opponent}
           lineups={lineups}
           games={dayGames}
-          knowsGames={day >= m.scoringPeriod && week.isSuccess}
+          knowsGames={!summary && day >= m.scoringPeriod && week.isSuccess}
+          summary={summary}
         />
       ) : (
         <>
@@ -213,7 +200,7 @@ export function MatchupSheet({
       )}
       <p className="text-[11px] text-muted">
         {m.categories
-          ? 'Read from ESPN Fantasy: categories through yesterday plus today’s starters, refreshed every couple of minutes; the figure under each total is the day’s. Step through the matchup’s days with ‹ ›; switch sides above the lineup, and scroll it sideways for every category.'
+          ? 'Read from ESPN Fantasy: categories through yesterday plus today’s starters, refreshed every couple of minutes; the figure under each total is the day’s. Step through the matchup’s days with ‹ ›, or tap the day for any day or the whole matchup’s summary; switch sides above the lineup, and scroll it sideways for every category.'
           : 'Read from ESPN Fantasy. Points refresh every couple of minutes; tap a player’s points for the breakdown.'}
       </p>
     </Sheet>
