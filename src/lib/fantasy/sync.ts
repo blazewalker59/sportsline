@@ -337,6 +337,8 @@ export async function storeMatchup(
     await attachOurs(db, row, [
       ...view.mine.lineup,
       ...(view.opponent?.lineup ?? []),
+      ...(view.mine.summary ?? []),
+      ...(view.opponent?.summary ?? []),
     ])
     // Sleeper sends no live projection: work it out from each Starter's Game.
     if (row.provider === 'sleeper') await projectLive(db, view)

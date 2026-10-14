@@ -10,6 +10,7 @@
 import {
   addStats,
   isCategoryScoring,
+  isRate,
   leagueCategories,
   playerDayLine,
   scoreCategories,
@@ -62,6 +63,11 @@ interface WireSide {
     scoreByStat?: Record<string, { score?: number | string }>
   }
   rosterForCurrentScoringPeriod?: { entries?: Array<WireEntry> }
+  /**
+   * Everyone who counted for the side this matchup period (dropped Players
+   * too), each with their matchup line (scoringPeriodId 0).
+   */
+  rosterForMatchupPeriod?: { entries?: Array<WireEntry> }
 }
 
 export interface WireLeague {
@@ -152,6 +158,12 @@ export interface MatchupSide {
   score: number
   projected: number | null
   lineup: Array<LineupPlayer>
+  /**
+   * Category leagues: the whole matchup so far, a row per Player who's on
+   * the roster or counted this matchup, `dayStats` holding their matchup
+   * line. `starter` marks who counted.
+   */
+  summary?: Array<LineupPlayer> | null
 }
 
 export interface MatchupView {
@@ -368,7 +380,60 @@ function sideOf(
           ? round(projectedSum)
           : null,
     lineup,
+    ...(categories
+      ? { summary: summaryOf(sport, side, lineup, categories) }
+      : {}),
   }
+}
+
+/**
+ * A side's whole matchup by Player: ESPN's matchup line for each who
+ * counted. Whether that line takes in today varies, so it's checked
+ * against the side's totals through yesterday: when the lines add up to
+ * those, today's Starters' lines go on top.
+ */
+function summaryOf(
+  sport: FantasySport,
+  side: WireSide,
+  lineup: ReadonlyArray<LineupPlayer>,
+  categories: ReadonlyArray<LeagueCategory>,
+): Array<LineupPlayer> {
+  const counted = lineupOf(
+    sport,
+    side.rosterForMatchupPeriod?.entries ?? [],
+    0,
+    categories,
+  )
+  const period = new Map(counted.map((p) => [p.espnId, p.dayStats ?? {}]))
+  const given = toStats(side.cumulativeScore?.scoreByStat)
+  const summed = addStats(...period.values())
+  // Counts only: a rate (FG%) doesn't add up across Players.
+  const ids = Object.keys(given).filter(
+    (k) => k in summed && !isRate(sport, Number(k)),
+  )
+  const throughYesterday =
+    ids.length > 0 && ids.every((k) => Math.abs(summed[k] - given[k]) < 0.01)
+  const line = (p: LineupPlayer): Stats => {
+    const before = period.get(p.espnId) ?? {}
+    return throughYesterday && p.starter
+      ? addStats(before, p.dayStats ?? {})
+      : before
+  }
+  const onRoster = lineup.map((p) => {
+    const stats = line(p)
+    return {
+      ...p,
+      starter: Object.values(stats).some((n) => n > 0),
+      dayStats: stats,
+      dayLine: playerDayLine(sport, categories, stats),
+    }
+  })
+  // Dropped this matchup but counted before they went.
+  const gone = counted
+    .filter((p) => !lineup.some((q) => q.espnId === p.espnId))
+    .map((p) => ({ ...p, starter: true }))
+  const rank = (p: LineupPlayer) => (p.starter ? 0 : 1)
+  return [...onRoster, ...gone].sort((a, b) => rank(a) - rank(b))
 }
 
 /** The Viewer's team in a league: the one their SWID owns, else `teamId`. */

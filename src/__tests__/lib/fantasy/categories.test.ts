@@ -115,6 +115,25 @@ describe('category Matchups (from ESPN payloads dreamteam reads)', () => {
     ).toBeNull()
   })
 
+  it('sums the whole matchup by Player, today on top only when ESPN’s lines stop at yesterday', () => {
+    const league = basketball as unknown as WireLeague
+    const view = readMatchup('basketball', league, homeOf(league))!
+    const line = (side: 'mine' | 'opponent', name: string) =>
+      view[side]!.summary!.find((p) => p.name === name)!
+    // The opponent's lines add up to their totals through yesterday, so
+    // today goes on top: 148 before today, 28 today.
+    expect(line('opponent', 'Luka Doncic').dayStats?.[0]).toBe(176)
+    // The Viewer's don't (they already take in today): as ESPN has them.
+    expect(line('mine', 'Stephen Curry').dayStats?.[0]).toBe(145)
+    // Dropped this matchup, but counted before going: still there.
+    expect(line('mine', 'Victor Wembanyama')).toMatchObject({
+      starter: true,
+    })
+    expect(line('opponent', 'Nikola Jokic').dayStats?.[0]).toBe(117)
+    // Who counted comes first.
+    expect(view.mine.summary!.every((p) => p.starter)).toBe(true)
+  })
+
   it('orders basketball shooting first, points last, whatever the league lists', () => {
     const listed = [0, 11, 1, 2, 3, 6, 17, 21, 20, 19, 37].map((statId) => ({
       statId,
