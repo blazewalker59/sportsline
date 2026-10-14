@@ -2,30 +2,57 @@
  * A category league's Matchup at a glance: one row per category, the
  * Viewer's total on the left and their opponent's on the right, and a bar
  * from the middle that leans toward whoever leads, as far as the lead is
- * decisive (categoryLean). HTML rather than a chart: it reads as a table,
- * framed like the app's charts (ChartCard, CHART_COLORS).
+ * decisive (categoryLean). Each row's border is the leader's color (yellow
+ * while tied), and under each total sits that side's figure for the day
+ * being looked at. HTML rather than a chart: it reads as a table, framed
+ * like the app's charts (ChartCard, CHART_COLORS).
  */
 
-import { categoryRecord } from './format'
+import { categoryRecord, dayRecord } from './format'
+import type { CategoryResult } from '@/lib/fantasy/categories'
 import type { MatchupView } from '@/lib/fantasy/matchup'
 import { CHART_COLORS, ChartCard } from '@/components/charts/ChartCard'
 import { categoryLean } from '@/lib/fantasy/categories'
 import { cn } from '@/lib/utils'
 
+/** The day under the totals: its name, and its categories once read. */
+export interface CategoryDay {
+  label: string
+  categories: ReadonlyArray<CategoryResult> | null
+}
+
+/** A row's border: the leader's color, yellow for a tie, none before. */
+function edge(leader: CategoryResult['leader']): {
+  className: string
+  style?: React.CSSProperties
+} {
+  if (leader === 'tie') return { className: 'border-yellow-500/80' }
+  if (leader === null) return { className: 'border-transparent' }
+  const color = leader === 'mine' ? CHART_COLORS.mine : CHART_COLORS.opponent
+  return {
+    className: '',
+    style: { borderColor: `color-mix(in srgb, ${color} 60%, transparent)` },
+  }
+}
+
 export function CategoryBars({
   m,
   categories,
+  day,
 }: {
   m: MatchupView
   categories: NonNullable<MatchupView['categories']>
+  day?: CategoryDay
 }) {
   const value = (leading: boolean, trailing: boolean, color: string) => ({
     className: cn(
-      'tabular-nums text-sm',
+      'tabular-nums text-sm leading-tight',
       leading ? 'font-bold' : trailing ? 'text-foreground/55' : 'font-medium',
     ),
     style: leading ? { color } : undefined,
   })
+  const dayOf = (statId: number) =>
+    day?.categories?.find((c) => c.statId === statId)
   return (
     <section>
       <h3 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
@@ -39,23 +66,60 @@ export function CategoryBars({
             : []),
         ]}
         headline={
-          <span className="font-semibold text-foreground tabular-nums">
-            {categoryRecord(m)}
+          <span className="tabular-nums">
+            <span className="font-semibold text-foreground">
+              {categoryRecord(m)}
+            </span>
+            {day && (
+              <span>
+                {' · '}
+                {day.label}{' '}
+                <span className="font-semibold text-foreground">
+                  {day.categories ? dayRecord(day.categories) : '…'}
+                </span>
+              </span>
+            )}
           </span>
         }
       >
-        <ul className="flex flex-col gap-1.5 px-1 pt-1">
+        <ul className="flex flex-col gap-1 pt-1">
           {categories.map((c) => {
             const lean = categoryLean(c)
             const mine = c.leader === 'mine'
             const theirs = c.leader === 'opponent'
+            const d = dayOf(c.statId)
+            const border = edge(c.leader)
+            const dayFigure = (
+              side: 'mine' | 'opponent',
+              align: 'left' | 'right',
+            ) =>
+              day && (
+                <span
+                  className={cn(
+                    'text-[10.5px] leading-tight tabular-nums',
+                    d?.leader === side
+                      ? 'font-semibold text-foreground/80'
+                      : 'text-muted',
+                    align === 'right' && 'text-right',
+                  )}
+                >
+                  {day.categories ? (d?.[side] ?? '—') : '…'}
+                </span>
+              )
             return (
               <li
                 key={c.statId}
-                className="grid grid-cols-[3.75rem_minmax(0,1fr)_3.75rem] items-center gap-2"
+                className={cn(
+                  'grid grid-cols-[3.75rem_minmax(0,1fr)_3.75rem] items-center gap-2 rounded-lg border-[1.5px] px-1.5 py-1',
+                  border.className,
+                )}
+                style={border.style}
               >
-                <span {...value(mine, theirs, CHART_COLORS.mine)}>
-                  {c.mine}
+                <span className="flex flex-col">
+                  <span {...value(mine, theirs, CHART_COLORS.mine)}>
+                    {c.mine}
+                  </span>
+                  {dayFigure('mine', 'left')}
                 </span>
                 <span className="flex flex-col items-center gap-1">
                   <span className="text-[11px] leading-none font-semibold text-muted">
@@ -64,7 +128,7 @@ export function CategoryBars({
                       <span className="sr-only"> (lower is better)</span>
                     )}
                     {c.leader === 'tie' && (
-                      <span className="font-normal"> · tied</span>
+                      <span className="sr-only"> (tied)</span>
                     )}
                   </span>
                   <span
@@ -87,14 +151,17 @@ export function CategoryBars({
                     )}
                   </span>
                 </span>
-                <span
-                  {...value(theirs, mine, CHART_COLORS.opponent)}
-                  className={cn(
-                    value(theirs, mine, CHART_COLORS.opponent).className,
-                    'text-right',
-                  )}
-                >
-                  {c.opponent}
+                <span className="flex flex-col items-end">
+                  <span
+                    {...value(theirs, mine, CHART_COLORS.opponent)}
+                    className={cn(
+                      value(theirs, mine, CHART_COLORS.opponent).className,
+                      'text-right',
+                    )}
+                  >
+                    {c.opponent}
+                  </span>
+                  {dayFigure('opponent', 'right')}
                 </span>
               </li>
             )

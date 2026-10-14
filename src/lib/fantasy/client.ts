@@ -66,16 +66,26 @@ export async function fanProfile(session: EspnSession): Promise<unknown> {
   return null
 }
 
-/** A league's teams, Lineups, this period's Matchups and settings. */
+/**
+ * A league's teams, Lineups, this period's Matchups and settings; with a
+ * scoring period, the Lineups and stat lines are that day's.
+ */
 export function leagueViews(
   session: EspnSession | null,
   sport: FantasySport,
   season: number,
   leagueId: string,
+  scoringPeriod?: number,
 ): Promise<WireLeague> {
   const views = ['mTeam', 'mRoster', 'mMatchup', 'mMatchupScore', 'mSettings']
+  const query = [
+    ...views.map((v) => `view=${v}`),
+    ...(scoringPeriod === undefined
+      ? []
+      : [`scoringPeriodId=${scoringPeriod}`]),
+  ].join('&')
   return get(
-    `https://lm-api-reads.fantasy.espn.com/apis/v3/games/${SPORTS[sport].code}/seasons/${season}/segments/0/leagues/${encodeURIComponent(leagueId)}?${views.map((v) => `view=${v}`).join('&')}`,
+    `https://lm-api-reads.fantasy.espn.com/apis/v3/games/${SPORTS[sport].code}/seasons/${season}/segments/0/leagues/${encodeURIComponent(leagueId)}?${query}`,
     session,
   )
 }

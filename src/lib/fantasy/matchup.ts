@@ -70,6 +70,8 @@ export interface WireLeague {
   status?: { currentMatchupPeriod?: number; latestScoringPeriod?: number }
   settings?: {
     name?: string
+    /** Each matchup period's scoring periods (days), by period id. */
+    scheduleSettings?: { matchupPeriods?: Record<string, Array<number>> }
     scoringSettings?: {
       scoringType?: string
       scoringItems?: Array<{ statId?: number; isReverseItem?: boolean }>
@@ -165,6 +167,21 @@ export interface MatchupView {
    */
   categories?: Array<CategoryResult> | null
   ties?: number
+  /** Category leagues: each category from today's Starters alone. */
+  today?: Array<CategoryResult> | null
+  /** The matchup's scoring periods (days), first to last. */
+  days?: Array<number>
+}
+
+/**
+ * One day of a category Matchup: each side's Lineup that day with their
+ * lines, and each category from that day's Starters alone.
+ */
+export interface MatchupDay {
+  scoringPeriod: number
+  categories: Array<CategoryResult>
+  mine: Array<LineupPlayer>
+  opponent: Array<LineupPlayer> | null
 }
 
 const round = (n: number) => Math.round(n * 100) / 100
@@ -259,6 +276,20 @@ function sorted(
   return [...lineup].sort((a, b) => rank(a) - rank(b))
 }
 
+/** A side's Starters' stats in one scoring period, summed. */
+function startersDay(
+  sport: FantasySport,
+  side: WireSide,
+  scoringPeriod: number,
+): Stats {
+  const notStarting = SPORTS[sport].notStarting
+  return addStats(
+    ...(side.rosterForCurrentScoringPeriod?.entries ?? [])
+      .filter((e) => !notStarting.has(e.lineupSlotId ?? -1))
+      .map((e) => dayStats(e, scoringPeriod)),
+  )
+}
+
 /**
  * A side's category totals: through yesterday from ESPN, plus today's
  * Starters (ratios are recomputed from the sum, in categories.ts).
@@ -269,11 +300,31 @@ function categoryTotals(
   scoringPeriod: number,
 ): { totals: Stats; given: Stats } {
   const given = toStats(side.cumulativeScore?.scoreByStat)
-  const notStarting = SPORTS[sport].notStarting
-  const today = (side.rosterForCurrentScoringPeriod?.entries ?? [])
-    .filter((e) => !notStarting.has(e.lineupSlotId ?? -1))
-    .map((e) => dayStats(e, scoringPeriod))
-  return { totals: addStats(given, ...today), given }
+  return {
+    totals: addStats(given, startersDay(sport, side, scoringPeriod)),
+    given,
+  }
+}
+
+/** Each category from one day's Starters alone (no innings minimum). */
+function dayCategories(
+  sport: FantasySport,
+  categories: ReadonlyArray<LeagueCategory>,
+  mine: WireSide,
+  theirs: WireSide | undefined,
+  scoringPeriod: number,
+): Array<CategoryResult> {
+  const day = (side: WireSide) => ({
+    totals: startersDay(sport, side, scoringPeriod),
+    given: {},
+  })
+  return scoreCategories(
+    sport,
+    categories,
+    day(mine),
+    theirs ? day(theirs) : null,
+    null,
+  )
 }
 
 function sideOf(
@@ -333,6 +384,43 @@ export function myTeamId(
   return owned?.id ?? teamId ?? null
 }
 
+/** The Viewer's side and their opponent's in one matchup period. */
+function sidesOf(
+  league: WireLeague,
+  period: number,
+  teamId: number,
+): { mineWire: WireSide; theirsWire: WireSide | undefined } {
+  const game = league.schedule?.find(
+    (m) =>
+      m.matchupPeriodId === period &&
+      (m.home?.teamId === teamId || m.away?.teamId === teamId),
+  )
+  return {
+    mineWire:
+      game?.home?.teamId === teamId ? game.home : (game?.away ?? { teamId }),
+    theirsWire: game && game.home?.teamId === teamId ? game.away : game?.home,
+  }
+}
+
+function categoriesOf(
+  sport: FantasySport,
+  league: WireLeague,
+): Array<LeagueCategory> | null {
+  const scoring = league.settings?.scoringSettings
+  return isCategoryScoring(scoring?.scoringType)
+    ? leagueCategories(sport, scoring?.scoringItems ?? [])
+    : null
+}
+
+/** The matchup period a scoring period falls in, from the league's schedule. */
+function periodOf(league: WireLeague, scoringPeriod: number): number | null {
+  const periods = league.settings?.scheduleSettings?.matchupPeriods ?? {}
+  const hit = Object.entries(periods).find(([, days]) =>
+    days.includes(scoringPeriod),
+  )
+  return hit ? Number(hit[0]) : null
+}
+
 export function readMatchup(
   sport: FantasySport,
   league: WireLeague,
@@ -341,20 +429,10 @@ export function readMatchup(
   const period = league.status?.currentMatchupPeriod ?? 1
   const scoringPeriod =
     league.scoringPeriodId ?? league.status?.latestScoringPeriod ?? period
-  const game = league.schedule?.find(
-    (m) =>
-      m.matchupPeriodId === period &&
-      (m.home?.teamId === teamId || m.away?.teamId === teamId),
-  )
-  const mineWire =
-    game?.home?.teamId === teamId ? game.home : (game?.away ?? { teamId })
-  const theirsWire =
-    game && game.home?.teamId === teamId ? game.away : game?.home
+  const { mineWire, theirsWire } = sidesOf(league, period, teamId)
   const scoring = league.settings?.scoringSettings
   const scoringType = scoring?.scoringType ?? 'H2H_POINTS'
-  const categories = isCategoryScoring(scoringType)
-    ? leagueCategories(sport, scoring?.scoringItems ?? [])
-    : null
+  const categories = categoriesOf(sport, league)
   const mine = sideOf(sport, league, mineWire, scoringPeriod, categories)
   if (!mine) return null
   const opponent = theirsWire
@@ -383,6 +461,16 @@ export function readMatchup(
     const t = tally(results)
     view.categories = results
     view.ties = t.ties
+    view.today = dayCategories(
+      sport,
+      categories,
+      mineWire,
+      theirsWire && opponent ? theirsWire : undefined,
+      scoringPeriod,
+    )
+    const days =
+      league.settings?.scheduleSettings?.matchupPeriods?.[String(period)]
+    view.days = days?.length ? [...days].sort((a, b) => a - b) : [scoringPeriod]
     // A side's score is the categories it leads; points mean nothing here.
     mine.score = t.wins
     mine.projected = null
@@ -392,4 +480,40 @@ export function readMatchup(
     }
   }
   return view
+}
+
+/**
+ * One day of a category Matchup, from league views read for that scoring
+ * period (ESPN's `scoringPeriodId`): each side's Lineup that day and each
+ * category from that day's Starters. Null outside a category league, or
+ * when the Viewer's team isn't in it.
+ */
+export function readMatchupDay(
+  sport: FantasySport,
+  league: WireLeague,
+  teamId: number,
+  scoringPeriod: number,
+): MatchupDay | null {
+  const categories = categoriesOf(sport, league)
+  if (!categories) return null
+  const period =
+    periodOf(league, scoringPeriod) ?? league.status?.currentMatchupPeriod ?? 1
+  const { mineWire, theirsWire } = sidesOf(league, period, teamId)
+  const mine = sideOf(sport, league, mineWire, scoringPeriod, categories)
+  if (!mine) return null
+  const opponent = theirsWire
+    ? sideOf(sport, league, theirsWire, scoringPeriod, categories)
+    : null
+  return {
+    scoringPeriod,
+    categories: dayCategories(
+      sport,
+      categories,
+      mineWire,
+      opponent ? theirsWire : undefined,
+      scoringPeriod,
+    ),
+    mine: mine.lineup,
+    opponent: opponent?.lineup ?? null,
+  }
 }

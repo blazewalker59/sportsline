@@ -30,10 +30,9 @@ const has = (s: Stats, id: number) => id in s
 const ratio = (num: number, den: number) => (den > 0 ? num / den : null)
 
 const whole = (n: number) => String(Math.round(n))
-/** .342, as averages are written. */
+/** .342, as averages (and shooting percentages) are written. */
 const avg = (n: number) => n.toFixed(3).replace(/^0(?=\.)/, '')
 const two = (n: number) => n.toFixed(2)
-const pct = (n: number) => `${(n * 100).toFixed(1)}%`
 /** Innings from outs: 16 outs → "5.1". */
 export const innings = (outs: number) =>
   `${Math.floor(outs / 3)}.${Math.round(outs % 3)}`
@@ -142,17 +141,17 @@ const BASKETBALL: Record<number, CategoryDef> = {
   19: {
     label: 'FG%',
     compute: (s) => (has(s, 14) ? ratio(v(s, 13), v(s, 14)) : null),
-    format: pct,
+    format: avg,
   },
   20: {
     label: 'FT%',
     compute: (s) => (has(s, 16) ? ratio(v(s, 15), v(s, 16)) : null),
-    format: pct,
+    format: avg,
   },
   21: {
     label: '3P%',
     compute: (s) => (has(s, 18) ? ratio(v(s, 17), v(s, 18)) : null),
-    format: pct,
+    format: avg,
   },
   36: {
     label: 'A/TO',
@@ -177,6 +176,15 @@ const DEFAULT_CATEGORIES: Record<FantasySport, ReadonlyArray<number>> = {
   baseball: [20, 5, 21, 23, 2, 53, 57, 48, 47, 41],
 }
 
+/**
+ * The order a sport's categories read in, whatever order the league lists
+ * them: basketball's shooting first, then the counts, points last. A
+ * category not listed here keeps its place after these.
+ */
+const DISPLAY_ORDER: Partial<Record<FantasySport, ReadonlyArray<number>>> = {
+  basketball: [19, 20, 21, 17, 6, 3, 2, 1, 11, 0],
+}
+
 export const isCategoryScoring = (scoringType: string | undefined) =>
   scoringType !== undefined &&
   /CATEGOR/.test(scoringType) &&
@@ -188,7 +196,7 @@ export interface LeagueCategory {
   reverse: boolean
 }
 
-/** A league's categories, in its order, from its scoring settings. */
+/** A league's categories from its scoring settings, in DISPLAY_ORDER. */
 export function leagueCategories(
   sport: FantasySport,
   items: ReadonlyArray<{ statId?: number; isReverseItem?: boolean }>,
@@ -200,12 +208,17 @@ export function leagueCategories(
   const ids = listed.length
     ? listed
     : DEFAULT_CATEGORIES[sport].map((id) => ({ id, rev: undefined }))
-  return ids.map(({ id, rev }) => ({
-    statId: id,
-    label: defs[id]?.label ?? `Stat ${id}`,
-    // The league's own setting wins; else what the stat usually is.
-    reverse: rev ?? defs[id]?.reverse ?? false,
-  }))
+  const order = DISPLAY_ORDER[sport] ?? []
+  const rank = (id: number) =>
+    order.includes(id) ? order.indexOf(id) : order.length
+  return [...ids]
+    .sort((a, b) => rank(a.id) - rank(b.id))
+    .map(({ id, rev }) => ({
+      statId: id,
+      label: defs[id]?.label ?? `Stat ${id}`,
+      // The league's own setting wins; else what the stat usually is.
+      reverse: rev ?? defs[id]?.reverse ?? false,
+    }))
 }
 
 /** ESPN numbers may arrive as "Infinity" (an ERA with no innings). */

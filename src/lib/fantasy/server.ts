@@ -10,10 +10,16 @@ import { EspnError, bracedSwid, fanProfile } from './client'
 import { discoverConnectedLeagues } from './discoverNow'
 import { leagueFromUrl } from './discovery'
 import { seasonOf } from './sports'
-import { leagueRowId, loadSession, syncAccount, syncLeague } from './sync'
+import {
+  leagueRowId,
+  loadSession,
+  readDay,
+  syncAccount,
+  syncLeague,
+} from './sync'
 import { sleeperUser } from './sleeper/client'
 import { sleeperLeagueRowId, syncAccount as syncSleeper } from './sleeper/sync'
-import type { MatchupView } from './matchup'
+import type { MatchupDay, MatchupView } from './matchup'
 import type { RacePoint } from './race'
 import type { FantasySport } from './sports'
 import { getCloudflareEnv } from '@/lib/db'
@@ -405,6 +411,32 @@ export const getMatchupRace = createServerFn({ method: 'GET' })
           ),
         )
         .orderBy(asc(fantasyScorePoints.at))
+    }),
+  )
+
+/** An earlier day of a category Matchup, for stepping through its days. */
+export const getMatchupDay = createServerFn({ method: 'GET' })
+  .validator((data: { leagueId: string; scoringPeriod: number }) =>
+    z
+      .object({
+        leagueId: z.string().max(300),
+        scoringPeriod: z.number().int().min(0).max(400),
+      })
+      .parse(data),
+  )
+  .handler(({ data }) =>
+    withViewer(async ({ viewerId }): Promise<MatchupDay | null> => {
+      const env = getCloudflareEnv()
+      try {
+        return await readDay(env, viewerId, data.leagueId, data.scoringPeriod)
+      } catch (error) {
+        await reportError(env, 'espn', error, {
+          viewerId,
+          step: 'day',
+          scoringPeriod: data.scoringPeriod,
+        })
+        throw new Error('Couldn’t read that day from ESPN.')
+      }
     }),
   )
 
