@@ -21,10 +21,10 @@ import { EspnError, fanProfile, leagueViews } from './client'
 import { discoverLeagues } from './discovery'
 import { liveProjected } from './liveProjection'
 import { countsInMatchupWindow, matchupWindow } from './schedule'
-import { myTeamId, readMatchup } from './matchup'
+import { myTeamId, readMatchup, readMatchupDay } from './matchup'
 import { MLB_PRO_TEAMS, NFL_PRO_TEAMS, SPORTS, seasonOf } from './sports'
 import type { EspnSession } from './client'
-import type { LineupPlayer, MatchupView } from './matchup'
+import type { LineupPlayer, MatchupDay, MatchupView } from './matchup'
 import type { FantasySport } from './sports'
 import type { CloudflareEnv, Database } from '@/lib/db'
 import { dbFromD1 } from '@/lib/db'
@@ -294,6 +294,36 @@ async function ourTeams(
 }
 
 /**
+ * Lineup Players matched to ours (with headshots), with their Teams'
+ * logos and abbreviations. Changes the Players in place.
+ */
+export async function attachOurs(
+  db: Database,
+  row: Pick<typeof fantasyLeagues.$inferSelect, 'id' | 'sport'>,
+  everyone: ReadonlyArray<LineupPlayer>,
+): Promise<void> {
+  const ids = await ourPlayers(db, row.sport, everyone, row.id)
+  const teamsBy = await ourTeams(db, row.sport, everyone)
+  for (const p of everyone) {
+    const ours = ids.get(p.espnId)
+    p.playerId = ours?.id ?? null
+    if (p.sourcePlayerId !== undefined) p.headshot = ours?.headshotUrl ?? null
+    const t = p.proTeamId === null ? undefined : teamsBy.get(p.proTeamId)
+    // NFL logos and abbreviations from ESPN's fixed team ids, so a stored
+    // Team's record can never put another League's logo on a D/ST.
+    const nfl =
+      row.sport === 'football' && p.proTeamId !== null
+        ? NFL_PRO_TEAMS[p.proTeamId]
+        : undefined
+    p.teamId = t?.id ?? null
+    p.teamLogo = nfl
+      ? `https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500-dark/${nfl.toLowerCase()}.png&w=80&h=80`
+      : (t?.logoUrl ?? null)
+    p.teamAbbrev = nfl ?? t?.abbreviation ?? null
+  }
+}
+
+/**
  * Store a league's Matchup (any provider's): its Players mapped to ours
  * (with headshots), their Teams' logos, and who's in it for the feed.
  */
@@ -304,26 +334,10 @@ export async function storeMatchup(
   set: { season: number; teamId: number | null; lastError: string | null },
 ): Promise<void> {
   if (view) {
-    const everyone = [...view.mine.lineup, ...(view.opponent?.lineup ?? [])]
-    const ids = await ourPlayers(db, row.sport, everyone, row.id)
-    const teamsBy = await ourTeams(db, row.sport, everyone)
-    for (const p of everyone) {
-      const ours = ids.get(p.espnId)
-      p.playerId = ours?.id ?? null
-      if (p.sourcePlayerId !== undefined) p.headshot = ours?.headshotUrl ?? null
-      const t = p.proTeamId === null ? undefined : teamsBy.get(p.proTeamId)
-      // NFL logos and abbreviations from ESPN's fixed team ids, so a stored
-      // Team's record can never put another League's logo on a D/ST.
-      const nfl =
-        row.sport === 'football' && p.proTeamId !== null
-          ? NFL_PRO_TEAMS[p.proTeamId]
-          : undefined
-      p.teamId = t?.id ?? null
-      p.teamLogo = nfl
-        ? `https://a.espncdn.com/combiner/i?img=/i/teamlogos/nfl/500-dark/${nfl.toLowerCase()}.png&w=80&h=80`
-        : (t?.logoUrl ?? null)
-      p.teamAbbrev = nfl ?? t?.abbreviation ?? null
-    }
+    await attachOurs(db, row, [
+      ...view.mine.lineup,
+      ...(view.opponent?.lineup ?? []),
+    ])
     // Sleeper sends no live projection: work it out from each Starter's Game.
     if (row.provider === 'sleeper') await projectLive(db, view)
     await db
@@ -495,6 +509,45 @@ export async function syncLeague(
       teamId === null ? 'Couldn’t find your team in this league.' : null,
   })
   return view
+}
+
+/**
+ * One earlier day of a Viewer's category Matchup, read from ESPN on
+ * demand (a day is final once it's over, so it isn't stored). Null when
+ * the league isn't theirs, isn't a category league on ESPN, or the day
+ * isn't an earlier day of its current Matchup.
+ */
+export async function readDay(
+  env: Pick<CloudflareEnv, 'DB' | 'ESPN_ENCRYPTION_KEY'>,
+  viewerId: string,
+  rowId: string,
+  scoringPeriod: number,
+): Promise<MatchupDay | null> {
+  const db = dbFromD1(env.DB)
+  const row = await db
+    .select()
+    .from(fantasyLeagues)
+    .where(
+      and(eq(fantasyLeagues.id, rowId), eq(fantasyLeagues.viewerId, viewerId)),
+    )
+    .get()
+  const m = row?.matchup
+  if (!row || row.provider !== 'espn' || !m?.categories || row.teamId === null)
+    return null
+  if (!m.days?.includes(scoringPeriod) || scoringPeriod >= m.scoringPeriod)
+    return null
+  const session = await loadSession(env, viewerId)
+  if (!session) return null
+  const league = await leagueViews(
+    session,
+    row.sport,
+    row.season,
+    row.leagueId,
+    scoringPeriod,
+  )
+  const day = readMatchupDay(row.sport, league, row.teamId, scoringPeriod)
+  if (day) await attachOurs(db, row, [...day.mine, ...(day.opponent ?? [])])
+  return day
 }
 
 /** Bring one Viewer's Fantasy leagues up to date. */

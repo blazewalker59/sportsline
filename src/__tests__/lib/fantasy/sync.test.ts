@@ -3,11 +3,13 @@
  * ESPN itself is a stand-in. Bun only.
  */
 
+import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { isBun, sqliteDb } from '../../helpers/sqliteDb'
+import basketball from '../../fixtures/fantasy/basketball-category-matchup.json'
 import type * as Db from '@/lib/db'
 import type { EspnError as EspnErrorClass } from '@/lib/fantasy/client'
-import type { MatchupView } from '@/lib/fantasy/matchup'
+import type { MatchupView, WireLeague } from '@/lib/fantasy/matchup'
 import type * as Sync from '@/lib/fantasy/sync'
 import type * as Vault from '@/lib/kalshi/vault'
 import type * as FantasyClient from '@/lib/fantasy/client'
@@ -364,6 +366,45 @@ describe.skipIf(!isBun)('ESPN fantasy sync', () => {
       teamId: 'tm_buf',
       teamAbbrev: 'BUF',
     })
+  })
+
+  it('reads an earlier day of a category Matchup on demand', async () => {
+    const { fantasyLeagues } = await import('@/lib/db/schema')
+    const { readMatchup } = await import('@/lib/fantasy/matchup')
+    const league = basketball as unknown as WireLeague
+    const view = readMatchup('basketball', league, 1)!
+    sqlite.run(
+      "INSERT INTO fantasy_leagues (id,viewer_id,sport,league_id,season,team_id,name,updated_at) VALUES ('u1~basketball~5','u1','basketball','5',2027,1,'Hoops','x')",
+    )
+    await db
+      .update(fantasyLeagues)
+      .set({ matchup: view })
+      .where(eq(fantasyLeagues.id, 'u1~basketball~5'))
+    const asked: Array<number | undefined> = []
+    const client = await import('@/lib/fantasy/client')
+    vi.spyOn(client, 'leagueViews').mockImplementation(((
+      _s,
+      _sport,
+      _season,
+      _id,
+      scoringPeriod?: number,
+    ) => {
+      asked.push(scoringPeriod)
+      return Promise.resolve(league)
+    }) as typeof client.leagueViews)
+
+    // Today comes from the stored Matchup, a day outside it isn't read,
+    // and nor is anyone else's league.
+    expect(await sync.readDay(env, 'u1', 'u1~basketball~5', 85)).toBeNull()
+    expect(await sync.readDay(env, 'u1', 'u1~basketball~5', 77)).toBeNull()
+    expect(await sync.readDay(env, 'u2', 'u1~basketball~5', 84)).toBeNull()
+    expect(asked).toEqual([])
+
+    const day = await sync.readDay(env, 'u1', 'u1~basketball~5', 84)
+    expect(asked).toEqual([84])
+    expect(day?.scoringPeriod).toBe(84)
+    expect(day?.categories.map((c) => c.label)).toContain('FG%')
+    expect(day?.mine.length).toBeGreaterThan(0)
   })
 })
 

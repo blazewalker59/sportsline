@@ -4,7 +4,10 @@
  */
 
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
+import type { CategoryResult } from '@/lib/fantasy/categories'
 import type { LineupPlayer, MatchupView } from '@/lib/fantasy/matchup'
+import { tally } from '@/lib/fantasy/categories'
+import { shiftSportsDay, sportsDayOf } from '@/lib/model/sportsDay'
 
 export const pts = (n: number | null) => (n === null ? '—' : n.toFixed(1))
 
@@ -15,6 +18,33 @@ export const scoreText = (m: MatchupView, n: number | null) =>
 /** "6–3–1": categories won, lost and tied (from the Viewer's side). */
 export const categoryRecord = (m: MatchupView) =>
   `${m.mine.score}–${m.opponent?.score ?? 0}${m.ties ? `–${m.ties}` : ''}`
+
+/** "5–4" or "5–3–1": one day's categories won, lost and tied. */
+export function dayRecord(categories: ReadonlyArray<CategoryResult>): string {
+  const t = tally(categories)
+  return `${t.wins}–${t.losses}${t.ties ? `–${t.ties}` : ''}`
+}
+
+/**
+ * A Matchup day's name: "Today", "Yesterday", else "Sat, Oct 11". Each
+ * scoring period is a day, counted back from the Matchup's current one.
+ */
+export function dayLabel(
+  m: Pick<MatchupView, 'scoringPeriod'>,
+  scoringPeriod: number,
+  now: Date = new Date(),
+): string {
+  const back = m.scoringPeriod - scoringPeriod
+  if (back === 0) return 'Today'
+  if (back === 1) return 'Yesterday'
+  const day = shiftSportsDay(sportsDayOf(now), -back)
+  return new Date(`${day}T12:00:00Z`).toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  })
+}
 
 /**
  * A Player's figure beside their name: points, or in a category league

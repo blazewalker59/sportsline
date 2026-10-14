@@ -12,7 +12,7 @@ import {
   scoreCategories,
   toStats,
 } from '@/lib/fantasy/categories'
-import { readMatchup } from '@/lib/fantasy/matchup'
+import { readMatchup, readMatchupDay } from '@/lib/fantasy/matchup'
 
 const homeOf = (league: WireLeague) =>
   league.schedule!.find(
@@ -48,7 +48,8 @@ describe('category Matchups (from ESPN payloads dreamteam reads)', () => {
     const league = basketball as unknown as WireLeague
     const view = readMatchup('basketball', league, homeOf(league))!
     const cats = Object.fromEntries(view.categories!.map((c) => [c.label, c]))
-    expect(cats['FG%'].mine).toMatch(/%$/)
+    // Shooting reads as averages do: no leading zero, no percent sign.
+    expect(cats['FG%'].mine).toMatch(/^\.\d{3}$/)
     expect(cats.TO).toMatchObject({ reverse: true, leader: 'mine' })
     expect(view.categories!.map((c) => c.label)).toEqual([
       'FG%',
@@ -61,6 +62,89 @@ describe('category Matchups (from ESPN payloads dreamteam reads)', () => {
       'TO',
       'PTS',
     ])
+  })
+
+  it('scores today on its own, and knows the matchup’s days', () => {
+    const league = basketball as unknown as WireLeague
+    const view = readMatchup('basketball', league, homeOf(league))!
+    expect(view.days).toEqual([78, 79, 80, 81, 82, 83, 84, 85])
+    const today = Object.fromEntries(view.today!.map((c) => [c.label, c]))
+    // Today's Starters alone: 21-40 and 9-25 from the floor.
+    expect(today['FG%']).toMatchObject({
+      mine: '.525',
+      opponent: '.360',
+      leader: 'mine',
+    })
+    expect(today.PTS).toMatchObject({ mine: '60', opponent: '28' })
+    expect(today['3PM']).toMatchObject({ mine: '6', opponent: '3' })
+    // Fewer turnovers wins the day too.
+    expect(today.TO).toMatchObject({ mine: '5', opponent: '4' })
+    expect(today.TO.leader).toBe('opponent')
+    // The matchup's totals are untouched.
+    expect(view.categories!.find((c) => c.label === 'PTS')!.mine).not.toBe('60')
+  })
+
+  it('reads one day of a matchup: that day’s Lineups and categories', () => {
+    const league = basketball as unknown as WireLeague
+    const day = readMatchupDay('basketball', league, homeOf(league), 85)!
+    expect(day.scoringPeriod).toBe(85)
+    expect(day.categories.map((c) => c.label)).toEqual(
+      readMatchup('basketball', league, homeOf(league))!.today!.map(
+        (c) => c.label,
+      ),
+    )
+    expect(day.categories.find((c) => c.label === 'PTS')!.mine).toBe('60')
+    expect(day.mine.length).toBeGreaterThan(0)
+    expect(day.opponent?.length).toBeGreaterThan(0)
+    // A day with no lines yet: nothing to show, nobody leads.
+    const empty = readMatchupDay('basketball', league, homeOf(league), 80)!
+    expect(empty.categories.every((c) => c.leader === null)).toBe(true)
+    expect(empty.categories[0].mine).toBe('—')
+    // Not a category league: no days to read.
+    expect(
+      readMatchupDay(
+        'basketball',
+        {
+          ...league,
+          settings: { scoringSettings: { scoringType: 'H2H_POINTS' } },
+        },
+        homeOf(league),
+        85,
+      ),
+    ).toBeNull()
+  })
+
+  it('orders basketball shooting first, points last, whatever the league lists', () => {
+    const listed = [0, 11, 1, 2, 3, 6, 17, 21, 20, 19, 37].map((statId) => ({
+      statId,
+    }))
+    expect(leagueCategories('basketball', listed).map((c) => c.label)).toEqual([
+      'FG%',
+      'FT%',
+      '3P%',
+      '3PM',
+      'REB',
+      'AST',
+      'STL',
+      'BLK',
+      'TO',
+      'PTS',
+      // Not in the order: after the rest.
+      'DD',
+    ])
+    // Other sports keep the league's own order.
+    expect(
+      leagueCategories('baseball', [{ statId: 5 }, { statId: 20 }]).map(
+        (c) => c.label,
+      ),
+    ).toEqual(['HR', 'R'])
+  })
+
+  it('writes shooting percentages without a leading zero', () => {
+    expect(formatCategory('basketball', 19, 0.5294)).toBe('.529')
+    expect(formatCategory('basketball', 20, 0.8)).toBe('.800')
+    expect(formatCategory('basketball', 21, 1)).toBe('1.000')
+    expect(formatCategory('basketball', 19, null)).toBe('—')
   })
 
   it('reads a league’s own categories and reverse flags', () => {
