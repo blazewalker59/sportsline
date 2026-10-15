@@ -162,7 +162,8 @@ function StepButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'w-9 shrink-0 text-base text-muted hover:text-foreground',
+        // A full thumb's width on phones; compact where there's a pointer.
+        'w-11 shrink-0 touch-manipulation text-2xl leading-none text-muted hover:text-foreground sm:w-9 sm:text-lg',
         'disabled:opacity-30 disabled:hover:text-muted',
       )}
     >
