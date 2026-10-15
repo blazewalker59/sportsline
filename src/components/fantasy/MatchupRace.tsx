@@ -3,6 +3,8 @@
  * period as step lines, from the points sync keeps (fantasy/race.ts),
  * with each side's projected finish as a faint dashed rule. Hover, tap
  * or keyboard focus shows the time, both scores and who led by how much.
+ * It opens on the latest stretch of games (a week's games fall on a few
+ * days, flat between), with the whole week in an overview underneath.
  */
 
 import { defineChart, lineY, ruleY } from '@tanstack/charts'
@@ -15,7 +17,13 @@ import { pts } from './format'
 import type { MatchupView } from '@/lib/fantasy/matchup'
 import type { RacePoint, RaceStep } from '@/lib/fantasy/race'
 import { CHART_COLORS, ChartCard } from '@/components/charts/ChartCard'
+import {
+  TimeOverview,
+  WINDOWED_MARGIN,
+  useTimeWindow,
+} from '@/components/charts/TimeOverview'
 import { clockTime } from '@/components/charts/format'
+import { actionWindow, withinWindow } from '@/components/charts/timeWindow'
 import { leadChanges, raceSteps } from '@/lib/fantasy/race'
 import { getMatchupRace } from '@/lib/fantasy/server'
 
@@ -54,11 +62,61 @@ export function MatchupRace({
       : [...stored, { at: new Date().toISOString(), ...now }]
   }, [race.data, m.mine.score, opponent])
 
+  const steps = useMemo(
+    () => ({
+      mine: raceSteps(points, 'mine'),
+      theirs: raceSteps(points, 'opponent'),
+    }),
+    [points],
+  )
+  const extent = useMemo(
+    () =>
+      points.length > 0
+        ? {
+            start: Date.parse(points[0].at),
+            end: Date.parse(points[points.length - 1].at),
+          }
+        : { start: 0, end: 0 },
+    [points],
+  )
+  // Moments: whenever either side scored. Games a few hours apart are one
+  // stretch; overnight is a break.
+  const action = useMemo(
+    () =>
+      actionWindow(
+        extent,
+        points.flatMap((p, i) =>
+          i > 0 &&
+          (p.mine !== points[i - 1].mine ||
+            p.opponent !== points[i - 1].opponent)
+            ? [Date.parse(p.at)]
+            : [],
+        ),
+        { gapMs: 3 * HOUR, leadMs: 30 * 60_000 },
+      ),
+    [points, extent],
+  )
+  const { view, pick, showAction, showAll } = useTimeWindow(extent, action)
+  const overview = useMemo(
+    () => [
+      {
+        id: 'opponent',
+        rows: steps.theirs.map((s) => ({ t: s.t, y: s.score })),
+        color: CHART_COLORS.opponent,
+      },
+      {
+        id: 'mine',
+        rows: steps.mine.map((s) => ({ t: s.t, y: s.score })),
+        color: CHART_COLORS.mine,
+      },
+    ],
+    [steps],
+  )
+
   const definition = useMemo(() => {
-    const ts = points.map((p) => Date.parse(p.at))
-    const spansDays = ts.length > 1 && ts.at(-1)! - ts[0] > 30 * HOUR
-    const mine = raceSteps(points, 'mine')
-    const theirs = raceSteps(points, 'opponent')
+    const spansDays = view.end - view.start > 30 * HOUR
+    const mine = withinWindow(steps.mine, view)
+    const theirs = withinWindow(steps.theirs, view)
     const projections = [
       { value: m.mine.projected, color: CHART_COLORS.mine, id: 'proj-mine' },
       {
@@ -79,6 +137,8 @@ export function MatchupRace({
           ],
     )
     return defineChart({
+      margin: WINDOWED_MARGIN,
+      clip: true,
       marks: [
         ...projections,
         lineY(theirs, {
@@ -98,7 +158,7 @@ export function MatchupRace({
       ],
       scales: {
         x: {
-          scale: scaleLinear,
+          scale: scaleLinear().domain([view.start, view.end]),
           axis: {
             ticks: { format: (v: number) => when(v, spansDays), count: 3 },
           },
@@ -115,8 +175,8 @@ export function MatchupRace({
         use: tooltip,
         formatGroup(focused) {
           // Corners repeat the previous reading; show the reading itself.
-          const steps = focused.map((f) => f.datum as RaceStep)
-          const step = steps.find((s) => !s.corner) ?? steps[0]
+          const readings = focused.map((f) => f.datum as RaceStep)
+          const step = readings.find((s) => !s.corner) ?? readings[0]
           if (!step) return ''
           const p = step.point
           const lead = p.mine - p.opponent
@@ -131,7 +191,7 @@ export function MatchupRace({
         },
       },
     })
-  }, [points, m.mine.projected, m.mine.abbrev, opponent])
+  }, [steps, view, m.mine.projected, m.mine.abbrev, opponent])
 
   if (!opponent || m.categories) return null
   const changes = leadChanges(points)
@@ -178,6 +238,19 @@ export function MatchupRace({
             height={150}
             initialWidth={340}
             ariaLabel={`${m.mine.abbrev} ${pts(m.mine.score)} to ${opponent.abbrev} ${pts(opponent.score)}; the lead changed ${changes} times`}
+          />
+        )}
+        {points.length >= 2 && (
+          <TimeOverview
+            series={overview}
+            extent={extent}
+            action={action}
+            view={view}
+            onPick={pick}
+            onShowAction={showAction}
+            onShowAll={showAll}
+            format={(t) => when(t, extent.end - extent.start > 20 * HOUR)}
+            label="Race"
           />
         )}
       </ChartCard>
