@@ -10,7 +10,7 @@ import { Chart } from '@tanstack/charts/react'
 import { brushX } from '@tanstack/charts/interaction/brush'
 import { controlledSignal } from '@tanstack/charts/interaction/signal'
 import { scaleLinear } from '@tanstack/charts/scales/linear'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { sameWindow } from './timeWindow'
 import type {
   BrushRange,
@@ -24,6 +24,13 @@ import { cn } from '@/lib/utils'
  * overview's marked stretch sits under the part of the chart it shows.
  */
 export const WINDOWED_MARGIN = { left: 36, right: 26 }
+
+/** Each handle's touch area: this wide, and half this past the strip. */
+const HANDLE = 28
+/** The strip the series is drawn in. */
+const STRIP = 28
+/** Room above and below the strip for the handles' touch areas. */
+const PAD = HANDLE / 2
 
 export interface OverviewSeries {
   id: string
@@ -95,10 +102,30 @@ export function TimeOverview({
   const nearest = (t: number) =>
     times.reduce((best, x) => (Math.abs(x - t) < Math.abs(best - t) ? x : best))
   const range = { start: nearest(view.start), end: nearest(view.end) }
+  // The overview's width, to set the grips on the brush's edges.
+  const box = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(340)
+  useEffect(() => {
+    const el = box.current
+    if (!el) return
+    const observer = new ResizeObserver(([entry]) =>
+      setWidth(entry.contentRect.width),
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+  const plot = width - WINDOWED_MARGIN.left - WINDOWED_MARGIN.right
+  const xOf = (t: number) =>
+    WINDOWED_MARGIN.left +
+    (extent.end > extent.start
+      ? ((t - extent.start) / (extent.end - extent.start)) * plot
+      : 0)
+  const left = xOf(range.start)
+  const right = xOf(range.end)
   const definition = useMemo(
     () =>
       defineChart({
-        margin: { ...WINDOWED_MARGIN, top: 3, bottom: 3 },
+        margin: { ...WINDOWED_MARGIN, top: PAD, bottom: PAD },
         marks: series.map((s) =>
           lineY(
             s.rows.map((r, i) => ({ ...r, i })),
@@ -135,12 +162,15 @@ export function TimeOverview({
             ariaLabel: `${label} shown`,
             startAriaLabel: 'From',
             endAriaLabel: 'To',
+            handleSize: HANDLE,
             selectionStyle: {
               fill: 'var(--color-accent)',
-              fillOpacity: 0.12,
+              fillOpacity: 0.1,
               stroke: 'var(--color-accent)',
-              strokeOpacity: 0.6,
+              strokeOpacity: 0.7,
             },
+            // The handles stay as touch areas; the grips below draw them.
+            handleStyle: { fillOpacity: 0, strokeOpacity: 0 },
           }),
         ],
       }),
@@ -151,16 +181,54 @@ export function TimeOverview({
   const onAction = sameWindow(view, action)
   const onAll = sameWindow(view, extent)
   return (
-    <div className="mt-1">
-      <div className="rounded-md bg-background/60">
+    <div className="mt-0.5">
+      <div ref={box} className="relative">
+        {/* The strip's track, under the series. */}
+        <div
+          aria-hidden="true"
+          className="absolute rounded-md bg-background/60"
+          style={{
+            top: PAD,
+            height: STRIP,
+            left: WINDOWED_MARGIN.left,
+            right: WINDOWED_MARGIN.right,
+          }}
+        />
         <Chart
           definition={definition}
-          height={34}
+          height={STRIP + 2 * PAD}
           initialWidth={340}
           ariaLabel={`All of the ${label.toLowerCase()}, ${format(extent.start)} to ${format(extent.end)}`}
         />
+        {/* Over the brush, letting touches through: the stretch outside
+            the shown one dimmed, and a grip on each edge. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-[2]"
+        >
+          <div
+            className="absolute rounded-l-md bg-surface/70"
+            style={{
+              top: PAD,
+              height: STRIP,
+              left: WINDOWED_MARGIN.left,
+              width: Math.max(0, left - WINDOWED_MARGIN.left),
+            }}
+          />
+          <div
+            className="absolute rounded-r-md bg-surface/70"
+            style={{
+              top: PAD,
+              height: STRIP,
+              left: right,
+              width: Math.max(0, WINDOWED_MARGIN.left + plot - right),
+            }}
+          />
+          <Grip x={left} side="start" />
+          <Grip x={right} side="end" />
+        </div>
       </div>
-      <div className="mt-1 flex items-center justify-between gap-2 px-1 text-[11px]">
+      <div className="mt-0.5 flex items-center justify-between gap-2 px-1 text-[11px]">
         <span className="tabular-nums" aria-live="polite">
           {format(view.start)} – {format(view.end)}
         </span>
@@ -175,6 +243,27 @@ export function TimeOverview({
           </span>
         )}
       </div>
+    </div>
+  )
+}
+
+/**
+ * A brush edge's grip: a pill with two ridges, just outside the edge (as
+ * on a video trimmer), so a narrow stretch's two grips never overlap. It
+ * stays inside its handle's touch area, which straddles the edge.
+ */
+function Grip({ x, side }: { x: number; side: 'start' | 'end' }) {
+  return (
+    <div
+      className="absolute flex w-3 items-center justify-center gap-px rounded-full border-2 border-accent bg-surface shadow-sm"
+      style={{
+        left: side === 'start' ? x - 12 : x,
+        top: PAD - 5,
+        height: STRIP + 10,
+      }}
+    >
+      <span className="h-2.5 w-px rounded-full bg-accent" />
+      <span className="h-2.5 w-px rounded-full bg-accent" />
     </div>
   )
 }
