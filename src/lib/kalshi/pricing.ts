@@ -2,10 +2,10 @@
  * What a Prediction's market is worth now (CONTEXT.md, "Odds"). Pure.
  *
  * A single market trades on a book: its chance is the bid/ask midpoint.
- * A Combo's market has no book (Kalshi shows a $0 bid and $1 ask), so its
- * chance is its Legs' chances multiplied, a won Leg counting 1 and a lost
- * one 0: the way Kalshi prices a Combo's cash-out. Without priced Legs, a
- * market's last trade stands in.
+ * A Combo's market has no real book (Kalshi shows a $1 ask over a $0 or
+ * token $0.0001 bid), so its chance is its Legs' chances multiplied, a won
+ * Leg counting 1 and a lost one 0: the way Kalshi prices a Combo's
+ * cash-out. Without priced Legs, a market's last trade stands in.
  */
 
 export interface Book {
@@ -48,32 +48,31 @@ export function comboChance(legs: ReadonlyArray<PricedLeg>): number | null {
 }
 
 /**
- * A Prediction's YES chance: a Combo's from its Legs (its own book is
- * empty), a single's from its book; the last trade when neither prices.
+ * A Prediction's YES chance: a Combo's from its Legs (its own book is never
+ * real), else its last trade; a single's from its book.
  */
 export function predictionYesChance(
   kind: 'single' | 'combo',
   own: Book | undefined,
   legs: ReadonlyArray<PricedLeg>,
 ): number | null {
-  if (kind === 'combo') {
-    const fromLegs = comboChance(legs)
-    if (fromLegs !== null) return fromLegs
-  }
+  if (kind === 'combo') return comboChance(legs) ?? own?.lastPrice ?? null
   return own ? bookChance(own) : null
 }
 
 /**
- * What the position would sell for now (dollars): at the bid on a book,
- * else (a Combo) at its fair value from the chance.
+ * What the position would sell for now (dollars): a single at the bid on
+ * its book, a Combo (or a single with no book) at its value from the
+ * chance. A Combo's own bid is never its cash-out.
  */
 export function positionValue(
+  kind: 'single' | 'combo',
   side: 'yes' | 'no',
   contracts: number,
   own: Book | undefined,
   yesChance: number | null,
 ): number | null {
-  if (own && !isEmptyBook(own)) {
+  if (kind === 'single' && own && !isEmptyBook(own)) {
     const sell =
       side === 'yes' ? own.yesBid : own.yesAsk !== null ? 1 - own.yesAsk : null
     if (sell !== null) return contracts * sell

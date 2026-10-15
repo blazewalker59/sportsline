@@ -39,13 +39,35 @@ describe('pricing a Prediction', () => {
     }))
     const yes = predictionYesChance('combo', empty, legs)
     expect(yes).toBeCloseTo(0.1066, 3)
-    expect(positionValue('yes', 123.45, empty, yes)).toBeCloseTo(13.16, 1)
+    expect(positionValue('combo', 'yes', 123.45, empty, yes)).toBeCloseTo(
+      13.16,
+      1,
+    )
+  })
+
+  it('values a Combo at its Legs’ chance over a token $0.0001 bid', () => {
+    // Colorado wins · Washington wins: 32.08 contracts, Legs 75.5% and 84.5%.
+    const token = { yesBid: 0.0001, yesAsk: 1, lastPrice: 0.624 }
+    const legs = [0.755, 0.845].map((c) => ({
+      side: 'yes' as const,
+      yesChance: c,
+    }))
+    const yes = predictionYesChance('combo', token, legs)
+    expect(yes).toBeCloseTo(0.638, 3)
+    expect(positionValue('combo', 'yes', 32.08, token, yes)).toBeCloseTo(
+      20.47,
+      1,
+    )
+    // Unpriced Legs: the last trade, never the token book's midpoint.
+    expect(
+      predictionYesChance('combo', token, [{ side: 'yes', yesChance: null }]),
+    ).toBe(0.624)
   })
 
   it('values a single at its bid', () => {
     const book = { yesBid: 0.6, yesAsk: 0.62, lastPrice: 0.61 }
     const yes = predictionYesChance('single', book, [])
-    expect(positionValue('yes', 10, book, yes)).toBeCloseTo(6)
-    expect(positionValue('no', 10, book, yes)).toBeCloseTo(3.8)
+    expect(positionValue('single', 'yes', 10, book, yes)).toBeCloseTo(6)
+    expect(positionValue('single', 'no', 10, book, yes)).toBeCloseTo(3.8)
   })
 })
