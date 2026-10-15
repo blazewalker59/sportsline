@@ -3,7 +3,9 @@
  * side's chance as a line (0–100%), a dashed rule at the chance they
  * bought in at, and the Scoring Plays in its Games as dots in the scoring
  * team's color, set on the line at the moment they happened, so a swing
- * shows its cause. Tap a dot for the play.
+ * shows its cause. Tap a dot for the play. It opens on the latest action
+ * (a Prediction bought hours before its games is flat until they start),
+ * with the whole of it in an overview underneath to scan.
  */
 
 import { areaY, defineChart, dot, lineY, ruleY } from '@tanstack/charts'
@@ -13,7 +15,17 @@ import { tooltip } from '@tanstack/charts/tooltip'
 import { useMemo } from 'react'
 import type { PredictionDetail, PredictionMove } from '@/lib/kalshi/server'
 import { CHART_COLORS, ChartCard } from '@/components/charts/ChartCard'
+import {
+  TimeOverview,
+  WINDOWED_MARGIN,
+  useTimeWindow,
+} from '@/components/charts/TimeOverview'
 import { clockTime, pct, shortDate } from '@/components/charts/format'
+import {
+  actionWindow,
+  windowTicks,
+  withinWindow,
+} from '@/components/charts/timeWindow'
 import { usePredictionDetail } from '@/lib/kalshi/usePredictions'
 import { cn } from '@/lib/utils'
 
@@ -50,10 +62,23 @@ function chanceAxis(peak: number): { top: number; ticks: Array<number> } {
   return { top, ticks }
 }
 
-/** About four evenly spaced times across the span. */
-function timeTicks(start: number, end: number): Array<number> {
-  if (end <= start) return [start]
-  return Array.from({ length: 4 }, (_, i) => start + ((end - start) * i) / 3)
+const MINUTE = 60_000
+/** Odds moving this much (from the last such move) is a moment. */
+const SWING = 0.03
+
+/** When something happened: each scoring play, and each real odds swing. */
+function moments(
+  rows: ReadonlyArray<OddsRow>,
+  plays: ReadonlyArray<PlayRow>,
+): Array<number> {
+  const out = plays.map((p) => p.t)
+  let anchor = rows[0].chance
+  for (const r of rows) {
+    if (Math.abs(r.chance - anchor) < SWING) continue
+    out.push(r.t)
+    anchor = r.chance
+  }
+  return out
 }
 
 /** Minutes from kalshi_prices ("2026-10-04T19:42") or ISO instants → ms. */
@@ -103,6 +128,33 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
 
   const start = rows[0].t
   const end = rows[rows.length - 1].t
+  const action = useMemo(
+    () =>
+      actionWindow({ start, end }, moments(rows, plays), {
+        gapMs: 45 * MINUTE,
+        leadMs: 15 * MINUTE,
+      }),
+    [rows, plays, start, end],
+  )
+  const { view, pick, showAction, showAll } = useTimeWindow(
+    { start, end },
+    action,
+  )
+  const shown = useMemo(() => withinWindow(rows, view), [rows, view])
+  const shownPlays = useMemo(
+    () => plays.filter((p) => p.t >= view.start && p.t <= view.end),
+    [plays, view],
+  )
+  const overview = useMemo(
+    () => [
+      {
+        id: 'odds',
+        rows: rows.map((r) => ({ t: r.t, y: r.chance })),
+        color: CHART_COLORS.muted,
+      },
+    ],
+    [rows],
+  )
   const now = rows[rows.length - 1].chance
   const entry = detail.entryChance
   const move = entry === null ? null : Math.round((now - entry) * 100)
@@ -111,20 +163,27 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
   const axis = chanceAxis(Math.max(entry ?? 0, ...rows.map((r) => r.chance)))
   // Over a day and a half, label dates; within one, clock times.
   const formatTime = (t: number) =>
-    end - start > 36 * 3_600_000
+    view.end - view.start > 36 * 3_600_000
       ? shortDate(new Date(t))
+      : clockTime(new Date(t))
+  // The overview's range reads with the day when the whole spans days.
+  const formatRange = (t: number) =>
+    end - start > 18 * 3_600_000
+      ? `${shortDate(new Date(t))} ${clockTime(new Date(t))}`
       : clockTime(new Date(t))
 
   const definition = useMemo(() => {
     // One dot mark per scoring team: a dot's fill is constant.
     const byColor = new Map<string, Array<PlayRow>>()
-    for (const p of plays) {
+    for (const p of shownPlays) {
       const key = p.color ?? NEUTRAL
       byColor.set(key, [...(byColor.get(key) ?? []), p])
     }
     return defineChart({
+      margin: WINDOWED_MARGIN,
+      clip: true,
       marks: [
-        areaY(rows, {
+        areaY(shown, {
           id: 'odds-area',
           x: 't',
           y: 'chance',
@@ -141,7 +200,7 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
                 strokeDasharray: '4 4',
               }),
             ]),
-        lineY(rows, {
+        lineY(shown, {
           id: 'odds',
           x: 't',
           y: 'chance',
@@ -164,9 +223,9 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
       ],
       scales: {
         x: {
-          scale: scaleLinear,
+          scale: scaleLinear().domain([view.start, view.end]),
           axis: {
-            ticks: { values: timeTicks(start, end), format: formatTime },
+            ticks: { values: windowTicks(view), format: formatTime },
           },
         },
         y: {
@@ -191,9 +250,9 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
         },
       },
     })
-    // formatTime only depends on start and end.
+    // formatTime only depends on the view.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, plays, lineColor, entry, start, end, axis.top])
+  }, [shown, shownPlays, lineColor, entry, view, axis.top])
 
   return (
     <ChartCard
@@ -242,6 +301,17 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
         ariaLabel={`Your odds moved from ${pct(rows[0].chance)} to ${pct(now)}${
           plays.length ? `, with ${plays.length} scoring plays marked` : ''
         }`}
+      />
+      <TimeOverview
+        series={overview}
+        extent={{ start, end }}
+        action={action}
+        view={view}
+        onPick={pick}
+        onShowAction={showAction}
+        onShowAll={showAll}
+        format={formatRange}
+        label="Odds"
       />
     </ChartCard>
   )
