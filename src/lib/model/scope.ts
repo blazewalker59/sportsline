@@ -62,3 +62,35 @@ export function scopeFollows(
         : [{ kind: 'league', league: scope }]
   }
 }
+
+/**
+ * The top-level views in the order the Scope chips show them: the League
+ * choice, then Following, Predictions and Fantasy when the Viewer has them.
+ */
+export function scopeStops(
+  lastLeague: 'all' | RowItem,
+  offered: { following: boolean; predictions: boolean; fantasy: boolean },
+): Array<Scope> {
+  return [
+    lastLeague,
+    ...(offered.following ? (['following'] as const) : []),
+    ...(offered.predictions ? (['predictions'] as const) : []),
+    ...(offered.fantasy ? (['fantasy'] as const) : []),
+  ]
+}
+
+/**
+ * The view a step moves to from `scope` (1: the next chip, -1: the one
+ * before), or null at either end: it doesn't wrap. Any League choice
+ * stands in the League chip's place.
+ */
+export function neighborScope(
+  stops: ReadonlyArray<Scope>,
+  scope: Scope,
+  step: 1 | -1,
+): Scope | null {
+  const views: ReadonlyArray<Scope> = ['following', 'predictions', 'fantasy']
+  const at = views.includes(scope) ? stops.indexOf(scope) : 0
+  if (at === -1) return null
+  return stops[at + step] ?? null
+}

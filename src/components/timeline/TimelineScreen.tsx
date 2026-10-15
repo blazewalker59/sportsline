@@ -12,10 +12,13 @@ import { entryTime } from './FeedRows'
 import { FeedFooter, TimelineFeed } from './TimelineFeed'
 import { TimelineSheets } from './TimelineSheets'
 import { TimelineTop } from './TimelineTop'
+import { useGoToScope, useLastLeague } from './ScopeBar'
 import { followsGame } from './timelineScope'
 import { usePastDay } from './usePastDay'
 import { useTimelineScope } from './useTimelineScope'
 import type { Scope } from '@/lib/model/scope'
+import { neighborScope, scopeStops } from '@/lib/model/scope'
+import { useSwipe } from '@/components/layout/useSwipe'
 import { FantasyTagsProvider } from '@/components/fantasy/FantasyParts'
 import { ReactionsProvider } from '@/components/chat/Reactions'
 import { takePlayOpened } from '@/lib/timeline/playSheet'
@@ -121,6 +124,24 @@ function Timeline({
   const panelHidden = cardsHidden && !dayOpen
   // The spacer under the fixed top section follows its full height.
   const topRef = useRef<HTMLDivElement>(null)
+  // Swiping across the Timeline steps through the Scope chips (not while
+  // one Game is open: that's a drill-in, not a view).
+  const rootRef = useRef<HTMLDivElement>(null)
+  const lastLeague = useLastLeague(scope, s.rowItems)
+  const goToScope = useGoToScope()
+  useSwipe(rootRef, (direction) => {
+    if (gameId) return
+    const next = neighborScope(
+      scopeStops(lastLeague, {
+        following: s.viewerFollows.length > 0,
+        predictions: Boolean(s.kalshi.data),
+        fantasy: s.fantasyLeagues.length > 0,
+      }),
+      scope,
+      direction === 'left' ? 1 : -1,
+    )
+    if (next) goToScope(next)
+  })
   const [topHeight, setTopHeight] = useState(0)
   useEffect(() => {
     const el = topRef.current
@@ -199,10 +220,14 @@ function Timeline({
   return (
     // A chat feed, not a document: nothing selects, so long-pressing a
     // bubble to react never makes iOS highlight the page around it.
-    <div className="mx-auto max-w-xl px-4 pb-16 select-none [-webkit-touch-callout:none]">
+    <div
+      ref={rootRef}
+      className="mx-auto max-w-xl px-4 pb-16 select-none [-webkit-touch-callout:none]"
+    >
       <TimelineTop
         topRef={topRef}
         scope={s}
+        lastLeague={lastLeague}
         sportsDay={sportsDay}
         today={today}
         gameId={gameId}
