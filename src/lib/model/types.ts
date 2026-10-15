@@ -156,6 +156,11 @@ export interface GameSnapshot {
   box: SourceBox | null
   /** Source's suggested seconds before the next poll, if it gives one. */
   pollHintSeconds?: number
+  /**
+   * Why the Source answered with less than usual this time (e.g. Plays
+   * without who was involved), when it fell back.
+   */
+  fallback?: string
 }
 
 /** A Game on a League's schedule, before its play-by-play is fetched. */

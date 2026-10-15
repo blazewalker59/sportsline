@@ -42,6 +42,13 @@ const ALERT_WINDOW_MS = 15 * 60_000
 const ALERTS_PER_WINDOW = 6
 /** Give up after this many consecutive failed polls; the cron re-wakes live Games. */
 const MAX_CONSECUTIVE_ERRORS = 20
+/** Consecutive polls the Source answered with its fallback. */
+const FALLBACKS_KEY = 'fallbacks'
+/**
+ * A fallback is only warned about until it lasts this many polls in a
+ * row (minutes, live): then it's reported, and again each as many more.
+ */
+export const FALLBACK_REPORT_EVERY = 30
 // D1 caps bound parameters per statement at 100.
 const ITEM_ROWS_PER_INSERT = 3
 const PLAYER_ROWS_PER_INSERT = 45
@@ -87,6 +94,7 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
     try {
       const snapshot = await sourceFor(game.league).snapshot(game.sourceGameId)
       await this.apply(game, snapshot)
+      await this.noteFallback(game, snapshot.fallback)
       await this.ctx.storage.put(ERRORS_KEY, 0)
       await this.ctx.storage.delete(RATE_LIMITED_KEY)
       delay = nextPollDelay(
@@ -116,6 +124,28 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
       delay = errors >= MAX_CONSECUTIVE_ERRORS ? null : retry.delayMs
     }
     if (delay !== null) await this.ctx.storage.setAlarm(Date.now() + delay)
+  }
+
+  /** Count polls in a row on the Source's fallback; report one that lasts. */
+  private async noteFallback(
+    game: TrackRequest,
+    fallback: string | undefined,
+  ): Promise<void> {
+    if (!fallback) {
+      await this.ctx.storage.delete(FALLBACKS_KEY)
+      return
+    }
+    const fallbacks =
+      ((await this.ctx.storage.get<number>(FALLBACKS_KEY)) ?? 0) + 1
+    await this.ctx.storage.put(FALLBACKS_KEY, fallbacks)
+    if (fallbacks % FALLBACK_REPORT_EVERY === 0) {
+      await reportError(
+        this.env,
+        'source-fallback',
+        new Error(`${game.league}: ${fallback}`),
+        { gameId: game.gameId, fallbacks },
+      )
+    }
   }
 
   private async loadSeen(): Promise<Map<string, SeenItem>> {

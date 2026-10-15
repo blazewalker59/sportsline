@@ -110,6 +110,26 @@ export function collegeDescription(text: string): string {
   )
 }
 
+/**
+ * The summary's drive plays in the core API's shape, for when the core API
+ * refuses us: the same Plays, but no one Involved. A play's team is the one
+ * with the ball at its end, as the core API reports it.
+ */
+export function drivePlays(summary: NflSummary): NflCorePlays {
+  const drives = [
+    ...(summary.drives?.previous ?? []),
+    ...(summary.drives?.current ? [summary.drives.current] : []),
+  ]
+  return {
+    items: drives.flatMap((d) =>
+      (d.plays ?? []).map(({ wallclock: _, ...p }) => ({
+        ...p,
+        team: p.team ?? p.end?.team,
+      })),
+    ),
+  }
+}
+
 export function parseGame(
   summary: NflSummary,
   core: NflCorePlays,
@@ -239,7 +259,7 @@ export function parseGame(
       description: describe((row.text ?? type).trim()),
       playType: type,
       significance: scored ? 'scoring' : significance(row, type),
-      side: sideOf(refId(row.team?.$ref, 'teams')),
+      side: sideOf(refId(row.team?.$ref, 'teams') ?? row.team?.id ?? null),
       involved: [...involved.values()],
       credits: [],
       detail: {
