@@ -15,6 +15,7 @@ import { Collapse, ConnectionDot, HighlightsButton } from './TimelineControls'
 import { inScope } from './timelineScope'
 import type { TimelineScopeState } from './useTimelineScope'
 import type { GameSummary, TimelineItem } from '@/lib/model/timeline'
+import type { RowItem } from '@/lib/model/leagues'
 import type { Connection } from '@/lib/timeline/useLiveTimeline'
 import { FantasyStrip } from '@/components/fantasy/FantasyParts'
 import {
@@ -28,6 +29,7 @@ import { cn } from '@/lib/utils'
 export function TimelineTop({
   topRef,
   scope: s,
+  lastLeague,
   sportsDay,
   today,
   gameId,
@@ -48,6 +50,8 @@ export function TimelineTop({
 }: {
   topRef: React.Ref<HTMLDivElement>
   scope: TimelineScopeState
+  /** The League choice the Scope chips return to. */
+  lastLeague: 'all' | RowItem
   sportsDay: string
   today: string
   gameId: string | null
@@ -120,6 +124,7 @@ export function TimelineTop({
           <ScopeBar
             scope={s.scope}
             items={s.rowItems}
+            lastLeague={lastLeague}
             canFollow={s.viewerFollows.length > 0}
             canPredict={Boolean(s.kalshi.data)}
             canFantasy={s.fantasyLeagues.length > 0}

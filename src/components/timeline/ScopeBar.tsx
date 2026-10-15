@@ -12,34 +12,18 @@ import { cn } from '@/lib/utils'
 
 const LAST_LEAGUE_KEY = 'sportsline:leagueScope'
 
+const isLeagueScope = (scope: Scope, items: ReadonlyArray<RowItem>) =>
+  scope === 'all' || items.includes(scope as RowItem)
+
 /**
- * Four views: the Leagues picker (All, or one League or college group),
- * Following, Predictions and Fantasy. The picker is one pill: tapped from
- * another view it returns to the last League choice; tapped while showing,
- * it opens the list of the Viewer's Leagues and college groups, in their
- * order. Switching Scope is a View Transition over cached data.
+ * The League choice to return to from another view: the one showing, else
+ * the last one shown (kept across visits).
  */
-export function ScopeBar({
-  scope,
-  items,
-  canFollow,
-  canPredict,
-  canFantasy,
-}: {
-  scope: Scope
-  /** The Viewer's visible Leagues and college groups, in their order. */
-  items: ReadonlyArray<RowItem>
-  /** The Viewer follows something, so "Following" is offered. */
-  canFollow: boolean
-  /** The Viewer has connected Kalshi, so "Predictions" is offered. */
-  canPredict?: boolean
-  /** The Viewer has Fantasy Matchups, so "Fantasy" is offered. */
-  canFantasy?: boolean
-}) {
-  const navigate = useNavigate()
-  const [menuOpen, setMenuOpen] = useState(false)
-  const leagueScope = scope === 'all' || items.includes(scope as RowItem)
-  // The League choice to return to from another view.
+export function useLastLeague(
+  scope: Scope,
+  items: ReadonlyArray<RowItem>,
+): 'all' | RowItem {
+  const leagueScope = isLeagueScope(scope, items)
   const [lastLeague, setLastLeague] = useState<'all' | RowItem>('all')
   useEffect(() => {
     if (leagueScope) {
@@ -59,15 +43,13 @@ export function ScopeBar({
       // Storage is a convenience.
     }
   }, [scope, leagueScope, items])
-  useEffect(() => {
-    if (!menuOpen) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuOpen(false)
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [menuOpen])
+  return lastLeague
+}
 
-  const go = (value: Scope) => {
-    setMenuOpen(false)
+/** Switch the Timeline's Scope: a View Transition over cached data. */
+export function useGoToScope(): (value: Scope) => void {
+  const navigate = useNavigate()
+  return (value: Scope) => {
     void navigate({
       to: '/',
       search: (prev) => ({
@@ -82,6 +64,50 @@ export function ScopeBar({
       viewTransition: true,
       resetScroll: false,
     })
+  }
+}
+
+/**
+ * Four views: the Leagues picker (All, or one League or college group),
+ * Following, Predictions and Fantasy. The picker is one pill: tapped from
+ * another view it returns to the last League choice; tapped while showing,
+ * it opens the list of the Viewer's Leagues and college groups, in their
+ * order. Switching Scope is a View Transition over cached data; a swipe
+ * across the Timeline moves to the next or previous view (useScopeSwipe).
+ */
+export function ScopeBar({
+  scope,
+  items,
+  lastLeague,
+  canFollow,
+  canPredict,
+  canFantasy,
+}: {
+  scope: Scope
+  /** The Viewer's visible Leagues and college groups, in their order. */
+  items: ReadonlyArray<RowItem>
+  /** The League choice the picker returns to (useLastLeague). */
+  lastLeague: 'all' | RowItem
+  /** The Viewer follows something, so "Following" is offered. */
+  canFollow: boolean
+  /** The Viewer has connected Kalshi, so "Predictions" is offered. */
+  canPredict?: boolean
+  /** The Viewer has Fantasy Matchups, so "Fantasy" is offered. */
+  canFantasy?: boolean
+}) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const leagueScope = isLeagueScope(scope, items)
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuOpen(false)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [menuOpen])
+
+  const goTo = useGoToScope()
+  const go = (value: Scope) => {
+    setMenuOpen(false)
+    goTo(value)
   }
   const chipClass = (selected: boolean) =>
     cn(
