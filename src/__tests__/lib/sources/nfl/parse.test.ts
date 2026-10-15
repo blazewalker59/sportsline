@@ -3,7 +3,7 @@ import summaryFixture from '../../../fixtures/nfl/live-401872964.json'
 import playsFixture from '../../../fixtures/nfl/live-401872964-plays.json'
 import type { NflCorePlays, NflSummary } from '@/lib/sources/nfl/feed'
 import type { SourceMilestone, SourcePlay } from '@/lib/model/types'
-import { parseGame, quarterLabel } from '@/lib/sources/nfl/parse'
+import { drivePlays, parseGame, quarterLabel } from '@/lib/sources/nfl/parse'
 
 const live = parseGame(
   summaryFixture as unknown as NflSummary,
@@ -148,5 +148,32 @@ describe('two-point conversions', () => {
     expect(play('Penalty').significance).not.toBe('scoring')
     expect(play('Kickoff').score).toEqual({ away: 24, home: 24 })
     expect(play('Kickoff').significance).not.toBe('scoring')
+  })
+})
+
+describe('NFL parseGame — from the summary alone (core API refused)', () => {
+  const summary = summaryFixture as unknown as NflSummary
+  const fallback = parseGame(summary, drivePlays(summary))
+  const fallbackPlays = fallback.items.filter(
+    (i): i is SourcePlay => i.kind === 'play',
+  )
+  const strip = (p: SourcePlay) => ({ ...p, involved: [] })
+
+  it('gives the same Plays, keyed alike, with no one Involved', () => {
+    const byKey = new Map(plays.map((p) => [p.key, p]))
+    // The core list can run a snap or two ahead of the summary.
+    expect(fallbackPlays.length).toBeGreaterThan(plays.length - 3)
+    for (const p of fallbackPlays) {
+      expect(p.involved).toEqual([])
+      const core = byKey.get(p.key)
+      if (core) expect(strip(p)).toEqual(strip(core))
+    }
+  })
+
+  it("keeps the Game's score and milestones", () => {
+    expect(fallback.score).toEqual(live.score)
+    expect(
+      fallback.items.filter((i) => i.kind === 'milestone').map((m) => m.key),
+    ).toEqual(milestones.map((m) => m.key))
   })
 })

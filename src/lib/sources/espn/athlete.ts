@@ -1,7 +1,8 @@
 /**
  * An ESPN athlete's overview (NFL, college football, NBA): season stats,
- * recent games, next game, news and Rotowire's note. Read from
- * site.web.api.espn.com, which answers Workers (site.api.espn.com may not).
+ * recent games, next game, news and Rotowire's note. ESPN serves it from
+ * two hosts and has refused Workers on each at different times, so it's
+ * read from one and, failing that, the other.
  */
 
 import type { PlayerOverview } from '@/lib/model/types'
@@ -75,8 +76,9 @@ export async function espnAthleteOverview(
   teamSourceId: string | null,
   getJson: <T>(url: string) => Promise<T>,
 ): Promise<PlayerOverview | null> {
-  const d = await getJson<Overview>(
-    `https://site.web.api.espn.com/apis/common/v3/sports/${sportPath}/athletes/${encodeURIComponent(athleteId)}/overview`,
+  const path = `/apis/common/v3/sports/${sportPath}/athletes/${encodeURIComponent(athleteId)}/overview`
+  const d = await getJson<Overview>(`https://site.api.espn.com${path}`).catch(
+    () => getJson<Overview>(`https://site.web.api.espn.com${path}`),
   )
   const st = d.statistics
   const split =

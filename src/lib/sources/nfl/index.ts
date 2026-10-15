@@ -3,7 +3,7 @@
 import { ROSTER_CONCURRENCY, getJson as jsonFrom, mapPool } from '../pool'
 import { fetchTeamSchedule } from '../espn/common'
 import { espnAthleteOverview } from '../espn/athlete'
-import { parseGame, parseRoster, parseScoreboard } from './parse'
+import { drivePlays, parseGame, parseRoster, parseScoreboard } from './parse'
 import type {
   NflCorePlays,
   NflRoster,
@@ -11,11 +11,40 @@ import type {
   NflSummary,
   NflTeams,
 } from './feed'
-import type { SourceAdapter } from '@/lib/model/types'
+import type { GameSnapshot, SourceAdapter } from '@/lib/model/types'
+import type { FootballLeague } from './parse'
 
 const SITE = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl'
 const CORE = 'https://sports.core.api.espn.com/v2/sports/football/leagues/nfl'
 const getJson = jsonFrom('ESPN')
+
+/**
+ * An NFL or college game: the summary, and the core API's plays for who
+ * was involved. ESPN's core API refuses Workers at times: then the
+ * summary's own plays stand in, without anyone involved, rather than the
+ * game going dark, and the snapshot says it fell back.
+ */
+export async function footballSnapshot(
+  site: string,
+  core: string,
+  sourceGameId: string,
+  league: FootballLeague = 'nfl',
+): Promise<GameSnapshot> {
+  const id = encodeURIComponent(sourceGameId)
+  let fallback: string | undefined
+  const [summary, plays] = await Promise.all([
+    getJson<NflSummary>(`${site}/summary?event=${id}`),
+    getJson<NflCorePlays>(
+      `${core}/events/${id}/competitions/${id}/plays?limit=500`,
+    ).catch((error: unknown) => {
+      fallback = `ESPN core plays unavailable: ${error instanceof Error ? error.message : String(error)}`
+      console.warn(`[source] ${fallback}`)
+      return null
+    }),
+  ])
+  const game = parseGame(summary, plays ?? drivePlays(summary), league)
+  return fallback ? { ...game, fallback } : game
+}
 
 export const nflAdapter: SourceAdapter = {
   league: 'nfl',
@@ -27,14 +56,7 @@ export const nflAdapter: SourceAdapter = {
     return parseScoreboard(scoreboard)
   },
   async snapshot(sourceGameId) {
-    const id = encodeURIComponent(sourceGameId)
-    const [summary, plays] = await Promise.all([
-      getJson<NflSummary>(`${SITE}/summary?event=${id}`),
-      getJson<NflCorePlays>(
-        `${CORE}/events/${id}/competitions/${id}/plays?limit=500`,
-      ),
-    ])
-    return parseGame(summary, plays)
+    return footballSnapshot(SITE, CORE, sourceGameId)
   },
   async roster() {
     const teams = await getJson<NflTeams>(`${SITE}/teams`)

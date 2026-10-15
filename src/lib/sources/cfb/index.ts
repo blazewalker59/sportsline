@@ -6,16 +6,11 @@
  */
 
 import { fetchTeamSchedule, top25 } from '../espn/common'
-import { parseGame, parseRoster, parseScoreboard } from '../nfl/parse'
+import { parseRoster, parseScoreboard } from '../nfl/parse'
+import { footballSnapshot } from '../nfl'
 import { ROSTER_CONCURRENCY, getJson as jsonFrom, mapPool } from '../pool'
 import { espnAthleteOverview } from '../espn/athlete'
-import type {
-  NflCorePlays,
-  NflRoster,
-  NflScoreboard,
-  NflSummary,
-  NflTeams,
-} from '../nfl/feed'
+import type { NflRoster, NflScoreboard, NflTeams } from '../nfl/feed'
 import type { SourceAdapter } from '@/lib/model/types'
 
 const SITE =
@@ -44,11 +39,18 @@ export function isCovered(
   )
 }
 
-interface CoreTeamList {
-  items?: Array<{ $ref?: string }>
+interface Standings {
+  standings?: { entries?: Array<{ team?: { id?: string } }> }
+  children?: Array<Standings>
 }
 
-/** The covered teams' ESPN ids, from the season's conference lists. */
+const STANDINGS =
+  'https://site.api.espn.com/apis/v2/sports/football/college-football/standings'
+
+/**
+ * The covered teams' ESPN ids, from the season's conference standings
+ * (ESPN's core API, which lists conference members, refuses Workers).
+ */
 async function coveredTeamIds(): Promise<Array<string>> {
   // A season runs August to January: bowls and the playoff belong to the
   // year it started.
@@ -56,18 +58,17 @@ async function coveredTeamIds(): Promise<Array<string>> {
   const season = now.getUTCFullYear() - (now.getUTCMonth() < 6 ? 1 : 0)
   const lists = await Promise.all(
     [...COVERED_CONFERENCES].map((group) =>
-      getJson<CoreTeamList>(
-        `${CORE}/seasons/${season}/types/2/groups/${group}/teams?limit=50`,
-      ),
+      getJson<Standings>(`${STANDINGS}?group=${group}&season=${season}`),
     ),
   )
-  const ids = lists.flatMap((l) =>
-    (l.items ?? []).flatMap((i) => {
-      const id = i.$ref?.match(/\/teams\/(\d+)/)?.[1]
-      return id ? [id] : []
-    }),
-  )
-  return [...new Set([...ids, ...COVERED_TEAMS])]
+  // A conference with divisions lists its teams under each division.
+  const teamIds = (s: Standings): Array<string> => [
+    ...(s.standings?.entries ?? []).flatMap((e) =>
+      e.team?.id ? [e.team.id] : [],
+    ),
+    ...(s.children ?? []).flatMap(teamIds),
+  ]
+  return [...new Set([...lists.flatMap(teamIds), ...COVERED_TEAMS])]
 }
 
 export const cfbAdapter: SourceAdapter = {
@@ -86,14 +87,7 @@ export const cfbAdapter: SourceAdapter = {
     )
   },
   async snapshot(sourceGameId) {
-    const id = encodeURIComponent(sourceGameId)
-    const [summary, plays] = await Promise.all([
-      getJson<NflSummary>(`${SITE}/summary?event=${id}`),
-      getJson<NflCorePlays>(
-        `${CORE}/events/${id}/competitions/${id}/plays?limit=500`,
-      ),
-    ])
-    return parseGame(summary, plays, 'cfb')
+    return footballSnapshot(SITE, CORE, sourceGameId, 'cfb')
   },
   async roster() {
     const [ids, all] = await Promise.all([

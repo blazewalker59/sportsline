@@ -548,6 +548,31 @@ describe.skipIf(!isBun)('LiveGame', () => {
     expect(finalRow?.status).toBe('final')
   })
 
+  it('warns of a Source fallback, and reports it only once it lasts', async () => {
+    const { FALLBACK_REPORT_EVERY } = await import('@/lib/live/LiveGame')
+    const game = instance()
+    await game.track(tracked)
+    const poll = async (times: number, fallback?: string) => {
+      state.snap = snap([play('a')], fallback ? { fallback } : {})
+      for (let i = 0; i < times; i++) await game.alarm()
+    }
+
+    await poll(FALLBACK_REPORT_EVERY - 1, 'core plays unavailable')
+    expect(state.reports).toEqual([])
+    await poll(1, 'core plays unavailable')
+    expect(state.reports).toEqual(['source-fallback'])
+
+    // The Source answering in full starts the count over.
+    await poll(1)
+    await poll(FALLBACK_REPORT_EVERY - 1, 'core plays unavailable')
+    expect(state.reports).toHaveLength(1)
+    await poll(1, 'core plays unavailable')
+    expect(state.reports).toHaveLength(2)
+    // Still on it: reported again each as many polls more.
+    await poll(FALLBACK_REPORT_EVERY, 'core plays unavailable')
+    expect(state.reports).toHaveLength(3)
+  })
+
   it('retries a failed poll, reports a 429 only after it lasts, and gives up', async () => {
     const game = instance()
     await game.track(tracked)

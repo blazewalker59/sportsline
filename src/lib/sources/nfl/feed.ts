@@ -23,8 +23,8 @@ interface Ref {
   $ref?: string
 }
 
-interface EspnDrivePlay {
-  id: string
+/** A drive's play: the core API's play, less who took part. */
+export interface EspnDrivePlay extends Omit<NflCorePlay, 'participants'> {
   wallclock?: string
 }
 
@@ -84,7 +84,7 @@ export interface NflCorePlay {
   isPenalty?: boolean
   statYardage?: number
   modified?: string
-  team?: Ref
+  team?: Ref & { id?: string }
   start?: NflDownDistance
   end?: NflDownDistance
   participants?: Array<{ athlete?: Ref; type?: string; order?: number }>
