@@ -358,7 +358,7 @@ export const getPredictions = createServerFn({ method: 'GET' }).handler(
           entryChance: p.contracts > 0 ? p.cost / p.contracts : null,
           value:
             p.status === 'open'
-              ? positionValue(p.side, p.contracts, m, yes)
+              ? positionValue(p.kind, p.side, p.contracts, m, yes)
               : null,
           history: history
             .filter((h) => h.ticker === p.marketTicker)
