@@ -103,7 +103,7 @@ export function KeyPlayPanel({
   const none = index === -1
   return (
     <div
-      className="mt-1.5 flex min-h-[4.25rem] items-stretch gap-1 rounded-lg border border-border bg-background/60 text-[11px]"
+      className="mt-1.5 flex min-h-[4.75rem] items-center gap-2 rounded-lg border border-border bg-background/60 px-1.5 text-[11px]"
       aria-live="polite"
     >
       <StepButton
@@ -112,38 +112,49 @@ export function KeyPlayPanel({
         // From none, step back from the latest.
         onClick={() => onStep(none ? count - 1 : index - 1)}
       >
-        ‹
+        <path d="m15 6-6 6 6 6" />
       </StepButton>
-      <div className="min-w-0 flex-1 py-1.5">
+      <div className="min-w-0 flex-1 self-stretch py-1.5">
         {none ? (
           <p className="flex h-full items-center justify-center text-center">
             Tap the chart for a {noun} · {count} marked
           </p>
         ) : (
           <>
-            <p className="mb-0.5 text-[10px] text-muted tabular-nums">
+            <p className="mb-0.5 flex items-center justify-between text-[10px] text-muted tabular-nums">
               {index + 1} of {count}
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={onClose}
+                // Small to see, but a fair size to tap.
+                className="-my-2 -mr-1 flex size-8 touch-manipulation items-center justify-center rounded-full hover:text-foreground"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                  className="size-3.5 fill-none stroke-current stroke-[2.5]"
+                >
+                  <path d="M6 6l12 12M18 6 6 18" />
+                </svg>
+              </button>
             </p>
             {children}
           </>
         )}
       </div>
-      {!none && (
-        <StepButton label="Close" onClick={onClose}>
-          ×
-        </StepButton>
-      )}
       <StepButton
         label={`Next ${noun}`}
         disabled={!none && index === count - 1}
         onClick={() => onStep(none ? 0 : index + 1)}
       >
-        ›
+        <path d="m9 6 6 6-6 6" />
       </StepButton>
     </div>
   )
 }
 
+/** A round button with a chevron: a thumb's size on phones. */
 function StepButton({
   label,
   disabled,
@@ -153,6 +164,7 @@ function StepButton({
   label: string
   disabled?: boolean
   onClick: () => void
+  /** The chevron's path. */
   children: React.ReactNode
 }) {
   return (
@@ -162,12 +174,21 @@ function StepButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        // A full thumb's width on phones; compact where there's a pointer.
-        'w-11 shrink-0 touch-manipulation text-2xl leading-none text-muted hover:text-foreground sm:w-9 sm:text-lg',
-        'disabled:opacity-30 disabled:hover:text-muted',
+        'flex size-11 shrink-0 touch-manipulation items-center justify-center rounded-full sm:size-9',
+        'border border-border bg-foreground/10 text-foreground transition',
+        'hover:bg-foreground/15 active:scale-95 active:bg-foreground/20',
+        'disabled:pointer-events-none disabled:opacity-30',
       )}
     >
-      {children}
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        className="size-5 fill-none stroke-current stroke-[2.75] sm:size-4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {children}
+      </svg>
     </button>
   )
 }
