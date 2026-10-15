@@ -3,7 +3,8 @@
  * side's chance as a line (0–100%), a dashed rule at the chance they
  * bought in at, and the Scoring Plays in its Games as dots in the scoring
  * team's color, set on the line at the moment they happened, so a swing
- * shows its cause. Tap a dot for the play. It opens on the latest action
+ * shows its cause. Tap anywhere for the nearest play, which reads under
+ * the chart with the swing it caused. It opens on the latest action
  * (a Prediction bought hours before its games is flat until they start),
  * with the whole of it in an overview underneath to scan.
  */
@@ -11,10 +12,15 @@
 import { areaY, defineChart, dot, lineY, ruleY } from '@tanstack/charts'
 import { Chart } from '@tanstack/charts/react'
 import { scaleLinear } from '@tanstack/charts/scales/linear'
-import { tooltip } from '@tanstack/charts/tooltip'
+import { decorative } from '@tanstack/charts/mark/decorative'
 import { useMemo } from 'react'
 import type { PredictionDetail, PredictionMove } from '@/lib/kalshi/server'
 import { CHART_COLORS, ChartCard } from '@/components/charts/ChartCard'
+import {
+  KeyPlayPanel,
+  keyPlaySelection,
+  useKeyPlay,
+} from '@/components/charts/KeyPlays'
 import {
   TimeOverview,
   WINDOWED_MARGIN,
@@ -37,10 +43,18 @@ interface OddsRow {
 
 interface PlayRow extends PredictionMove {
   kind: 'play'
+  key: string
   t: number
   /** The odds when it happened (the last point at or before it). */
   chance: number
+  /** The odds once it sank in: a few minutes on, or the latest. */
+  after: number
 }
+
+/** How long a play takes to show in the odds. */
+const SETTLE_MS = 3 * 60_000
+
+const playKey = (p: PlayRow) => p.key
 
 const Y_TICKS = [0, 0.25, 0.5, 0.75, 1]
 /** A team without a color in our table still gets a visible dot. */
@@ -122,7 +136,19 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
         if (r.t > t) break
         chance = r.chance
       }
-      return [{ ...m, kind: 'play', t, chance }]
+      const after = (
+        rows.find((r) => r.t >= t + SETTLE_MS) ?? rows[rows.length - 1]
+      ).chance
+      return [
+        {
+          ...m,
+          kind: 'play',
+          key: `${m.at}|${m.headline}|${m.team ?? ''}`,
+          t,
+          chance,
+          after,
+        },
+      ]
     })
   }, [detail.moves, rows])
 
@@ -145,6 +171,7 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
     () => plays.filter((p) => p.t >= view.start && p.t <= view.end),
     [plays, view],
   )
+  const keyPlay = useKeyPlay(shownPlays, playKey)
   const overview = useMemo(
     () => [
       {
@@ -173,6 +200,11 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
       : clockTime(new Date(t))
 
   const definition = useMemo(() => {
+    const picking = keyPlaySelection<PlayRow>(
+      keyPlay.selected,
+      keyPlay.pick,
+      playKey,
+    )
     // One dot mark per scoring team: a dot's fill is constant.
     const byColor = new Map<string, Array<PlayRow>>()
     for (const p of shownPlays) {
@@ -182,36 +214,44 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
     return defineChart({
       margin: WINDOWED_MARGIN,
       clip: true,
+      // The odds are context: taps and focus land on the plays.
       marks: [
-        areaY(shown, {
-          id: 'odds-area',
-          x: 't',
-          y: 'chance',
-          fill: lineColor,
-          fillOpacity: 0.12,
-        }),
+        decorative(
+          areaY(shown, {
+            id: 'odds-area',
+            x: 't',
+            y: 'chance',
+            fill: lineColor,
+            fillOpacity: 0.12,
+          }),
+        ),
         ...(entry === null
           ? []
           : [
-              ruleY([entry], {
-                id: 'entry',
-                stroke: 'currentColor',
-                strokeOpacity: 0.45,
-                strokeDasharray: '4 4',
-              }),
+              decorative(
+                ruleY([entry], {
+                  id: 'entry',
+                  stroke: 'currentColor',
+                  strokeOpacity: 0.45,
+                  strokeDasharray: '4 4',
+                }),
+              ),
             ]),
-        lineY(shown, {
-          id: 'odds',
-          x: 't',
-          y: 'chance',
-          stroke: lineColor,
-          strokeWidth: 2,
-        }),
+        decorative(
+          lineY(shown, {
+            id: 'odds',
+            x: 't',
+            y: 'chance',
+            stroke: lineColor,
+            strokeWidth: 2,
+          }),
+        ),
         ...[...byColor].map(([color, group], i) =>
           dot(group, {
             id: `plays-${i}`,
             x: 't',
             y: 'chance',
+            key: playKey,
             r: 4.5,
             fill: color,
             // A ring, so a dark team color still shows on a dark card.
@@ -220,6 +260,11 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
             strokeWidth: 1.25,
           }),
         ),
+        picking.highlight(shownPlays, {
+          x: (p) => p.t,
+          y: (p) => p.chance,
+          fill: lineColor,
+        }),
       ],
       scales: {
         x: {
@@ -234,25 +279,13 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
           axis: { ticks: { values: axis.ticks, format: pct } },
         },
       },
-      tooltip: {
-        use: tooltip,
-        format(point) {
-          const d = point.datum as Partial<PlayRow> & { t?: number }
-          const when = d.t === undefined ? '' : clockTime(new Date(d.t))
-          if (d.kind === 'play')
-            return [
-              `${when} · ${d.headline}${d.team ? ` · ${d.team}` : ''}`,
-              d.description,
-              `Odds then ${pct(d.chance!)}`,
-            ].join('\n')
-          if (d.kind === 'odds') return `${when} · ${pct(d.chance!)}`
-          return entry === null ? '' : `You got in at ${pct(entry)}`
-        },
-      },
+      selection: picking.selection,
+      focus: picking.focus,
+      maxFocusDistance: picking.maxFocusDistance,
     })
     // formatTime only depends on the view.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shown, shownPlays, lineColor, entry, view, axis.top])
+  }, [shown, shownPlays, lineColor, entry, view, axis.top, keyPlay.selected])
 
   return (
     <ChartCard
@@ -302,6 +335,14 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
           plays.length ? `, with ${plays.length} scoring plays marked` : ''
         }`}
       />
+      <KeyPlayPanel
+        count={shownPlays.length}
+        index={keyPlay.index}
+        onStep={(i) => keyPlay.pick(playKey(shownPlays[i]))}
+        onClose={() => keyPlay.pick(null)}
+      >
+        {keyPlay.play && <PlayDetail play={keyPlay.play} />}
+      </KeyPlayPanel>
       <TimeOverview
         series={overview}
         extent={{ start, end }}
@@ -314,5 +355,43 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
         label="Odds"
       />
     </ChartCard>
+  )
+}
+
+/** A key play as the panel tells it: what, who, and the swing it caused. */
+function PlayDetail({ play }: { play: PlayRow }) {
+  const swing = Math.round((play.after - play.chance) * 100)
+  return (
+    <>
+      <p className="flex items-center gap-1.5 font-semibold text-foreground">
+        <span
+          aria-hidden="true"
+          className="size-2 shrink-0 rounded-full"
+          style={{ background: play.color ?? NEUTRAL }}
+        />
+        <span className="truncate">
+          {play.headline}
+          {play.team ? ` · ${play.team}` : ''}
+        </span>
+        <span className="ml-auto shrink-0 font-normal text-muted tabular-nums">
+          {clockTime(new Date(play.t))}
+        </span>
+      </p>
+      <p className="line-clamp-2">{play.description}</p>
+      <p className="tabular-nums">
+        Odds {pct(play.chance)} → {pct(play.after)}
+        {swing !== 0 && (
+          <span
+            className={cn(
+              'ml-1 font-semibold',
+              swing > 0 ? 'text-scoring' : 'text-live',
+            )}
+          >
+            {swing > 0 ? '▲' : '▼'}
+            {Math.abs(swing)}
+          </span>
+        )}
+      </p>
+    </>
   )
 }
