@@ -56,11 +56,11 @@ export const CalibrationChart = lazyChart<
 )
 export const OddsChart = lazyChart<ComponentProps<typeof OddsChartType>>(
   () => import('@/components/predictions/OddsChart').then((m) => m.OddsChart),
-  300,
+  372,
 )
 export const GameFlow = lazyChart<ComponentProps<typeof GameFlowType>>(
   () => import('@/components/games/GameFlow').then((m) => m.GameFlow),
-  260,
+  332,
 )
 export const MatchupRace = lazyChart<ComponentProps<typeof MatchupRaceType>>(
   () => import('@/components/fantasy/MatchupRace').then((m) => m.MatchupRace),
