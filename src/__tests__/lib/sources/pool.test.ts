@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fetchWithRetry, getJson, mapPool } from '@/lib/sources/pool'
+import {
+  BROWSER_USER_AGENT,
+  fetchWithRetry,
+  getJson,
+  mapPool,
+} from '@/lib/sources/pool'
 
 describe('mapPool', () => {
   it('keeps order and never exceeds the limit', async () => {
@@ -73,6 +78,17 @@ describe('getJson', () => {
       ok: true,
     })
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('sends a browser User-Agent, which ESPN requires', async () => {
+    const fetchMock = vi.fn((_url: string, _init?: RequestInit) =>
+      Promise.resolve(new Response('{}', { status: 200 })),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    await getJson('ESPN')('https://site.api.espn.com/x')
+    const headers = new Headers(fetchMock.mock.calls[0][1]?.headers)
+    expect(headers.get('user-agent')).toBe(BROWSER_USER_AGENT)
+    expect(headers.get('user-agent')).toMatch(/^Mozilla\/5\.0 /)
   })
 
   it('names the source when the response is not ok', async () => {
