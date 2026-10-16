@@ -7,7 +7,7 @@
 import { SPORTS } from './sports'
 import type { FantasySport } from './sports'
 import type { WireLeague } from './matchup'
-import { fetchWithRetry } from '@/lib/sources/pool'
+import { BROWSER_USER_AGENT, fetchWithRetry } from '@/lib/sources/pool'
 
 export interface EspnSession {
   swid: string
@@ -23,9 +23,6 @@ export class EspnError extends Error {
   }
 }
 
-const USER_AGENT =
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36'
-
 /** SWID as ESPN expects it: an upper-case GUID in braces. */
 export function bracedSwid(swid: string): string {
   return `{${swid.trim().replace(/[{}]/g, '').toUpperCase()}}`
@@ -34,7 +31,7 @@ export function bracedSwid(swid: string): string {
 async function get<T>(url: string, session: EspnSession | null): Promise<T> {
   const headers: Record<string, string> = {
     accept: 'application/json',
-    'user-agent': USER_AGENT,
+    'user-agent': BROWSER_USER_AGENT,
   }
   if (session) {
     headers.cookie = `espn_s2=${session.espnS2}; SWID=${bracedSwid(session.swid)}`

@@ -55,13 +55,21 @@ export async function fetchWithRetry(
 }
 
 /**
+ * ESPN's edge answers 403 to some runtime defaults (`Bun/1.3`, since
+ * October 2026) and its Fantasy API to Workers' missing one, so Source
+ * calls pass as a browser.
+ */
+export const BROWSER_USER_AGENT =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36'
+
+/**
  * GET JSON, retrying 429s and 5xxs. `source` names the API in the error
  * (`ESPN 429 for https://…`). The reader is what shared ESPN helpers take.
  */
 export function getJson(source: string): <T>(url: string) => Promise<T> {
   return async <T>(url: string): Promise<T> => {
     const res = await fetchWithRetry(url, {
-      headers: { accept: 'application/json' },
+      headers: { accept: 'application/json', 'user-agent': BROWSER_USER_AGENT },
     })
     if (!res.ok) throw new Error(`${source} ${res.status} for ${url}`)
     return (await res.json()) as T
