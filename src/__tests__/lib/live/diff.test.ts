@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { SourcePlay } from '@/lib/model/types'
 import type { SeenItem } from '@/lib/live/diff'
-import { MAX_REMOVALS_PER_POLL, diffItems, fingerprint } from '@/lib/live/diff'
+import {
+  MAX_REMOVALS_PER_POLL,
+  diffItems,
+  fingerprint,
+  keepInvolved,
+} from '@/lib/live/diff'
 
 function play(key: string, overrides: Partial<SourcePlay> = {}): SourcePlay {
   return {
@@ -91,5 +96,31 @@ describe('diffItems', () => {
 
   it('never removes anything on an empty response', () => {
     expect(diffItems(seenFrom(play('a')), [])).toEqual([])
+  })
+})
+
+describe('keepInvolved', () => {
+  const allen = { sourceId: '1', name: 'Josh Allen', role: 'passer' }
+  const seen = new Map<string, SeenItem>([
+    ['a', { id: 'id-a', ...fingerprint(play('a')), involved: [allen] }],
+  ])
+
+  it('keeps the players a play was seen with when it now has none', () => {
+    const [a] = keepInvolved(seen, [play('a')])
+    expect(a.kind === 'play' && a.involved).toEqual([allen])
+    // So it reads as unchanged, not a Revision dropping its players.
+    expect(
+      diffItems(seen, keepInvolved(seen, [play('a', { involved: [allen] })])),
+    ).toEqual(diffItems(seen, [play('a', { involved: [allen] })]))
+  })
+
+  it('takes what the Source names now, and leaves unseen plays alone', () => {
+    const cook = { sourceId: '2', name: 'James Cook', role: 'rusher' }
+    const [a, b] = keepInvolved(seen, [
+      play('a', { involved: [cook] }),
+      play('b'),
+    ])
+    expect(a.kind === 'play' && a.involved).toEqual([cook])
+    expect(b.kind === 'play' && b.involved).toEqual([])
   })
 })

@@ -8,7 +8,7 @@
 
 import { DurableObject } from 'cloudflare:workers'
 import { eq, inArray, sql } from 'drizzle-orm'
-import { diffItems, fingerprint } from './diff'
+import { diffItems, fingerprint, keepInvolved } from './diff'
 import { resolve } from './identity'
 import { isRateLimited, nextPollDelay, retryAfterFailure } from './pacing'
 import { itemRow, toTimelineItem } from './rows'
@@ -165,7 +165,11 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
     snapshot: GameSnapshot,
   ): Promise<void> {
     const seen = await this.loadSeen()
-    const changes = diffItems(seen, snapshot.items)
+    // On a fallback, keep the players a play was seen with before.
+    const items = snapshot.fallback
+      ? keepInvolved(seen, snapshot.items)
+      : snapshot.items
+    const changes = diffItems(seen, items)
     const db = dbFromD1(this.env.DB)
     const now = new Date().toISOString()
 
@@ -217,6 +221,9 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
       nextSeen.set(item.key, {
         id,
         ...fingerprint(item),
+        ...(item.kind === 'play' && item.involved.length > 0
+          ? { involved: item.involved }
+          : {}),
         ...(stampedAt ? { stampedAt } : {}),
       })
     // Sources without wall-clock times give estimates (SourceItem

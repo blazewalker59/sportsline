@@ -159,15 +159,24 @@ describe('NFL parseGame — from the summary alone (core API refused)', () => {
   )
   const strip = (p: SourcePlay) => ({ ...p, involved: [] })
 
-  it('gives the same Plays, keyed alike, with no one Involved', () => {
+  it('gives the same Plays, keyed alike, with no one Involved but the latest', () => {
     const byKey = new Map(plays.map((p) => [p.key, p]))
     // The core list can run a snap or two ahead of the summary.
     expect(fallbackPlays.length).toBeGreaterThan(plays.length - 3)
-    for (const p of fallbackPlays) {
+    for (const p of fallbackPlays.slice(0, -1)) {
       expect(p.involved).toEqual([])
       const core = byKey.get(p.key)
       if (core) expect(strip(p)).toEqual(strip(core))
     }
+  })
+
+  it('names who was Involved on the latest play, as the core API does', () => {
+    const latest = fallbackPlays.at(-1)!
+    const core = plays.find((p) => p.key === latest.key)!
+    expect(latest.involved.length).toBeGreaterThan(0)
+    expect(latest.involved.map((p) => [p.sourceId, p.role])).toEqual(
+      core.involved.map((p) => [p.sourceId, p.role]),
+    )
   })
 
   it("keeps the Game's score and milestones", () => {

@@ -40,6 +40,7 @@ describe('NFL snapshot', () => {
     expect(game.fallback).toMatch(/ESPN core plays unavailable: ESPN 403/)
     const plays = game.items.filter((i) => i.kind === 'play')
     expect(plays.length).toBeGreaterThan(100)
-    expect(plays.every((p) => p.involved.length === 0)).toBe(true)
+    // Only the latest play names its players in the summary.
+    expect(plays.filter((p) => p.involved.length > 0)).toHaveLength(1)
   })
 })

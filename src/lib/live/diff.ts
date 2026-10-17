@@ -5,7 +5,7 @@
  * Durable Object.
  */
 
-import type { Score, SourceItem } from '@/lib/model/types'
+import type { InvolvedPlayer, Score, SourceItem } from '@/lib/model/types'
 
 /** What a LiveGame remembers about an item it has already published. */
 export interface SeenItem {
@@ -16,6 +16,8 @@ export interface SeenItem {
   score: Score
   /** When this item was first seen, if that replaced an estimated time. */
   stampedAt?: string
+  /** A play's Involved Players, when it had any. */
+  involved?: Array<InvolvedPlayer>
 }
 
 export type ItemChange =
@@ -37,6 +39,22 @@ export function fingerprint(item: SourceItem): Omit<SeenItem, 'id'> {
     scoring: item.kind === 'play' && item.significance === 'scoring',
     score: item.score,
   }
+}
+
+/**
+ * A Source on its fallback may name a play's players only while it's the
+ * latest (ESPN's summary): a play it now gives no one keeps those seen
+ * before, rather than losing them in a Revision.
+ */
+export function keepInvolved(
+  seen: ReadonlyMap<string, SeenItem>,
+  items: ReadonlyArray<SourceItem>,
+): Array<SourceItem> {
+  return items.map((item) => {
+    if (item.kind !== 'play' || item.involved.length > 0) return item
+    const before = seen.get(item.key)?.involved
+    return before?.length ? { ...item, involved: before } : item
+  })
 }
 
 export function diffItems(
