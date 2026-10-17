@@ -23,8 +23,11 @@ interface Ref {
   $ref?: string
 }
 
-/** A drive's play: the core API's play, less who took part. */
-export interface EspnDrivePlay extends Omit<NflCorePlay, 'participants'> {
+/**
+ * A drive's play: the core API's play. Its participants come inline (an
+ * athlete's id and name, not a $ref), and only on the latest play.
+ */
+export interface EspnDrivePlay extends NflCorePlay {
   wallclock?: string
 }
 
@@ -87,7 +90,11 @@ export interface NflCorePlay {
   team?: Ref & { id?: string }
   start?: NflDownDistance
   end?: NflDownDistance
-  participants?: Array<{ athlete?: Ref; type?: string; order?: number }>
+  participants?: Array<{
+    athlete?: Ref & { id?: string; displayName?: string }
+    type?: string
+    order?: number
+  }>
 }
 
 export interface NflCorePlays {

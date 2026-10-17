@@ -112,8 +112,10 @@ export function collegeDescription(text: string): string {
 
 /**
  * The summary's drive plays in the core API's shape, for when the core API
- * refuses us: the same Plays, but no one Involved. A play's team is the one
- * with the ball at its end, as the core API reports it.
+ * refuses us: the same Plays, with who was Involved only on the latest (the
+ * summary names a play's participants only while it's the latest: LiveGame
+ * keeps them from then on). A play's team is the one with the ball at its
+ * end, as the core API reports it.
  */
 export function drivePlays(summary: NflSummary): NflCorePlays {
   const drives = [
@@ -236,11 +238,12 @@ export function parseGame(
     for (const p of [...(row.participants ?? [])].sort(
       (a, b) => (a.order ?? 0) - (b.order ?? 0),
     )) {
-      const id = refId(p.athlete?.$ref, 'athletes')
+      // The core API refers to an athlete; the summary names them inline.
+      const id = refId(p.athlete?.$ref, 'athletes') ?? p.athlete?.id
       if (!id || involved.has(id)) continue
       involved.set(id, {
         sourceId: id,
-        name: names.get(id) ?? `#${id}`,
+        name: names.get(id) ?? p.athlete?.displayName ?? `#${id}`,
         role: p.type ?? 'player',
       })
     }

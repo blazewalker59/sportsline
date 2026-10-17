@@ -548,6 +548,30 @@ describe.skipIf(!isBun)('LiveGame', () => {
     expect(finalRow?.status).toBe('final')
   })
 
+  it("keeps a play's players on a fallback that no longer names them", async () => {
+    const game = instance()
+    await game.track(tracked)
+    const judge = { sourceId: '99', name: 'Aaron Judge', role: 'batter' }
+    const fallback = 'core plays unavailable'
+    // Named while it's the latest play…
+    state.snap = snap([play('a', { involved: [judge] })], { fallback })
+    await game.alarm()
+    // …then not, once another play comes after it.
+    state.snap = snap([play('a'), play('b', { sequence: 2 })], { fallback })
+    await game.alarm()
+
+    const linked = () =>
+      sqliteQuery(sqlite, 'SELECT item_id, player_id FROM item_players')
+    expect(linked()).toEqual([{ item_id: 'gm_1~a', player_id: 'pl_judge' }])
+    const [a] = (await rows()).filter((r) => r.itemKey === 'a')
+    expect(a.revisedAt).toBeNull()
+
+    // Outside a fallback the Source's word stands, players or none.
+    state.snap = snap([play('a'), play('b', { sequence: 2 })])
+    await game.alarm()
+    expect(linked()).toEqual([])
+  })
+
   it('warns of a Source fallback, and reports it only once it lasts', async () => {
     const { FALLBACK_REPORT_EVERY } = await import('@/lib/live/LiveGame')
     const game = instance()
