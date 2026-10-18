@@ -16,6 +16,7 @@ import type { AlertMessage } from './alerts'
 import type { CloudflareEnv, Database } from '@/lib/db'
 import { bookChance, predictionYesChance } from '@/lib/kalshi/pricing'
 import { dbFromD1 } from '@/lib/db'
+import { chunk } from '@/lib/live/identity'
 import {
   alertMarks,
   kalshiMarkets,
@@ -80,15 +81,17 @@ export async function sendPredictionAlerts(
   if (viewers.length === 0) return 0
 
   const since = new Date(Date.now() - RESULT_FRESH_MS).toISOString()
-  const preds = await db
-    .select()
-    .from(predictions)
-    .where(
-      and(
-        inArray(predictions.viewerId, viewers),
-        or(eq(predictions.status, 'open'), gte(predictions.settledAt, since)),
+  const preds = await inChunks(viewers, (part) =>
+    db
+      .select()
+      .from(predictions)
+      .where(
+        and(
+          inArray(predictions.viewerId, part),
+          or(eq(predictions.status, 'open'), gte(predictions.settledAt, since)),
+        ),
       ),
-    )
+  )
   if (preds.length === 0) return 0
   const legs = await inChunks(
     preds.map((p) => p.id),
@@ -296,10 +299,10 @@ export async function sendPredictionAlerts(
       if (result === 'gone') gone.add(d.endpoint)
     }
   }
-  if (gone.size > 0)
+  for (const part of chunk([...gone], CHUNK))
     await db
       .delete(pushSubscriptions)
-      .where(inArray(pushSubscriptions.endpoint, [...gone]))
+      .where(inArray(pushSubscriptions.endpoint, part))
   return sent
 }
 
@@ -330,12 +333,14 @@ async function recentScore(
   return row.description
 }
 
+/** Ids per `inArray`, with room for a statement's other values (D1 binds 100). */
+const CHUNK = 80
+
 async function inChunks<T>(
   ids: ReadonlyArray<string>,
   query: (part: Array<string>) => Promise<Array<T>>,
 ): Promise<Array<T>> {
   const out: Array<T> = []
-  for (let i = 0; i < ids.length; i += 80)
-    out.push(...(await query(ids.slice(i, i + 80))))
+  for (const part of chunk(ids, CHUNK)) out.push(...(await query(part)))
   return out
 }
