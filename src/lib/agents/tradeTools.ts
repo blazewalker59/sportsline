@@ -15,6 +15,7 @@ import type { PriceDisplay } from '@/lib/model/price'
 import { loadAccount } from '@/lib/kalshi/account'
 import { market as fetchMarket } from '@/lib/kalshi/client'
 import { maxCentsFor } from '@/lib/model/price'
+import { UserError } from '@/lib/userError'
 
 const dollarsOf = (d: string | undefined) =>
   d === undefined ? null : Number(d)
@@ -43,12 +44,12 @@ export function tradeTools(
         // Market data is read with the Viewer's read-only key.
         const account = await loadAccount(env, caller.viewerId)
         if (!account) {
-          throw new Error(
+          throw new UserError(
             'The Viewer needs a read-only Kalshi key connected (Predictions page) to read markets.',
           )
         }
         const m = await fetchMarket(account, marketTicker)
-        if (!m) throw new Error(`No Kalshi market ${marketTicker}.`)
+        if (!m) throw new UserError(`No Kalshi market ${marketTicker}.`)
         return {
           marketTicker: m.ticker,
           title: m.title ?? null,
@@ -110,20 +111,20 @@ export function tradeTools(
         let limit = limitCents
         if (minMultiplier !== undefined) {
           if (input.action === 'sell') {
-            throw new Error(
+            throw new UserError(
               'Give a sell limitCents: a multiplier is for buying.',
             )
           }
           const c = maxCentsFor(minMultiplier)
           if (c === null) {
-            throw new Error(
+            throw new UserError(
               `No Kalshi price pays ${minMultiplier}x after the fee.`,
             )
           }
           limit = limitCents === undefined ? c : Math.min(c, limitCents)
         }
         if (limit === undefined) {
-          throw new Error('Give limitCents, or minMultiplier for a buy.')
+          throw new UserError('Give limitCents, or minMultiplier for a buy.')
         }
         return agentTrade(
           await proposeTrade(env, db, caller, { ...input, limitCents: limit }),
@@ -162,7 +163,7 @@ export function tradeTools(
           'cancelled',
           caller.tokenId,
         )
-        if (!row) throw new Error('No pending proposal with that id.')
+        if (!row) throw new UserError('No pending proposal with that id.')
         return agentTrade(row, Date.now(), display)
       },
     }),

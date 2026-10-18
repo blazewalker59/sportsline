@@ -17,6 +17,7 @@ import { getCloudflareEnv } from '@/lib/db'
 import { kalshiAccounts, predictions } from '@/lib/db/schema'
 import { reportError } from '@/lib/ops/errors'
 import { startViewerSync } from '@/lib/live/startViewerSync'
+import { UserError } from '@/lib/userError'
 
 export type ChangeDisplay = 'dollars' | 'percent'
 
@@ -72,7 +73,7 @@ export const connectKalshi = createServerFn({ method: 'POST' })
       try {
         signer = await importSigningKey(data.privateKey)
       } catch {
-        throw new Error(
+        throw new UserError(
           'That isn’t a private key Kalshi issues. Paste the whole key, including its BEGIN and END lines.',
         )
       }
@@ -85,15 +86,17 @@ export const connectKalshi = createServerFn({ method: 'POST' })
           error instanceof KalshiError &&
           (error.status === 401 || error.status === 403)
         ) {
-          throw new Error(
+          throw new UserError(
             'Kalshi didn’t accept this key. Check the key ID matches the private key.',
           )
         }
-        throw new Error('Couldn’t reach Kalshi to check the key. Try again.')
+        throw new UserError(
+          'Couldn’t reach Kalshi to check the key. Try again.',
+        )
       }
       const key = keys.find((k) => k.api_key_id === data.keyId)
       if (!isReadOnly(key?.scopes)) {
-        throw new Error(
+        throw new UserError(
           'This key can trade. Sportsline only accepts read-only keys: create one with only the Read scope in Kalshi.',
         )
       }

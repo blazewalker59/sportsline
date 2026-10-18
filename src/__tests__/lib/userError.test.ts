@@ -13,6 +13,7 @@ import {
 } from '@tanstack/router-core/ssr/client'
 import {
   SignInRequired,
+  UserError,
   isSignInRequired,
   userErrorAdapter,
 } from '@/lib/userError'
@@ -36,6 +37,18 @@ describe('typed errors over the wire', () => {
     }
     expect(isSignInRequired(back.error)).toBe(true)
     expect((back.error as SignInRequired).status).toBe(401)
+  })
+
+  it('keeps a UserError’s message and status', async () => {
+    const back = (await overTheWire({
+      error: new UserError('Connect ESPN first.'),
+    })) as { error: unknown }
+    expect(back.error).toBeInstanceOf(UserError)
+    expect(isSignInRequired(back.error)).toBe(false)
+    expect(back.error).toMatchObject({
+      message: 'Connect ESPN first.',
+      status: 400,
+    })
   })
 
   it('sends any other error as its message alone', async () => {

@@ -23,6 +23,7 @@ import { apiTokens, kalshiTradeKeys, tradeProposals } from '@/lib/db/schema'
 import { sportsDayOf } from '@/lib/model/sportsDay'
 import { viewerTrendRecord } from '@/lib/sharp/trendRecord'
 import { startViewerSync } from '@/lib/live/startViewerSync'
+import { UserError } from '@/lib/userError'
 
 /** Enough for a few Agents; more is likely tokens nobody revoked. */
 const MAX_ACTIVE_TOKENS = 10
@@ -71,7 +72,7 @@ export const createApiToken = createServerFn({ method: 'POST' })
       .from(apiTokens)
       .where(and(eq(apiTokens.viewerId, viewerId), isNull(apiTokens.revokedAt)))
     if (active.length >= MAX_ACTIVE_TOKENS) {
-      throw new Error(
+      throw new UserError(
         `You have ${MAX_ACTIVE_TOKENS} tokens: revoke one to make another`,
       )
     }
@@ -190,7 +191,7 @@ export const connectTradeKey = createServerFn({ method: 'POST' })
     try {
       signer = await importSigningKey(data.privateKey)
     } catch {
-      throw new Error(
+      throw new UserError(
         'That isn’t a private key Kalshi issues. Paste the whole key, including its BEGIN and END lines.',
       )
     }
@@ -202,15 +203,15 @@ export const connectTradeKey = createServerFn({ method: 'POST' })
         error instanceof KalshiError &&
         (error.status === 401 || error.status === 403)
       ) {
-        throw new Error(
+        throw new UserError(
           'Kalshi didn’t accept this key. Check the key ID matches the private key, and that the key has the Read scope.',
         )
       }
-      throw new Error('Couldn’t reach Kalshi to check the key. Try again.')
+      throw new UserError('Couldn’t reach Kalshi to check the key. Try again.')
     }
     const key = keys.find((k) => k.api_key_id === data.keyId)
     if (!isTradeOnly(key?.scopes)) {
-      throw new Error(
+      throw new UserError(
         'Sportsline needs a key with exactly the Read and Trade scopes: one that can trade but never withdraw or transfer money. Create one in Kalshi with only those.',
       )
     }

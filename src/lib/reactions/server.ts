@@ -10,6 +10,7 @@ import { viewerMiddleware } from '@/lib/viewer/middleware'
 import { teamColors } from '@/lib/brand/teamColors'
 import { toTimelineItem } from '@/lib/live/rows'
 import { games, reactions, teams, timelineItems } from '@/lib/db/schema'
+import { UserError } from '@/lib/userError'
 
 const SPORTS_DAY = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 
@@ -67,7 +68,7 @@ export const setReaction = createServerFn({ method: 'POST' })
       .from(timelineItems)
       .where(eq(timelineItems.id, data.itemId))
       .get()
-    if (!item) throw new Error('No such Play')
+    if (!item) throw new UserError('No such Play', 404)
     await db
       .insert(reactions)
       .values({

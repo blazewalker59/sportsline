@@ -33,6 +33,7 @@ import {
 import { seal } from '@/lib/kalshi/vault'
 import { reportError } from '@/lib/ops/errors'
 import { startViewerSync } from '@/lib/live/startViewerSync'
+import { UserError } from '@/lib/userError'
 
 export interface EspnConnection {
   status: 'ok' | 'error'
@@ -102,7 +103,7 @@ export const connectEspn = createServerFn({ method: 'POST' })
           error instanceof EspnError &&
           (error.status === 401 || error.status === 403)
         ) {
-          throw new Error(
+          throw new UserError(
             'ESPN didn’t accept these cookies. Sign in on espn.com and copy them again.',
           )
         }
@@ -149,7 +150,7 @@ function decodedCookie(value: string): string {
   try {
     return decodeURIComponent(value)
   } catch {
-    throw new Error(
+    throw new UserError(
       'That espn_s2 cookie looks cut off or mangled. Copy it again from espn.com.',
     )
   }
@@ -233,7 +234,9 @@ export const connectSleeper = createServerFn({ method: 'POST' })
     async ({ data, context: { db, viewerId } }): Promise<SleeperConnection> => {
       const user = await sleeperUser(data.username).catch(() => null)
       if (!user?.user_id)
-        throw new Error('Sleeper has no user by that name. Check the spelling.')
+        throw new UserError(
+          'Sleeper has no user by that name. Check the spelling.',
+        )
       const now = new Date().toISOString()
       const row = {
         viewerId,
@@ -294,7 +297,7 @@ export const addFantasyLeague = createServerFn({ method: 'POST' })
         .from(sleeperAccounts)
         .where(eq(sleeperAccounts.viewerId, viewerId))
         .get()
-      if (!account) throw new Error('Connect Sleeper first.')
+      if (!account) throw new UserError('Connect Sleeper first.')
       await db
         .insert(fantasyLeagues)
         .values({
@@ -316,13 +319,13 @@ export const addFantasyLeague = createServerFn({ method: 'POST' })
     }
     const parsed = leagueFromUrl(data.url)
     if (!parsed) {
-      throw new Error(
+      throw new UserError(
         'Paste the league’s URL from fantasy.espn.com (with leagueId= in it) or sleeper.com/leagues/….',
       )
     }
     const env = getCloudflareEnv()
     const session = await loadSession(env, viewerId)
-    if (!session) throw new Error('Connect ESPN first.')
+    if (!session) throw new UserError('Connect ESPN first.')
     const id = leagueRowId(viewerId, parsed.sport, parsed.leagueId)
     await db
       .insert(fantasyLeagues)
@@ -349,7 +352,7 @@ export const addFantasyLeague = createServerFn({ method: 'POST' })
     try {
       await syncLeague(db, session, row)
     } catch (error) {
-      throw new Error(
+      throw new UserError(
         error instanceof EspnError && error.status === 404
           ? 'ESPN has no such league this season.'
           : 'Couldn’t read that league from ESPN.',
@@ -453,7 +456,7 @@ export const getMatchupDay = createServerFn({ method: 'GET' })
           step: 'day',
           scoringPeriod: data.scoringPeriod,
         })
-        throw new Error('Couldn’t read that day from ESPN.')
+        throw new UserError('Couldn’t read that day from ESPN.')
       }
     },
   )

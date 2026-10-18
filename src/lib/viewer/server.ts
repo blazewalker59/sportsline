@@ -34,6 +34,7 @@ import {
 import { startViewerSync } from '@/lib/live/startViewerSync'
 import { isAdmin, reportError } from '@/lib/ops/errors'
 import { priceDisplayOf } from '@/lib/viewer/prefs'
+import { UserError } from '@/lib/userError'
 
 /** A Follow with what the UI needs to show it. */
 export interface FollowEntry {
@@ -262,7 +263,7 @@ export const setFollow = createServerFn({ method: 'POST' })
         data.kind === 'league' &&
         !(LEAGUES as ReadonlyArray<string>).includes(data.target)
       ) {
-        throw new Error('Unknown League')
+        throw new UserError('Unknown League')
       }
       if (data.following) {
         await db

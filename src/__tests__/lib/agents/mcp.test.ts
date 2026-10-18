@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { handleMcp, tool } from '@/lib/agents/mcp'
+import { GENERIC_MESSAGE, UserError } from '@/lib/userError'
 
 const echo = tool({
   name: 'echo',
@@ -14,7 +15,14 @@ const broken = tool({
   title: 'Broken',
   description: 'Always fails',
   input: z.object({}),
-  call: () => Promise.reject(new Error('no slate yet')),
+  call: () => Promise.reject(new UserError('no slate yet')),
+})
+const leaky = tool({
+  name: 'leaky',
+  title: 'Leaky',
+  description: 'Fails with internals',
+  input: z.object({}),
+  call: () => Promise.reject(new Error('D1_ERROR: no such column: secret')),
 })
 const tools = [echo, broken]
 const req = (method: string, params?: object, id: number | string = 1) => ({
@@ -103,6 +111,25 @@ describe('handleMcp', () => {
     expect(failed).toMatchObject({
       result: { isError: true, content: [{ text: 'no slate yet' }] },
     })
+  })
+
+  it('reports any other tool failure and tells the model only that it failed', async () => {
+    const reported: Array<[string, unknown]> = []
+    const failed = await handleMcp(
+      req('tools/call', { name: 'leaky' }),
+      [leaky],
+      undefined,
+      (name, error) => {
+        reported.push([name, error])
+        return Promise.resolve()
+      },
+    )
+    expect(failed).toMatchObject({
+      result: { isError: true, content: [{ text: GENERIC_MESSAGE }] },
+    })
+    expect(reported).toHaveLength(1)
+    expect(reported[0][0]).toBe('leaky')
+    expect((reported[0][1] as Error).message).toContain('D1_ERROR')
   })
 
   it('reports protocol errors as JSON-RPC errors', async () => {
