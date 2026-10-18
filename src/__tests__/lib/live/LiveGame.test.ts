@@ -285,6 +285,15 @@ describe.skipIf(!isBun)('LiveGame', () => {
     expect(await ctx.storage.getAlarm()).toBe(first)
   })
 
+  it('can put off its first poll, but never moves an alarm already set', async () => {
+    const game = instance()
+    await game.track(tracked, 90_000)
+    expect(await ctx.storage.getAlarm()).toBe(NOW + 90_000)
+    await game.track(tracked, 5_000)
+    await game.track(tracked)
+    expect(await ctx.storage.getAlarm()).toBe(NOW + 90_000)
+  })
+
   it('persists a first poll as backfill, then diffs later polls', async () => {
     const game = instance()
     await game.track(tracked)

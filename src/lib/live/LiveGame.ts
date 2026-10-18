@@ -99,11 +99,13 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
    * it every minute. It deliberately leaves the error count alone: a Game
    * that gave up after MAX_CONSECUTIVE_ERRORS gets one try per wake, not
    * another full run of fast retries, until a poll succeeds and resets it.
+   * `delayMs` puts off the first poll (staggering a past day's backfills);
+   * an alarm already set is never moved.
    */
-  async track(game: TrackRequest): Promise<void> {
+  async track(game: TrackRequest, delayMs = 0): Promise<void> {
     await this.ctx.storage.put(GAME_KEY, game)
     const alarm = await this.ctx.storage.getAlarm()
-    if (alarm === null) await this.ctx.storage.setAlarm(Date.now())
+    if (alarm === null) await this.ctx.storage.setAlarm(Date.now() + delayMs)
   }
 
   /**
