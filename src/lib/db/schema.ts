@@ -771,6 +771,8 @@ export const tradeProposals = sqliteTable(
         | 'partial'
         | 'unfilled'
         | 'failed'
+        // Sent, but Kalshi's reply was lost: looked up later (reconcile.ts).
+        | 'unknown'
       >()
       .notNull(),
     createdAt: text('created_at').notNull(),

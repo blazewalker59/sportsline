@@ -8,7 +8,7 @@
  */
 
 import { and, eq, inArray, lte } from 'drizzle-orm'
-import { UNSETTLED, stored } from './proposal'
+import { UNSETTLED } from './proposal'
 import { fillStatus, tradeAccount, tradeKeyRow } from './trading'
 import type { TradeProposal } from './proposal'
 import type { KalshiAccount } from '@/lib/kalshi/client'
@@ -54,7 +54,7 @@ export function unsettledTrades(
     .where(
       and(
         eq(tradeProposals.viewerId, viewerId),
-        inArray(tradeProposals.status, UNSETTLED.map(stored)),
+        inArray(tradeProposals.status, UNSETTLED),
         lte(
           tradeProposals.decidedAt,
           new Date(now.getTime() - SETTLE_AFTER_MS).toISOString(),
@@ -138,15 +138,14 @@ async function settle(
       error: null,
     }
   }
-  const { status, ...rest } = set
   // Only while still unsettled: never overwrite an outcome recorded since.
   const [row] = await db
     .update(tradeProposals)
-    .set({ ...rest, status: stored(status!) })
+    .set(set)
     .where(
       and(
         eq(tradeProposals.id, p.id),
-        inArray(tradeProposals.status, UNSETTLED.map(stored)),
+        inArray(tradeProposals.status, UNSETTLED),
       ),
     )
     .returning()

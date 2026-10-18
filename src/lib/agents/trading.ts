@@ -16,13 +16,7 @@ import {
   lte,
   sql,
 } from 'drizzle-orm'
-import {
-  SPENDING,
-  capProblem,
-  describeOrder,
-  spentOn,
-  stored,
-} from './proposal'
+import { SPENDING, capProblem, describeOrder, spentOn } from './proposal'
 import type { TradeProposal } from './proposal'
 import type { Caller } from './tokens'
 import type { CloudflareEnv, Database } from '@/lib/db'
@@ -61,7 +55,7 @@ async function spentToday(
       and(
         eq(tradeProposals.viewerId, viewerId),
         eq(tradeProposals.approvedDay, day),
-        inArray(tradeProposals.status, SPENDING.map(stored)),
+        inArray(tradeProposals.status, SPENDING),
       ),
     )
   return rows.reduce((n, p) => n + spentOn(p), 0)
@@ -254,10 +248,10 @@ export async function approveTrade(
   const finish = async ({ status, ...set }: Partial<TradeProposal>) => {
     const [row] = await db
       .update(tradeProposals)
-      .set({ ...set, ...(status ? { status: stored(status) } : {}) })
+      .set({ ...set, ...(status ? { status } : {}) })
       .where(eq(tradeProposals.id, id))
       .returning()
-    return row as TradeProposal
+    return row
   }
 
   // Today's spending, not counting this order.
