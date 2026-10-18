@@ -86,13 +86,6 @@ export async function openGame(
   data: z.infer<typeof OpenTeamGameInput>,
   now: Date,
 ): Promise<{ gameId: string } | null> {
-  const today = sportsDayOf(now)
-  if (
-    data.sportsDay < shiftSportsDay(today, -BACKFILL_DAYS) ||
-    data.sportsDay > shiftSportsDay(today, OPEN_DAYS_AHEAD)
-  ) {
-    return null
-  }
   const db = getDb()
   const source = sourceFor(data.league).source
   const find = async () =>
@@ -100,9 +93,16 @@ export async function openGame(
       data.sourceGameId,
     ) ?? null
   let gameId = await find()
-  if (!gameId) {
-    await syncOnce(data.league, data.sportsDay, now)
-    gameId = await find()
+  // A stored Game opens whatever its day; only a sync is held to the window.
+  if (gameId) return { gameId }
+  const today = sportsDayOf(now)
+  if (
+    data.sportsDay < shiftSportsDay(today, -BACKFILL_DAYS) ||
+    data.sportsDay > shiftSportsDay(today, OPEN_DAYS_AHEAD)
+  ) {
+    return null
   }
+  await syncOnce(data.league, data.sportsDay, now)
+  gameId = await find()
   return gameId ? { gameId } : null
 }

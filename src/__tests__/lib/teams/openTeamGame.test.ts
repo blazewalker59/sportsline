@@ -83,6 +83,19 @@ describe.skipIf(!isBun)('openTeamGame', () => {
     expect(state.syncs).toEqual(['nfl:2026-09-18', 'nfl:2026-10-21'])
   })
 
+  it('opens a stored Game outside the window, without a sync', async () => {
+    await (state.db as Awaited<ReturnType<typeof sqliteDb>>['db'])
+      .insert(sourceIds)
+      .values({
+        entity: 'game',
+        source: 'espn',
+        sourceId: '777',
+        internalId: 'gm_old',
+      })
+    expect(await open('2026-09-03', '777')).toEqual({ gameId: 'gm_old' })
+    expect(state.syncs).toEqual([])
+  })
+
   it('rejects a source game id that is not a Source id', () => {
     expect(() => open('2026-10-12', '../summary?x=1')).toThrow()
     expect(() => open('2026-10-12', '')).toThrow()
