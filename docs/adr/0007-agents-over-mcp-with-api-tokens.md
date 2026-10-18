@@ -2,7 +2,7 @@
 
 Viewers want their AI agents (Grok, Claude, their own bots) to use Sportsline: first to fetch Sharp picks, later perhaps to trade on Kalshi for them. Agents speak the Model Context Protocol, so Sportsline serves an MCP server at `/mcp` in the Worker, beside `/live` and `/api/auth`.
 
-An agent signs in with an **API token** the Viewer makes on the Agents page (`sl_` and 32 random bytes). It's shown once; only its SHA-256 is stored, with a name, its first characters for telling tokens apart, scopes, and when it was last used. Revoking one stops it at once. Each request sends it as `Authorization: Bearer sl_…`, and the tools act as that Viewer. A Viewer can hold ten working tokens.
+An agent signs in with an **API token** the Viewer makes on the Agents page (`sl_` and 32 random bytes). It's shown once; only its SHA-256 is stored, with a name, its first characters for telling tokens apart, scopes, and when it was last used. Revoking one stops it at once. Each request sends it as `Authorization: Bearer sl_…`, and the tools act as that Viewer. A Viewer can hold ten working tokens. Revoking a token also withdraws any trade proposals of its Agent still waiting on the Viewer (docs/adr/0008), and one already waiting can no longer be approved.
 
 The server is deliberately small: one JSON-RPC message per POST, answered with JSON (MCP's Streamable HTTP without the optional event stream, so no sessions to keep in a Worker), offering tools only. Notifications get 202; GET gets 405; a browser Origin other than ours gets 403. Tool failures and bad arguments come back as tool results the model can read; protocol mistakes as JSON-RPC errors. Prices are reported in cents and chances in percentage points, as the app shows them.
 

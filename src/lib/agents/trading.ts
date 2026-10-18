@@ -5,7 +5,17 @@
  * and daily caps, is sent to Kalshi, with the Viewer's trade key.
  */
 
-import { and, desc, eq, gt, inArray, lte, sql } from 'drizzle-orm'
+import {
+  and,
+  desc,
+  eq,
+  exists,
+  gt,
+  inArray,
+  isNull,
+  lte,
+  sql,
+} from 'drizzle-orm'
 import { SPENDING, capProblem, describeOrder, spentOn } from './proposal'
 import type { TradeProposal } from './proposal'
 import type { Caller } from './tokens'
@@ -17,6 +27,7 @@ import { importSigningKey } from '@/lib/kalshi/keys'
 import { maxCost, placeOrder } from '@/lib/kalshi/orders'
 import { unseal } from '@/lib/kalshi/vault'
 import {
+  apiTokens,
   kalshiTradeKeys,
   pushSubscriptions,
   tradeProposals,
@@ -202,7 +213,8 @@ export async function approveTrade(
   const key = await tradeKeyRow(db, viewerId)
   if (!key) throw new Error('Connect a Kalshi trade key first.')
   const day = sportsDayOf(now)
-  // One click wins: only a live, pending proposal moves to placing.
+  // One click wins: only a live, pending proposal, from a token that still
+  // works, moves to placing.
   const [claimed] = await db
     .update(tradeProposals)
     .set({ status: 'placing', decidedAt: now.toISOString(), approvedDay: day })
@@ -212,11 +224,24 @@ export async function approveTrade(
         eq(tradeProposals.viewerId, viewerId),
         eq(tradeProposals.status, 'pending'),
         gt(tradeProposals.expiresAt, now.toISOString()),
+        exists(
+          db
+            .select({ id: apiTokens.id })
+            .from(apiTokens)
+            .where(
+              and(
+                eq(apiTokens.id, tradeProposals.tokenId),
+                isNull(apiTokens.revokedAt),
+              ),
+            ),
+        ),
       ),
     )
     .returning()
   if (!claimed) {
-    throw new Error('This proposal has already been decided, or has expired.')
+    throw new Error(
+      'This proposal has already been decided, has expired, or its Agent’s token was revoked.',
+    )
   }
 
   const finish = async (set: Partial<TradeProposal>) => {
@@ -261,12 +286,16 @@ export async function approveTrade(
   }
 }
 
-/** The Viewer says no, or the Agent withdraws: only while it's pending. */
+/**
+ * The Viewer says no, or the Agent withdraws: only while it's pending. An
+ * Agent (`tokenId`) may only withdraw its own.
+ */
 export async function closeTrade(
   db: Database,
   viewerId: string,
   id: string,
   status: 'rejected' | 'cancelled',
+  tokenId?: string,
   now = new Date(),
 ): Promise<TradeProposal | null> {
   const [row] = await db
@@ -276,6 +305,7 @@ export async function closeTrade(
       and(
         eq(tradeProposals.id, id),
         eq(tradeProposals.viewerId, viewerId),
+        tokenId === undefined ? undefined : eq(tradeProposals.tokenId, tokenId),
         eq(tradeProposals.status, 'pending'),
       ),
     )

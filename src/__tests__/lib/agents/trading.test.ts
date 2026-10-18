@@ -282,6 +282,36 @@ describe.skipIf(!isBun)('Agent trading', () => {
     expect(state.placed).toHaveLength(0)
   })
 
+  it("won't send a proposal once its Agent's token is revoked", async () => {
+    const p = (await propose()).result!.structuredContent!.id as string
+    sqlite.run(
+      "UPDATE api_tokens SET revoked_at='2026-10-07T00:00:00Z' WHERE name='Grok'",
+    )
+    await expect(trading.approveTrade(env, db, 'u1', p)).rejects.toThrow(
+      /revoked/,
+    )
+    expect(state.placed).toHaveLength(0)
+  })
+
+  it('lets an Agent withdraw only its own proposals', async () => {
+    const { createToken } = await import('@/lib/agents/tokens')
+    const other = (await createToken(db, 'u1', 'Claude', ['read', 'trade']))
+      .token
+    const p = (await propose()).result!.structuredContent!.id as string
+    const theirs = await call(other, 'tools/call', {
+      name: 'cancel_trade',
+      arguments: { id: p },
+    })
+    expect(theirs.result?.content?.[0].text).toMatch(/No pending proposal/)
+    const mine = await call(tradeToken, 'tools/call', {
+      name: 'cancel_trade',
+      arguments: { id: p },
+    })
+    expect(mine.result?.structuredContent).toMatchObject({
+      status: 'cancelled',
+    })
+  })
+
   it("won't propose on a market that isn't trading, or without a trade key", async () => {
     state.market = { status: 'closed' }
     expect((await propose()).result?.content?.[0].text).toMatch(/isn’t open/)

@@ -365,10 +365,17 @@ function tradeTools(
     tool({
       name: 'cancel_trade',
       title: 'Cancel a trade proposal',
-      description: 'Withdraw a proposal the Viewer hasn’t decided yet.',
+      description:
+        'Withdraw a proposal of yours the Viewer hasn’t decided yet.',
       input: z.object({ id: z.string().min(1).max(64) }),
       call: async ({ id }) => {
-        const row = await closeTrade(db, caller.viewerId, id, 'cancelled')
+        const row = await closeTrade(
+          db,
+          caller.viewerId,
+          id,
+          'cancelled',
+          caller.tokenId,
+        )
         if (!row) throw new Error('No pending proposal with that id.')
         return agentTrade(row, Date.now(), display)
       },

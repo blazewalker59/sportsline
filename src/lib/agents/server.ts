@@ -85,17 +85,32 @@ export const createApiToken = createServerFn({ method: 'POST' })
     }),
   )
 
-/** Stop a token working, at once. */
+/** Stop a token working, at once, withdrawing what its Agent proposed. */
 export const revokeApiToken = createServerFn({ method: 'POST' })
   .validator((data: { id: string }) =>
     z.object({ id: z.string().min(1).max(64) }).parse(data),
   )
   .handler(({ data }) =>
     withViewer(async ({ db, viewerId }) => {
-      await db
-        .update(apiTokens)
-        .set({ revokedAt: new Date().toISOString() })
-        .where(and(eq(apiTokens.id, data.id), eq(apiTokens.viewerId, viewerId)))
+      const at = new Date().toISOString()
+      await db.batch([
+        db
+          .update(apiTokens)
+          .set({ revokedAt: at })
+          .where(
+            and(eq(apiTokens.id, data.id), eq(apiTokens.viewerId, viewerId)),
+          ),
+        db
+          .update(tradeProposals)
+          .set({ status: 'cancelled', decidedAt: at })
+          .where(
+            and(
+              eq(tradeProposals.tokenId, data.id),
+              eq(tradeProposals.viewerId, viewerId),
+              eq(tradeProposals.status, 'pending'),
+            ),
+          ),
+      ])
     }),
   )
 
