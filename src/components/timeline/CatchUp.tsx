@@ -106,11 +106,9 @@ export function CatchUpCard({
 /** Finals, then the key Plays, newest first. Opening anything closes it. */
 export function CatchUpSheet({
   catchUp,
-  now,
   onClose,
 }: {
   catchUp: CatchUp
-  now: number
   onClose: () => void
 }) {
   return (
@@ -126,7 +124,7 @@ export function CatchUpSheet({
           </h3>
           {catchUp.finals.map((item) => (
             <div key={item.id} className="flex">
-              <Notice item={item} now={now} showLeague />
+              <Notice item={item} showLeague />
             </div>
           ))}
         </section>

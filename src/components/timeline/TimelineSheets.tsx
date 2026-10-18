@@ -27,7 +27,6 @@ export function TimelineSheets({
   prediction,
   onPredictionClose,
   recap,
-  now,
   onRecapClose,
   live,
   onLiveClose,
@@ -46,7 +45,6 @@ export function TimelineSheets({
   onPredictionClose: () => void
   /** The catch-up, when its sheet is open. */
   recap: CatchUp | null
-  now: number
   onRecapClose: () => void
   /** The live Games, when their sheet is open (two or more). */
   live: Array<{ typing: Typing; game: GameSummary }> | null
@@ -68,9 +66,7 @@ export function TimelineSheets({
         <PredictionSheet prediction={prediction} onClose={onPredictionClose} />
       )}
 
-      {recap && (
-        <CatchUpSheet catchUp={recap} now={now} onClose={onRecapClose} />
-      )}
+      {recap && <CatchUpSheet catchUp={recap} onClose={onRecapClose} />}
 
       {live && (
         <Sheet title={`Live now · ${live.length}`} onClose={onLiveClose}>

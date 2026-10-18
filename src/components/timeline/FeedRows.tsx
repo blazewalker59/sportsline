@@ -4,7 +4,8 @@
  */
 
 import { Link } from '@tanstack/react-router'
-import { timeAgo } from './format'
+import { memo } from 'react'
+import { TimeAgo } from './format'
 import type { FeedEntry, Typing } from '@/lib/timeline/chat'
 import type { GameSummary } from '@/lib/model/timeline'
 import {
@@ -26,16 +27,44 @@ export function entryTime(entry: FeedEntry): string {
     : first.item.occurredAt
 }
 
-export function Cluster({
-  entry,
-  now,
-  focused,
-}: {
-  entry: Extract<FeedEntry, { type: 'cluster' }>
-  now: number
+type ClusterEntry = Extract<FeedEntry, { type: 'cluster' }>
+
+interface ClusterProps {
+  entry: ClusterEntry
   /** One Game is selected: the home team answers from the right, like a thread. */
   focused: boolean
-}) {
+}
+
+/**
+ * The feed is rebuilt on every socket event, so each cluster is a new
+ * object: it's the same cluster while its bubbles hold the same Plays.
+ */
+function sameCluster(a: ClusterProps, b: ClusterProps): boolean {
+  if (a.focused !== b.focused) return false
+  const x = a.entry
+  const y = b.entry
+  if (x === y) return true
+  if (
+    x.id !== y.id ||
+    x.gameId !== y.gameId ||
+    x.side !== y.side ||
+    x.bubbles.length !== y.bubbles.length
+  ) {
+    return false
+  }
+  return x.bubbles.every((p, i) => {
+    const q = y.bubbles[i]
+    if (p.type === 'play') return q.type === 'play' && p.item === q.item
+    return (
+      q.type === 'fold' &&
+      p.id === q.id &&
+      p.items.length === q.items.length &&
+      p.items.every((item, j) => item === q.items[j])
+    )
+  })
+}
+
+export const Cluster = memo(function Cluster({ entry, focused }: ClusterProps) {
   const first = entry.bubbles[0]
   const lead = first.type === 'fold' ? first.items[0] : first.item
   const team = entry.side === 'home' ? lead.homeTeam : lead.awayTeam
@@ -70,13 +99,13 @@ export function Cluster({
           <span className="font-semibold text-foreground/80">
             {team.abbreviation}
           </span>{' '}
-          · {lead.segmentLabel} · {timeAgo(lead.occurredAt, now)}
+          · {lead.segmentLabel} · <TimeAgo iso={lead.occurredAt} />
         </Link>
         <BubbleStack bubbles={entry.bubbles} align={align} />
       </div>
     </div>
   )
-}
+}, sameCluster)
 
 export function TypingRow({
   typing,
