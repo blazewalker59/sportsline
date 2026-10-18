@@ -7,7 +7,7 @@
  */
 
 import { DurableObject } from 'cloudflare:workers'
-import { eq, inArray, sql } from 'drizzle-orm'
+import { eq, getTableColumns, inArray, sql } from 'drizzle-orm'
 import {
   diffItems,
   fingerprint,
@@ -414,9 +414,7 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
           .values(upserts.slice(i, i + ITEM_ROWS_PER_INSERT))
           .onConflictDoUpdate({
             target: timelineItems.id,
-            set: Object.fromEntries(
-              UPDATABLE_COLUMNS.map((c) => [c, sql.raw(`excluded.${c}`)]),
-            ),
+            set: ON_CONFLICT_SET,
           }),
       )
     }
@@ -633,3 +631,15 @@ const UPDATABLE_COLUMNS = [
   'players',
   'detail',
 ] as const
+
+/**
+ * The upsert's `set`, keyed by Drizzle field name (revisedAt, playType…):
+ * Drizzle silently drops keys that aren't, which the SQL names are.
+ */
+const ON_CONFLICT_SET = Object.fromEntries(
+  Object.entries(getTableColumns(timelineItems)).flatMap(([field, column]) =>
+    (UPDATABLE_COLUMNS as ReadonlyArray<string>).includes(column.name)
+      ? [[field, sql.raw(`excluded.${column.name}`)]]
+      : [],
+  ),
+)

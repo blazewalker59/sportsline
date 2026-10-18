@@ -388,9 +388,9 @@ describe.skipIf(!isBun)('LiveGame', () => {
     const second = await rows()
     const revised = second.find((row) => row.itemKey === 'a')
     expect(revised?.description).toBe('Fielding error')
-    // See the skipped test below: revisedAt and playType stay as first written.
-    expect(revised?.revisedAt).toBeNull()
-    expect(revised?.playType).toBe('single')
+    expect(revised?.revisedAt).toBe(new Date(NOW).toISOString())
+    expect(revised?.playType).toBe('field_error')
+    // A backfilled play keeps the time it was first written with.
     expect(revised?.occurredAt).toBe('2026-10-08T17:00:00.000Z')
     const fresh = second.find((row) => row.itemKey === 'e')
     expect(fresh?.occurredAt).toBe(new Date(NOW).toISOString())
@@ -398,11 +398,7 @@ describe.skipIf(!isBun)('LiveGame', () => {
     expect(state.alertBatches).toBe(1)
   })
 
-  it.skip('a revision overwrites revisedAt, playType, scores and the segment', async () => {
-    // Bug: the upsert's onConflictDoUpdate set is keyed by SQL column names
-    // (revised_at, play_type, occurred_at, …). Drizzle only applies keys that
-    // match the Drizzle field name (revisedAt, playType, …), so a Revision
-    // updates description and leaves the rest of the row as first written.
+  it('a revision overwrites revisedAt, playType, scores and the segment', async () => {
     const game = instance()
     await game.track(tracked)
     state.snap = snap([
