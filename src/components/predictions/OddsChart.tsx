@@ -14,7 +14,10 @@ import { Chart } from '@tanstack/charts/react'
 import { scaleLinear } from '@tanstack/charts/scales/linear'
 import { decorative } from '@tanstack/charts/mark/decorative'
 import { useMemo } from 'react'
-import type { PredictionDetail, PredictionMove } from '@/lib/kalshi/server'
+import type {
+  PredictionDetail,
+  PredictionMove,
+} from '@/lib/kalshi/predictionDetail'
 import { CHART_COLORS, ChartCard } from '@/components/charts/ChartCard'
 import {
   KeyPlayPanel,

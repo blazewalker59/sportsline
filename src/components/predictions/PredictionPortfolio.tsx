@@ -12,7 +12,8 @@ import {
   profitText,
   toneOf,
 } from './PredictionParts'
-import type { ChangeDisplay, PredictionView } from '@/lib/kalshi/server'
+import type { ChangeDisplay } from '@/lib/kalshi/server'
+import type { PredictionView } from '@/lib/kalshi/predictionViews'
 import { Sheet } from '@/components/chat/Sheet'
 import { cn } from '@/lib/utils'
 

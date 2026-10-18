@@ -6,7 +6,7 @@
 
 import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
-import type { LegView, PredictionView } from '@/lib/kalshi/server'
+import type { LegView, PredictionView } from '@/lib/kalshi/predictionViews'
 import type { GameSummary } from '@/lib/model/timeline'
 import type { GameBox } from '@/lib/model/types'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'

@@ -15,7 +15,8 @@ import {
   profitText,
   toneOf,
 } from './PredictionParts'
-import type { ChangeDisplay, PredictionView } from '@/lib/kalshi/server'
+import type { ChangeDisplay } from '@/lib/kalshi/server'
+import type { PredictionView } from '@/lib/kalshi/predictionViews'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { CornerButton } from '@/components/timeline/GameStrip'

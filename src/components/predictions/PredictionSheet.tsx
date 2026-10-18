@@ -11,7 +11,7 @@ import {
   toneOf,
 } from './PredictionParts'
 import { PredictionGames } from './PredictionGames'
-import type { LegView, PredictionView } from '@/lib/kalshi/server'
+import type { LegView, PredictionView } from '@/lib/kalshi/predictionViews'
 import { OddsChart } from '@/components/charts/lazy'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'

@@ -4,12 +4,9 @@
  */
 
 import { queryOptions } from '@tanstack/react-query'
-import {
-  getKalshiConnection,
-  getPredictionDetail,
-  getPredictionRecord,
-  getPredictions,
-} from './server'
+import { getKalshiConnection } from './server'
+import { getPredictionRecord, getPredictions } from './predictionViews'
+import { getPredictionDetail } from './predictionDetail'
 
 /** Odds refresh on the server each minute; check in a bit more often. */
 const REFRESH_MS = 30_000
