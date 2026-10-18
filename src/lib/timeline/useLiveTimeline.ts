@@ -21,11 +21,17 @@ import {
   withGames,
   withItems,
 } from './merge'
-import { getGames, getTimeline } from './server'
+import {
+  gamesKey,
+  gamesQuery,
+  timelineDayKey,
+  timelineKey,
+  timelineQuery,
+} from './queries'
 import { useHubSocket } from './useHubSocket'
-import type { InfiniteData } from '@tanstack/react-query'
+import type { InfiniteData, QueryClient } from '@tanstack/react-query'
 import type { TimelinePage } from './server'
-import type { Follow, GameSummary } from '@/lib/model/timeline'
+import type { Follow, GameSummary, TimelineEvent } from '@/lib/model/timeline'
 import {
   DEFAULT_FOLLOWS,
   followsFromParam,
@@ -33,44 +39,61 @@ import {
   matchesFilter,
 } from '@/lib/model/timeline'
 import { shiftSportsDay } from '@/lib/model/sportsDay'
+import { applyEventsToGames } from '@/lib/games/queries'
 
 export type { Connection } from './useHubSocket'
 
-const STALE_MS = 30_000
 const ALL_PARAM = followsToParam(DEFAULT_FOLLOWS)
 
-function timelineKey(sportsDay: string, followParam: string) {
-  return ['timeline', sportsDay, followParam] as const
-}
-
-function gamesKey(sportsDay: string) {
-  return ['games', sportsDay] as const
-}
-
-function timelineQuery(sportsDay: string, followParam: string) {
-  return {
-    queryKey: timelineKey(sportsDay, followParam),
-    queryFn: ({ pageParam }: { pageParam: string | null }) =>
-      getTimeline({
-        data: {
-          sportsDay,
-          follows: followParam,
-          includeRoutine: true,
-          ...(pageParam ? { before: pageParam } : {}),
-        },
-      }),
-    initialPageParam: null as string | null,
-    getNextPageParam: (last: TimelinePage) => last.nextBefore,
-    staleTime: STALE_MS,
+/**
+ * Hand the socket's events to everything cached for the day: each Scope's
+ * pages take the events its Follows cover, the day's Games their updates,
+ * and any open Game (useLiveGame) its own Plays.
+ */
+export function applyLiveEvents(
+  queryClient: QueryClient,
+  sportsDay: string,
+  events: ReadonlyArray<TimelineEvent>,
+): void {
+  for (const [key] of queryClient.getQueriesData({
+    queryKey: timelineDayKey(sportsDay),
+  })) {
+    const filter = {
+      follows: followsFromParam(String(key[2])),
+      includeRoutine: true,
+    }
+    const mine = events.filter(
+      (e) => e.type !== 'upsert' || matchesFilter(e.item, filter),
+    )
+    if (mine.length === 0) continue
+    queryClient.setQueryData<InfiniteData<TimelinePage, string | null>>(
+      key,
+      (old) =>
+        old ? { ...old, pages: applyEventsToPages(old.pages, mine) } : old,
+    )
   }
+  const gameEvents = events.flatMap((e) => (e.type === 'game' ? [e.game] : []))
+  if (gameEvents.length > 0) {
+    queryClient.setQueryData<Array<GameSummary>>(gamesKey(sportsDay), (old) => {
+      const byId = new Map((old ?? []).map((g) => [g.id, g]))
+      for (const g of gameEvents)
+        if (g.sportsDay === sportsDay) byId.set(g.id, g)
+      return [...byId.values()]
+    })
+  }
+  applyEventsToGames(queryClient, events)
 }
 
-function gamesQuery(sportsDay: string) {
-  return {
-    queryKey: gamesKey(sportsDay),
-    queryFn: () => getGames({ data: { sportsDay } }),
-    staleTime: STALE_MS,
-  }
+/** After a dropped connection: read again whatever the socket missed. */
+export function refetchMissed(
+  queryClient: QueryClient,
+  sportsDay: string,
+): Promise<unknown> {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: timelineDayKey(sportsDay) }),
+    queryClient.invalidateQueries({ queryKey: gamesKey(sportsDay) }),
+    queryClient.invalidateQueries({ queryKey: ['game'] }),
+  ])
 }
 
 export function useLiveTimeline(
@@ -123,41 +146,8 @@ export function useLiveTimeline(
     live
       ? new URLSearchParams({ follows: ALL_PARAM, routine: '1' }).toString()
       : null,
-    (events) => {
-      for (const [key] of queryClient.getQueriesData({
-        queryKey: ['timeline', sportsDay],
-      })) {
-        const filter = {
-          follows: followsFromParam(String(key[2])),
-          includeRoutine: true,
-        }
-        const mine = events.filter(
-          (e) => e.type !== 'upsert' || matchesFilter(e.item, filter),
-        )
-        if (mine.length === 0) continue
-        queryClient.setQueryData<InfiniteData<TimelinePage, string | null>>(
-          key,
-          (old) =>
-            old ? { ...old, pages: applyEventsToPages(old.pages, mine) } : old,
-        )
-      }
-      const gameEvents = events.flatMap((e) =>
-        e.type === 'game' ? [e.game] : [],
-      )
-      if (gameEvents.length > 0) {
-        queryClient.setQueryData<Array<GameSummary>>(
-          gamesKey(sportsDay),
-          (old) => {
-            const byId = new Map((old ?? []).map((g) => [g.id, g]))
-            for (const g of gameEvents)
-              if (g.sportsDay === sportsDay) byId.set(g.id, g)
-            return [...byId.values()]
-          },
-        )
-      }
-    },
-    () =>
-      void queryClient.invalidateQueries({ queryKey: ['timeline', sportsDay] }),
+    (events) => applyLiveEvents(queryClient, sportsDay, events),
+    () => void refetchMissed(queryClient, sportsDay),
   )
 
   // Placeholder data is the previous day's: don't present it as this one's.
