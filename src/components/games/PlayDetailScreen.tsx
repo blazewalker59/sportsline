@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link, useNavigate } from '@tanstack/react-router'
-import { useEffect } from 'react'
+import { Link, Navigate } from '@tanstack/react-router'
 import type { ZonePitch } from '@/components/mlb/StrikeZone'
 import type { PlayDetail } from '@/lib/games/server'
 import { Sheet } from '@/components/chat/Sheet'
@@ -13,10 +12,12 @@ import { AppHeader } from '@/components/layout/AppHeader'
 import { Bases } from '@/components/mlb/Bases'
 import { StrikeZone, pitchColor } from '@/components/mlb/StrikeZone'
 import { Rink } from '@/components/nhl/Rink'
-import { getPlayDetail } from '@/lib/games/server'
-import { gameSearch } from '@/lib/timeline/gameLink'
+import { playDetailQuery } from '@/lib/games/queries'
+import { gameSearch, playSearch } from '@/lib/timeline/gameLink'
 import { PlayerButton } from '@/components/players/playerSheet'
 import { cn } from '@/lib/utils'
+import { clockTime } from '@/lib/time/format'
+import { useTimeZone } from '@/lib/time/useTimeZone'
 
 interface MlbPitch extends ZonePitch {
   type: string | null
@@ -163,33 +164,25 @@ const ROLE_LABELS: Record<string, string> = {
  * Timeline, on the Play's Sports Day.
  */
 export function PlayDetailScreen({ playId }: { playId: string }) {
-  const navigate = useNavigate()
-  const { data, isPending } = useQuery(playQuery(playId))
-  useEffect(() => {
-    if (!data) return
-    const day = gameSearch(data.game.id, data.item.sportsDay).day
-    void navigate({
-      to: '/',
-      search: { play: playId, ...(day ? { day } : {}) },
-      replace: true,
-    })
-  }, [data, playId, navigate])
+  const { data, isPending } = useQuery(playDetailQuery(playId))
+  // The route's loader redirects before this renders; it shows only when
+  // there's no such Play.
+  if (data)
+    return (
+      <Navigate
+        to="/"
+        search={playSearch(playId, data.item.sportsDay)}
+        replace
+      />
+    )
   return (
     <div className="mx-auto max-w-xl px-4">
       <AppHeader />
-      {!isPending && !data && (
+      {!isPending && (
         <p className="mt-16 text-center text-sm text-muted">Play not found.</p>
       )}
     </div>
   )
-}
-
-function playQuery(playId: string) {
-  return {
-    queryKey: ['play', playId] as const,
-    queryFn: () => getPlayDetail({ data: { playId } }),
-    staleTime: 60_000,
-  }
 }
 
 /** A Play's detail in a sheet over the Timeline. */
@@ -200,7 +193,7 @@ export function PlaySheet({
   playId: string
   onClose: () => void
 }) {
-  const { data, isPending } = useQuery(playQuery(playId))
+  const { data, isPending } = useQuery(playDetailQuery(playId))
   return (
     <Sheet title="Play" onClose={onClose}>
       {isPending ? (
@@ -218,6 +211,7 @@ function Play({ detail }: { detail: PlayDetail }) {
   const { item, game } = detail
   const mlb = item.league === 'mlb' ? (item.detail as MlbDetail | null) : null
   const overturn = item.kind === 'overturn'
+  const timeZone = useTimeZone()
   return (
     <article className="flex flex-col gap-4">
       <Link
@@ -282,10 +276,7 @@ function Play({ detail }: { detail: PlayDetail }) {
           <PlayText item={item} />
         </h1>
         <p className="mt-1 text-xs text-muted">
-          {new Date(item.occurredAt).toLocaleTimeString([], {
-            hour: 'numeric',
-            minute: '2-digit',
-          })}
+          {clockTime(item.occurredAt, timeZone)}
         </p>
       </header>
 

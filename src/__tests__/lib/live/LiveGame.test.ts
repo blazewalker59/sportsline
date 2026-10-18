@@ -23,8 +23,11 @@ const state = vi.hoisted(() => ({
   snap: null as GameSnapshot | null,
   snapError: null as Error | null,
   snapCalls: 0,
+  /** While set, a snapshot waits on it (a slow Source). */
+  gate: null as Promise<void> | null,
   events: [] as Array<Array<{ type: string }>>,
   hubThrows: false,
+  hubHangs: false,
   reports: [] as Array<string>,
   /** Whether each report would push the admins. */
   notified: [] as Array<boolean>,
@@ -54,10 +57,11 @@ vi.mock('@/lib/db', async (original) => ({
 vi.mock('@/lib/sources', () => ({
   sourceFor: () => ({
     source: 'mlb-statsapi',
-    snapshot: () => {
+    snapshot: async () => {
       state.snapCalls++
-      if (state.snapError) return Promise.reject(state.snapError)
-      return Promise.resolve(state.snap)
+      if (state.gate) await state.gate
+      if (state.snapError) throw state.snapError
+      return state.snap
     },
   }),
 }))
@@ -201,8 +205,10 @@ describe.skipIf(!isBun)('LiveGame', () => {
     state.snap = null
     state.snapError = null
     state.snapCalls = 0
+    state.gate = null
     state.events = []
     state.hubThrows = false
+    state.hubHangs = false
     state.reports = []
     state.notified = []
     state.alertBatches = 0
@@ -232,6 +238,7 @@ describe.skipIf(!isBun)('LiveGame', () => {
         get: () => ({
           publish: (events) => {
             if (state.hubThrows) return Promise.reject(new Error('hub down'))
+            if (state.hubHangs) return new Promise<void>(() => undefined)
             state.events.push(events)
             return Promise.resolve()
           },
@@ -276,6 +283,15 @@ describe.skipIf(!isBun)('LiveGame', () => {
     vi.setSystemTime(NOW + 5_000)
     await game.track(tracked)
     expect(await ctx.storage.getAlarm()).toBe(first)
+  })
+
+  it('can put off its first poll, but never moves an alarm already set', async () => {
+    const game = instance()
+    await game.track(tracked, 90_000)
+    expect(await ctx.storage.getAlarm()).toBe(NOW + 90_000)
+    await game.track(tracked, 5_000)
+    await game.track(tracked)
+    expect(await ctx.storage.getAlarm()).toBe(NOW + 90_000)
   })
 
   it('persists a first poll as backfill, then diffs later polls', async () => {
@@ -372,9 +388,9 @@ describe.skipIf(!isBun)('LiveGame', () => {
     const second = await rows()
     const revised = second.find((row) => row.itemKey === 'a')
     expect(revised?.description).toBe('Fielding error')
-    // See the skipped test below: revisedAt and playType stay as first written.
-    expect(revised?.revisedAt).toBeNull()
-    expect(revised?.playType).toBe('single')
+    expect(revised?.revisedAt).toBe(new Date(NOW).toISOString())
+    expect(revised?.playType).toBe('field_error')
+    // A backfilled play keeps the time it was first written with.
     expect(revised?.occurredAt).toBe('2026-10-08T17:00:00.000Z')
     const fresh = second.find((row) => row.itemKey === 'e')
     expect(fresh?.occurredAt).toBe(new Date(NOW).toISOString())
@@ -382,11 +398,7 @@ describe.skipIf(!isBun)('LiveGame', () => {
     expect(state.alertBatches).toBe(1)
   })
 
-  it.skip('a revision overwrites revisedAt, playType, scores and the segment', async () => {
-    // Bug: the upsert's onConflictDoUpdate set is keyed by SQL column names
-    // (revised_at, play_type, occurred_at, …). Drizzle only applies keys that
-    // match the Drizzle field name (revisedAt, playType, …), so a Revision
-    // updates description and leaves the rest of the row as first written.
+  it('a revision overwrites revisedAt, playType, scores and the segment', async () => {
     const game = instance()
     await game.track(tracked)
     state.snap = snap([
@@ -415,6 +427,7 @@ describe.skipIf(!isBun)('LiveGame', () => {
   it('records an Overturn beside the original and stores a box score', async () => {
     const game = instance()
     await game.track(tracked)
+    await ctx.storage.deleteAlarm()
     state.snap = snap([
       play('td', {
         significance: 'scoring',
@@ -422,7 +435,6 @@ describe.skipIf(!isBun)('LiveGame', () => {
         score: { away: 1, home: 0 },
       }),
     ])
-    await game.refresh()
     expect(await game.refresh()).toBe(true)
     state.snap = snap(
       [
@@ -676,13 +688,22 @@ describe.skipIf(!isBun)('LiveGame', () => {
     await game.alarm()
     expect(await rows()).toHaveLength(1)
 
+    // The Hub failing is reported, and the play still Alerts.
     state.hubThrows = true
     state.snap = snap([
       play('a', { significance: 'scoring' }),
-      play('b', { significance: 'scoring' }),
+      play('b', {
+        significance: 'scoring',
+        description: 'Sac fly',
+        occurredAt: new Date(NOW).toISOString(),
+      }),
     ])
+    const alertsBefore = state.alertBatches
+    state.reports.length = 0
     await game.alarm()
-    expect(state.reports.at(-1)).toBe('live-game')
+    await ctx.settle()
+    expect(state.reports).toEqual(['live-hub'])
+    expect(state.alertBatches).toBe(alertsBefore + 1)
 
     state.hubThrows = false
     state.deliverThrows = true
@@ -772,7 +793,324 @@ describe.skipIf(!isBun)('LiveGame', () => {
     expect(state.alertBatches).toBe(0)
     expect(await rows()).toHaveLength(2)
   })
+
+  it('does not hold the poll for the Hub', async () => {
+    const game = instance()
+    await game.track(tracked)
+    state.hubHangs = true
+    state.snap = snap([play('a')])
+    await game.alarm()
+    expect(await rows()).toHaveLength(1)
+    expect(ctx.alarmSets.at(-1)).toBe(NOW + 5_000)
+  })
+
+  it('runs a refresh and the alarm one at a time', async () => {
+    const game = instance()
+    await game.track(tracked)
+    state.snap = snap([play('old')])
+    await game.alarm()
+    await ctx.storage.deleteAlarm()
+    state.snap = snap([
+      play('old'),
+      play('hr', {
+        significance: 'scoring',
+        description: 'Home run',
+        occurredAt: new Date(NOW).toISOString(),
+      }),
+    ])
+    // A slow Source: the refresh is mid-fetch when the alarm fires.
+    let release = () => undefined as void
+    state.gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const refreshed = game.refresh()
+    const polled = game.alarm()
+    release()
+    state.gate = null
+    expect(await refreshed).toBe(true)
+    await polled
+    await ctx.settle()
+
+    expect(state.alertBatches).toBe(1)
+    const hr = state.events
+      .flat()
+      .filter(
+        (e) =>
+          e.type === 'upsert' &&
+          (e as { item?: { id: string } }).item?.id === 'gm_1~hr',
+      )
+    expect(hr).toHaveLength(1)
+  })
+
+  it('refreshes at most every few minutes, and not while an alarm is due', async () => {
+    const { REFRESH_EVERY_MS } = await import('@/lib/live/LiveGame')
+    const game = instance()
+    await game.track(tracked)
+    state.snap = snap([play('a')], { status: 'final' })
+    // The alarm polls anyway.
+    expect(await game.refresh()).toBe(false)
+    expect(state.snapCalls).toBe(0)
+
+    await ctx.storage.deleteAlarm()
+    expect(await game.refresh()).toBe(true)
+    // Every page view of the Game asks; one poll answers them all.
+    expect(await game.refresh()).toBe(false)
+    vi.setSystemTime(NOW + REFRESH_EVERY_MS - 1)
+    expect(await game.refresh()).toBe(false)
+    expect(state.snapCalls).toBe(1)
+
+    vi.setSystemTime(NOW + REFRESH_EVERY_MS)
+    expect(await game.refresh()).toBe(true)
+    expect(state.snapCalls).toBe(2)
+  })
+
+  it('rewrites the game and sends a game event only when it changed', async () => {
+    const game = instance()
+    await game.track(tracked)
+    const updatedAt = () =>
+      sqliteQuery(sqlite, 'SELECT updated_at FROM games')[0]?.updated_at
+    state.snap = snap([play('a')])
+    await game.alarm()
+    await ctx.settle()
+    const written = updatedAt()
+    expect(state.events).toHaveLength(1)
+
+    // Nothing new: no write, nothing to publish.
+    vi.setSystemTime(NOW + 10_000)
+    await game.alarm()
+    await ctx.settle()
+    expect(updatedAt()).toBe(written)
+    expect(state.events).toHaveLength(1)
+
+    state.snap = snap([play('a')], { score: { away: 2, home: 0 } })
+    await game.alarm()
+    await ctx.settle()
+    expect(updatedAt()).toBe(new Date(NOW + 10_000).toISOString())
+    expect(gameRow()[0]?.away_score).toBe(2)
+    expect(state.events.at(-1)?.map((event) => event.type)).toEqual(['game'])
+  })
+
+  it('keeps a full box score over one that is only the Plays', async () => {
+    const game = instance()
+    await game.track(tracked)
+    const storedBox = () =>
+      JSON.parse(String(gameRow()[0]?.box)) as { tables: Array<unknown> }
+    const partial = {
+      box: boxOf([]),
+      boxPartial: true,
+      fallback: 'NHL boxscore unavailable: NHL 503',
+    }
+
+    // Nothing better stored yet: the Plays' box stands in.
+    state.snap = snap([play('a')], partial)
+    await game.alarm()
+    expect(storedBox().tables).toHaveLength(0)
+
+    state.snap = snap([play('a')], { box: boxOf([skaters]) })
+    await game.alarm()
+    expect(storedBox().tables).toHaveLength(1)
+
+    state.snap = snap([play('a')], { ...partial, score: { away: 2, home: 0 } })
+    await game.alarm()
+    expect(storedBox().tables).toHaveLength(1)
+    expect(gameRow()[0]?.away_score).toBe(2)
+  })
+
+  it('keeps polling a final Game slowly until its full box score arrives', async () => {
+    const { BOX_RETRY_MS, MAX_BOX_RETRIES } =
+      await import('@/lib/live/LiveGame')
+    const game = instance()
+    await game.track(tracked)
+    ctx.alarmSets.length = 0
+    const partialFinal = snap([play('a')], {
+      status: 'final',
+      box: boxOf([]),
+      boxPartial: true,
+      fallback: 'NHL boxscore unavailable: NHL 503',
+    })
+    state.snap = partialFinal
+    await game.alarm()
+    await game.alarm()
+    expect(ctx.alarmSets).toEqual([NOW + BOX_RETRY_MS, NOW + BOX_RETRY_MS])
+
+    // The full box arrives: stored, and the Game stops polling.
+    state.snap = snap([play('a')], { status: 'final', box: boxOf([skaters]) })
+    await game.alarm()
+    expect(ctx.alarmSets).toHaveLength(2)
+    expect(JSON.parse(String(gameRow()[0]?.box))).toMatchObject({
+      tables: [{ title: 'Skaters' }],
+    })
+
+    // Never arriving, it gives up after MAX_BOX_RETRIES.
+    ctx.alarmSets.length = 0
+    state.snap = partialFinal
+    for (let i = 0; i <= MAX_BOX_RETRIES; i++) await game.alarm()
+    expect(ctx.alarmSets).toHaveLength(MAX_BOX_RETRIES)
+  })
+
+  it('names every unnamed player, however many a poll brings', async () => {
+    const many = Array.from({ length: 100 }, (_, i) => i)
+    sqlite.run(
+      `INSERT INTO players (id,league,name) VALUES ${many.map((i) => `('pl_n${i}','mlb','Player ${i}')`).join(',')}`,
+    )
+    sqlite.run(
+      `INSERT INTO source_ids (entity,source,source_id,internal_id) VALUES ${many.map((i) => `('player','mlb-statsapi','s${i}','pl_n${i}')`).join(',')}`,
+    )
+    const game = instance()
+    await game.track(tracked)
+    state.snap = snap([
+      play('a', {
+        involved: many.map((i) => ({
+          sourceId: `s${i}`,
+          name: `#s${i}`,
+          role: 'fielder',
+        })),
+      }),
+    ])
+    await game.alarm()
+    const [a] = await rows()
+    expect(a.players).toHaveLength(100)
+    expect(a.players.filter((p) => p.name.startsWith('#'))).toEqual([])
+  })
+
+  it('records more Overturns in one poll than a statement can bind', async () => {
+    const keys = Array.from({ length: 120 }, (_, i) => `td${i}`)
+    const game = instance()
+    await game.track(tracked)
+    state.snap = snap(
+      keys.map((key) =>
+        play(key, { significance: 'scoring', description: 'Touchdown' }),
+      ),
+    )
+    await game.alarm()
+    state.snap = snap(keys.map((key) => play(key, { description: 'Reversed' })))
+    await game.alarm()
+    const stored = await rows()
+    expect(stored.filter((row) => row.status === 'overturned')).toHaveLength(
+      120,
+    )
+    expect(stored.filter((row) => row.kind === 'overturn')).toHaveLength(120)
+    const upserts = state.events
+      .at(-1)
+      ?.filter((event) => event.type === 'upsert')
+    expect(upserts).toHaveLength(240)
+  })
+
+  it('gives a Game that gave up one try per wake until a poll succeeds', async () => {
+    const game = instance()
+    await game.track(tracked)
+    state.snapError = new Error('socket reset')
+    for (let i = 0; i < 20; i++) await game.alarm()
+    // It stopped; the schedule sync wakes it again.
+    await ctx.storage.deleteAlarm()
+    ctx.alarmSets.length = 0
+    await game.track(tracked)
+    await game.alarm()
+    // Still failing: one try, not another run of fast retries.
+    expect(ctx.alarmSets).toEqual([NOW])
+
+    await ctx.storage.deleteAlarm()
+    state.snapError = null
+    state.snap = snap([play('a')])
+    await game.track(tracked)
+    await game.alarm()
+    expect(ctx.data.get('errors')).toBe(0)
+    expect(ctx.alarmSets.at(-1)).toBe(NOW + 5_000)
+  })
+
+  it('keeps an Overturned play struck through when it is revised again', async () => {
+    const game = instance()
+    await game.track(tracked)
+    state.snap = snap([
+      play('td', {
+        significance: 'scoring',
+        description: 'Touchdown',
+        score: { away: 1, home: 0 },
+      }),
+    ])
+    await game.alarm()
+    state.snap = snap([
+      play('td', { description: 'Reversed', score: { away: 0, home: 0 } }),
+    ])
+    await game.alarm()
+    state.snap = snap([
+      play('td', {
+        description: 'Reversed on review',
+        score: { away: 0, home: 0 },
+      }),
+    ])
+    await game.alarm()
+    const original = (await rows()).find((row) => row.itemKey === 'td')
+    expect(original).toMatchObject({
+      status: 'overturned',
+      description: 'Reversed on review',
+    })
+  })
+
+  it('forgets the Alert cap once the Game is final', async () => {
+    const game = instance()
+    await game.track(tracked)
+    state.snap = snap([play('old')])
+    await game.alarm()
+    const hr = play('hr', {
+      significance: 'scoring',
+      description: 'Home run',
+      occurredAt: new Date(NOW).toISOString(),
+    })
+    state.snap = snap([play('old'), hr])
+    await game.alarm()
+    expect(ctx.data.has('alertLog')).toBe(true)
+
+    state.snap = snap(
+      [
+        play('old'),
+        hr,
+        {
+          kind: 'milestone',
+          key: 'final',
+          sequence: 9,
+          occurredAt: new Date(NOW).toISOString(),
+          segmentLabel: 'Final',
+          score: { away: 1, home: 0 },
+          description: 'Final',
+          milestone: 'final',
+        },
+      ],
+      { status: 'final' },
+    )
+    await game.alarm()
+    expect(state.alertBatches).toBe(2)
+    expect(ctx.data.has('alertLog')).toBe(false)
+  })
 })
+
+const skaters = {
+  side: 'away' as const,
+  title: 'Skaters',
+  columns: ['G'],
+  rows: [
+    {
+      player: { sourceId: '99', name: 'Aaron Judge' },
+      note: 'C',
+      sub: false,
+      values: [1],
+    },
+  ],
+}
+
+function boxOf(tables: Array<typeof skaters>): GameSnapshot['box'] {
+  return {
+    linescore: {
+      segments: ['1'],
+      away: [1],
+      home: [0],
+      totalColumns: ['G'],
+      awayTotals: [1],
+      homeTotals: [0],
+    },
+    tables,
+  }
+}
 
 function sqliteQuery(
   sqlite: {

@@ -1,22 +1,18 @@
 /** NFL Source adapter: ESPN's public site and core APIs. */
 
-import { ROSTER_CONCURRENCY, getJson as jsonFrom, mapPool } from '../pool'
-import { fetchTeamSchedule } from '../espn/common'
+import { LIVE_POLL, getJson as jsonFrom } from '../pool'
+import { espnRosters, fetchTeamSchedule } from '../espn/common'
 import { espnAthleteOverview } from '../espn/athlete'
 import { drivePlays, parseGame, parseRoster, parseScoreboard } from './parse'
-import type {
-  NflCorePlays,
-  NflRoster,
-  NflScoreboard,
-  NflSummary,
-  NflTeams,
-} from './feed'
+import type { NflCorePlays, NflRoster, NflSummary } from './feed'
+import type { EspnScoreboard } from '../espn/common'
 import type { GameSnapshot, SourceAdapter } from '@/lib/model/types'
 import type { FootballLeague } from './parse'
 
 const SITE = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl'
 const CORE = 'https://sports.core.api.espn.com/v2/sports/football/leagues/nfl'
 const getJson = jsonFrom('ESPN')
+const pollJson = jsonFrom('ESPN', LIVE_POLL)
 
 /**
  * An NFL or college game: the summary, and the core API's plays for who
@@ -33,8 +29,8 @@ export async function footballSnapshot(
   const id = encodeURIComponent(sourceGameId)
   let fallback: string | undefined
   const [summary, plays] = await Promise.all([
-    getJson<NflSummary>(`${site}/summary?event=${id}`),
-    getJson<NflCorePlays>(
+    pollJson<NflSummary>(`${site}/summary?event=${id}`),
+    pollJson<NflCorePlays>(
       `${core}/events/${id}/competitions/${id}/plays?limit=500`,
     ).catch((error: unknown) => {
       fallback = `ESPN core plays unavailable: ${error instanceof Error ? error.message : String(error)}`
@@ -50,7 +46,7 @@ export const nflAdapter: SourceAdapter = {
   league: 'nfl',
   source: 'espn',
   async schedule(sportsDay) {
-    const scoreboard = await getJson<NflScoreboard>(
+    const scoreboard = await getJson<EspnScoreboard>(
       `${SITE}/scoreboard?dates=${sportsDay.replaceAll('-', '')}`,
     )
     return parseScoreboard(scoreboard)
@@ -59,14 +55,7 @@ export const nflAdapter: SourceAdapter = {
     return footballSnapshot(SITE, CORE, sourceGameId)
   },
   async roster() {
-    const teams = await getJson<NflTeams>(`${SITE}/teams`)
-    const ids = (teams.sports?.[0]?.leagues?.[0]?.teams ?? []).map(
-      (t) => t.team.id,
-    )
-    const rosters = await mapPool(ids, ROSTER_CONCURRENCY, async (teamId) => ({
-      teamId,
-      roster: await getJson<NflRoster>(`${SITE}/teams/${teamId}/roster`),
-    }))
+    const { teams, rosters } = await espnRosters<NflRoster>(SITE, getJson)
     return parseRoster(teams, rosters)
   },
   teamSchedule(team) {

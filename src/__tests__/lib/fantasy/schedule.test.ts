@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
+import { isBun, sqliteDb } from '../../helpers/sqliteDb'
+import type { Database } from '@/lib/db'
 import type { GameSummary } from '@/lib/model/timeline'
 import {
   countsInMatchupWindow,
   matchupWindow,
   pickGame,
   sourceDays,
+  storedMatchupGames,
 } from '@/lib/fantasy/schedule'
 
 describe('a Matchup’s window', () => {
@@ -110,5 +113,30 @@ describe('picking a Team’s Game', () => {
       ])?.id,
     ).toBe('thu')
     expect(pickGame([])).toBeUndefined()
+  })
+})
+
+describe.skipIf(!isBun)('stored Games for a full Lineup', () => {
+  it('reads 80 Teams by id and abbreviation within D1’s parameter limit', async () => {
+    const { db, sqlite } = await sqliteDb()
+    const ids = Array.from({ length: 80 }, (_, i) => `tm_${i}`)
+    for (const id of ids)
+      sqlite.run(
+        `INSERT INTO teams (id, league, name, abbreviation) VALUES ('${id}', 'nba', '${id}', 'A${id.slice(3)}')`,
+      )
+    for (let i = 0; i < 80; i += 2)
+      sqlite.run(
+        `INSERT INTO games (id, league, sports_day, starts_at, status, away_team_id, home_team_id, updated_at) VALUES ('gm_${i}', 'nba', '2026-10-20', '2026-10-20T23:00:00Z', 'scheduled', 'tm_${i}', 'tm_${i + 1}', '')`,
+      )
+    const rows = await storedMatchupGames(
+      db as unknown as Database,
+      'nba',
+      { from: '2026-10-20', through: '2026-10-24' },
+      ids,
+      ids.map((id) => `A${id.slice(3)}`),
+    )
+    // Each Game twice: once by id, once by abbreviation.
+    expect(new Set(rows.map((r) => r.game.id)).size).toBe(40)
+    expect(rows).toHaveLength(80)
   })
 })

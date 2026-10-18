@@ -6,7 +6,7 @@
 
 import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
-import type { LegView, PredictionView } from '@/lib/kalshi/server'
+import type { LegView, PredictionView } from '@/lib/kalshi/predictionViews'
 import type { GameSummary } from '@/lib/model/timeline'
 import type { GameBox } from '@/lib/model/types'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
@@ -17,19 +17,17 @@ import { useLiveGame } from '@/lib/games/useLiveGame'
 import { typingFor } from '@/lib/timeline/chat'
 import { gameSearch } from '@/lib/timeline/gameLink'
 import { cn } from '@/lib/utils'
+import { weekdayTime } from '@/lib/time/format'
+import { useTimeZone } from '@/lib/time/useTimeZone'
 
 const PLAYS_SHOWN = 5
 
-function statusLabel(game: GameSummary): string {
+function statusLabel(game: GameSummary, timeZone: string | null): string {
   if (game.status === 'live' || game.status === 'delayed')
     return game.situation?.segmentLabel ?? 'Live'
   if (game.status === 'final') return 'Final'
   if (game.status === 'postponed') return 'Postponed'
-  return new Date(game.startsAt).toLocaleString([], {
-    weekday: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
+  return weekdayTime(game.startsAt, timeZone)
 }
 
 export function PredictionGames({
@@ -51,6 +49,7 @@ export function PredictionGames({
       games[0]?.id ??
       null,
   )
+  const timeZone = useTimeZone()
   if (games.length === 0) return null
   return (
     <section>
@@ -88,7 +87,7 @@ export function PredictionGames({
                     live ? 'text-live' : 'text-muted',
                   )}
                 >
-                  {statusLabel(g)}
+                  {statusLabel(g, timeZone)}
                 </span>
                 <span
                   aria-hidden="true"

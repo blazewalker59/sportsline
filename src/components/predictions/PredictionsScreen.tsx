@@ -4,19 +4,14 @@
  */
 
 import { useState } from 'react'
-import {
-  PredictionSheet,
-  PredictionSummary,
-  Sparkline,
-  money,
-  pct,
-  profitOf,
-  profitText,
-} from './PredictionParts'
+import { Sparkline, money, pct, profitOf, profitText } from './PredictionParts'
+import { PredictionSheet } from './PredictionSheet'
+import { PredictionSummary } from './PredictionPortfolio'
 import { PredictionRecordSection } from './PredictionRecord'
 import { SharpPicksSection } from './SharpPicks'
 import { PriceDisplayToggle } from './PriceDisplayToggle'
-import type { ChangeDisplay, PredictionView } from '@/lib/kalshi/server'
+import type { ChangeDisplay } from '@/lib/kalshi/server'
+import type { PredictionView } from '@/lib/kalshi/predictionViews'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { timeAgo, useNow } from '@/components/timeline/format'
 import {

@@ -1,53 +1,35 @@
 /**
  * One Game, live: its Plays and Situation from the LiveHub (filtered to the
- * Game), its box score refetched while it is live.
+ * Game), its box score refetched while it is live. On today's Timeline the
+ * Timeline's own socket already carries every Game's events into the cache
+ * (useLiveTimeline), so the Game reads those instead of opening a second.
  */
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getGameDetail } from './server'
+import { applyGameEvents, gameDetailQuery, gameKey } from './queries'
 import type { GameDetail } from './server'
-import type { TimelineEvent } from '@/lib/model/timeline'
 import { useHubSocket } from '@/lib/timeline/useHubSocket'
 
-const BOX_REFRESH_MS = 20_000
-
-function gameKey(gameId: string) {
-  return ['game', gameId] as const
-}
-
-function applyGameEvents(
-  detail: GameDetail,
-  events: ReadonlyArray<TimelineEvent>,
-): GameDetail {
-  const items = new Map(detail.items.map((i) => [i.id, i]))
-  let game = detail.game
-  for (const e of events) {
-    if (e.type === 'upsert') items.set(e.item.id, e.item)
-    else if (e.type === 'remove') items.delete(e.id)
-    else game = e.game
-  }
-  return {
-    ...detail,
-    game,
-    items: [...items.values()].sort((a, b) => a.sequence - b.sequence),
-  }
-}
+export { applyGameEvents }
 
 /** One Game live, or nothing while `gameId` is null. */
-export function useLiveGame(gameId: string | null) {
+export function useLiveGame(
+  gameId: string | null,
+  {
+    shared = false,
+  }: {
+    /** The Timeline's live socket covers this Game: don't open another. */
+    shared?: boolean
+  } = {},
+) {
   const queryClient = useQueryClient()
   const key = gameKey(gameId ?? '')
   const detail = useQuery({
-    queryKey: key,
-    queryFn: () => getGameDetail({ data: { gameId: gameId! } }),
+    ...gameDetailQuery(gameId ?? ''),
     enabled: gameId !== null,
-    refetchInterval: (q) => {
-      const status = q.state.data?.game.status
-      return status === 'live' || status === 'delayed' ? BOX_REFRESH_MS : false
-    },
   })
   const connection = useHubSocket(
-    gameId ? new URLSearchParams({ game: gameId }).toString() : null,
+    gameId && !shared ? new URLSearchParams({ game: gameId }).toString() : null,
     (events) =>
       queryClient.setQueryData<GameDetail | null>(key, (old) =>
         old ? applyGameEvents(old, events) : old,

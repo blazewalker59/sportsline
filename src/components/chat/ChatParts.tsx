@@ -5,7 +5,7 @@
  */
 
 import { Link } from '@tanstack/react-router'
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { PlayText } from './PlayText'
 import { ReactionPills, useItemReactions, useLongPress } from './Reactions'
 import type { Bubble } from '@/lib/timeline/chat'
@@ -14,7 +14,7 @@ import type { League } from '@/lib/model/types'
 import { FantasyTag } from '@/components/fantasy/FantasyParts'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
-import { timeAgo } from '@/components/timeline/format'
+import { TimeAgo } from '@/components/timeline/format'
 import { segmentDescription } from '@/lib/timeline/format'
 import {
   bubbleTints,
@@ -414,13 +414,11 @@ export function BubbleStack({
   )
 }
 
-export function Notice({
+export const Notice = memo(function Notice({
   item,
-  now,
   showLeague,
 }: {
   item: TimelineItem
-  now: number
   showLeague?: boolean
 }) {
   const className = cn(
@@ -432,7 +430,7 @@ export function Notice({
       {showLeague && <LeagueLogo league={item.league} size={16} />}
       <span className="truncate">{item.description}</span>
       <span className="shrink-0 font-normal tabular-nums">
-        · {timeAgo(item.occurredAt, now)}
+        · <TimeAgo iso={item.occurredAt} />
       </span>
     </>
   )
@@ -466,11 +464,11 @@ export function Notice({
       {showLeague && <LeagueLogo league={item.league} size={16} />}
       <span className="truncate">{item.description}</span>
       <span className="shrink-0 font-normal tabular-nums">
-        · {timeAgo(item.occurredAt, now)}
+        · <TimeAgo iso={item.occurredAt} />
       </span>
     </Link>
   )
-}
+})
 
 export function TypingDots({ align }: { align: Align }) {
   return (

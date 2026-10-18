@@ -7,6 +7,7 @@
 import { TRADE_INSTRUCTIONS, instructions, sportslineTools } from './tools'
 import { handleMcp, parseError } from './mcp'
 import { bearerToken, verifyToken } from './tokens'
+import { MCP_REQUESTS_PER_MINUTE, rateLimit } from './rateLimit'
 import type { CloudflareEnv } from '@/lib/db'
 import { dbFromD1 } from '@/lib/db'
 import { reportError } from '@/lib/ops/errors'
@@ -42,6 +43,26 @@ export async function serveMcp(
     })
   }
 
+  // Per token, so one busy Agent can't crowd out the Viewer's others. A
+  // counter that can't be reached lets the request through.
+  const wait = await rateLimit(env, caller).catch(async (error: unknown) => {
+    await reportError(env, 'mcp', error, { step: 'rate-limit' })
+    return 0
+  })
+  if (wait > 0) {
+    return Response.json(
+      {
+        jsonrpc: '2.0',
+        id: null,
+        error: {
+          code: -32000,
+          message: `Too many requests: at most ${MCP_REQUESTS_PER_MINUTE} a minute per token. Try again in ${wait} seconds.`,
+        },
+      },
+      { status: 429, headers: { 'retry-after': String(wait) } },
+    )
+  }
+
   const text = await request.text()
   if (text.length > MAX_BODY_BYTES) {
     return new Response('Request too large', { status: 413 })
@@ -62,6 +83,8 @@ export async function serveMcp(
       caller.scopes.includes('trade')
         ? `${instructions(display)} ${TRADE_INSTRUCTIONS}`
         : instructions(display),
+      (tool, error) =>
+        reportError(env, 'mcp', error, { viewerId: caller.viewerId, tool }),
     )
     return reply === null
       ? new Response(null, { status: 202 })

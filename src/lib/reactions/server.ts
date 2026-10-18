@@ -6,36 +6,41 @@ import { z } from 'zod'
 import { REACTIONS, tally } from './model'
 import type { ItemReactions, Reaction } from './model'
 import type { TimelineItem } from '@/lib/model/timeline'
+import { viewerMiddleware } from '@/lib/viewer/middleware'
 import { teamColors } from '@/lib/brand/teamColors'
 import { toTimelineItem } from '@/lib/live/rows'
-import { getDb } from '@/lib/db'
 import { games, reactions, teams, timelineItems } from '@/lib/db/schema'
-import { requireViewer, sessionViewer, withViewer } from '@/lib/viewer/session'
+import { UserError } from '@/lib/userError'
 
 const SPORTS_DAY = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 
 /** Every Reaction on a Sports Day's items, tallied for the current Viewer. */
 export const getReactions = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
   .validator((data: { sportsDay: string }) =>
     z.object({ sportsDay: SPORTS_DAY }).parse(data),
   )
-  .handler(async ({ data }): Promise<Record<string, ItemReactions>> => {
-    await requireViewer()
-    const viewer = await sessionViewer()
-    const rows = await getDb()
-      .select({
-        itemId: reactions.itemId,
-        viewerId: reactions.viewerId,
-        emoji: reactions.emoji,
-      })
-      .from(reactions)
-      .innerJoin(timelineItems, eq(timelineItems.id, reactions.itemId))
-      .where(eq(timelineItems.sportsDay, data.sportsDay))
-    return tally(rows, viewer?.id ?? null)
-  })
+  .handler(
+    async ({
+      data,
+      context: { db, viewerId },
+    }): Promise<Record<string, ItemReactions>> => {
+      const rows = await db
+        .select({
+          itemId: reactions.itemId,
+          viewerId: reactions.viewerId,
+          emoji: reactions.emoji,
+        })
+        .from(reactions)
+        .innerJoin(timelineItems, eq(timelineItems.id, reactions.itemId))
+        .where(eq(timelineItems.sportsDay, data.sportsDay))
+      return tally(rows, viewerId)
+    },
+  )
 
 /** React to a Play (replacing your earlier Reaction), or clear it with null. */
 export const setReaction = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: { itemId: string; emoji: string | null }) =>
     z
       .object({
@@ -44,33 +49,39 @@ export const setReaction = createServerFn({ method: 'POST' })
       })
       .parse(data),
   )
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }) => {
-      if (data.emoji === null) {
-        await db
-          .delete(reactions)
-          .where(
-            and(
-              eq(reactions.itemId, data.itemId),
-              eq(reactions.viewerId, viewerId),
-            ),
-          )
-        return
-      }
+  .handler(async ({ data, context: { db, viewerId } }) => {
+    if (data.emoji === null) {
       await db
-        .insert(reactions)
-        .values({
-          itemId: data.itemId,
-          viewerId,
-          emoji: data.emoji,
-          createdAt: new Date().toISOString(),
-        })
-        .onConflictDoUpdate({
-          target: [reactions.itemId, reactions.viewerId],
-          set: { emoji: data.emoji },
-        })
-    }),
-  )
+        .delete(reactions)
+        .where(
+          and(
+            eq(reactions.itemId, data.itemId),
+            eq(reactions.viewerId, viewerId),
+          ),
+        )
+      return
+    }
+    // Only to an item on the Timeline (the foreign key would refuse
+    // anything else, less helpfully).
+    const item = await db
+      .select({ id: timelineItems.id })
+      .from(timelineItems)
+      .where(eq(timelineItems.id, data.itemId))
+      .get()
+    if (!item) throw new UserError('No such Play', 404)
+    await db
+      .insert(reactions)
+      .values({
+        itemId: data.itemId,
+        viewerId,
+        emoji: data.emoji,
+        createdAt: new Date().toISOString(),
+      })
+      .onConflictDoUpdate({
+        target: [reactions.itemId, reactions.viewerId],
+        set: { emoji: data.emoji },
+      })
+  })
 
 const PAGE_SIZE = 50
 
@@ -88,11 +99,12 @@ export interface MyReactionsPage {
 
 /** The Viewer's own Reactions, newest first, with the Plays they're on. */
 export const getMyReactions = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
   .validator((data: { before?: string }) =>
     z.object({ before: z.string().max(40).optional() }).parse(data),
   )
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }): Promise<MyReactionsPage> => {
+  .handler(
+    async ({ data, context: { db, viewerId } }): Promise<MyReactionsPage> => {
       const away = aliasedTable(teams, 'away')
       const home = aliasedTable(teams, 'home')
       const rows = await db
@@ -138,5 +150,5 @@ export const getMyReactions = createServerFn({ method: 'GET' })
         nextBefore:
           rows.length > PAGE_SIZE ? (page.at(-1)?.reactedAt ?? null) : null,
       }
-    }),
+    },
   )

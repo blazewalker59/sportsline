@@ -8,6 +8,7 @@
  * times are estimated from the game clock (`timeEstimated`).
  */
 
+import { gameMilestones, scoreLine } from '../common'
 import type {
   NhlBios,
   NhlBoxscore,
@@ -49,7 +50,6 @@ const PLAY_TYPES = new Set([
   'penalty',
   'failed-shot-attempt',
 ])
-const FINAL_SEQUENCE = 1_000_000_000
 
 // Rough real-time pacing, for estimating when an event happened.
 const PREGAME_MS = 8 * 60_000
@@ -177,8 +177,6 @@ export function parseGame(
   const name = (id: number | undefined) =>
     id ? (names.get(id) ?? `#${id}`) : ''
 
-  const scoreLine = (s: Score) =>
-    `${away.abbreviation} ${s.away}, ${home.abbreviation} ${s.home}`
   const rows = [...(pbp.plays ?? [])].sort(
     (a, b) => (a.sortOrder ?? a.eventId) - (b.sortOrder ?? b.eventId),
   )
@@ -207,7 +205,7 @@ export function parseGame(
         timeEstimated: true,
         segmentLabel: label,
         score,
-        description: `End of ${period.periodType === 'REG' || !period.periodType ? `${label} period` : label}: ${scoreLine(score)}`,
+        description: `End of ${period.periodType === 'REG' || !period.periodType ? `${label} period` : label}: ${scoreLine({ away, home }, score)}`,
       })
       continue
     }
@@ -265,48 +263,26 @@ export function parseGame(
     away: pbp.awayTeam.score ?? score.away,
     home: pbp.homeTeam.score ?? score.home,
   }
-  if (plays.length > 0) {
-    milestones.push({
-      kind: 'milestone',
-      milestone: 'start',
-      key: 'start',
-      sequence: plays[0].sequence - 1,
-      occurredAt: plays[0].occurredAt,
-      timeEstimated: true,
-      segmentLabel: '1st',
-      score: { away: 0, home: 0 },
-      description: `Puck drop: ${away.abbreviation} @ ${home.abbreviation}`,
-    })
-  }
-  if (status === 'final') {
-    const last = pbp.periodDescriptor
-    const suffix =
-      last?.periodType === 'SO' ? '/SO' : last?.periodType === 'OT' ? '/OT' : ''
-    milestones.push({
-      kind: 'milestone',
-      milestone: 'final',
-      key: 'final',
-      sequence: FINAL_SEQUENCE,
-      occurredAt:
-        (plays.at(-1) ?? milestones.at(-1))?.occurredAt ?? pbp.startTimeUTC,
-      timeEstimated: true,
-      segmentLabel: `Final${suffix}`,
-      score: finalScore,
-      description: `Final${suffix}: ${scoreLine(finalScore)}`,
-    })
-  }
-  if (status === 'postponed') {
-    milestones.push({
-      kind: 'milestone',
-      milestone: 'postponed',
-      key: 'postponed',
-      sequence: FINAL_SEQUENCE,
-      occurredAt: pbp.startTimeUTC,
-      segmentLabel: '',
-      score: finalScore,
-      description: `${away.abbreviation} @ ${home.abbreviation} postponed`,
-    })
-  }
+  const last = pbp.periodDescriptor
+  const suffix =
+    last?.periodType === 'SO' ? '/SO' : last?.periodType === 'OT' ? '/OT' : ''
+  milestones.push(
+    ...gameMilestones(
+      { away, home },
+      {
+        status,
+        plays,
+        startsAt: pbp.startTimeUTC,
+        score: finalScore,
+        start: { segmentLabel: '1st', verb: 'Puck drop' },
+        // The feed's game-end is skipped above: the Final covers it.
+        finalLabel: `Final${suffix}`,
+        // Without Plays, the Final follows the last period's end.
+        finalAt: (plays.at(-1) ?? milestones.at(-1))?.occurredAt,
+        timeEstimated: true,
+      },
+    ),
+  )
 
   const items: Array<SourceItem> = [...plays, ...milestones]
   const live = status === 'live' || status === 'delayed'

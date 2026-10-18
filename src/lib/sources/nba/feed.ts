@@ -4,7 +4,7 @@
  * play-by-play, and box score. Loose on purpose.
  */
 
-import type { EspnCompetitor, EspnStatus } from '../nfl/feed'
+import type { EspnSummaryHeader } from '../espn/common'
 
 interface NbaPlay {
   id: string
@@ -36,14 +36,7 @@ interface NbaBoxAthlete {
 }
 
 export interface NbaSummary {
-  header: {
-    id: string
-    competitions: Array<{
-      date: string
-      status: EspnStatus
-      competitors: Array<EspnCompetitor>
-    }>
-  }
+  header: EspnSummaryHeader
   plays?: Array<NbaPlay>
   boxscore?: {
     players?: Array<{

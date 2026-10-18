@@ -5,12 +5,14 @@
  * COVERED_TEAMS independent or an AP Top 25 team, whoever the opponent is.
  */
 
-import { fetchTeamSchedule, top25 } from '../espn/common'
+import { espnRosters, fetchTeamSchedule, top25 } from '../espn/common'
 import { parseRoster, parseScoreboard } from '../nfl/parse'
 import { footballSnapshot } from '../nfl'
-import { ROSTER_CONCURRENCY, getJson as jsonFrom, mapPool } from '../pool'
+import { getJson as jsonFrom } from '../pool'
+import { seasonYear } from '../common'
 import { espnAthleteOverview } from '../espn/athlete'
-import type { NflRoster, NflScoreboard, NflTeams } from '../nfl/feed'
+import type { NflRoster } from '../nfl/feed'
+import type { EspnScoreboard } from '../espn/common'
 import type { SourceAdapter } from '@/lib/model/types'
 
 const SITE =
@@ -28,7 +30,7 @@ const getJson = jsonFrom('ESPN')
 
 /** Does this game involve a covered team? */
 export function isCovered(
-  event: NonNullable<NflScoreboard['events']>[number],
+  event: NonNullable<EspnScoreboard['events']>[number],
 ): boolean {
   return (event.competitions?.[0]?.competitors ?? []).some(
     (c) =>
@@ -37,6 +39,14 @@ export function isCovered(
       (c.team.conferenceId !== undefined &&
         COVERED_CONFERENCES.has(c.team.conferenceId)),
   )
+}
+
+/**
+ * A season runs August to January: bowls and the playoff belong to the year
+ * it started, which rolls over in July.
+ */
+export function cfbSeason(now: Date): number {
+  return seasonYear(now, 6)
 }
 
 interface Standings {
@@ -52,10 +62,7 @@ const STANDINGS =
  * (ESPN's core API, which lists conference members, refuses Workers).
  */
 async function coveredTeamIds(): Promise<Array<string>> {
-  // A season runs August to January: bowls and the playoff belong to the
-  // year it started.
-  const now = new Date()
-  const season = now.getUTCFullYear() - (now.getUTCMonth() < 6 ? 1 : 0)
+  const season = cfbSeason(new Date())
   const lists = await Promise.all(
     [...COVERED_CONFERENCES].map((group) =>
       getJson<Standings>(`${STANDINGS}?group=${group}&season=${season}`),
@@ -78,7 +85,7 @@ export const cfbAdapter: SourceAdapter = {
   // keeps the identity mapping apart (docs/adr/0002).
   source: 'espn-cfb',
   async schedule(sportsDay) {
-    const scoreboard = await getJson<NflScoreboard>(
+    const scoreboard = await getJson<EspnScoreboard>(
       `${SITE}/scoreboard?groups=${FBS}&limit=300&dates=${sportsDay.replaceAll('-', '')}`,
     )
     return parseScoreboard(
@@ -90,29 +97,11 @@ export const cfbAdapter: SourceAdapter = {
     return footballSnapshot(SITE, CORE, sourceGameId, 'cfb')
   },
   async roster() {
-    const [ids, all] = await Promise.all([
-      coveredTeamIds(),
-      getJson<NflTeams>(`${SITE}/teams?limit=1000`),
-    ])
-    const covered = new Set(ids)
-    const league = all.sports?.[0]?.leagues?.[0]
-    const teams: NflTeams = {
-      sports: [
-        {
-          leagues: [
-            {
-              teams: (league?.teams ?? []).filter((t) =>
-                covered.has(t.team.id),
-              ),
-            },
-          ],
-        },
-      ],
-    }
-    const rosters = await mapPool(ids, ROSTER_CONCURRENCY, async (teamId) => ({
-      teamId,
-      roster: await getJson<NflRoster>(`${SITE}/teams/${teamId}/roster`),
-    }))
+    const { teams, rosters } = await espnRosters<NflRoster>(
+      SITE,
+      getJson,
+      coveredTeamIds,
+    )
     return parseRoster(teams, rosters, 'cfb')
   },
   teamSchedule(team) {

@@ -5,17 +5,15 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, desc, eq, inArray, isNotNull, or } from 'drizzle-orm'
+import { and, asc, desc, eq, isNotNull, or } from 'drizzle-orm'
 import { z } from 'zod'
-import type { Database } from '@/lib/db'
+import { OpenTeamGameInput, knownIds, openGame } from './games'
 import type { Conference } from '@/lib/model/leagues'
 import type { League, ScheduledGame, SourceTeam } from '@/lib/model/types'
-import { requireViewer } from '@/lib/viewer/session'
+import { viewerMiddleware } from '@/lib/viewer/middleware'
 import { teamColors } from '@/lib/brand/teamColors'
 import { getCloudflareEnv, getDb } from '@/lib/db'
 import { games, players, sourceIds, teams } from '@/lib/db/schema'
-import { syncLeague } from '@/lib/live/schedule'
-import { LEAGUES } from '@/lib/model/types'
 import { sourceFor } from '@/lib/sources'
 import { reportError } from '@/lib/ops/errors'
 
@@ -68,32 +66,6 @@ export interface TeamPage {
   scheduleError: boolean
 }
 
-/** Sportsline ids for Source ids, for those already known (never creates). */
-async function knownIds(
-  db: Database,
-  entity: 'team' | 'game',
-  source: string,
-  ids: ReadonlyArray<string>,
-): Promise<Map<string, string>> {
-  const out = new Map<string, string>()
-  const unique = [...new Set(ids)]
-  // D1 binds at most 100 parameters a statement.
-  for (let i = 0; i < unique.length; i += 90) {
-    const rows = await db
-      .select({ sourceId: sourceIds.sourceId, id: sourceIds.internalId })
-      .from(sourceIds)
-      .where(
-        and(
-          eq(sourceIds.entity, entity),
-          eq(sourceIds.source, source),
-          inArray(sourceIds.sourceId, unique.slice(i, i + 90)),
-        ),
-      )
-    for (const r of rows) out.set(r.sourceId, r.id)
-  }
-  return out
-}
-
 function resultOf(g: ScheduledGame, home: boolean): TeamGame['result'] {
   if (g.status !== 'final') return null
   const us = home ? g.score.home : g.score.away
@@ -116,11 +88,11 @@ function recordOf(
 }
 
 export const getTeamPage = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
   .validator((data: { teamId: string }) =>
     z.object({ teamId: z.string().min(1).max(200) }).parse(data),
   )
   .handler(async ({ data }): Promise<TeamPage | null> => {
-    await requireViewer()
     const db = getDb()
     const team = await db
       .select()
@@ -265,38 +237,15 @@ export const getTeamPage = createServerFn({ method: 'GET' })
   })
 
 /**
- * Open a Game from a Team page that isn't stored yet: sync its League's
- * schedule for that day (storing the Game and backfilling it if it has
- * finished), then return its id.
+ * Open a Game from a Team page that isn't stored yet (openGame): only as
+ * far back as a past Sports Day can be backfilled, and a few days ahead.
  */
 export const openTeamGame = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator(
     (data: { league: string; sourceGameId: string; sportsDay: string }) =>
-      z
-        .object({
-          league: z.enum(LEAGUES),
-          sourceGameId: z.string().min(1).max(64),
-          sportsDay: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-        })
-        .parse(data),
+      OpenTeamGameInput.parse(data),
   )
   .handler(async ({ data }): Promise<{ gameId: string } | null> => {
-    await requireViewer()
-    const db = getDb()
-    const source = sourceFor(data.league).source
-    const find = async () =>
-      (await knownIds(db, 'game', source, [data.sourceGameId])).get(
-        data.sourceGameId,
-      ) ?? null
-    let gameId = await find()
-    if (!gameId) {
-      await syncLeague(
-        getCloudflareEnv(),
-        data.league,
-        data.sportsDay,
-        new Date(),
-      )
-      gameId = await find()
-    }
-    return gameId ? { gameId } : null
+    return openGame(data, new Date())
   })

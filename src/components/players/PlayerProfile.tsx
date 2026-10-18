@@ -5,10 +5,10 @@
  * (`usePlayerSheet`), so closing it lands exactly where they were.
  */
 
-import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { useCallback, useMemo, useState } from 'react'
-import { OpenPlayer } from './playerSheet'
+import { useMemo, useState } from 'react'
+import { PredictionsSection } from './PredictionsSection'
+import { Section } from './Section'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { LineupPlayer } from '@/lib/fantasy/matchup'
 import type { PlayerLine } from '@/lib/players/detail'
@@ -27,54 +27,26 @@ import {
 } from '@/components/fantasy/FantasyParts'
 import { FollowButton } from '@/components/follows/FollowButton'
 import { PlaySheet } from '@/components/games/PlayDetailScreen'
-import {
-  PredictionCard,
-  PredictionSheet,
-} from '@/components/predictions/PredictionParts'
-import { startTime } from '@/components/timeline/format'
 import { SPORTS } from '@/lib/fantasy/sports'
 import { useFantasy } from '@/lib/fantasy/useFantasy'
-import {
-  useKalshiConnection,
-  usePredictions,
-} from '@/lib/kalshi/usePredictions'
-import { getPlayerDetail } from '@/lib/players/detail'
-import { getPlayerPage } from '@/lib/players/server'
+import { usePlayerDetail, usePlayerFirstPage } from '@/lib/players/usePlayer'
 import { cn } from '@/lib/utils'
 import { useViewer } from '@/lib/viewer/useViewer'
+import { clockTime, dateLabel, formatDate } from '@/lib/time/format'
+import { useTimeZone } from '@/lib/time/useTimeZone'
 
-// ─── The sheet, from anywhere ───────────────────────────────────────────────
-
-export function PlayerSheetProvider({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  const [playerId, setPlayerId] = useState<string | null>(null)
-  const close = useCallback(() => setPlayerId(null), [])
-  return (
-    <OpenPlayer.Provider value={setPlayerId}>
-      {children}
-      {playerId && (
-        <PlayerSheet key={playerId} playerId={playerId} onClose={close} />
-      )}
-    </OpenPlayer.Provider>
-  )
-}
+// ─── The sheet, from anywhere (opened by PlayerSheetProvider) ───────────────
 
 const RECENT_PLAYS = 5
 
-function PlayerSheet({
+export function PlayerSheet({
   playerId,
   onClose,
 }: {
   playerId: string
   onClose: () => void
 }) {
-  const page = useQuery({
-    queryKey: ['player', playerId, 'first'],
-    queryFn: () => getPlayerPage({ data: { playerId } }),
-  })
+  const page = usePlayerFirstPage(playerId)
   const [playId, setPlayId] = useState<string | null>(null)
   const player = page.data?.player
   return (
@@ -204,14 +176,7 @@ export function PlayerDetailSections({
   player: PlayerProfile
   onNavigate?: () => void
 }) {
-  const detail = useQuery({
-    queryKey: ['player-detail', player.id],
-    queryFn: () => getPlayerDetail({ data: { playerId: player.id } }),
-    staleTime: 60_000,
-    // A live Game's line keeps moving.
-    refetchInterval: (q) =>
-      q.state.data?.game?.status === 'live' ? 30_000 : false,
-  })
+  const detail = usePlayerDetail(player.id)
   const overview = detail.data?.overview ?? null
   return (
     <div className="flex flex-col gap-5">
@@ -261,31 +226,7 @@ export function PlayerDetailSections({
   )
 }
 
-function Section({
-  title,
-  children,
-}: {
-  title: string
-  children: React.ReactNode
-}) {
-  return (
-    <section>
-      <h2 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-        {title}
-      </h2>
-      {children}
-    </section>
-  )
-}
-
 // ─── The Game now or next ───────────────────────────────────────────────────
-
-const dateLabel = (iso: string) =>
-  new Date(iso).toLocaleDateString([], {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  })
 
 function GameSection({
   game,
@@ -298,6 +239,7 @@ function GameSection({
   next: PlayerOverview['next']
   onNavigate?: () => void
 }) {
+  const timeZone = useTimeZone()
   if (!game) {
     if (!next) return null
     return (
@@ -308,7 +250,7 @@ function GameSection({
           </span>
           <span className="text-muted">
             {' '}
-            · {dateLabel(next.date)} {startTime(next.date)}
+            · {dateLabel(next.date, timeZone)} {clockTime(next.date, timeZone)}
           </span>
         </div>
       </Section>
@@ -338,9 +280,9 @@ function GameSection({
               'Final'
             ) : (
               <>
-                {dateLabel(game.startsAt)}
+                {dateLabel(game.startsAt, timeZone)}
                 <br />
-                {startTime(game.startsAt)}
+                {clockTime(game.startsAt, timeZone)}
               </>
             )}
           </span>
@@ -479,6 +421,7 @@ function RecentSection({
   recent: PlayerOverview['recent']
   form: PlayerOverview['form']
 }) {
+  const timeZone = useTimeZone()
   return (
     <Section title="Recent games">
       {form && <PlayerForm form={form} recent={recent} />}
@@ -486,7 +429,7 @@ function RecentSection({
         {recent.map((g, i) => (
           <li key={i} className="flex items-center gap-3 px-3 py-2 text-sm">
             <span className="w-14 shrink-0 text-xs text-muted">
-              {g.date ? shortDate(g.date) : ''}
+              {g.date ? numericDate(g.date, timeZone) : ''}
             </span>
             <span className="w-16 shrink-0 font-medium">
               {g.home ? 'vs' : '@'} {g.opponent}
@@ -514,15 +457,12 @@ function RecentSection({
   )
 }
 
-function shortDate(date: string): string {
-  // Plain dates ("2026-09-28") are calendar days, not instants.
-  const d = /^\d{4}-\d{2}-\d{2}$/.test(date)
-    ? new Date(`${date}T12:00:00`)
-    : new Date(date)
-  return d.toLocaleDateString([], { month: 'numeric', day: 'numeric' })
-}
+/** "9/28": plain dates are calendar days, the rest instants. */
+const numericDate = (date: string, timeZone: string | null) =>
+  formatDate(date, timeZone, { month: 'numeric', day: 'numeric' })
 
 function NewsSection({ news }: { news: PlayerOverview['news'] }) {
+  const timeZone = useTimeZone()
   return (
     <Section title="News">
       <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
@@ -539,7 +479,7 @@ function NewsSection({ news }: { news: PlayerOverview['news'] }) {
               </span>
               {n.published && (
                 <span className="text-[11px] text-muted">
-                  {dateLabel(n.published)}
+                  {dateLabel(n.published, timeZone)}
                 </span>
               )}
             </a>
@@ -646,46 +586,4 @@ function fantasyEntries(
       return player && team ? [{ league, side, team: team.name, player }] : []
     })
   })
-}
-
-/** The Viewer's open Predictions with a Leg on this Player (or Team). */
-export function PredictionsSection({
-  playerId,
-  teamId,
-}: {
-  playerId?: string
-  teamId?: string
-}) {
-  const { data: predictions } = usePredictions()
-  const { data: connection } = useKalshiConnection()
-  const [selected, setSelected] = useState<string | null>(null)
-  const mine = (predictions ?? []).filter(
-    (p) =>
-      p.status === 'open' &&
-      p.legs.some((l) =>
-        playerId ? l.playerId === playerId : teamId && l.teamId === teamId,
-      ),
-  )
-  if (mine.length === 0) return null
-  const open = mine.find((p) => p.id === selected)
-  return (
-    <Section title="Your predictions">
-      <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none]">
-        <ul className="flex gap-2">
-          {mine.map((p) => (
-            <li key={p.id} className="flex shrink-0">
-              <PredictionCard
-                prediction={p}
-                display={connection?.changeDisplay}
-                onSelect={() => setSelected(p.id)}
-              />
-            </li>
-          ))}
-        </ul>
-      </div>
-      {open && (
-        <PredictionSheet prediction={open} onClose={() => setSelected(null)} />
-      )}
-    </Section>
-  )
 }

@@ -8,7 +8,8 @@ import { and, eq, inArray, notInArray, sql } from 'drizzle-orm'
 import { chunk, resolve } from './identity'
 import { RATE_LIMIT_GRACE_MS, WARMUP_MINUTES, isRateLimited } from './pacing'
 import type { BatchItem } from 'drizzle-orm/batch'
-import type { CloudflareEnv } from '@/lib/db'
+import type { CloudflareEnv, Database } from '@/lib/db'
+import type { Conference } from '@/lib/model/leagues'
 import type { League, ScheduledGame } from '@/lib/model/types'
 import { ACTIVE_LEAGUES, sourceFor } from '@/lib/sources'
 import { sportsDayOf } from '@/lib/model/sportsDay'
@@ -75,6 +76,12 @@ export async function syncDay(
   }
 }
 
+/** Statuses whose Game row its LiveGame writes, not the schedule sync. */
+const OWNED_BY_LIVE_GAME = ['live', 'delayed', 'final']
+
+/** Between the first polls of Finals woken together to be backfilled. */
+export const BACKFILL_SPACING_MS = 3_000
+
 /** When each League's schedule source started answering 429 (this isolate). */
 const rateLimitedSince = new Map<League, number>()
 
@@ -107,15 +114,8 @@ export async function syncLeague(
     scheduled.map((g) => ({ sourceId: g.sourceGameId, name: g.sourceGameId })),
   )
 
-  const ids = [...gameIds.values()]
-  const stored = new Map(
-    (
-      await db
-        .select({ id: games.id, status: games.status })
-        .from(games)
-        .where(inArray(games.id, ids))
-    ).map((r) => [r.id, r.status]),
-  )
+  const stored = await storedGames(db, [...gameIds.values()])
+  const storedLogos = await storedTeamLogos(db, [...new Set(teamIds.values())])
 
   const nowIso = now.toISOString()
   const writes = scheduled.flatMap((g): Array<BatchItem<'sqlite'>> => {
@@ -136,36 +136,43 @@ export async function syncLeague(
       homeConference: g.home.conference ?? null,
       updatedAt: nowIso,
     }
-    // Once a LiveGame owns a Game (live or later), it writes the row.
-    return stored.has(id)
-      ? [
-          db
-            .update(games)
-            .set({
-              startsAt: row.startsAt,
-              status: row.status,
-              awayRank: row.awayRank,
-              homeRank: row.homeRank,
-              awayConference: row.awayConference,
-              homeConference: row.homeConference,
-              updatedAt: nowIso,
-            })
-            .where(
-              and(
-                eq(games.id, id),
-                notInArray(games.status, ['live', 'delayed', 'final']),
-              ),
-            ),
-        ]
-      : [db.insert(games).values(row).onConflictDoNothing()]
+    const prior = stored.get(id)
+    if (!prior) return [db.insert(games).values(row).onConflictDoNothing()]
+    // Once a LiveGame owns a Game (live or later), it writes the row; and
+    // an unchanged Game isn't rewritten every minute.
+    if (OWNED_BY_LIVE_GAME.includes(prior.status)) return []
+    const update = {
+      startsAt: row.startsAt,
+      status: row.status,
+      awayRank: row.awayRank,
+      homeRank: row.homeRank,
+      awayConference: row.awayConference,
+      homeConference: row.homeConference,
+    }
+    const changed = (Object.keys(update) as Array<keyof typeof update>).some(
+      (k) => update[k] !== prior[k],
+    )
+    if (!changed) return []
+    return [
+      db
+        .update(games)
+        .set({ ...update, updatedAt: nowIso })
+        .where(
+          and(eq(games.id, id), notInArray(games.status, OWNED_BY_LIVE_GAME)),
+        ),
+    ]
   })
-  // Keep each Team's name and logo current between nightly roster syncs.
-  const scheduledTeams = [
+  // Keep each Team's logo current between nightly roster syncs, writing
+  // only those that changed (resolve() created any new Team with its logo).
+  const changedTeams = [
     ...new Map(
       scheduled.flatMap((g) => [g.away, g.home]).map((t) => [t.sourceId, t]),
     ).values(),
-  ]
-  for (const part of chunk(scheduledTeams, 20)) {
+  ].filter((t) => {
+    const id = teamIds.get(t.sourceId)!
+    return storedLogos.has(id) && storedLogos.get(id) !== t.logoUrl
+  })
+  for (const part of chunk(changedTeams, 20)) {
     writes.push(
       db
         .insert(teams)
@@ -181,37 +188,93 @@ export async function syncLeague(
         .onConflictDoUpdate({
           target: teams.id,
           set: { logoUrl: sql`excluded.logo_url` },
+          setWhere: sql`${teams.logoUrl} is not excluded.logo_url`,
         }),
     )
   }
   const [first, ...rest] = writes
-  await db.batch([first, ...rest])
+  if (first) await db.batch([first, ...rest])
 
+  // A past day can hold a hundred Finals to backfill: space their first
+  // polls out rather than send every LiveGame to the Source at once.
+  let backfills = 0
   const wakes = scheduled
     .filter((g) =>
-      needsTracking(g, stored.get(gameIds.get(g.sourceGameId)!), now),
+      needsTracking(g, stored.get(gameIds.get(g.sourceGameId)!)?.status, now),
     )
     .map((g) => {
       const gameId = gameIds.get(g.sourceGameId)!
       const stub = env.LIVE_GAME.get(env.LIVE_GAME.idFromName(gameId))
-      return stub.track({
-        gameId,
-        league,
-        sourceGameId: g.sourceGameId,
-        sportsDay: g.sportsDay,
-        awayTeam: {
-          id: teamIds.get(g.away.sourceId)!,
-          abbreviation: g.away.abbreviation,
-          logoUrl: g.away.logoUrl,
-          name: g.away.name,
+      const delayMs =
+        g.status === 'final' ? backfills++ * BACKFILL_SPACING_MS : 0
+      return stub.track(
+        {
+          gameId,
+          league,
+          sourceGameId: g.sourceGameId,
+          sportsDay: g.sportsDay,
+          awayTeam: {
+            id: teamIds.get(g.away.sourceId)!,
+            abbreviation: g.away.abbreviation,
+            logoUrl: g.away.logoUrl,
+            name: g.away.name,
+          },
+          homeTeam: {
+            id: teamIds.get(g.home.sourceId)!,
+            abbreviation: g.home.abbreviation,
+            logoUrl: g.home.logoUrl,
+            name: g.home.name,
+          },
         },
-        homeTeam: {
-          id: teamIds.get(g.home.sourceId)!,
-          abbreviation: g.home.abbreviation,
-          logoUrl: g.home.logoUrl,
-          name: g.home.name,
-        },
-      })
+        delayMs,
+      )
     })
   await Promise.all(wakes)
+}
+
+/** The schedule fields of the Games already stored, by id. */
+async function storedGames(db: Database, ids: Array<string>) {
+  const out = new Map<
+    string,
+    {
+      status: string
+      startsAt: string
+      awayRank: number | null
+      homeRank: number | null
+      awayConference: Conference | null
+      homeConference: Conference | null
+    }
+  >()
+  for (const part of chunk(ids, 90)) {
+    const rows = await db
+      .select({
+        id: games.id,
+        status: games.status,
+        startsAt: games.startsAt,
+        awayRank: games.awayRank,
+        homeRank: games.homeRank,
+        awayConference: games.awayConference,
+        homeConference: games.homeConference,
+      })
+      .from(games)
+      .where(inArray(games.id, part))
+    for (const { id, ...row } of rows) out.set(id, row)
+  }
+  return out
+}
+
+/** Each stored Team's logo, by id. */
+async function storedTeamLogos(
+  db: Database,
+  ids: Array<string>,
+): Promise<Map<string, string | null>> {
+  const out = new Map<string, string | null>()
+  for (const part of chunk(ids, 90)) {
+    const rows = await db
+      .select({ id: teams.id, logoUrl: teams.logoUrl })
+      .from(teams)
+      .where(inArray(teams.id, part))
+    for (const r of rows) out.set(r.id, r.logoUrl)
+  }
+  return out
 }

@@ -161,6 +161,11 @@ export interface GameSnapshot {
    * without who was involved), when it fell back.
    */
   fallback?: string
+  /**
+   * `box` is only what the Plays give (the Source's box score failed): it
+   * shouldn't replace a full one already stored.
+   */
+  boxPartial?: boolean
 }
 
 /** A Game on a League's schedule, before its play-by-play is fetched. */

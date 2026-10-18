@@ -4,9 +4,8 @@
  * Plays since. Dismissing it hides it until there is a newer Read Marker.
  */
 
-import { useState } from 'react'
 import type { CatchUp } from '@/lib/timeline/catchup'
-import { useDeviceValue } from '@/lib/useDeviceValue'
+import { useStoredValue } from '@/lib/useStoredValue'
 import { catchUpLine } from '@/lib/timeline/catchup'
 import { Sheet } from '@/components/chat/Sheet'
 import {
@@ -19,14 +18,6 @@ import {
 
 const DISMISSED_KEY = 'sportsline:catchup-dismissed'
 
-function dismissedFor(readAt: string): boolean {
-  try {
-    return localStorage.getItem(DISMISSED_KEY) === readAt
-  } catch {
-    return false
-  }
-}
-
 /** The card, until dismissed for this Read Marker. */
 export function CatchUpCard({
   catchUp,
@@ -37,18 +28,9 @@ export function CatchUpCard({
   readAt: string
   onOpen: () => void
 }) {
-  const stored = useDeviceValue(() => dismissedFor(readAt), false)
-  const [dismissedNow, setDismissed] = useState(false)
-  const dismissed = stored || dismissedNow
-  if (dismissed) return null
-  const dismiss = () => {
-    setDismissed(true)
-    try {
-      localStorage.setItem(DISMISSED_KEY, readAt)
-    } catch {
-      // Private mode: it stays dismissed for this visit only.
-    }
-  }
+  const [dismissedAt, setDismissedAt] = useStoredValue(DISMISSED_KEY)
+  if (dismissedAt === readAt) return null
+  const dismiss = () => setDismissedAt(readAt)
   const teams = [
     ...new Map(
       [...catchUp.finals, ...catchUp.keyPlays].map((i) => [
@@ -106,11 +88,9 @@ export function CatchUpCard({
 /** Finals, then the key Plays, newest first. Opening anything closes it. */
 export function CatchUpSheet({
   catchUp,
-  now,
   onClose,
 }: {
   catchUp: CatchUp
-  now: number
   onClose: () => void
 }) {
   return (
@@ -126,7 +106,7 @@ export function CatchUpSheet({
           </h3>
           {catchUp.finals.map((item) => (
             <div key={item.id} className="flex">
-              <Notice item={item} now={now} showLeague />
+              <Notice item={item} showLeague />
             </div>
           ))}
         </section>

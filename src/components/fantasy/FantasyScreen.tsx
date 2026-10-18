@@ -8,7 +8,8 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { MatchupSheet } from './FantasyParts'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
-import { getGames } from '@/lib/timeline/server'
+import { gamesQuery } from '@/lib/timeline/queries'
+import { useToday } from '@/lib/timeline/useToday'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { GRIP_DOTS, useDragReorder } from '@/components/layout/useDragReorder'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
@@ -351,9 +352,9 @@ function Leagues() {
   const leagues = fantasy.data ?? []
   const selected = leagues.find((l) => l.id === open && l.matchup)
   // Today's Games, for each Player's game state in the Matchup sheet.
+  const today = useToday()
   const games = useQuery({
-    queryKey: ['games', 'today'],
-    queryFn: () => getGames({ data: {} }),
+    ...gamesQuery(today),
     enabled: Boolean(selected),
     refetchInterval: 30_000,
   })

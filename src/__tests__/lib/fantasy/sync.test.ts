@@ -41,6 +41,8 @@ vi.mock('@/lib/kalshi/vault', async (original) => {
     ...mod,
     unseal: (_key: string, sealed: { ciphertext: string }) =>
       Promise.resolve(sealed.ciphertext),
+    // The stand-in cookies are never sealed again.
+    isLegacy: () => false,
   }
 })
 

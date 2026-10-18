@@ -11,9 +11,9 @@ import type { GameSummary } from '@/lib/model/timeline'
 import type { GameBox } from '@/lib/model/types'
 import type { CatchUp } from '@/lib/timeline/catchup'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
-import type { PredictionView } from '@/lib/kalshi/server'
+import type { PredictionView } from '@/lib/kalshi/predictionViews'
 import { MatchupSheet } from '@/components/fantasy/FantasyParts'
-import { PredictionSheet } from '@/components/predictions/PredictionParts'
+import { PredictionSheet } from '@/components/predictions/PredictionSheet'
 import { PlaySheet } from '@/components/games/PlayDetailScreen'
 import { BoxSheet } from '@/components/games/GameView'
 import { Sheet } from '@/components/chat/Sheet'
@@ -27,7 +27,6 @@ export function TimelineSheets({
   prediction,
   onPredictionClose,
   recap,
-  now,
   onRecapClose,
   live,
   onLiveClose,
@@ -46,7 +45,6 @@ export function TimelineSheets({
   onPredictionClose: () => void
   /** The catch-up, when its sheet is open. */
   recap: CatchUp | null
-  now: number
   onRecapClose: () => void
   /** The live Games, when their sheet is open (two or more). */
   live: Array<{ typing: Typing; game: GameSummary }> | null
@@ -68,16 +66,19 @@ export function TimelineSheets({
         <PredictionSheet prediction={prediction} onClose={onPredictionClose} />
       )}
 
-      {recap && (
-        <CatchUpSheet catchUp={recap} now={now} onClose={onRecapClose} />
-      )}
+      {recap && <CatchUpSheet catchUp={recap} onClose={onRecapClose} />}
 
       {live && (
         <Sheet title={`Live now · ${live.length}`} onClose={onLiveClose}>
           <ol className="flex flex-col gap-3">
             {live.map(({ typing: t, game: g }) => (
-              <li key={g.id} onClick={onLiveClose}>
-                <TypingRow typing={t} game={g} focused={false} />
+              <li key={g.id}>
+                <TypingRow
+                  typing={t}
+                  game={g}
+                  focused={false}
+                  onClick={onLiveClose}
+                />
               </li>
             ))}
           </ol>

@@ -20,6 +20,7 @@ import type { LeagueCategory } from '@/lib/fantasy/categories'
 import type { LineupPlayer, MatchupSide } from '@/lib/fantasy/matchup'
 import type { FantasySport } from '@/lib/fantasy/sports'
 import type { GameSummary } from '@/lib/model/timeline'
+import { useTimeZone } from '@/lib/time/useTimeZone'
 import { CHART_COLORS } from '@/components/charts/ChartCard'
 import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
 import { PlayerButton } from '@/components/players/playerSheet'
@@ -61,6 +62,7 @@ export function CategoryLineup({
   summary?: boolean
 }) {
   const [side, setSide] = useState<Side>('mine')
+  const timeZone = useTimeZone()
   const shown = side === 'mine' || !opponent ? lineups.mine : lineups.theirs
   const color = side === 'mine' ? CHART_COLORS.mine : CHART_COLORS.opponent
   const columns = boxColumns(sport, categories)
@@ -99,7 +101,7 @@ export function CategoryLineup({
     </button>
   )
   const row = (p: LineupPlayer) => {
-    const state = gameState(p, games)
+    const state = gameState(p, games, timeZone)
     const idle = !p.starter || (knowsGames && !state && !played(p.dayStats))
     return (
       <tr key={p.espnId} className={cn(idle && 'opacity-50')}>
@@ -219,7 +221,7 @@ function PlayerLabel({
   /** Mark a Player who isn't starting with their slot (BN, IR). */
   slot: boolean
 }) {
-  const state = gameState(player, games)
+  const state = gameState(player, games, useTimeZone())
   const position = player.positionId
     ? POSITIONS[sport][player.positionId]
     : undefined

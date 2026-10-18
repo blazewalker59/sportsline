@@ -20,8 +20,7 @@ import type { LineupPlayer, MatchupSide } from '@/lib/fantasy/matchup'
 import type { GameSummary } from '@/lib/model/timeline'
 import { MatchupRace } from '@/components/charts/lazy'
 import { Sheet } from '@/components/chat/Sheet'
-import { getMatchupGames } from '@/lib/fantasy/schedule'
-import { getMatchupDay } from '@/lib/fantasy/server'
+import { matchupDayQuery, matchupGamesQuery } from '@/lib/fantasy/queries'
 import { SPORTS } from '@/lib/fantasy/sports'
 import { cn } from '@/lib/utils'
 
@@ -45,19 +44,9 @@ export function MatchupSheet({
   const abbrevs = [
     ...new Set(lineup.flatMap((p) => (p.teamAbbrev ? [p.teamAbbrev] : []))),
   ]
-  const week = useQuery({
-    queryKey: [
-      'matchup-games',
-      league.id,
-      [...teamIds].sort().join(),
-      [...abbrevs].sort().join(),
-    ],
-    queryFn: () =>
-      getMatchupGames({
-        data: { league: SPORTS[m.sport].league, teamIds, abbrevs },
-      }),
-    staleTime: 5 * 60_000,
-  })
+  const week = useQuery(
+    matchupGamesQuery(league.id, SPORTS[m.sport].league, teamIds, abbrevs),
+  )
   const allGames = useMemo(
     () => [...games, ...(week.data ?? [])],
     [games, week.data],
@@ -73,14 +62,9 @@ export function MatchupSheet({
   // The day in view; the summary keeps today's Games and lookups.
   const day = summary ? m.scoringPeriod : part
   const today = day === m.scoringPeriod
-  // An earlier day is final, so it's read once; a later one's Lineups can
-  // still change.
   const past = useQuery({
-    queryKey: ['matchup-day', league.id, day],
-    queryFn: () =>
-      getMatchupDay({ data: { leagueId: league.id, scoringPeriod: day } }),
+    ...matchupDayQuery(league.id, day, m.scoringPeriod),
     enabled: !today && !summary,
-    staleTime: day < m.scoringPeriod ? Infinity : 5 * 60_000,
   })
   const label = dayLabel(m, day)
   const categoryDay: CategoryDay | undefined = summary

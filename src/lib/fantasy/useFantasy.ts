@@ -7,40 +7,35 @@ import {
   connectSleeper,
   disconnectEspn,
   disconnectSleeper,
-  getEspnConnection,
-  getFantasy,
-  getSleeperConnection,
   reorderFantasyLeagues,
   setFantasyLeagueEnabled,
   syncFantasyNow,
 } from './server'
+import {
+  espnConnectionQuery,
+  fantasyQuery,
+  sleeperConnectionQuery,
+} from './queries'
 import type { FantasyLeagueView } from './server'
 import { useViewer } from '@/lib/viewer/useViewer'
 
-const ESPN_KEY = ['espn-connection'] as const
-const FANTASY_KEY = ['fantasy'] as const
-/** Matchups refresh on the server every two minutes. */
-const REFRESH_MS = 60_000
+const ESPN_KEY = espnConnectionQuery().queryKey
+const SLEEPER_KEY = sleeperConnectionQuery().queryKey
+const FANTASY_KEY = fantasyQuery().queryKey
 
 export function useEspnConnection() {
   const { data: viewerState } = useViewer()
   return useQuery({
-    queryKey: ESPN_KEY,
-    queryFn: () => getEspnConnection(),
+    ...espnConnectionQuery(),
     enabled: Boolean(viewerState?.viewer),
-    staleTime: 60_000,
   })
 }
-
-const SLEEPER_KEY = ['sleeper-connection'] as const
 
 export function useSleeperConnection() {
   const { data: viewerState } = useViewer()
   return useQuery({
-    queryKey: SLEEPER_KEY,
-    queryFn: () => getSleeperConnection(),
+    ...sleeperConnectionQuery(),
     enabled: Boolean(viewerState?.viewer),
-    staleTime: 60_000,
   })
 }
 
@@ -59,13 +54,7 @@ export function useFantasyConnected(): {
 
 export function useFantasy() {
   const { connected } = useFantasyConnected()
-  return useQuery({
-    queryKey: FANTASY_KEY,
-    queryFn: () => getFantasy(),
-    enabled: connected,
-    refetchInterval: REFRESH_MS,
-    staleTime: REFRESH_MS / 2,
-  })
+  return useQuery({ ...fantasyQuery(), enabled: connected })
 }
 
 function useRefreshAll() {

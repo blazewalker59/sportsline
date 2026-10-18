@@ -1,6 +1,6 @@
 /**
- * Reactions (CONTEXT.md) on Play bubbles: long-press (or right-click) a
- * bubble for the emoji bar; choosing one saves your Reaction and copies an
+ * Reactions (CONTEXT.md) on Play bubbles: long-press (or right-click, or
+ * press R or the menu key on a focused bubble) for the emoji bar; choosing one saves your Reaction and copies an
  * image of the message to the clipboard for sharing elsewhere.
  */
 
@@ -156,7 +156,17 @@ function ReactionPicker({
   onChoose: (emoji: Reaction) => void
   onClose: () => void
 }) {
+  const bar = useRef<HTMLDivElement>(null)
   useEffect(() => {
+    // Focus moves into the bar (your Reaction, else the first) and back to
+    // the bubble after, so it works from the keyboard too.
+    const opener =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
+    bar.current
+      ?.querySelector<HTMLElement>('[aria-pressed="true"], button')
+      ?.focus({ preventScroll: true })
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     const onScroll = () => onClose()
     window.addEventListener('keydown', onKey)
@@ -164,6 +174,7 @@ function ReactionPicker({
     return () => {
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('scroll', onScroll)
+      if (opener?.isConnected) opener.focus({ preventScroll: true })
     }
   }, [onClose])
   const above = anchor.top > 120
@@ -178,6 +189,7 @@ function ReactionPicker({
         onClick={onClose}
       />
       <div
+        ref={bar}
         className="animate-in fade-in zoom-in-95 absolute flex gap-1 rounded-full border border-border bg-surface p-1.5 shadow-xl duration-150"
         style={{
           left,
@@ -240,7 +252,8 @@ export function ReactionPills({
 
 /**
  * Long-press and right-click handlers for a bubble: opening the emoji bar
- * swallows the tap that would otherwise open the Play.
+ * swallows the tap that would otherwise open the Play. From the keyboard,
+ * R (or the menu key, or Shift+F10) on a focused bubble opens it.
  */
 export function useLongPress(item: TimelineItem) {
   const reactions = useItemReactions()
@@ -285,6 +298,22 @@ export function useLongPress(item: TimelineItem) {
       cancel()
       openAt(e.currentTarget)
     },
+    onKeyDown: (e: React.KeyboardEvent<HTMLElement>) => {
+      // A keyboard click (Enter) never follows a long-press.
+      fired.current = false
+      const plainR =
+        e.key.toLowerCase() === 'r' &&
+        !e.altKey &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.shiftKey
+      if (!plainR) return
+      e.preventDefault()
+      cancel()
+      openAt(e.currentTarget)
+      fired.current = false
+    },
+    'aria-keyshortcuts': 'R',
     onClickCapture: (e: React.MouseEvent) => {
       if (fired.current) {
         e.preventDefault()

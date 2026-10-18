@@ -5,18 +5,30 @@
  * and daily caps, is sent to Kalshi, with the Viewer's trade key.
  */
 
-import { and, desc, eq, gt, inArray, lte, sql } from 'drizzle-orm'
+import {
+  and,
+  desc,
+  eq,
+  exists,
+  gt,
+  inArray,
+  isNull,
+  lte,
+  sql,
+} from 'drizzle-orm'
 import { SPENDING, capProblem, describeOrder, spentOn } from './proposal'
 import type { TradeProposal } from './proposal'
 import type { Caller } from './tokens'
 import type { CloudflareEnv, Database } from '@/lib/db'
 import type { OrderIntent } from '@/lib/kalshi/orders'
+import { dbFromD1 } from '@/lib/db'
 import { loadAccount } from '@/lib/kalshi/account'
-import { market as fetchMarket } from '@/lib/kalshi/client'
+import { KalshiError, market as fetchMarket } from '@/lib/kalshi/client'
 import { importSigningKey } from '@/lib/kalshi/keys'
 import { maxCost, placeOrder } from '@/lib/kalshi/orders'
-import { unseal } from '@/lib/kalshi/vault'
+import { isLegacy, seal, unseal } from '@/lib/kalshi/vault'
 import {
+  apiTokens,
   kalshiTradeKeys,
   pushSubscriptions,
   tradeProposals,
@@ -26,6 +38,7 @@ import { reportError } from '@/lib/ops/errors'
 import { vapidKeys } from '@/lib/push/deliver'
 import { sendPush } from '@/lib/push/webpush'
 import { priceDisplayOf } from '@/lib/viewer/prefs'
+import { UserError } from '@/lib/userError'
 
 /** Prices move: a proposal not decided in this long lapses. */
 export const PROPOSAL_TTL_MS = 10 * 60_000
@@ -73,7 +86,7 @@ export async function proposeTrade(
 ): Promise<TradeProposal> {
   const key = await tradeKeyRow(db, caller.viewerId)
   if (!key) {
-    throw new Error(
+    throw new UserError(
       'Trading isn’t set up: the Viewer needs to connect a Kalshi trade key on Sportsline’s Agents page.',
     )
   }
@@ -89,7 +102,7 @@ export async function proposeTrade(
     )
     .get()
   if ((pending?.n ?? 0) >= MAX_PENDING) {
-    throw new Error(
+    throw new UserError(
       `${MAX_PENDING} proposals are already waiting for the Viewer. Wait for them to be decided, or cancel one.`,
     )
   }
@@ -99,9 +112,9 @@ export async function proposeTrade(
   const reader =
     (await loadAccount(env, caller.viewerId)) ?? (await tradeAccount(env, key))
   const m = await fetchMarket(reader, input.marketTicker).catch(() => null)
-  if (!m) throw new Error(`No Kalshi market ${input.marketTicker}.`)
+  if (!m) throw new UserError(`No Kalshi market ${input.marketTicker}.`)
   if (m.status !== 'active') {
-    throw new Error(
+    throw new UserError(
       `Kalshi market ${input.marketTicker} isn’t open for trading (${m.status ?? 'unknown status'}).`,
     )
   }
@@ -112,7 +125,7 @@ export async function proposeTrade(
     key,
     await spentToday(db, caller.viewerId, sportsDayOf(now)),
   )
-  if (problem) throw new Error(problem)
+  if (problem) throw new UserError(problem)
 
   const row: TradeProposal = {
     id: crypto.randomUUID(),
@@ -138,7 +151,7 @@ export async function proposeTrade(
     feesDollars: null,
     error: null,
   }
-  await db.insert(tradeProposals).values(row)
+  await db.insert(tradeProposals).values({ ...row, status: 'pending' })
   await notifyProposal(env, db, row).catch((error: unknown) =>
     reportError(env, 'trading', error, { step: 'notify', id: row.id }),
   )
@@ -153,14 +166,27 @@ function marketTitle(
   return [m.title, sub].filter(Boolean).join(' · ') || 'Kalshi market'
 }
 
-async function tradeAccount(
+export async function tradeAccount(
   env: CloudflareEnv,
   key: typeof kalshiTradeKeys.$inferSelect,
 ) {
-  const pem = await unseal(env.KALSHI_ENCRYPTION_KEY, {
-    ciphertext: key.keyCiphertext,
-    iv: key.keyIv,
-  })
+  const context = { purpose: 'kalshi-trade', viewerId: key.viewerId } as const
+  const sealed = { ciphertext: key.keyCiphertext, iv: key.keyIv }
+  const pem = await unseal(env.KALSHI_ENCRYPTION_KEY, sealed, context)
+  // Sealed before keys were bound to their Viewer: bind it now (unless it
+  // was reconnected meanwhile).
+  if (isLegacy(sealed)) {
+    const fresh = await seal(env.KALSHI_ENCRYPTION_KEY, pem, context)
+    await dbFromD1(env.DB)
+      .update(kalshiTradeKeys)
+      .set({ keyCiphertext: fresh.ciphertext, keyIv: fresh.iv })
+      .where(
+        and(
+          eq(kalshiTradeKeys.viewerId, key.viewerId),
+          eq(kalshiTradeKeys.keyCiphertext, key.keyCiphertext),
+        ),
+      )
+  }
   return { keyId: key.keyId, signer: await importSigningKey(pem) }
 }
 
@@ -200,9 +226,10 @@ export async function approveTrade(
   now = new Date(),
 ): Promise<TradeProposal> {
   const key = await tradeKeyRow(db, viewerId)
-  if (!key) throw new Error('Connect a Kalshi trade key first.')
+  if (!key) throw new UserError('Connect a Kalshi trade key first.')
   const day = sportsDayOf(now)
-  // One click wins: only a live, pending proposal moves to placing.
+  // One click wins: only a live, pending proposal, from a token that still
+  // works, moves to placing.
   const [claimed] = await db
     .update(tradeProposals)
     .set({ status: 'placing', decidedAt: now.toISOString(), approvedDay: day })
@@ -212,17 +239,30 @@ export async function approveTrade(
         eq(tradeProposals.viewerId, viewerId),
         eq(tradeProposals.status, 'pending'),
         gt(tradeProposals.expiresAt, now.toISOString()),
+        exists(
+          db
+            .select({ id: apiTokens.id })
+            .from(apiTokens)
+            .where(
+              and(
+                eq(apiTokens.id, tradeProposals.tokenId),
+                isNull(apiTokens.revokedAt),
+              ),
+            ),
+        ),
       ),
     )
     .returning()
   if (!claimed) {
-    throw new Error('This proposal has already been decided, or has expired.')
+    throw new UserError(
+      'This proposal has already been decided, has expired, or its Agent’s token was revoked.',
+    )
   }
 
-  const finish = async (set: Partial<TradeProposal>) => {
+  const finish = async ({ status, ...set }: Partial<TradeProposal>) => {
     const [row] = await db
       .update(tradeProposals)
-      .set(set)
+      .set({ ...set, ...(status ? { status } : {}) })
       .where(eq(tradeProposals.id, id))
       .returning()
     return row
@@ -233,20 +273,18 @@ export async function approveTrade(
   const problem = capProblem(claimed.maxCostDollars, key, spent)
   if (problem) return finish({ status: 'failed', error: problem })
 
+  let sent = false
   try {
+    const account = await tradeAccount(env, key)
+    sent = true
     const result = await placeOrder(
-      await tradeAccount(env, key),
+      account,
       claimed.marketTicker,
       claimed,
       claimed.id,
     )
     return finish({
-      status:
-        result.filled === 0
-          ? 'unfilled'
-          : result.filled < claimed.count
-            ? 'partial'
-            : 'filled',
+      status: fillStatus(result.filled, claimed.count),
       orderId: result.orderId,
       filledCount: result.filled,
       avgPriceDollars: result.avgPrice,
@@ -254,19 +292,39 @@ export async function approveTrade(
     })
   } catch (error) {
     await reportError(env, 'trading', error, { step: 'place', id })
+    // Kalshi refused it (4xx): nothing was placed. Anything else (no reply,
+    // a timeout, a 5xx) may have gone through: it's looked up later and
+    // counts in full toward the day's cap meanwhile.
+    const refused =
+      !sent ||
+      (error instanceof KalshiError &&
+        error.status >= 400 &&
+        error.status < 500)
     return finish({
-      status: 'failed',
+      status: refused ? 'failed' : 'unknown',
       error: error instanceof Error ? error.message : String(error),
     })
   }
 }
 
-/** The Viewer says no, or the Agent withdraws: only while it's pending. */
+/** A placed order's status from what filled of it. Pure. */
+export function fillStatus(
+  filled: number,
+  count: number,
+): 'filled' | 'partial' | 'unfilled' {
+  return filled === 0 ? 'unfilled' : filled < count ? 'partial' : 'filled'
+}
+
+/**
+ * The Viewer says no, or the Agent withdraws: only while it's pending. An
+ * Agent (`tokenId`) may only withdraw its own.
+ */
 export async function closeTrade(
   db: Database,
   viewerId: string,
   id: string,
   status: 'rejected' | 'cancelled',
+  tokenId?: string,
   now = new Date(),
 ): Promise<TradeProposal | null> {
   const [row] = await db
@@ -276,6 +334,7 @@ export async function closeTrade(
       and(
         eq(tradeProposals.id, id),
         eq(tradeProposals.viewerId, viewerId),
+        tokenId === undefined ? undefined : eq(tradeProposals.tokenId, tokenId),
         eq(tradeProposals.status, 'pending'),
       ),
     )

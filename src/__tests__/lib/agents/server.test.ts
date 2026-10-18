@@ -266,6 +266,38 @@ describe.skipIf(!isBun)('agent server functions', () => {
     )
   })
 
+  it("withdraws a revoked token's pending proposals, and only its own", async () => {
+    await db()
+      .insert(apiTokens)
+      .values(
+        ['tok', 'kept'].map((id) => ({
+          id,
+          viewerId: 'u1',
+          name: id,
+          tokenHash: id.padEnd(64, 'h'),
+          prefix: `sl_${id}`,
+          scopes: ['read', 'trade'] as Array<'read' | 'trade'>,
+          createdAt: '2026-10-08T12:00:00.000Z',
+        })),
+      )
+    await proposal('mine')
+    await proposal('filled', { status: 'filled' })
+    await proposal('other-token', { tokenId: 'kept' })
+    await proposal('other-viewer', { viewerId: 'u2' })
+
+    await call('revokeApiToken', { id: 'tok' })
+    const status = Object.fromEntries(
+      (await db().select().from(tradeProposals)).map((p) => [p.id, p.status]),
+    )
+    expect(status).toEqual({
+      mine: 'cancelled',
+      filled: 'filled',
+      'other-token': 'pending',
+      // Another Viewer's proposal under the same token id is left alone.
+      'other-viewer': 'pending',
+    })
+  })
+
   it('rejects a revoke id the validator will not accept', async () => {
     const bad = await call('revokeApiToken', { id: '' })
     expect(bad.error).toBeTruthy()

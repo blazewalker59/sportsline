@@ -23,7 +23,7 @@ import {
 } from '@/components/charts/KeyPlays'
 import { buildFlow } from '@/lib/games/flow'
 import { flowColors } from '@/lib/games/flowColors'
-import { getGameDetail } from '@/lib/games/server'
+import { gameDetailQuery } from '@/lib/games/queries'
 import { scoringHeadline } from '@/lib/timeline/chat'
 
 const AWAY = 'var(--team-away)'
@@ -33,12 +33,7 @@ const scoreKey = (s: FlowScore) => s.item.id
 
 export function GameFlow({ game }: { game: GameSummary }) {
   const live = game.status === 'live' || game.status === 'delayed'
-  const detail = useQuery({
-    queryKey: ['game', game.id],
-    queryFn: () => getGameDetail({ data: { gameId: game.id } }),
-    refetchInterval: live ? 30_000 : false,
-    staleTime: live ? 15_000 : 5 * 60_000,
-  })
+  const detail = useQuery(gameDetailQuery(game.id))
   const flow = useMemo(
     () => (detail.data ? buildFlow(detail.data.items, game.league) : null),
     [detail.data, game.league],

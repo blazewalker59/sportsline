@@ -6,6 +6,7 @@
 
 import type { GameRef } from './sources'
 import type { League } from '@/lib/model/types'
+import { zonedParts } from '@/lib/time/format'
 
 /** Fans' shorthand for nicknames, mapped to a word in the full name. */
 const SHORTHAND: Record<string, string> = {
@@ -95,19 +96,10 @@ const SLATE_ENDS: Array<[Slate, number]> = [
   ['evening', 21 * 60 + 30],
 ]
 
-const easternClock = new Intl.DateTimeFormat('en-US', {
-  timeZone: 'America/New_York',
-  hour: '2-digit',
-  minute: '2-digit',
-  hourCycle: 'h23',
-})
-
 /** The Slate a Game kicking off then is in. */
 export function slateOf(startsAt: string): Slate {
-  const parts = easternClock.formatToParts(new Date(startsAt))
-  const part = (type: string) =>
-    Number(parts.find((p) => p.type === type)?.value ?? 0)
-  const minutes = part('hour') * 60 + part('minute')
+  const { hour, minute } = zonedParts(startsAt, 'America/New_York')
+  const minutes = hour * 60 + minute
   // Past midnight is still the night before's late window.
   if (minutes < 6 * 60) return 'late'
   return SLATE_ENDS.find(([, end]) => minutes < end)?.[0] ?? 'late'

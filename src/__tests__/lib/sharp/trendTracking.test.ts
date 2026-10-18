@@ -111,6 +111,52 @@ describe.skipIf(!isBun)('following find_bet', () => {
     })
   })
 
+  it("records a six-leg combo's picks", async () => {
+    await rec.recordRequest(
+      db,
+      caller,
+      { team: 'Avs', count: 3, legs: 6 } as never,
+      {
+        games: [],
+        picks: ['A', 'B', 'C', 'D', 'E', 'F'].map((t) =>
+          pickOf(t, 'yes', '2026-10-09T02:00:00Z'),
+        ),
+        combo: null,
+        reason: null,
+      },
+      new Date('2026-10-08T15:00:00Z'),
+    )
+    expect(rows()).toHaveLength(6)
+  })
+
+  it('follows more open picks than one statement can bind', async () => {
+    const tickers = Array.from({ length: 130 }, (_, i) => `T${i}`)
+    for (let i = 0; i < tickers.length; i += 5)
+      await rec.recordRequest(
+        db,
+        caller,
+        { team: 'Avs', count: 5 },
+        {
+          games: [],
+          picks: tickers
+            .slice(i, i + 5)
+            .map((t) => pickOf(t, 'yes', '2026-10-09T02:00:00Z')),
+          combo: null,
+          reason: null,
+        },
+        new Date('2026-10-08T15:00:00Z'),
+      )
+    sqlite.run(`INSERT INTO predictions (id,viewer_id,market_ticker,kind,side,title,contracts,cost,status,opened_at,traded_at,updated_at)
+      VALUES ('u1~T120','u1','T120','single','yes','T120',10,5,'open','2026-10-08T16:05:00Z','2026-10-08T16:00:00Z','x')`)
+    await rec.trackTrendPicks(env, new Date('2026-10-08T20:00:00Z'))
+    const placed = sqlite
+      .query(
+        'SELECT market_ticker FROM trend_picks WHERE placed_via IS NOT NULL',
+      )
+      .all()
+    expect(placed).toEqual([{ market_ticker: 'T120' }])
+  })
+
   it('credits placements on Kalshi and by agents, then settles', async () => {
     const suggested = new Date('2026-10-08T15:00:00Z')
     await rec.recordRequest(

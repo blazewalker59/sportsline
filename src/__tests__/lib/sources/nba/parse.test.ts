@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import fixture from '../../../fixtures/nba/final-401859964.json'
 import type { NbaSummary } from '@/lib/sources/nba/feed'
 import type { SourceMilestone, SourcePlay } from '@/lib/model/types'
-import { parseGame, roleOf, takesLead } from '@/lib/sources/nba/parse'
+import { parseGame, roleOf } from '@/lib/sources/nba/parse'
+import { takesLead } from '@/lib/sources/common'
 
 const game = parseGame(fixture as unknown as NbaSummary)
 const plays = game.items.filter((i): i is SourcePlay => i.kind === 'play')

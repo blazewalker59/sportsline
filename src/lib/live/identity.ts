@@ -4,7 +4,7 @@
  * in `source_ids`; afterwards the mapping is looked up.
  */
 
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { Database } from '@/lib/db'
 import type { League, SourceRef, SourceTeam } from '@/lib/model/types'
@@ -57,10 +57,16 @@ async function lookup(
   return found
 }
 
+/** Keeps a VALUES row (`v`) only if a mapping points at its fresh id. */
+const claimed = sql`where exists (select 1 from source_ids where internal_id = v.column1)`
+
 /**
  * Resolve every ref to a Sportsline id, creating Teams/Players (and their
- * mappings) that have never been seen. Concurrent creators are safe: the
- * mapping insert is idempotent and the final lookup is authoritative.
+ * mappings) that have never been seen. Concurrent creators are safe: each
+ * batch claims the mappings first (a loser's insert does nothing), then
+ * creates only the Teams/Players whose fresh id won its mapping, all in one
+ * transaction, so a lost race leaves no row behind. The final lookup is
+ * authoritative.
  */
 export async function resolve(
   db: Database,
@@ -82,30 +88,6 @@ export async function resolve(
 
   const created = missing.map((ref) => ({ ref, id: newId(entity) }))
   const statements: Array<BatchItem<'sqlite'>> = []
-  // Multi-row inserts, sized to stay under D1's 100 bound parameters.
-  if (entity === 'team') {
-    for (const part of chunk(created, 20)) {
-      statements.push(
-        db.insert(teams).values(
-          part.map(({ ref, id }) => ({
-            id,
-            league,
-            name: ref.name,
-            abbreviation: 'abbreviation' in ref ? ref.abbreviation : ref.name,
-            logoUrl: 'logoUrl' in ref ? ref.logoUrl : null,
-          })),
-        ),
-      )
-    }
-  } else if (entity === 'player') {
-    for (const part of chunk(created, 30)) {
-      statements.push(
-        db
-          .insert(players)
-          .values(part.map(({ ref, id }) => ({ id, league, name: ref.name }))),
-      )
-    }
-  }
   for (const part of chunk(created, 24)) {
     statements.push(
       db
@@ -120,6 +102,34 @@ export async function resolve(
         )
         .onConflictDoNothing(),
     )
+  }
+  // Only rows whose id is now mapped: a concurrent caller that got there
+  // first kept its own. Sized to stay under D1's 100 bound parameters.
+  if (entity === 'team') {
+    for (const part of chunk(created, 20)) {
+      const rows = part.map(
+        ({ ref, id }) =>
+          sql`(${id}, ${ref.name}, ${'abbreviation' in ref ? ref.abbreviation : ref.name}, ${'logoUrl' in ref ? ref.logoUrl : null})`,
+      )
+      statements.push(
+        db
+          .insert(teams)
+          .select(
+            sql`select v.column1, ${league}, v.column2, v.column3, v.column4 from (values ${sql.join(rows, sql`, `)}) v ${claimed}`,
+          ),
+      )
+    }
+  } else if (entity === 'player') {
+    for (const part of chunk(created, 45)) {
+      const rows = part.map(({ ref, id }) => sql`(${id}, ${ref.name})`)
+      statements.push(
+        db
+          .insert(players)
+          .select(
+            sql`select v.column1, ${league}, v.column2, null, null, null from (values ${sql.join(rows, sql`, `)}) v ${claimed}`,
+          ),
+      )
+    }
   }
   const [first, ...rest] = statements
   await db.batch([first, ...rest])

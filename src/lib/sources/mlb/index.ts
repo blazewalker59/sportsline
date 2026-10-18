@@ -1,6 +1,7 @@
 /** MLB Source adapter: MLB StatsAPI (statsapi.mlb.com). */
 
-import { getJson as jsonFrom } from '../pool'
+import { LIVE_POLL, getJson as jsonFrom } from '../pool'
+import { seasonYear } from '../common'
 import {
   parseFeed,
   parsePlayerOverview,
@@ -18,6 +19,12 @@ import type { SourceAdapter } from '@/lib/model/types'
 
 const BASE = 'https://statsapi.mlb.com/api'
 const getJson = jsonFrom('MLB StatsAPI')
+const pollJson = jsonFrom('MLB StatsAPI', LIVE_POLL)
+
+/** A season is a calendar year; before March, the last one's schedule. */
+export function mlbSeason(now: Date): number {
+  return seasonYear(now, 2)
+}
 
 export const mlbAdapter: SourceAdapter = {
   league: 'mlb',
@@ -29,7 +36,7 @@ export const mlbAdapter: SourceAdapter = {
     return parseSchedule(schedule)
   },
   async snapshot(sourceGameId) {
-    const feed = await getJson<MlbFeed>(
+    const feed = await pollJson<MlbFeed>(
       `${BASE}/v1.1/game/${encodeURIComponent(sourceGameId)}/feed/live`,
     )
     return parseFeed(feed)
@@ -42,9 +49,7 @@ export const mlbAdapter: SourceAdapter = {
     return parseRoster(teams, people)
   },
   async teamSchedule(team) {
-    // A season is a calendar year; before spring training, show the last.
-    const now = new Date()
-    const season = now.getUTCFullYear() - (now.getUTCMonth() < 2 ? 1 : 0)
+    const season = mlbSeason(new Date())
     const schedule = await getJson<MlbSchedule>(
       `${BASE}/v1/schedule?sportId=1&teamId=${encodeURIComponent(team.sourceId)}&season=${season}&gameType=R,F,D,L,W&hydrate=team`,
     )

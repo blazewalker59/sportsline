@@ -22,6 +22,36 @@ export interface VapidKeys {
   subject: string
 }
 
+/**
+ * The push services browsers subscribe through. A subscription's endpoint
+ * comes from the browser, and the Worker POSTs to it, so only these are
+ * accepted (anything else would let a Viewer aim the Worker at any URL):
+ * - Google (FCM): Chrome, Edge on Android, Opera, Samsung Internet, Brave.
+ * - Mozilla autopush: Firefox, desktop and Android.
+ * - Microsoft WNS: Edge on Windows (wns2-*.notify.windows.com).
+ * - Apple: Safari on macOS and Home Screen apps on iOS (web.push.apple.com).
+ */
+const PUSH_HOSTS = ['fcm.googleapis.com', 'web.push.apple.com']
+const PUSH_DOMAINS = [
+  '.push.services.mozilla.com',
+  '.notify.windows.com',
+  '.push.apple.com',
+]
+
+/** Whether an endpoint is https on a known push service's default port. */
+export function isPushEndpoint(endpoint: string): boolean {
+  let url: URL
+  try {
+    url = new URL(endpoint)
+  } catch {
+    return false
+  }
+  if (url.protocol !== 'https:' || url.port !== '') return false
+  if (url.username !== '' || url.password !== '') return false
+  const host = url.hostname
+  return PUSH_HOSTS.includes(host) || PUSH_DOMAINS.some((d) => host.endsWith(d))
+}
+
 /** Bytes backed by a plain ArrayBuffer (what WebCrypto accepts). */
 type Bytes = Uint8Array<ArrayBuffer>
 
@@ -191,7 +221,8 @@ export type PushResult = 'sent' | 'gone' | 'failed'
 
 /**
  * Send one Web Push message. `gone` means the subscription is dead (the
- * browser unsubscribed or the app was removed) and should be deleted.
+ * browser unsubscribed or the app was removed) and should be deleted; so
+ * is one saved before endpoints were checked that isn't a push service.
  */
 export async function sendPush(
   sub: PushSubscriptionRecord,
@@ -199,6 +230,7 @@ export async function sendPush(
   keys: VapidKeys,
   options: { ttlSeconds?: number; topic?: string } = {},
 ): Promise<PushResult> {
+  if (!isPushEndpoint(sub.endpoint)) return 'gone'
   const body = await encryptPayload(sub, payload)
   const res = await fetch(sub.endpoint, {
     method: 'POST',

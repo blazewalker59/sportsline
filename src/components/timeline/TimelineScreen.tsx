@@ -5,9 +5,9 @@
  * (TimelineFeed) and the sheets it opens (TimelineSheets).
  */
 
+import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useRouter } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNow } from './format'
 import { entryTime } from './FeedRows'
 import { FeedFooter, TimelineFeed } from './TimelineFeed'
 import { TimelineSheets } from './TimelineSheets'
@@ -26,10 +26,11 @@ import { useHideOnScroll } from '@/lib/useHideOnScroll'
 import { useLiveGame } from '@/lib/games/useLiveGame'
 import { catchUp } from '@/lib/timeline/catchup'
 import { AppHeader } from '@/components/layout/AppHeader'
-import { sportsDayOf } from '@/lib/model/sportsDay'
 import { buildChat, typingFor } from '@/lib/timeline/chat'
 import { useLiveTimeline } from '@/lib/timeline/useLiveTimeline'
+import { useToday } from '@/lib/timeline/useToday'
 import { useReadMarkerWriter, useViewer } from '@/lib/viewer/useViewer'
+import { viewerQuery } from '@/lib/viewer/queries'
 
 export function TimelineScreen({
   day,
@@ -47,7 +48,8 @@ export function TimelineScreen({
   matchupId?: string
 }) {
   const viewerState = useViewer()
-  const [today] = useState(() => sportsDayOf(new Date()))
+  // Rolls over at the Sports Day boundary: today's Timeline moves on with it.
+  const today = useToday()
   const sportsDay = day && day < today ? day : today
   // Wait for the session so a signed-in Viewer never flashes the default Timeline.
   if (viewerState.isPending) {
@@ -105,7 +107,26 @@ function Timeline({
   const navigate = useNavigate()
   // The divider marks where the Viewer stopped last time, so it is fixed at
   // load while the stored marker keeps moving.
-  const [readAt] = useState(() => data?.readAt ?? null)
+  const [readAt, setReadAt] = useState(() => data?.readAt ?? null)
+  // A new Sports Day while the app is open: the divider moves up to where
+  // the Viewer had read by then, so the new day doesn't offer last night's
+  // plays as missed.
+  const queryClient = useQueryClient()
+  const openedOn = useRef(today)
+  useEffect(() => {
+    if (today === openedOn.current) return
+    openedOn.current = today
+    let cancelled = false
+    queryClient
+      .fetchQuery({ ...viewerQuery(), staleTime: 0 })
+      .then((state) => {
+        if (!cancelled) setReadAt(state.readAt)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [today, queryClient])
   // Highlights = Scoring and Notable Plays only. It starts on when the
   // Viewer sees every League (the default Follows), off for their own Follows.
   const [highlights, setHighlights] = useState(() => !followed?.length)
@@ -115,8 +136,8 @@ function Timeline({
   // Only today's Timeline moves the Read Marker; browsing history must not.
   useReadMarkerWriter(timeline.items, viewer !== null && isToday && !gameId)
   const backfill = usePastDay(sportsDay, isToday, timeline.reload)
-  const now = useNow()
-  const game = useLiveGame(gameId)
+  // Today's Timeline socket already carries the Game's events.
+  const game = useLiveGame(gameId, { shared: isToday })
   const [boxOpen, setBoxOpen] = useState(false)
   const [dayOpen, setDayOpen] = useState(false)
   useEffect(() => setDayOpen(false), [sportsDay])
@@ -275,7 +296,6 @@ function Timeline({
           entries={entries}
           typing={typing}
           gameId={gameId}
-          now={now}
           dimmed={dimmed}
           loading={timeline.loading}
           recap={recap}
@@ -326,7 +346,6 @@ function Timeline({
         }
         onPredictionClose={() => setPredictionOpen(null)}
         recap={recapOpen ? recap : null}
-        now={now}
         onRecapClose={() => setRecapOpen(false)}
         live={liveOpen && typing.length > 1 ? typing : null}
         onLiveClose={() => setLiveOpen(false)}

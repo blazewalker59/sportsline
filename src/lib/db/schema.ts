@@ -244,6 +244,20 @@ export const itemPlayers = sqliteTable(
   ],
 )
 
+/**
+ * A past Sports Day's League whose schedule synced with no Games, so
+ * opening that day again doesn't ask the Source every time.
+ */
+export const emptyDays = sqliteTable(
+  'empty_days',
+  {
+    league: text('league').$type<League>().notNull(),
+    sportsDay: text('sports_day').notNull(),
+    checkedAt: text('checked_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.league, table.sportsDay] })],
+)
+
 // ─── Viewers ────────────────────────────────────────────────────────────────
 
 /** A Viewer's Follows (CONTEXT.md). `target` is a League code, Team id or Player id. */
@@ -262,18 +276,27 @@ export const follows = sqliteTable(
   ],
 )
 
-/** A Viewer's Reaction to a Timeline item (CONTEXT.md): one emoji each. */
+/**
+ * A Viewer's Reaction to a Timeline item (CONTEXT.md): one emoji each.
+ * Retention keeps a Play with a Reaction; a Removal takes its Reactions
+ * with it.
+ */
 export const reactions = sqliteTable(
   'reactions',
   {
-    itemId: text('item_id').notNull(),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => timelineItems.id, { onDelete: 'cascade' }),
     viewerId: text('viewer_id')
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
     emoji: text('emoji').notNull(),
     createdAt: text('created_at').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.itemId, table.viewerId] })],
+  (table) => [
+    primaryKey({ columns: [table.itemId, table.viewerId] }),
+    index('reactions_viewer_time_idx').on(table.viewerId, table.createdAt),
+  ],
 )
 
 /** How a Viewer arranges Leagues: their order on the Scope row, and which are hidden. */
@@ -748,6 +771,8 @@ export const tradeProposals = sqliteTable(
         | 'partial'
         | 'unfilled'
         | 'failed'
+        // Sent, but Kalshi's reply was lost: looked up later (reconcile.ts).
+        | 'unknown'
       >()
       .notNull(),
     createdAt: text('created_at').notNull(),

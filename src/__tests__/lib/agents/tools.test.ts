@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { SharpPick } from '@/lib/sharp/queries'
 import type { Caller } from '@/lib/agents/tokens'
 import type { CloudflareEnv, Database } from '@/lib/db'
-import { agentPick, priceField, sportslineTools } from '@/lib/agents/tools'
+import { agentPick, priceField } from '@/lib/agents/format'
+import { sportslineTools } from '@/lib/agents/tools'
 
 const single: SharpPick = {
   id: '2026-10-07:1',

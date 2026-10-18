@@ -2,21 +2,20 @@
  * Viewer-owned data (CONTEXT.md, "Viewer"): Follows and the Read Marker.
  *
  * D1 has no row-level security, so every read and write here is scoped by
- * the session's user id via `withViewer`, the same pattern as dreamteam's
- * `withUser`.
+ * the session's user id from `viewerMiddleware`, the same pattern as
+ * dreamteam's `withUser`.
  */
 
 import { createServerFn } from '@tanstack/react-start'
 import { and, eq, like, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
-import { sessionViewer, withViewer } from './session'
+import { optionalViewerMiddleware, viewerMiddleware } from './middleware'
 import type { ViewerProfile } from './session'
 import type { Database } from '@/lib/db'
 import type { ViewerFollow } from '@/lib/model/timeline'
 import type { League } from '@/lib/model/types'
 import type { LeagueSettings } from '@/lib/model/leagues'
 import type { PriceDisplay } from '@/lib/model/price'
-import { requireViewer } from '@/lib/viewer/session'
 import { getCloudflareEnv, getDb } from '@/lib/db'
 import {
   follows,
@@ -35,6 +34,7 @@ import {
 import { startViewerSync } from '@/lib/live/startViewerSync'
 import { isAdmin, reportError } from '@/lib/ops/errors'
 import { priceDisplayOf } from '@/lib/viewer/prefs'
+import { UserError } from '@/lib/userError'
 
 /** A Follow with what the UI needs to show it. */
 export interface FollowEntry {
@@ -165,9 +165,10 @@ function keepSyncing(viewerId: string): void {
   )
 }
 
-export const getViewerState = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<ViewerState> => {
-    const viewer = await sessionViewer()
+/** The session check itself: signed out is an answer here, not an error. */
+export const getViewerState = createServerFn({ method: 'GET' })
+  .middleware([optionalViewerMiddleware])
+  .handler(async ({ context: { viewer, db } }): Promise<ViewerState> => {
     if (!viewer)
       return {
         viewer: null,
@@ -176,7 +177,6 @@ export const getViewerState = createServerFn({ method: 'GET' }).handler(
         leagues: DEFAULT_LEAGUE_SETTINGS,
       }
     keepSyncing(viewer.id)
-    const db = getDb()
     const [entries, marker, arrangement, priceDisplay] = await Promise.all([
       followEntries(db, viewer.id),
       db
@@ -199,29 +199,28 @@ export const getViewerState = createServerFn({ method: 'GET' }).handler(
       isAdmin: isAdmin(getCloudflareEnv(), viewer.email),
       priceDisplay,
     }
-  },
-)
+  })
 
 /** Show Kalshi prices as cents or as a payout multiplier, everywhere. */
 export const setPriceDisplay = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: { display: string }) =>
     z.object({ display: z.enum(['cents', 'multiplier']) }).parse(data),
   )
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }) => {
-      await db
-        .insert(viewerSettings)
-        .values({ viewerId, priceDisplay: data.display })
-        .onConflictDoUpdate({
-          target: viewerSettings.viewerId,
-          set: { priceDisplay: data.display },
-        })
-      return data.display
-    }),
-  )
+  .handler(async ({ data, context: { db, viewerId } }) => {
+    await db
+      .insert(viewerSettings)
+      .values({ viewerId, priceDisplay: data.display })
+      .onConflictDoUpdate({
+        target: viewerSettings.viewerId,
+        set: { priceDisplay: data.display },
+      })
+    return data.display
+  })
 
 /** Save how the Viewer arranges Leagues; returns the normalized settings. */
 export const setLeagueSettings = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: { order: Array<string>; hidden: Array<string> }) =>
     z
       .object({
@@ -231,8 +230,8 @@ export const setLeagueSettings = createServerFn({ method: 'POST' })
       })
       .parse(data),
   )
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }): Promise<LeagueSettings> => {
+  .handler(
+    async ({ data, context: { db, viewerId } }): Promise<LeagueSettings> => {
       const settings = normalizeLeagueSettings(data)
       const now = new Date().toISOString()
       await db
@@ -243,7 +242,7 @@ export const setLeagueSettings = createServerFn({ method: 'POST' })
           set: { ...settings, updatedAt: now },
         })
       return settings
-    }),
+    },
   )
 
 const followInput = z.object({
@@ -253,14 +252,18 @@ const followInput = z.object({
 })
 
 export const setFollow = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: z.input<typeof followInput>) => followInput.parse(data))
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }): Promise<Array<FollowEntry>> => {
+  .handler(
+    async ({
+      data,
+      context: { db, viewerId },
+    }): Promise<Array<FollowEntry>> => {
       if (
         data.kind === 'league' &&
         !(LEAGUES as ReadonlyArray<string>).includes(data.target)
       ) {
-        throw new Error('Unknown League')
+        throw new UserError('Unknown League')
       }
       if (data.following) {
         await db
@@ -284,41 +287,54 @@ export const setFollow = createServerFn({ method: 'POST' })
           )
       }
       return followEntries(db, viewerId)
-    }),
+    },
   )
 
 const ISO = z.string().datetime({ offset: true })
 
-/** Move the Read Marker forward (never back: a stale tab can't rewind it). */
+/**
+ * Move the Read Marker forward (never back: a stale tab can't rewind it).
+ * Markers are compared as text, as Plays' occurredAt are, so each is
+ * stored in UTC and no later than now: an offset or a future time would
+ * sort wrong and pin the marker. A stored one that doesn't (written before
+ * this rule) gives way to the new one.
+ */
 export const markRead = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: { readAt: string }) =>
     z.object({ readAt: ISO }).parse(data),
   )
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }) => {
-      const now = new Date().toISOString()
-      await db
-        .insert(readMarkers)
-        .values({ viewerId, readAt: data.readAt, updatedAt: now })
-        .onConflictDoUpdate({
-          target: readMarkers.viewerId,
-          set: {
-            readAt: sql`max(${readMarkers.readAt}, excluded.read_at)`,
-            updatedAt: now,
-          },
-        })
-    }),
-  )
+  .handler(async ({ data, context: { db, viewerId } }) => {
+    const now = new Date().toISOString()
+    const sent = Date.parse(data.readAt)
+    const at = Math.min(sent, Date.parse(now))
+    const utc = new Date(at).toISOString()
+    // Keep whole seconds whole, as a Source's "…:05Z" occurredAt is: its
+    // "…:05.000Z" would sort before the very Play it marks.
+    const readAt =
+      at === sent && !/\.\d/.test(data.readAt) ? utc.replace('.000Z', 'Z') : utc
+    const stored = sql`case when ${readMarkers.readAt} like '%Z' and ${readMarkers.readAt} <= ${now} then ${readMarkers.readAt} else '' end`
+    await db
+      .insert(readMarkers)
+      .values({ viewerId, readAt, updatedAt: now })
+      .onConflictDoUpdate({
+        target: readMarkers.viewerId,
+        set: {
+          readAt: sql`max(${stored}, excluded.read_at)`,
+          updatedAt: now,
+        },
+      })
+  })
 
 export type Followable = FollowEntry
 
 /** Teams and Players whose name matches, for the Follows search box. */
 export const searchFollowables = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
   .validator((data: { q: string }) =>
     z.object({ q: z.string().trim().min(2).max(60) }).parse(data),
   )
   .handler(async ({ data }): Promise<Array<Followable>> => {
-    await requireViewer()
     const db = getDb()
     const pattern = `%${data.q.replace(/[%_]/g, '')}%`
     const [teamRows, playerRows] = await Promise.all([

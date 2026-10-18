@@ -1,12 +1,11 @@
 /**
- * Opening a Player as a sheet over the current screen (PlayerProfile's
- * PlayerSheetProvider), so leaving it lands exactly where the Viewer was.
+ * Opening a Player as a sheet over the current screen (PlayerSheetProvider),
+ * so leaving it lands exactly where the Viewer was.
  */
 
-import { createContext, useContext } from 'react'
+import { useContext } from 'react'
+import { OpenPlayer } from './PlayerSheetProvider'
 import { cn } from '@/lib/utils'
-
-export const OpenPlayer = createContext<(playerId: string) => void>(() => {})
 
 /** Open a Player's sheet over the current screen. */
 function usePlayerSheet(): (playerId: string) => void {

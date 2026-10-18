@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { useCallback, useEffect, useState } from 'react'
 import {
   deletePushSubscription,
@@ -71,19 +76,28 @@ export function useAlerts() {
       const key = await getPushKey()
       if (!key) return setState('unsupported')
       const reg = await registration()
-      const sub =
-        (await reg.pushManager.getSubscription()) ??
-        (await reg.pushManager.subscribe({
+      const subscribe = () =>
+        reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: b64urlDecode(key),
-        }))
-      const json = sub.toJSON() as {
-        endpoint: string
-        keys: { p256dh: string; auth: string }
+        })
+      const save = (sub: PushSubscription) => {
+        const json = sub.toJSON() as {
+          endpoint: string
+          keys: { p256dh: string; auth: string }
+        }
+        return savePushSubscription({
+          data: { endpoint: json.endpoint, keys: json.keys },
+        })
       }
-      await savePushSubscription({
-        data: { endpoint: json.endpoint, keys: json.keys },
-      })
+      const sub =
+        (await reg.pushManager.getSubscription()) ?? (await subscribe())
+      // Another Viewer signed in here before: this device gets a fresh
+      // subscription of its own rather than taking over theirs.
+      if ((await save(sub)).taken) {
+        await sub.unsubscribe()
+        await save(await subscribe())
+      }
       setState('on')
     } finally {
       setBusy(false)
@@ -109,17 +123,20 @@ export function useAlerts() {
   return { state, busy, enable, disable }
 }
 
-const LEVELS_KEY = ['alert-levels'] as const
+export function alertLevelsQuery() {
+  return queryOptions({
+    queryKey: ['alert-levels'] as const,
+    queryFn: () => getAlertLevels(),
+    staleTime: 5 * 60_000,
+  })
+}
+
+const LEVELS_KEY = alertLevelsQuery().queryKey
 
 /** The Viewer's Alert levels; a change shows at once and saves behind. */
 export function useAlertLevels(enabled: boolean) {
   const queryClient = useQueryClient()
-  const query = useQuery({
-    queryKey: LEVELS_KEY,
-    queryFn: () => getAlertLevels(),
-    enabled,
-    staleTime: 5 * 60_000,
-  })
+  const query = useQuery({ ...alertLevelsQuery(), enabled })
   const save = useMutation({
     mutationFn: (levels: AlertLevels) => setAlertLevels({ data: levels }),
     onMutate: (levels) => queryClient.setQueryData(LEVELS_KEY, levels),

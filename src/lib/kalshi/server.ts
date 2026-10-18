@@ -1,39 +1,23 @@
 /**
  * Kalshi over HTTP for the signed-in Viewer: connect a read-only key,
- * disconnect, sync now, and read Predictions with their Odds (CONTEXT.md).
+ * disconnect, and sync now. Predictions are read in predictionViews.ts,
+ * one Prediction's detail in predictionDetail.ts.
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import { aliasedTable, and, desc, eq, gte, inArray, lte } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { KalshiError, apiKeys } from './client'
 import { importSigningKey } from './keys'
 import { isReadOnly } from './scopes'
-import { progressOf } from './props'
-import { bookChance, positionValue, predictionYesChance } from './pricing'
 import { refreshPrices, syncAccount } from './sync'
 import { seal } from './vault'
-import type { Progress } from './props'
-import type { RecordEntry } from './record'
-import type { GameSummary } from '@/lib/model/timeline'
+import { viewerMiddleware } from '@/lib/viewer/middleware'
 import { getCloudflareEnv } from '@/lib/db'
-import {
-  games,
-  kalshiAccounts,
-  kalshiMarkets,
-  kalshiPrices,
-  players,
-  predictionLegs,
-  predictions,
-  teams,
-  timelineItems,
-} from '@/lib/db/schema'
-import { toGameSummary, toTimelineItem } from '@/lib/live/rows'
-import { teamRef } from '@/lib/players/cards'
-import { scoringHeadline } from '@/lib/timeline/chat'
-import { sessionViewer, withViewer } from '@/lib/viewer/session'
+import { kalshiAccounts, predictions } from '@/lib/db/schema'
 import { reportError } from '@/lib/ops/errors'
 import { startViewerSync } from '@/lib/live/startViewerSync'
+import { UserError } from '@/lib/userError'
 
 export type ChangeDisplay = 'dollars' | 'percent'
 
@@ -46,49 +30,10 @@ export interface KalshiConnection {
   changeDisplay: ChangeDisplay
 }
 
-export interface LegView {
-  title: string
-  side: 'yes' | 'no'
-  /** The chance this Leg goes the Viewer's way (0–1), if priced. */
-  chance: number | null
-  status: 'pending' | 'won' | 'lost'
-  game: GameSummary | null
-  playerId: string | null
-  playerName: string | null
-  teamId: string | null
-  /** A stat prop's count so far against its line (212 of 300 rec yds). */
-  progress: Progress | null
-}
-
-export interface PredictionView {
-  id: string
-  kind: 'single' | 'combo'
-  side: 'yes' | 'no'
-  title: string
-  contracts: number
-  cost: number
-  status: 'open' | 'settled' | 'closed'
-  result: 'won' | 'lost' | 'void' | null
-  payout: number | null
-  pnl: number | null
-  openedAt: string
-  settledAt: string | null
-  /** The chance of the Viewer's side now (0–1), if priced. */
-  chance: number | null
-  /** The chance they got in at: what they paid per contract. */
-  entryChance: number | null
-  /** What the position would sell for now (dollars), if priced. */
-  value: number | null
-  /** The Viewer's side's chance over the last day, oldest first. */
-  history: Array<{ at: string; chance: number }>
-  legs: Array<LegView>
-}
-
-export const getKalshiConnection = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<KalshiConnection | null> => {
-    const viewer = await sessionViewer()
-    if (!viewer) return null
-    return withViewer(async ({ db, viewerId }) => {
+export const getKalshiConnection = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
+  .handler(
+    async ({ context: { db, viewerId } }): Promise<KalshiConnection | null> => {
       const row = await db
         .select()
         .from(kalshiAccounts)
@@ -103,9 +48,8 @@ export const getKalshiConnection = createServerFn({ method: 'GET' }).handler(
             changeDisplay: row.changeDisplay,
           }
         : null
-    })
-  },
-)
+    },
+  )
 
 /**
  * Connect a Kalshi account with a read-only key (docs/adr/0003): the key
@@ -113,6 +57,7 @@ export const getKalshiConnection = createServerFn({ method: 'GET' }).handler(
  * read-only. Its private half is sealed before it's stored.
  */
 export const connectKalshi = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: { keyId: string; privateKey: string }) =>
     z
       .object({
@@ -121,14 +66,14 @@ export const connectKalshi = createServerFn({ method: 'POST' })
       })
       .parse(data),
   )
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }): Promise<KalshiConnection> => {
+  .handler(
+    async ({ data, context: { db, viewerId } }): Promise<KalshiConnection> => {
       const env = getCloudflareEnv()
       let signer
       try {
         signer = await importSigningKey(data.privateKey)
       } catch {
-        throw new Error(
+        throw new UserError(
           'That isn’t a private key Kalshi issues. Paste the whole key, including its BEGIN and END lines.',
         )
       }
@@ -141,19 +86,24 @@ export const connectKalshi = createServerFn({ method: 'POST' })
           error instanceof KalshiError &&
           (error.status === 401 || error.status === 403)
         ) {
-          throw new Error(
+          throw new UserError(
             'Kalshi didn’t accept this key. Check the key ID matches the private key.',
           )
         }
-        throw new Error('Couldn’t reach Kalshi to check the key. Try again.')
+        throw new UserError(
+          'Couldn’t reach Kalshi to check the key. Try again.',
+        )
       }
       const key = keys.find((k) => k.api_key_id === data.keyId)
       if (!isReadOnly(key?.scopes)) {
-        throw new Error(
+        throw new UserError(
           'This key can trade. Sportsline only accepts read-only keys: create one with only the Read scope in Kalshi.',
         )
       }
-      const sealed = await seal(env.KALSHI_ENCRYPTION_KEY, data.privateKey)
+      const sealed = await seal(env.KALSHI_ENCRYPTION_KEY, data.privateKey, {
+        purpose: 'kalshi-read',
+        viewerId,
+      })
       const now = new Date().toISOString()
       const row = {
         viewerId,
@@ -187,434 +137,40 @@ export const connectKalshi = createServerFn({ method: 'POST' })
         syncedAt: new Date().toISOString(),
         changeDisplay: row.changeDisplay,
       }
-    }),
+    },
   )
 
 /** Show Prediction cards' profit or loss in dollars or percent return. */
 export const setChangeDisplay = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: { display: string }) =>
     z.object({ display: z.enum(['dollars', 'percent']) }).parse(data),
   )
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }) => {
-      await db
-        .update(kalshiAccounts)
-        .set({ changeDisplay: data.display })
-        .where(eq(kalshiAccounts.viewerId, viewerId))
-      return data.display
-    }),
-  )
+  .handler(async ({ data, context: { db, viewerId } }) => {
+    await db
+      .update(kalshiAccounts)
+      .set({ changeDisplay: data.display })
+      .where(eq(kalshiAccounts.viewerId, viewerId))
+    return data.display
+  })
 
 /** Forget the key and every Prediction read with it. */
-export const disconnectKalshi = createServerFn({ method: 'POST' }).handler(() =>
-  withViewer(async ({ db, viewerId }) => {
-    await db.delete(predictions).where(eq(predictions.viewerId, viewerId))
-    await db.delete(kalshiAccounts).where(eq(kalshiAccounts.viewerId, viewerId))
-  }),
-)
+export const disconnectKalshi = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
+  .handler(async ({ context: { db, viewerId } }) => {
+    // In one batch: a failure halfway can't leave the key behind.
+    await db.batch([
+      db.delete(predictions).where(eq(predictions.viewerId, viewerId)),
+      db.delete(kalshiAccounts).where(eq(kalshiAccounts.viewerId, viewerId)),
+    ])
+  })
 
-export const syncKalshiNow = createServerFn({ method: 'POST' }).handler(() =>
-  withViewer(async ({ viewerId }) => {
+export const syncKalshiNow = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
+  .handler(async ({ context: { viewerId } }) => {
     const env = getCloudflareEnv()
     const counts = await syncAccount(env, viewerId)
-    await refreshPrices(env)
+    // Only this Viewer's markets: never read with every Viewer's key.
+    await refreshPrices(env, viewerId)
     return counts
-  }),
-)
-
-const HISTORY_MS = 24 * 3_600_000
-const SETTLED_SHOWN = 100
-
-export const getPredictions = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<Array<PredictionView>> => {
-    const viewer = await sessionViewer()
-    if (!viewer) return []
-    return withViewer(async ({ db, viewerId }) => {
-      const [open, settled] = await Promise.all([
-        db
-          .select()
-          .from(predictions)
-          .where(
-            and(
-              eq(predictions.viewerId, viewerId),
-              eq(predictions.status, 'open'),
-            ),
-          )
-          .orderBy(desc(predictions.openedAt)),
-        db
-          .select()
-          .from(predictions)
-          .where(
-            and(
-              eq(predictions.viewerId, viewerId),
-              inArray(predictions.status, ['settled', 'closed']),
-            ),
-          )
-          .orderBy(desc(predictions.settledAt), desc(predictions.updatedAt))
-          .limit(SETTLED_SHOWN),
-      ])
-      const all = [...open, ...settled]
-      if (all.length === 0) return []
-      const ids = all.map((p) => p.id)
-
-      // In parts: D1 binds at most 100 parameters, and history grows.
-      const legs = await inChunks(ids, (part) =>
-        db
-          .select({
-            leg: predictionLegs,
-            playerName: players.name,
-          })
-          .from(predictionLegs)
-          .leftJoin(players, eq(players.id, predictionLegs.playerId))
-          .where(inArray(predictionLegs.predictionId, part))
-          .orderBy(predictionLegs.predictionId, predictionLegs.position),
-      )
-      const tickers = [
-        ...new Set([
-          ...all.map((p) => p.marketTicker),
-          ...legs.map((l) => l.leg.marketTicker),
-        ]),
-      ]
-      const gameIds = [
-        ...new Set(legs.flatMap((l) => (l.leg.gameId ? [l.leg.gameId] : []))),
-      ]
-      const away = aliasedTable(teams, 'away')
-      const home = aliasedTable(teams, 'home')
-      const [marketRows, gameRows, history] = await Promise.all([
-        inChunks(tickers, (part) =>
-          db
-            .select()
-            .from(kalshiMarkets)
-            .where(inArray(kalshiMarkets.ticker, part)),
-        ),
-        inChunks(gameIds, (part) =>
-          db
-            .select({ game: games, away, home })
-            .from(games)
-            .innerJoin(away, eq(away.id, games.awayTeamId))
-            .innerJoin(home, eq(home.id, games.homeTeamId))
-            .where(inArray(games.id, part)),
-        ),
-        inChunks(
-          open.map((p) => p.marketTicker),
-          (part) =>
-            db
-              .select()
-              .from(kalshiPrices)
-              .where(
-                and(
-                  inArray(kalshiPrices.ticker, part),
-                  gte(
-                    kalshiPrices.at,
-                    new Date(Date.now() - HISTORY_MS)
-                      .toISOString()
-                      .slice(0, 16),
-                  ),
-                ),
-              )
-              .orderBy(kalshiPrices.at),
-        ),
-      ])
-      const marketBy = new Map(marketRows.map((m) => [m.ticker, m]))
-      const gameBy = new Map(
-        gameRows.map((r) => [r.game.id, toGameSummary(r.game, r.away, r.home)]),
-      )
-      const boxBy = new Map(gameRows.map((r) => [r.game.id, r.game.box]))
-      const yesChance = (ticker: string): number | null => {
-        const m = marketBy.get(ticker)
-        return m ? bookChance(m) : null
-      }
-      const forSide = (chance: number | null, side: 'yes' | 'no') =>
-        chance === null ? null : side === 'yes' ? chance : 1 - chance
-
-      return all.map((p): PredictionView => {
-        const m = marketBy.get(p.marketTicker)
-        // A Combo has no book: its chance (and cash-out) come from its Legs.
-        const yes = predictionYesChance(
-          p.kind,
-          m,
-          legs
-            .filter((l) => l.leg.predictionId === p.id)
-            .map(({ leg }) => ({
-              side: leg.side,
-              yesChance: yesChance(leg.marketTicker),
-              result: marketBy.get(leg.marketTicker)?.result,
-            })),
-        )
-        return {
-          id: p.id,
-          kind: p.kind,
-          side: p.side,
-          title: p.title,
-          contracts: p.contracts,
-          cost: p.cost,
-          status: p.status,
-          result: p.result,
-          payout: p.payout,
-          pnl: p.pnl,
-          openedAt: p.openedAt,
-          settledAt: p.settledAt,
-          chance: p.status === 'open' ? forSide(yes, p.side) : null,
-          entryChance: p.contracts > 0 ? p.cost / p.contracts : null,
-          value:
-            p.status === 'open'
-              ? positionValue(p.kind, p.side, p.contracts, m, yes)
-              : null,
-          history: history
-            .filter((h) => h.ticker === p.marketTicker)
-            .map((h) => ({
-              at: h.at,
-              chance: p.side === 'yes' ? h.chance : 1 - h.chance,
-            })),
-          legs: legs
-            .filter((l) => l.leg.predictionId === p.id)
-            .map(({ leg, playerName }) => {
-              const lm = marketBy.get(leg.marketTicker)
-              const result = lm?.result
-              const game = leg.gameId ? (gameBy.get(leg.gameId) ?? null) : null
-              return {
-                title: leg.title,
-                side: leg.side,
-                chance: forSide(yesChance(leg.marketTicker), leg.side),
-                status:
-                  result === 'yes' || result === 'no'
-                    ? result === leg.side
-                      ? 'won'
-                      : 'lost'
-                    : 'pending',
-                game,
-                playerId: leg.playerId,
-                playerName,
-                teamId: leg.teamId,
-                progress: game
-                  ? progressOf({
-                      league: game.league,
-                      eventTicker: leg.eventTicker,
-                      title: leg.title,
-                      floorStrike: lm?.floorStrike ?? null,
-                      game,
-                      box: boxBy.get(game.id) ?? null,
-                      teamId: leg.teamId,
-                      playerId: leg.playerId,
-                    })
-                  : null,
-              }
-            }),
-        }
-      })
-    })
-  },
-)
-
-/**
- * Every Prediction the Viewer has made, compactly, for their Record
- * (record.ts builds it on the device, for any range).
- */
-export const getPredictionRecord = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<Array<RecordEntry>> => {
-    if (!(await sessionViewer())) return []
-    return withViewer(async ({ db, viewerId }) => {
-      const rows = await db
-        .select()
-        .from(predictions)
-        .where(eq(predictions.viewerId, viewerId))
-      if (rows.length === 0) return []
-      const legs = await inChunks(
-        rows.map((r) => r.id),
-        (part) =>
-          db
-            .select({
-              predictionId: predictionLegs.predictionId,
-              eventTicker: predictionLegs.eventTicker,
-              marketTicker: predictionLegs.marketTicker,
-              side: predictionLegs.side,
-              playerId: predictionLegs.playerId,
-            })
-            .from(predictionLegs)
-            .where(inArray(predictionLegs.predictionId, part)),
-      )
-      const results = new Map(
-        (
-          await inChunks(
-            [...new Set(legs.map((l) => l.marketTicker))],
-            (part) =>
-              db
-                .select({
-                  ticker: kalshiMarkets.ticker,
-                  result: kalshiMarkets.result,
-                })
-                .from(kalshiMarkets)
-                .where(inArray(kalshiMarkets.ticker, part)),
-          )
-        ).map((m) => [m.ticker, m.result]),
-      )
-      const legsOf = new Map<string, Array<RecordEntry['legs'][number]>>()
-      for (const l of legs) {
-        const r = results.get(l.marketTicker)
-        const list = legsOf.get(l.predictionId) ?? []
-        list.push({
-          series: l.eventTicker.split('-')[0],
-          playerProp: l.playerId !== null,
-          status:
-            r === 'yes' || r === 'no'
-              ? r === l.side
-                ? 'won'
-                : 'lost'
-              : 'pending',
-        })
-        legsOf.set(l.predictionId, list)
-      }
-      return rows.map((r) => ({
-        id: r.id,
-        kind: r.kind,
-        title: r.title,
-        cost: r.cost,
-        status: r.status,
-        result: r.result,
-        pnl: r.pnl,
-        madeAt: r.tradedAt ?? r.openedAt,
-        settledAt: r.settledAt,
-        entryChance: r.contracts > 0 ? r.cost / r.contracts : null,
-        legs: legsOf.get(r.id) ?? [],
-      }))
-    })
-  },
-)
-
-/** A Scoring Play in one of a Prediction's Games: what moved its odds. */
-export interface PredictionMove {
-  at: string
-  /** "Touchdown", "Home run". */
-  headline: string
-  description: string
-  /** The scoring team's abbreviation and color, when the play has a side. */
-  team: string | null
-  color: string | null
-}
-
-export interface PredictionDetail {
-  /** The Viewer's side's chance (0–1) since the Prediction was made. */
-  history: Array<{ at: string; chance: number }>
-  /** What they paid per contract: the chance they got in at. */
-  entryChance: number | null
-  moves: Array<PredictionMove>
-}
-
-/** At most this many plays: enough to explain the swings, not every one. */
-const MOVES_SHOWN = 60
-
-/**
- * One Prediction's whole life for its sheet: the odds on the Viewer's side
- * since it was made (kalshi_prices, a point a minute while it's open) and
- * the Scoring Plays in its Games over that time.
- */
-export const getPredictionDetail = createServerFn({ method: 'GET' })
-  .validator((data: { id: string }) =>
-    z.object({ id: z.string().min(1).max(400) }).parse(data),
-  )
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }): Promise<PredictionDetail | null> => {
-      const p = await db
-        .select()
-        .from(predictions)
-        .where(
-          and(eq(predictions.id, data.id), eq(predictions.viewerId, viewerId)),
-        )
-        .get()
-      if (!p) return null
-      const from = p.tradedAt ?? p.openedAt
-      const to = p.settledAt ?? new Date().toISOString()
-      const [points, legs] = await Promise.all([
-        db
-          .select({ at: kalshiPrices.at, chance: kalshiPrices.chance })
-          .from(kalshiPrices)
-          .where(
-            and(
-              eq(kalshiPrices.ticker, p.marketTicker),
-              gte(kalshiPrices.at, from.slice(0, 16)),
-              lte(kalshiPrices.at, to.slice(0, 16)),
-            ),
-          )
-          .orderBy(kalshiPrices.at),
-        db
-          .select({ gameId: predictionLegs.gameId })
-          .from(predictionLegs)
-          .where(eq(predictionLegs.predictionId, p.id)),
-      ])
-      const history = points
-        // A Combo's market has no book: before Combos were priced from
-        // their Legs, its points sat at the empty book's midpoint (50%).
-        .filter((h) => p.kind !== 'combo' || h.chance !== 0.5)
-        .map((h) => ({
-          at: h.at,
-          chance: p.side === 'yes' ? h.chance : 1 - h.chance,
-        }))
-      // A settled Prediction ends at its result (a closed market's last
-      // quotes are no longer a chance).
-      if ((p.result === 'won' || p.result === 'lost') && p.settledAt) {
-        const at = p.settledAt.slice(0, 16)
-        // One point a minute: the result replaces that minute's quote.
-        if (history.at(-1)?.at === at) history.pop()
-        history.push({ at, chance: p.result === 'won' ? 1 : 0 })
-      }
-
-      const gameIds = [
-        ...new Set(legs.flatMap((l) => (l.gameId ? [l.gameId] : []))),
-      ]
-      const away = aliasedTable(teams, 'away')
-      const home = aliasedTable(teams, 'home')
-      const plays = await inChunks(gameIds, (part) =>
-        db
-          .select({ item: timelineItems, away, home })
-          .from(timelineItems)
-          .innerJoin(away, eq(away.id, timelineItems.awayTeamId))
-          .innerJoin(home, eq(home.id, timelineItems.homeTeamId))
-          .where(
-            and(
-              inArray(timelineItems.gameId, part),
-              eq(timelineItems.kind, 'play'),
-              eq(timelineItems.significance, 'scoring'),
-              eq(timelineItems.status, 'active'),
-              gte(timelineItems.occurredAt, from),
-              lte(timelineItems.occurredAt, to),
-            ),
-          ),
-      )
-      const moves = plays
-        .map(({ item, away: a, home: h }): PredictionMove => {
-          const play = toTimelineItem(item, teamRef(a), teamRef(h))
-          const team =
-            play.side === 'away'
-              ? play.awayTeam
-              : play.side === 'home'
-                ? play.homeTeam
-                : null
-          return {
-            at: play.occurredAt,
-            headline: scoringHeadline(play),
-            description: play.description,
-            team: team?.abbreviation ?? null,
-            color: team?.colors?.primary ?? null,
-          }
-        })
-        .sort((x, y) => x.at.localeCompare(y.at))
-        .slice(-MOVES_SHOWN)
-      return {
-        history,
-        entryChance: p.contracts > 0 ? p.cost / p.contracts : null,
-        moves,
-      }
-    }),
-  )
-
-/** Run a query over ids in parts (D1 binds at most 100 parameters). */
-async function inChunks<T>(
-  ids: ReadonlyArray<string>,
-  query: (part: Array<string>) => Promise<Array<T>>,
-): Promise<Array<T>> {
-  const out: Array<T> = []
-  for (let i = 0; i < ids.length; i += 80) {
-    out.push(...(await query(ids.slice(i, i + 80))))
-  }
-  return out
-}
+  })

@@ -1,16 +1,17 @@
 /**
  * The signed-in Viewer, for server functions. Server-only: kept apart from
  * the server-function modules so the client bundle never pulls in auth or
- * the database.
+ * the database. Server functions don't call it directly: they take their
+ * Viewer from `viewerMiddleware` (./middleware).
  *
  * D1 has no row-level security, so every Viewer-owned read and write is
- * scoped by the session's user id via `withViewer`, the same pattern as
- * dreamteam's `withUser`.
+ * scoped by the session's user id, the same pattern as dreamteam's
+ * `withUser`.
  */
 
-import type { Database } from '@/lib/db'
+import type { ServerRequestContext } from '@/lib/db'
 import { getAuth } from '@/lib/auth/server'
-import { getCloudflareEnv, getDb, serverRequestContext } from '@/lib/db'
+import { getCloudflareEnv, serverRequestContext } from '@/lib/db'
 
 export interface ViewerProfile {
   id: string
@@ -19,9 +20,26 @@ export interface ViewerProfile {
   email: string
 }
 
-export async function sessionViewer(): Promise<ViewerProfile | null> {
-  const headers = serverRequestContext.getStore()?.headers
-  if (!headers) return null
+/** One lookup per request, however many server functions a page runs. */
+const resolved = new WeakMap<
+  ServerRequestContext,
+  Promise<ViewerProfile | null>
+>()
+
+export function sessionViewer(): Promise<ViewerProfile | null> {
+  const store = serverRequestContext.getStore()
+  if (!store) return Promise.resolve(null)
+  let viewer = resolved.get(store)
+  if (!viewer) {
+    viewer = lookUp(store.headers)
+    // A failed lookup isn't remembered: the next call tries again.
+    viewer.catch(() => resolved.delete(store))
+    resolved.set(store, viewer)
+  }
+  return viewer
+}
+
+async function lookUp(headers: Headers): Promise<ViewerProfile | null> {
   const session = await getAuth(getCloudflareEnv()).api.getSession({ headers })
   if (!session?.user) return null
   return {
@@ -30,20 +48,4 @@ export async function sessionViewer(): Promise<ViewerProfile | null> {
     image: session.user.image ?? null,
     email: session.user.email,
   }
-}
-
-/** Sportsline is for signed-in Viewers: every server function but the
- * session check itself starts here. */
-export async function requireViewer(): Promise<ViewerProfile> {
-  const viewer = await sessionViewer()
-  if (!viewer) throw new Error('Sign in required')
-  return viewer
-}
-
-export async function withViewer<T>(
-  fn: (scope: { db: Database; viewerId: string }) => Promise<T>,
-): Promise<T> {
-  const viewer = await sessionViewer()
-  if (!viewer) throw new Error('Sign in required')
-  return fn({ db: getDb(), viewerId: viewer.id })
 }

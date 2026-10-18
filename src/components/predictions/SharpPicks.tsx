@@ -12,7 +12,6 @@ import type { ReactNode } from 'react'
 import type { SharpPick } from '@/lib/sharp/server'
 import type { RecordEntry } from '@/lib/kalshi/record'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
-import { clockTime, shortDate } from '@/components/charts/format'
 import { CalibrationChart } from '@/components/charts/lazy'
 import { calibrationOf } from '@/lib/kalshi/record'
 import { picksRecord } from '@/lib/sharp/record'
@@ -21,7 +20,11 @@ import { bannerVisible, kalshiEventUrl, slateSummary } from '@/lib/sharp/view'
 import { sportsDayOf } from '@/lib/model/sportsDay'
 import { formatPrice } from '@/lib/model/price'
 import { usePriceDisplay } from '@/lib/viewer/useViewer'
+import { useStoredValue } from '@/lib/useStoredValue'
+import { StatGrid, StatTile } from '@/components/layout/StatTile'
 import { cn } from '@/lib/utils'
+import { clockTime, shortDay } from '@/lib/time/format'
+import { useTimeZone } from '@/lib/time/useTimeZone'
 
 const cents = (p: number) => `${Math.round(p * 100)}¢`
 const pct1 = (p: number) => `${(p * 100).toFixed(1)}%`
@@ -49,35 +52,20 @@ const GRADES = {
 
 const DISMISSED_KEY = 'sportsline:sharp-banner-dismissed'
 
-function readDismissed(): string | null {
-  try {
-    return localStorage.getItem(DISMISSED_KEY)
-  } catch {
-    return null
-  }
-}
-
 /**
  * On the Timeline's Predictions Scope: "Sharp picks available" for today's
  * slate, dismissable for the day; open, the picks in line.
  */
 export function SharpPicksBanner() {
   const slate = useSharpSlate()
-  const [dismissed, setDismissed] = useState(readDismissed)
+  const [dismissed, setDismissed] = useStoredValue(DISMISSED_KEY)
   const [open, setOpen] = useState(false)
   const data = slate.data
   const today = sportsDayOf(new Date())
   if (!data || data.day !== today || !bannerVisible(data.day, dismissed))
     return null
   const summary = slateSummary(data.picks)
-  const dismiss = () => {
-    setDismissed(data.day)
-    try {
-      localStorage.setItem(DISMISSED_KEY, data.day)
-    } catch {
-      // Private mode: it stays dismissed for this visit only.
-    }
-  }
+  const dismiss = () => setDismissed(data.day)
   return (
     <section className="overflow-hidden rounded-2xl border border-accent/40 bg-surface">
       <div className="flex items-center">
@@ -178,7 +166,7 @@ export function SharpPicksSection() {
           Sharp picks
           {data && (
             <span className="ml-1 font-normal normal-case">
-              · {shortDate(data.day)}
+              · {shortDay(data.day)}
             </span>
           )}
         </h2>
@@ -424,15 +412,18 @@ function GradeChip({ grade }: { grade: SharpPick['grade'] }) {
 }
 
 /** Where the pick stands: its start time, then live, then the result. */
-function statusOf(p: SharpPick): { text: string; tone: 'good' | 'bad' | null } {
+function statusOf(
+  p: SharpPick,
+  timeZone: string | null,
+): { text: string; tone: 'good' | 'bad' | null } {
   if (p.result === 'won') return { text: 'Won', tone: 'good' }
   if (p.result === 'lost') return { text: 'Lost', tone: 'bad' }
   if (Date.now() >= Date.parse(p.startsAt)) return { text: 'Live', tone: null }
-  return { text: clockTime(p.startsAt), tone: null }
+  return { text: clockTime(p.startsAt, timeZone), tone: null }
 }
 
 function StatusText({ pick }: { pick: SharpPick }) {
-  const s = statusOf(pick)
+  const s = statusOf(pick, useTimeZone())
   return (
     <span
       className={cn(
@@ -485,6 +476,7 @@ function KalshiLink({
 function PickRow({ pick: p }: { pick: SharpPick }) {
   const [open, setOpen] = useState(false)
   const display = usePriceDisplay()
+  const timeZone = useTimeZone()
   return (
     <div>
       <button
@@ -519,7 +511,7 @@ function PickRow({ pick: p }: { pick: SharpPick }) {
             for something the books give a {pct1(p.fair)} chance:{' '}
             <b className="text-foreground">{pts(p.edge)}</b>.{' '}
             {p.marketKind && KIND_NAMES[p.marketKind]}, Kalshi{' '}
-            {p.side?.toUpperCase()}, {clockTime(p.startsAt)}.
+            {p.side?.toUpperCase()}, {clockTime(p.startsAt, timeZone)}.
           </p>
           {p.form && (
             <p>
@@ -686,19 +678,11 @@ function PicksRecord() {
       <h3 className="text-xs font-bold tracking-wide text-muted uppercase">
         Picks record · {s.picks} picks
       </h3>
-      <div className="grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-border bg-border">
+      <StatGrid>
         {tiles.map((t) => (
-          <div key={t.label} className="bg-surface px-3 py-2">
-            <span className="block text-[10px] font-semibold tracking-wide text-muted uppercase">
-              {t.label}
-            </span>
-            <span className="block text-lg leading-tight font-bold tabular-nums">
-              {t.value}
-            </span>
-            <span className="text-[11px] text-muted">{t.sub}</span>
-          </div>
+          <StatTile key={t.label} label={t.label} value={t.value} sub={t.sub} />
         ))}
-      </div>
+      </StatGrid>
       <div className="rounded-xl border border-border bg-surface px-3 py-2.5">
         <div className="grid grid-cols-[minmax(0,1fr)_2.5rem_3.5rem_3.5rem_3.5rem] gap-x-2 gap-y-1 text-[12px] tabular-nums">
           {['Grade', '#', 'Close', 'W–L', 'Return'].map((h, i) => (

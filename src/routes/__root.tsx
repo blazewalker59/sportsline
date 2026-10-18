@@ -12,17 +12,27 @@ import appCss from '../styles.css?url'
 import { THEME_BOOT, THEME_COLOR_BOOT } from '../lib/theme'
 
 import type { QueryClient } from '@tanstack/react-query'
-import { PlayerSheetProvider } from '@/components/players/PlayerProfile'
-import { Landing } from '@/components/landing/Landing'
+import { PlayerSheetProvider } from '@/components/players/PlayerSheetProvider'
+import { Landing } from '@/components/landing/LazyLanding'
 import { useViewer } from '@/lib/viewer/useViewer'
+import { ensureViewer } from '@/lib/viewer/queries'
 import { sendClientError, useClientErrors } from '@/lib/ops/useClientErrors'
 import { isStaleBuild, reloadForNewBuild } from '@/lib/ops/staleBuild'
+import { requestTimeZone } from '@/lib/time/requestTimeZone'
+import { TimeZoneProvider } from '@/lib/time/useTimeZone'
 
 interface MyRouterContext {
   queryClient: QueryClient
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
+  // The session first, so the server renders the app (or the Landing) rather
+  // than a splash, and every loader below knows who's asking. The Viewer's
+  // time zone too, from their tz cookie, so the server renders their times.
+  beforeLoad: async ({ context }) => ({
+    viewerState: await ensureViewer(context.queryClient),
+    timeZone: requestTimeZone(),
+  }),
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
@@ -55,12 +65,22 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
     ],
   }),
   shellComponent: RootDocument,
-  component: Gate,
+  component: Root,
   errorComponent: Crashed,
   notFoundComponent: () => (
     <p className="p-8 text-center text-muted">Page not found.</p>
   ),
 })
+
+/** Times read in the Viewer's zone, the same through hydration (useTimeZone). */
+function Root() {
+  const { timeZone } = Route.useRouteContext()
+  return (
+    <TimeZoneProvider zone={timeZone}>
+      <Gate />
+    </TimeZoneProvider>
+  )
+}
 
 /**
  * Sportsline is for signed-in Viewers: a visitor sees the Landing, a

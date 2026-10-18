@@ -8,17 +8,15 @@ import { useState } from 'react'
 import type { ErrorView, JobView, OpsHealth } from '@/lib/ops/server'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { timeAgo, useNow } from '@/components/timeline/format'
-import { getOpsHealth } from '@/lib/ops/server'
+import { opsHealthQuery } from '@/lib/ops/queries'
 import { cn } from '@/lib/utils'
+import { dateTime } from '@/lib/time/format'
+import { useTimeZone } from '@/lib/time/useTimeZone'
 
 const DAY = 24 * 3_600_000
 
 export function AdminScreen() {
-  const health = useQuery({
-    queryKey: ['ops-health'],
-    queryFn: () => getOpsHealth(),
-    refetchInterval: 30_000,
-  })
+  const health = useQuery(opsHealthQuery())
   return (
     <div className="mx-auto max-w-2xl px-4 pb-16">
       <AppHeader />
@@ -33,8 +31,7 @@ export function AdminScreen() {
           <span className="font-semibold text-foreground">
             {health.data.email}
           </span>
-          , which isn’t an admin
-          {health.data.adminsConfigured === 0 && ' (no admins are configured)'}.
+          , which isn’t an admin.
         </p>
       ) : (
         <Health health={health.data} />
@@ -62,7 +59,7 @@ function Health({ health }: { health: OpsHealth }) {
   const now = useNow(15_000)
   const states = health.jobs.map(jobState)
   const recentErrors = health.errors
-    .filter((e) => now - Date.parse(e.lastAt) < DAY)
+    .filter((e) => now !== null && now - Date.parse(e.lastAt) < DAY)
     .reduce((n, e) => n + e.count, 0)
   return (
     <div className="flex flex-col gap-6">
@@ -173,8 +170,9 @@ function Health({ health }: { health: OpsHealth }) {
   )
 }
 
-function ErrorRow({ error: e, now }: { error: ErrorView; now: number }) {
+function ErrorRow({ error: e, now }: { error: ErrorView; now: number | null }) {
   const [open, setOpen] = useState(false)
+  const timeZone = useTimeZone()
   return (
     <li>
       <button
@@ -197,8 +195,8 @@ function ErrorRow({ error: e, now }: { error: ErrorView; now: number }) {
       {open && (
         <div className="px-3 pb-3 text-xs text-muted">
           <p className="mb-1">
-            First seen {new Date(e.firstAt).toLocaleString()} · last{' '}
-            {new Date(e.lastAt).toLocaleString()}
+            First seen {dateTime(e.firstAt, timeZone)} · last{' '}
+            {dateTime(e.lastAt, timeZone)}
           </p>
           {e.details && (
             <pre className="max-h-64 overflow-auto rounded-lg bg-notice p-2 text-[11px] leading-snug whitespace-pre-wrap">

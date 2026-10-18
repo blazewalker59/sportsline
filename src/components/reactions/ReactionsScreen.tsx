@@ -3,9 +3,8 @@
  * grouped by Sports Day. Tapping a Play opens its detail in a sheet here.
  */
 
-import { useInfiniteQuery } from '@tanstack/react-query'
 import { useNavigate, useRouter } from '@tanstack/react-router'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect } from 'react'
 import type { MyReaction } from '@/lib/reactions/server'
 import { AppHeader } from '@/components/layout/AppHeader'
 import {
@@ -16,8 +15,8 @@ import {
 import { PlaySheet } from '@/components/games/PlayDetailScreen'
 import { dayLabel } from '@/components/timeline/DayButton'
 import { timeAgo, useNow } from '@/components/timeline/format'
-import { sportsDayOf } from '@/lib/model/sportsDay'
-import { getMyReactions } from '@/lib/reactions/server'
+import { useMyReactions } from '@/lib/reactions/useReactions'
+import { useToday } from '@/lib/timeline/useToday'
 import { takePlayOpened } from '@/lib/timeline/playSheet'
 import { useViewer } from '@/lib/viewer/useViewer'
 
@@ -25,14 +24,8 @@ export function ReactionsScreen({ playId }: { playId: string | null }) {
   const { data: viewerState, isPending } = useViewer()
   const signedIn = Boolean(viewerState?.viewer)
   const now = useNow()
-  const [today] = useState(() => sportsDayOf(new Date()))
-  const query = useInfiniteQuery({
-    queryKey: ['my-reactions'],
-    queryFn: ({ pageParam }) => getMyReactions({ data: { before: pageParam } }),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (last) => last.nextBefore ?? undefined,
-    enabled: signedIn,
-  })
+  const today = useToday()
+  const query = useMyReactions(signedIn)
   const reactions = query.data?.pages.flatMap((p) => p.reactions) ?? []
   const days = groupByDay(reactions)
 
@@ -101,7 +94,7 @@ function ReactionEntry({
   now,
 }: {
   reaction: MyReaction
-  now: number
+  now: number | null
 }) {
   const team = item.side === 'home' ? item.homeTeam : item.awayTeam
   return (

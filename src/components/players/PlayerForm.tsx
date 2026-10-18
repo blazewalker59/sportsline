@@ -12,7 +12,8 @@ import { tooltip } from '@tanstack/charts/tooltip'
 import { useMemo } from 'react'
 import type { PlayerOverview } from '@/lib/model/types'
 import { CHART_COLORS, ChartCard } from '@/components/charts/ChartCard'
-import { shortDate } from '@/components/charts/format'
+import { shortDate } from '@/lib/time/format'
+import { useTimeZone } from '@/lib/time/useTimeZone'
 
 type Game = PlayerOverview['recent'][number]
 
@@ -31,6 +32,7 @@ export function PlayerForm({
   form: NonNullable<PlayerOverview['form']>
   recent: PlayerOverview['recent']
 }) {
+  const timeZone = useTimeZone()
   // Save percentage reads as .912; everything else is a count.
   const show = (v: number) =>
     form.label.includes('%')
@@ -104,7 +106,7 @@ export function PlayerForm({
             const b = point.datum as Bar
             const g = b.game
             return [
-              `${g.date ? shortDate(g.date) : ''} · ${g.home ? 'vs' : '@'} ${g.opponent}`,
+              `${g.date ? shortDate(g.date, timeZone) : ''} · ${g.home ? 'vs' : '@'} ${g.opponent}`,
               [g.result, g.score].filter(Boolean).join(' '),
               `${show(b.value)} ${form.label}`,
               g.line,
@@ -116,7 +118,7 @@ export function PlayerForm({
       }),
     // `show` only depends on form.label.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [bars, form.average, form.label],
+    [bars, form.average, form.label, timeZone],
   )
 
   if (bars.length < 2) return null

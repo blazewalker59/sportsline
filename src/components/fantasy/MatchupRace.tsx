@@ -22,19 +22,17 @@ import {
   WINDOWED_MARGIN,
   useTimeWindow,
 } from '@/components/charts/TimeOverview'
-import { clockTime } from '@/components/charts/format'
 import { actionWindow, withinWindow } from '@/components/charts/timeWindow'
 import { leadChanges, raceSteps } from '@/lib/fantasy/race'
-import { getMatchupRace } from '@/lib/fantasy/server'
+import { matchupRaceQuery } from '@/lib/fantasy/queries'
+import { clockTime, weekdayTime } from '@/lib/time/format'
+import { useTimeZone } from '@/lib/time/useTimeZone'
 
 const HOUR = 3_600_000
 
 /** "Sun 4:25 PM": weekday and time when the race spans days. */
-function when(t: number, spansDays: boolean): string {
-  const d = new Date(t)
-  return spansDays
-    ? `${d.toLocaleDateString([], { weekday: 'short' })} ${clockTime(d)}`
-    : clockTime(d)
+function when(t: number, spansDays: boolean, timeZone: string | null): string {
+  return spansDays ? weekdayTime(t, timeZone) : clockTime(t, timeZone)
 }
 
 export function MatchupRace({
@@ -44,12 +42,8 @@ export function MatchupRace({
   leagueId: string
   m: MatchupView
 }) {
-  const race = useQuery({
-    queryKey: ['matchup-race', leagueId, m.matchupPeriod],
-    queryFn: () => getMatchupRace({ data: { leagueId } }),
-    refetchInterval: 2 * 60_000,
-    staleTime: 60_000,
-  })
+  const race = useQuery(matchupRaceQuery(leagueId, m.matchupPeriod))
+  const timeZone = useTimeZone()
   const opponent = m.opponent
   // The race so far, ending at the score the sheet shows now.
   const points = useMemo((): Array<RacePoint> => {
@@ -160,7 +154,10 @@ export function MatchupRace({
         x: {
           scale: scaleLinear().domain([view.start, view.end]),
           axis: {
-            ticks: { format: (v: number) => when(v, spansDays), count: 3 },
+            ticks: {
+              format: (v: number) => when(v, spansDays, timeZone),
+              count: 3,
+            },
           },
         },
         y: {
@@ -181,7 +178,7 @@ export function MatchupRace({
           const p = step.point
           const lead = p.mine - p.opponent
           return [
-            when(Date.parse(p.at), true),
+            when(Date.parse(p.at), true, timeZone),
             `${m.mine.abbrev} ${pts(p.mine)}`,
             `${opponent?.abbrev ?? 'Opp'} ${pts(p.opponent)}`,
             lead === 0
@@ -191,7 +188,7 @@ export function MatchupRace({
         },
       },
     })
-  }, [steps, view, m.mine.projected, m.mine.abbrev, opponent])
+  }, [steps, view, m.mine.projected, m.mine.abbrev, opponent, timeZone])
 
   if (!opponent || m.categories) return null
   const changes = leadChanges(points)
@@ -249,7 +246,9 @@ export function MatchupRace({
             onPick={pick}
             onShowAction={showAction}
             onShowAll={showAll}
-            format={(t) => when(t, extent.end - extent.start > 20 * HOUR)}
+            format={(t) =>
+              when(t, extent.end - extent.start > 20 * HOUR, timeZone)
+            }
             label="Race"
           />
         )}

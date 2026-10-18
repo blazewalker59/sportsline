@@ -1,26 +1,22 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import {
-  getViewerState,
   markRead,
   setFollow,
   setLeagueSettings,
   setPriceDisplay,
 } from './server'
+import { VIEWER_KEY, viewerQuery } from './queries'
 import type { PriceDisplay } from '@/lib/model/price'
 import type { Follow, TimelineItem, ViewerFollow } from '@/lib/model/timeline'
 import type { FollowEntry, ViewerState } from './server'
 import type { LeagueSettings } from '@/lib/model/leagues'
 import { followsToParam } from '@/lib/model/timeline'
 
-export const VIEWER_KEY = ['viewer'] as const
+export { VIEWER_KEY }
 
 export function useViewer() {
-  return useQuery({
-    queryKey: VIEWER_KEY,
-    queryFn: () => getViewerState(),
-    staleTime: 60_000,
-  })
+  return useQuery(viewerQuery())
 }
 
 export function followKey(follow: Follow): string {

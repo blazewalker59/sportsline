@@ -4,36 +4,22 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import {
-  aliasedTable,
-  and,
-  desc,
-  eq,
-  inArray,
-  isNotNull,
-  lt,
-  ne,
-  or,
-  sql,
-} from 'drizzle-orm'
+import { aliasedTable, and, desc, eq, lt } from 'drizzle-orm'
 import { z } from 'zod'
 import { BACKFILL_DAYS } from './days'
-import type { SQL } from 'drizzle-orm'
+import { coverageWhere } from './coverage'
+import { syncPastDay } from './pastDay'
 import type { GameSummary, TeamRef, TimelineItem } from '@/lib/model/timeline'
 import type { League } from '@/lib/model/types'
+import { viewerMiddleware } from '@/lib/viewer/middleware'
 import { teamColors } from '@/lib/brand/teamColors'
 import { getCloudflareEnv, getDb } from '@/lib/db'
-import {
-  fantasyLeagues,
-  fantasyPlayers,
-  games,
-  itemPlayers,
-  teams,
-  timelineItems,
-} from '@/lib/db/schema'
-import { requireViewer, sessionViewer } from '@/lib/viewer/session'
+import { games, teams, timelineItems } from '@/lib/db/schema'
 import { shiftSportsDay, sportsDayOf } from '@/lib/model/sportsDay'
-import { syncDay } from '@/lib/live/schedule'
+import { syncLeague } from '@/lib/live/schedule'
+import { isRateLimited } from '@/lib/live/pacing'
+import { ACTIVE_LEAGUES } from '@/lib/sources'
+import { reportError } from '@/lib/ops/errors'
 import { followsFromParam } from '@/lib/model/timeline'
 import { toGameSummary, toTimelineItem } from '@/lib/live/rows'
 
@@ -56,223 +42,90 @@ export interface TimelinePage {
 }
 
 export const getTimeline = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
   .validator((data: z.input<typeof timelineInput>) => timelineInput.parse(data))
-  .handler(async ({ data }): Promise<TimelinePage> => {
-    await requireViewer()
-    const db = getDb()
-    const sportsDay = data.sportsDay ?? sportsDayOf(new Date())
-    const follows = followsFromParam(data.follows)
-    if (follows.length === 0) return { sportsDay, items: [], nextBefore: null }
-
-    // The same coverage rules as matchesFilter (src/lib/model/timeline.ts),
-    // expressed in SQL.
-    const t = timelineItems
-    const covered: Array<SQL> = []
-    const leagues = follows.flatMap((f) =>
-      f.kind === 'league' ? [f.league] : [],
-    )
-    const teamIds = follows.flatMap((f) =>
-      f.kind === 'team' ? [f.teamId] : [],
-    )
-    const playerIds = follows.flatMap((f) =>
-      f.kind === 'player' ? [f.playerId] : [],
-    )
-    if (leagues.length > 0) {
-      const leagueMatch = inArray(t.league, leagues)
-      covered.push(
-        data.includeRoutine
-          ? leagueMatch
-          : and(
-              leagueMatch,
-              or(ne(t.kind, 'play'), ne(t.significance, 'routine')),
-            )!,
-      )
-    }
-    if (follows.some((f) => f.kind === 'top25')) {
-      covered.push(
-        and(
-          eq(t.league, 'cfb'),
-          inArray(
-            t.gameId,
-            db
-              .select({ id: games.id })
-              .from(games)
-              .where(
-                and(
-                  eq(games.sportsDay, sportsDay),
-                  or(isNotNull(games.awayRank), isNotNull(games.homeRank)),
-                ),
-              ),
-          ),
-          data.includeRoutine
-            ? undefined
-            : or(ne(t.kind, 'play'), ne(t.significance, 'routine')),
-        )!,
-      )
-    }
-    const conferences = follows.flatMap((f) =>
-      f.kind === 'conference' ? [f.conference] : [],
-    )
-    if (conferences.length > 0) {
-      covered.push(
-        and(
-          eq(t.league, 'cfb'),
-          inArray(
-            t.gameId,
-            db
-              .select({ id: games.id })
-              .from(games)
-              .where(
-                and(
-                  eq(games.sportsDay, sportsDay),
-                  or(
-                    inArray(games.awayConference, conferences),
-                    inArray(games.homeConference, conferences),
-                  ),
-                ),
-              ),
-          ),
-          data.includeRoutine
-            ? undefined
-            : or(ne(t.kind, 'play'), ne(t.significance, 'routine')),
-        )!,
-      )
-    }
-    const gameIds = follows.flatMap((f) =>
-      f.kind === 'game' ? [f.gameId] : [],
-    )
-    if (gameIds.length > 0) {
-      covered.push(
-        and(
-          inArray(t.gameId, gameIds),
-          data.includeRoutine
-            ? undefined
-            : or(ne(t.kind, 'play'), ne(t.significance, 'routine')),
-        )!,
-      )
-    }
-    if (follows.some((f) => f.kind === 'fantasy')) {
-      // The Viewer's own Starters, either side of each Matchup, read here:
-      // one bound value however many there are (D1 binds at most 100).
-      const viewer = await sessionViewer()
-      if (viewer) {
-        covered.push(
-          and(
-            ne(t.kind, 'milestone'),
-            inArray(
-              t.id,
-              db
-                .select({ id: itemPlayers.itemId })
-                .from(itemPlayers)
-                .where(
-                  inArray(
-                    itemPlayers.playerId,
-                    db
-                      .select({ id: fantasyPlayers.playerId })
-                      .from(fantasyPlayers)
-                      .innerJoin(
-                        fantasyLeagues,
-                        eq(fantasyLeagues.id, fantasyPlayers.leagueRowId),
-                      )
-                      .where(
-                        and(
-                          eq(fantasyLeagues.viewerId, viewer.id),
-                          eq(fantasyLeagues.enabled, true),
-                          eq(fantasyPlayers.starter, true),
-                        ),
-                      ),
-                  ),
-                ),
-            ),
-          )!,
-        )
-      }
-    }
-    if (teamIds.length > 0) {
-      covered.push(
-        or(inArray(t.awayTeamId, teamIds), inArray(t.homeTeamId, teamIds))!,
-      )
-    }
-    if (playerIds.length > 0) {
-      covered.push(
-        and(
-          ne(t.kind, 'milestone'),
-          inArray(
-            t.id,
-            db
-              .select({ id: itemPlayers.itemId })
-              .from(itemPlayers)
-              .where(inArray(itemPlayers.playerId, playerIds)),
-          ),
-        )!,
-      )
-    }
-
-    const away = aliasedTable(teams, 'away')
-    const home = aliasedTable(teams, 'home')
-    const rows = await db
-      .select({
-        item: t,
-        ranks: { away: games.awayRank, home: games.homeRank },
-        conferences: { away: games.awayConference, home: games.homeConference },
-        away: {
-          id: away.id,
-          abbreviation: away.abbreviation,
-          logoUrl: away.logoUrl,
-          name: away.name,
-          league: away.league,
-        },
-        home: {
-          id: home.id,
-          abbreviation: home.abbreviation,
-          logoUrl: home.logoUrl,
-          name: home.name,
-          league: home.league,
-        },
+  .handler(
+    async ({ data, context: { db, viewerId } }): Promise<TimelinePage> => {
+      const sportsDay = data.sportsDay ?? sportsDayOf(new Date())
+      const covered = coverageWhere(followsFromParam(data.follows), {
+        sportsDay,
+        includeRoutine: data.includeRoutine,
+        viewerId,
       })
-      .from(t)
-      .innerJoin(games, eq(games.id, t.gameId))
-      .innerJoin(away, eq(away.id, t.awayTeamId))
-      .innerJoin(home, eq(home.id, t.homeTeamId))
-      .where(
-        and(
-          eq(t.sportsDay, sportsDay),
-          or(...covered),
-          data.before ? lt(t.occurredAt, data.before) : undefined,
-        ),
-      )
-      .orderBy(desc(t.occurredAt), desc(t.sequence))
-      .limit(PAGE_SIZE + 1)
+      if (!covered) return { sportsDay, items: [], nextBefore: null }
 
-    const page = rows.slice(0, PAGE_SIZE)
-    return {
-      sportsDay,
-      items: page.map((r) =>
-        toTimelineItem(
-          r.item,
-          {
-            ...withColors(r.away),
-            rank: r.ranks.away,
-            conference: r.conferences.away,
+      const t = timelineItems
+      const away = aliasedTable(teams, 'away')
+      const home = aliasedTable(teams, 'home')
+      const rows = await db
+        .select({
+          item: t,
+          ranks: { away: games.awayRank, home: games.homeRank },
+          conferences: {
+            away: games.awayConference,
+            home: games.homeConference,
           },
-          {
-            ...withColors(r.home),
-            rank: r.ranks.home,
-            conference: r.conferences.home,
+          away: {
+            id: away.id,
+            abbreviation: away.abbreviation,
+            logoUrl: away.logoUrl,
+            name: away.name,
+            league: away.league,
           },
+          home: {
+            id: home.id,
+            abbreviation: home.abbreviation,
+            logoUrl: home.logoUrl,
+            name: home.name,
+            league: home.league,
+          },
+        })
+        .from(t)
+        .innerJoin(games, eq(games.id, t.gameId))
+        .innerJoin(away, eq(away.id, t.awayTeamId))
+        .innerJoin(home, eq(home.id, t.homeTeamId))
+        .where(
+          and(
+            eq(t.sportsDay, sportsDay),
+            covered,
+            data.before ? lt(t.occurredAt, data.before) : undefined,
+          ),
+        )
+        .orderBy(desc(t.occurredAt), desc(t.sequence))
+        .limit(PAGE_SIZE + 1)
+
+      const page = rows.slice(0, PAGE_SIZE)
+      return {
+        sportsDay,
+        items: page.map((r) =>
+          toTimelineItem(
+            r.item,
+            {
+              ...withColors(r.away),
+              rank: r.ranks.away,
+              conference: r.conferences.away,
+            },
+            {
+              ...withColors(r.home),
+              rank: r.ranks.home,
+              conference: r.conferences.home,
+            },
+          ),
         ),
-      ),
-      nextBefore:
-        rows.length > PAGE_SIZE ? (page.at(-1)?.item.occurredAt ?? null) : null,
-    }
-  })
+        nextBefore:
+          rows.length > PAGE_SIZE
+            ? (page.at(-1)?.item.occurredAt ?? null)
+            : null,
+      }
+    },
+  )
 
 export const getGames = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
   .validator((data: { sportsDay?: string }) =>
     z.object({ sportsDay: SPORTS_DAY.optional() }).parse(data),
   )
   .handler(async ({ data }): Promise<Array<GameSummary>> => {
-    await requireViewer()
     const db = getDb()
     const sportsDay = data.sportsDay ?? sportsDayOf(new Date())
     const away = aliasedTable(teams, 'away')
@@ -304,32 +157,36 @@ function withColors(t: {
 
 /**
  * Make sure a past Sports Day has its Games: if none are stored, sync that
- * day's schedules so each finished Game is backfilled once. Idempotent;
- * returns how many Games the day has after the sync.
+ * day's schedules so each finished Game is backfilled once. Idempotent; a
+ * League found to have no Games that day isn't asked again for a while
+ * (./pastDay). Returns how many Games the day has after the sync.
  */
 export const ensureSportsDay = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: { sportsDay: string }) =>
     z.object({ sportsDay: SPORTS_DAY }).parse(data),
   )
   .handler(async ({ data }): Promise<{ games: number; loading: boolean }> => {
-    await requireViewer()
-    const today = sportsDayOf(new Date())
+    const now = new Date()
+    const today = sportsDayOf(now)
     const oldest = shiftSportsDay(today, -BACKFILL_DAYS)
     if (data.sportsDay >= today || data.sportsDay < oldest) {
       return { games: 0, loading: false }
     }
-    const db = getDb()
-    const existing = await db
-      .select({ n: sql<number>`count(*)` })
-      .from(games)
-      .where(eq(games.sportsDay, data.sportsDay))
-      .get()
-    if ((existing?.n ?? 0) > 0) return { games: existing!.n, loading: false }
-    await syncDay(getCloudflareEnv(), data.sportsDay, new Date())
-    const after = await db
-      .select({ n: sql<number>`count(*)` })
-      .from(games)
-      .where(eq(games.sportsDay, data.sportsDay))
-      .get()
-    return { games: after?.n ?? 0, loading: (after?.n ?? 0) > 0 }
+    const env = getCloudflareEnv()
+    const result = await syncPastDay(
+      getDb(),
+      data.sportsDay,
+      now,
+      ACTIVE_LEAGUES,
+      (league) => syncLeague(env, league, data.sportsDay, now),
+    )
+    // A rate limit clears itself; the next open tries that League again.
+    for (const failure of result.failures) {
+      if (!isRateLimited(failure))
+        await reportError(env, 'schedule', failure, {
+          sportsDay: data.sportsDay,
+        })
+    }
+    return { games: result.games, loading: result.synced && result.games > 0 }
   })
