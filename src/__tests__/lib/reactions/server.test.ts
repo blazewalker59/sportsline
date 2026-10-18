@@ -141,7 +141,7 @@ describe.skipIf(!isBun)('reaction server functions', () => {
         "EXPLAIN QUERY PLAN SELECT * FROM reactions WHERE viewer_id = 'u1' ORDER BY created_at DESC",
       )
       .all()
-      .map((r) => String(r.detail))
+      .map((r: { detail: string }) => r.detail)
       .join('\n')
     expect(plan).toContain('reactions_viewer_time_idx')
   })
