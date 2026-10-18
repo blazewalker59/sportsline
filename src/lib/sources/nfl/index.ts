@@ -1,6 +1,11 @@
 /** NFL Source adapter: ESPN's public site and core APIs. */
 
-import { ROSTER_CONCURRENCY, getJson as jsonFrom, mapPool } from '../pool'
+import {
+  LIVE_POLL,
+  ROSTER_CONCURRENCY,
+  getJson as jsonFrom,
+  mapPool,
+} from '../pool'
 import { fetchTeamSchedule } from '../espn/common'
 import { espnAthleteOverview } from '../espn/athlete'
 import { drivePlays, parseGame, parseRoster, parseScoreboard } from './parse'
@@ -17,6 +22,7 @@ import type { FootballLeague } from './parse'
 const SITE = 'https://site.api.espn.com/apis/site/v2/sports/football/nfl'
 const CORE = 'https://sports.core.api.espn.com/v2/sports/football/leagues/nfl'
 const getJson = jsonFrom('ESPN')
+const pollJson = jsonFrom('ESPN', LIVE_POLL)
 
 /**
  * An NFL or college game: the summary, and the core API's plays for who
@@ -33,8 +39,8 @@ export async function footballSnapshot(
   const id = encodeURIComponent(sourceGameId)
   let fallback: string | undefined
   const [summary, plays] = await Promise.all([
-    getJson<NflSummary>(`${site}/summary?event=${id}`),
-    getJson<NflCorePlays>(
+    pollJson<NflSummary>(`${site}/summary?event=${id}`),
+    pollJson<NflCorePlays>(
       `${core}/events/${id}/competitions/${id}/plays?limit=500`,
     ).catch((error: unknown) => {
       fallback = `ESPN core plays unavailable: ${error instanceof Error ? error.message : String(error)}`

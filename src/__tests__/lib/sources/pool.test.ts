@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   BROWSER_USER_AGENT,
+  LIVE_POLL,
   fetchWithRetry,
   getJson,
   mapPool,
@@ -100,5 +101,47 @@ describe('getJson', () => {
     await expect(read('https://statsapi.mlb.com/api/x')).rejects.toThrow(
       'MLB StatsAPI 404 for https://statsapi.mlb.com/api/x',
     )
+  })
+})
+
+describe('timeouts and live polls', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('abandons a call that does not answer in time, naming the source', async () => {
+    // A Source that never answers, until the request is aborted.
+    const fetchMock = vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () =>
+            reject(init.signal?.reason),
+          )
+        }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(
+      getJson('NHL', { timeoutMs: 10 })('https://api-web.nhle.com/x'),
+    ).rejects.toThrow('NHL timed out after 10ms for https://api-web.nhle.com/x')
+    // Retrying is about 429s and 5xxs; a timeout fails the call.
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('gives every call a deadline by default', async () => {
+    const fetchMock = vi.fn((_url: string, _init?: RequestInit) =>
+      Promise.resolve(new Response('{}', { status: 200 })),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    await getJson('ESPN')('https://x')
+    expect(fetchMock.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('makes a live poll a single attempt, leaving backoff to its pacing', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(new Response('', { status: 429 })),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(getJson('NHL', LIVE_POLL)('https://x')).rejects.toThrow(
+      'NHL 429 for https://x',
+    )
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })
