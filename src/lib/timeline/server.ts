@@ -4,10 +4,11 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import { aliasedTable, and, desc, eq, lt, sql } from 'drizzle-orm'
+import { aliasedTable, and, desc, eq, lt } from 'drizzle-orm'
 import { z } from 'zod'
 import { BACKFILL_DAYS } from './days'
 import { coverageWhere } from './coverage'
+import { syncPastDay } from './pastDay'
 import type { GameSummary, TeamRef, TimelineItem } from '@/lib/model/timeline'
 import type { League } from '@/lib/model/types'
 import { teamColors } from '@/lib/brand/teamColors'
@@ -15,7 +16,10 @@ import { getCloudflareEnv, getDb } from '@/lib/db'
 import { games, teams, timelineItems } from '@/lib/db/schema'
 import { requireViewer } from '@/lib/viewer/session'
 import { shiftSportsDay, sportsDayOf } from '@/lib/model/sportsDay'
-import { syncDay } from '@/lib/live/schedule'
+import { syncLeague } from '@/lib/live/schedule'
+import { isRateLimited } from '@/lib/live/pacing'
+import { ACTIVE_LEAGUES } from '@/lib/sources'
+import { reportError } from '@/lib/ops/errors'
 import { followsFromParam } from '@/lib/model/timeline'
 import { toGameSummary, toTimelineItem } from '@/lib/live/rows'
 
@@ -147,8 +151,9 @@ function withColors(t: {
 
 /**
  * Make sure a past Sports Day has its Games: if none are stored, sync that
- * day's schedules so each finished Game is backfilled once. Idempotent;
- * returns how many Games the day has after the sync.
+ * day's schedules so each finished Game is backfilled once. Idempotent; a
+ * League found to have no Games that day isn't asked again for a while
+ * (./pastDay). Returns how many Games the day has after the sync.
  */
 export const ensureSportsDay = createServerFn({ method: 'POST' })
   .validator((data: { sportsDay: string }) =>
@@ -156,23 +161,26 @@ export const ensureSportsDay = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }): Promise<{ games: number; loading: boolean }> => {
     await requireViewer()
-    const today = sportsDayOf(new Date())
+    const now = new Date()
+    const today = sportsDayOf(now)
     const oldest = shiftSportsDay(today, -BACKFILL_DAYS)
     if (data.sportsDay >= today || data.sportsDay < oldest) {
       return { games: 0, loading: false }
     }
-    const db = getDb()
-    const existing = await db
-      .select({ n: sql<number>`count(*)` })
-      .from(games)
-      .where(eq(games.sportsDay, data.sportsDay))
-      .get()
-    if ((existing?.n ?? 0) > 0) return { games: existing!.n, loading: false }
-    await syncDay(getCloudflareEnv(), data.sportsDay, new Date())
-    const after = await db
-      .select({ n: sql<number>`count(*)` })
-      .from(games)
-      .where(eq(games.sportsDay, data.sportsDay))
-      .get()
-    return { games: after?.n ?? 0, loading: (after?.n ?? 0) > 0 }
+    const env = getCloudflareEnv()
+    const result = await syncPastDay(
+      getDb(),
+      data.sportsDay,
+      now,
+      ACTIVE_LEAGUES,
+      (league) => syncLeague(env, league, data.sportsDay, now),
+    )
+    // A rate limit clears itself; the next open tries that League again.
+    for (const failure of result.failures) {
+      if (!isRateLimited(failure))
+        await reportError(env, 'schedule', failure, {
+          sportsDay: data.sportsDay,
+        })
+    }
+    return { games: result.games, loading: result.synced && result.games > 0 }
   })
