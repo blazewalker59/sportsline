@@ -17,6 +17,7 @@ import { followsGame } from './timelineScope'
 import { usePastDay } from './usePastDay'
 import { useTimelineScope } from './useTimelineScope'
 import type { Scope } from '@/lib/model/scope'
+import type { LeagueMatchup } from '@/lib/fantasy/matchup'
 import { neighborScope, scopeStops } from '@/lib/model/scope'
 import { useSwipe } from '@/components/layout/useSwipe'
 import { FantasyTagsProvider } from '@/components/fantasy/FantasyParts'
@@ -103,7 +104,11 @@ function Timeline({
   const s = useTimelineScope({ requestedScope, predictionId, matchupId })
   const { scope, follows } = s
   const [predictionOpen, setPredictionOpen] = useState<string | null>(null)
-  const [matchupOpen, setMatchupOpen] = useState<string | null>(null)
+  // A league's sheet: the Viewer's Matchup, or another in the league.
+  const [matchupOpen, setMatchupOpen] = useState<{
+    id: string
+    other?: LeagueMatchup
+  } | null>(null)
   const navigate = useNavigate()
   // The divider marks where the Viewer stopped last time, so it is fixed at
   // load while the stored marker keeps moving.
@@ -265,7 +270,7 @@ function Timeline({
         items={timeline.items}
         onBox={() => setBoxOpen(true)}
         onPrediction={setPredictionOpen}
-        onMatchup={setMatchupOpen}
+        onMatchup={(id, other) => setMatchupOpen({ id, other })}
       />
       <div aria-hidden="true" className="mb-3" style={{ height: topHeight }} />
 
@@ -333,9 +338,10 @@ function Timeline({
         onPlayClose={closePlay}
         matchup={
           matchupOpen
-            ? (s.fantasyLeagues.find((l) => l.id === matchupOpen) ?? null)
+            ? (s.fantasyLeagues.find((l) => l.id === matchupOpen.id) ?? null)
             : null
         }
+        otherMatchup={matchupOpen?.other}
         games={timeline.games}
         onMatchupClose={() => setMatchupOpen(null)}
         prediction={

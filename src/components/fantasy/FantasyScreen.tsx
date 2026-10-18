@@ -8,7 +8,6 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { MatchupSheet } from './FantasyParts'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
-import type { LeagueMatchup } from '@/lib/fantasy/matchup'
 import { gamesQuery } from '@/lib/timeline/queries'
 import { useToday } from '@/lib/timeline/useToday'
 import { AppHeader } from '@/components/layout/AppHeader'
@@ -349,13 +348,9 @@ function Leagues() {
   const add = useAddFantasyLeague()
   const setEnabled = useSetFantasyLeagueEnabled()
   const [url, setUrl] = useState('')
-  // The Viewer's Matchup in a league, or another one in it.
-  const [open, setOpen] = useState<{
-    id: string
-    other?: LeagueMatchup
-  } | null>(null)
+  const [open, setOpen] = useState<string | null>(null)
   const leagues = fantasy.data ?? []
-  const selected = leagues.find((l) => l.id === open?.id && l.matchup)
+  const selected = leagues.find((l) => l.id === open && l.matchup)
   // Today's Games, for each Player's game state in the Matchup sheet.
   const today = useToday()
   const games = useQuery({
@@ -378,7 +373,7 @@ function Leagues() {
         ) : (
           <LeagueList
             leagues={leagues}
-            onOpen={(id, other) => setOpen({ id, other })}
+            onOpen={setOpen}
             onToggle={(l) =>
               setEnabled.mutate({ id: l.id, enabled: !l.enabled })
             }
@@ -422,9 +417,7 @@ function Leagues() {
       </details>
       {selected && (
         <MatchupSheet
-          key={`${selected.id}:${open?.other?.left.teamId ?? 'mine'}`}
           league={selected}
-          other={open?.other}
           games={games.data ?? []}
           onClose={() => setOpen(null)}
         />
@@ -436,8 +429,7 @@ function Leagues() {
 /**
  * The Viewer's leagues, one compact row each, in their order (the
  * Timeline's Fantasy cards follow it): drag the grip to reorder, tap the
- * score for the Matchup, Show or Hide in the Timeline. Under each shown
- * league, its other Matchups, each opening the same sheet.
+ * score for the Matchup, Show or Hide in the Timeline.
  */
 function LeagueList({
   leagues,
@@ -445,7 +437,7 @@ function LeagueList({
   onToggle,
 }: {
   leagues: ReadonlyArray<FantasyLeagueView>
-  onOpen: (id: string, other?: LeagueMatchup) => void
+  onOpen: (id: string) => void
   onToggle: (league: FantasyLeagueView) => void
 }) {
   const reorder = useReorderFantasyLeagues()
@@ -462,7 +454,7 @@ function LeagueList({
         <li
           key={l.id}
           className={cn(
-            'relative bg-surface py-1.5 pr-2 pl-0.5',
+            'relative flex min-h-14 items-center gap-2 bg-surface py-1.5 pr-2 pl-0.5',
             dragging === l.id
               ? 'z-10 rounded-xl shadow-lg ring-1 ring-border'
               : active && 'transition-transform duration-150',
@@ -471,84 +463,75 @@ function LeagueList({
             active ? { transform: `translateY(${shift(index)}px)` } : undefined
           }
         >
-          <div className="flex min-h-11 items-center gap-2">
-            <button
-              type="button"
-              aria-label={`Move ${l.name}. Use the arrow keys to reorder.`}
-              className="flex h-11 w-8 shrink-0 cursor-grab touch-none items-center justify-center text-muted active:cursor-grabbing"
-              {...handle(l.id, index)}
+          <button
+            type="button"
+            aria-label={`Move ${l.name}. Use the arrow keys to reorder.`}
+            className="flex h-11 w-8 shrink-0 cursor-grab touch-none items-center justify-center text-muted active:cursor-grabbing"
+            {...handle(l.id, index)}
+          >
+            <svg
+              width="14"
+              height="20"
+              viewBox="0 0 14 20"
+              fill="currentColor"
+              aria-hidden="true"
             >
-              <svg
-                width="14"
-                height="20"
-                viewBox="0 0 14 20"
-                fill="currentColor"
-                aria-hidden="true"
+              {GRIP_DOTS.map(({ x, y }) => (
+                <circle key={`${x}-${y}`} cx={x} cy={y} r="1.6" />
+              ))}
+            </svg>
+          </button>
+          <span
+            className={cn(
+              'flex min-w-0 flex-1 items-center gap-2.5',
+              !l.enabled && 'opacity-45',
+            )}
+          >
+            <LeagueLogo league={SPORTS[l.sport].league} size={20} />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold">
+                {l.name}
+              </span>
+              <span
+                className={cn(
+                  'block truncate text-xs',
+                  l.lastError ? 'text-live' : 'text-muted',
+                )}
               >
-                {GRIP_DOTS.map(({ x, y }) => (
-                  <circle key={`${x}-${y}`} cx={x} cy={y} r="1.6" />
-                ))}
-              </svg>
-            </button>
-            <span
-              className={cn(
-                'flex min-w-0 flex-1 items-center gap-2.5',
-                !l.enabled && 'opacity-45',
-              )}
-            >
-              <LeagueLogo league={SPORTS[l.sport].league} size={20} />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">
-                  {l.name}
-                </span>
-                <span
-                  className={cn(
-                    'block truncate text-xs',
-                    l.lastError ? 'text-live' : 'text-muted',
-                  )}
-                >
-                  {l.lastError ??
-                    [
-                      l.teamName,
-                      l.matchup?.mine.record,
-                      l.provider === 'sleeper' ? 'Sleeper' : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                </span>
+                {l.lastError ??
+                  [
+                    l.teamName,
+                    l.matchup?.mine.record,
+                    l.provider === 'sleeper' ? 'Sleeper' : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
               </span>
             </span>
-            {l.enabled && l.matchup && (
-              <button
-                type="button"
-                onClick={() => onOpen(l.id)}
-                aria-label={`${l.name} matchup`}
-                className="flex shrink-0 flex-col items-end rounded-lg px-1.5 py-0.5 tabular-nums hover:bg-notice"
-              >
-                <MatchupScore league={l} />
-              </button>
-            )}
+          </span>
+          {l.enabled && l.matchup && (
             <button
               type="button"
-              onClick={() => onToggle(l)}
-              aria-pressed={l.enabled}
-              className={cn(
-                'min-h-8 shrink-0 rounded-full px-2.5 text-xs font-semibold',
-                l.enabled
-                  ? 'border border-border text-foreground/80'
-                  : 'bg-notice text-muted',
-              )}
+              onClick={() => onOpen(l.id)}
+              aria-label={`${l.name} matchup`}
+              className="flex shrink-0 flex-col items-end rounded-lg px-1.5 py-0.5 tabular-nums hover:bg-notice"
             >
-              {l.enabled ? 'Hide' : 'Show'}
+              <MatchupScore league={l} />
             </button>
-          </div>
-          {l.enabled && l.matchup?.others && l.matchup.others.length > 0 && (
-            <LeagueMatchups
-              league={l}
-              others={l.matchup.others}
-              onOpen={(other) => onOpen(l.id, other)}
-            />
           )}
+          <button
+            type="button"
+            onClick={() => onToggle(l)}
+            aria-pressed={l.enabled}
+            className={cn(
+              'min-h-8 shrink-0 rounded-full px-2.5 text-xs font-semibold',
+              l.enabled
+                ? 'border border-border text-foreground/80'
+                : 'bg-notice text-muted',
+            )}
+          >
+            {l.enabled ? 'Hide' : 'Show'}
+          </button>
         </li>
       ))}
     </ol>
@@ -596,76 +579,5 @@ function MatchupScore({ league }: { league: FantasyLeagueView }) {
         {m.opponent ? `vs ${m.opponent.abbrev}` : 'Bye'}
       </span>
     </>
-  )
-}
-
-/**
- * A league's other Matchups this period, a chip each, scrolling sideways
- * under its row: each team's abbreviation and score, the leader's bold.
- */
-function LeagueMatchups({
-  league,
-  others,
-  onOpen,
-}: {
-  league: FantasyLeagueView
-  others: ReadonlyArray<LeagueMatchup>
-  onOpen: (other: LeagueMatchup) => void
-}) {
-  const cats = Boolean(league.matchup?.categories)
-  const fmt = (n: number) => (cats ? String(n) : n.toFixed(1))
-  return (
-    <div className="-mr-2 overflow-x-auto pr-2 pl-[42px] [scrollbar-width:none]">
-      <ul
-        className="flex gap-1.5 pt-1 pb-0.5"
-        aria-label={`Other matchups in ${league.name}`}
-      >
-        {others.map((o) => {
-          const { left, right } = o
-          const lead =
-            !right || left.score === right.score
-              ? null
-              : left.score > right.score
-                ? 'left'
-                : 'right'
-          return (
-            <li key={left.teamId} className="shrink-0">
-              <button
-                type="button"
-                onClick={() => onOpen(o)}
-                aria-label={
-                  right
-                    ? `${left.name} ${fmt(left.score)}, ${right.name} ${fmt(right.score)}`
-                    : `${left.name}, bye week`
-                }
-                className="flex items-center gap-1 rounded-lg border border-border bg-background px-2 py-1 text-xs whitespace-nowrap tabular-nums hover:bg-notice"
-              >
-                <span
-                  className={cn(
-                    lead === 'left' ? 'font-bold' : 'text-foreground/75',
-                  )}
-                >
-                  {left.abbrev} {right && fmt(left.score)}
-                </span>
-                {right ? (
-                  <>
-                    <span className="text-muted">–</span>
-                    <span
-                      className={cn(
-                        lead === 'right' ? 'font-bold' : 'text-foreground/75',
-                      )}
-                    >
-                      {fmt(right.score)} {right.abbrev}
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-muted">· Bye</span>
-                )}
-              </button>
-            </li>
-          )
-        })}
-      </ul>
-    </div>
   )
 }

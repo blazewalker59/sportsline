@@ -1,11 +1,16 @@
 /**
  * Fantasy Matchups as cards (CONTEXT.md, "Matchup"): the strip across the
- * top of the Timeline, one card per league.
+ * top of the Timeline, one card per league. A selected card's league
+ * shows its other Matchups ("League Matchups") under the strip.
  */
 
 import { categoryRecord, pts, scoreText } from './format'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
-import type { MatchupSide, MatchupView } from '@/lib/fantasy/matchup'
+import type {
+  LeagueMatchup,
+  MatchupSide,
+  MatchupView,
+} from '@/lib/fantasy/matchup'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { CornerButton } from '@/components/timeline/GameStrip'
 import { SPORTS } from '@/lib/fantasy/sports'
@@ -94,7 +99,8 @@ function MatchupCard({
 /**
  * Matchups as a strip of cards, like the score cards: tapping one narrows
  * the Timeline to its Starters (tap again to clear), and the selected
- * card's corner badge opens its sheet.
+ * card's corner badge opens its sheet. The selected card's league's other
+ * Matchups follow under the strip, each opening its own sheet.
  */
 export function FantasyStrip({
   leagues,
@@ -105,27 +111,111 @@ export function FantasyStrip({
   leagues: ReadonlyArray<FantasyLeagueView>
   selected?: string
   onSelect: (id: string | null) => void
-  onDetails: (id: string) => void
+  /** Open a league's sheet: the Viewer's Matchup, or another in it. */
+  onDetails: (id: string, other?: LeagueMatchup) => void
 }) {
   const shown = leagues.filter((l) => l.enabled && l.matchup)
   if (shown.length === 0) return null
+  const open = shown.find((l) => l.id === selected)
+  return (
+    <>
+      <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none]">
+        <ul className="flex gap-2 pt-2 pb-0.5" aria-label="Your Matchups">
+          {shown.map((l) => (
+            <li key={l.id} className="relative flex shrink-0">
+              <MatchupCard
+                league={l}
+                selected={l.id === selected}
+                onSelect={() => onSelect(l.id === selected ? null : l.id)}
+              />
+              {l.id === selected && (
+                <CornerButton label="Matchup" onClick={() => onDetails(l.id)}>
+                  <path d="M4 6h16M4 12h16M4 18h16" />
+                </CornerButton>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+      {open?.matchup?.others && open.matchup.others.length > 0 && (
+        <LeagueMatchups
+          league={open}
+          others={open.matchup.others}
+          onOpen={(other) => onDetails(open.id, other)}
+        />
+      )}
+    </>
+  )
+}
+
+/**
+ * A league's other Matchups this period, a chip each, scrolling sideways
+ * under the strip: each team's abbreviation and score, the leader's bold.
+ */
+function LeagueMatchups({
+  league,
+  others,
+  onOpen,
+}: {
+  league: FantasyLeagueView
+  others: ReadonlyArray<LeagueMatchup>
+  onOpen: (other: LeagueMatchup) => void
+}) {
+  const m = league.matchup!
   return (
     <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none]">
-      <ul className="flex gap-2 pt-2 pb-0.5" aria-label="Your Matchups">
-        {shown.map((l) => (
-          <li key={l.id} className="relative flex shrink-0">
-            <MatchupCard
-              league={l}
-              selected={l.id === selected}
-              onSelect={() => onSelect(l.id === selected ? null : l.id)}
-            />
-            {l.id === selected && (
-              <CornerButton label="Matchup" onClick={() => onDetails(l.id)}>
-                <path d="M4 6h16M4 12h16M4 18h16" />
-              </CornerButton>
-            )}
-          </li>
-        ))}
+      <ul
+        className="flex items-center gap-1.5 pt-1.5"
+        aria-label={`Other matchups in ${m.leagueName}`}
+      >
+        <li className="shrink-0 pr-0.5 text-[11px] font-semibold text-muted">
+          League
+        </li>
+        {others.map((o) => {
+          const { left, right } = o
+          const lead =
+            !right || left.score === right.score
+              ? null
+              : left.score > right.score
+                ? 'left'
+                : 'right'
+          return (
+            <li key={left.teamId} className="shrink-0">
+              <button
+                type="button"
+                onClick={() => onOpen(o)}
+                aria-label={
+                  right
+                    ? `${left.name} ${scoreText(m, left.score)}, ${right.name} ${scoreText(m, right.score)}`
+                    : `${left.name}, bye week`
+                }
+                className="flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs whitespace-nowrap tabular-nums hover:bg-notice"
+              >
+                <span
+                  className={cn(
+                    lead === 'left' ? 'font-bold' : 'text-foreground/75',
+                  )}
+                >
+                  {left.abbrev} {right && scoreText(m, left.score)}
+                </span>
+                {right ? (
+                  <>
+                    <span className="text-muted">–</span>
+                    <span
+                      className={cn(
+                        lead === 'right' ? 'font-bold' : 'text-foreground/75',
+                      )}
+                    >
+                      {scoreText(m, right.score)} {right.abbrev}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-muted">· Bye</span>
+                )}
+              </button>
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

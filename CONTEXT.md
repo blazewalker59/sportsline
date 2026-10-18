@@ -188,7 +188,7 @@ The Viewer's Fantasy team against its opponent this scoring period, decided by f
 _Avoid_: game (a Game is real), fixture
 
 **League Matchups**:
-The other Matchups in a Viewer's Fantasy league this scoring period, between teams that aren't the Viewer's: their scores kept with each sync, each opening in full (both Lineups) when the Viewer opens it. Read only to look at: they add nothing to the Fantasy feed or Alerts.
+The other Matchups in a Viewer’s Fantasy league this scoring period, between teams that aren’t the Viewer’s: their scores kept with each sync and shown under the Timeline’s Fantasy cards while the Viewer’s Matchup in that league is selected, each opening in full (both Lineups) when tapped. Read only to look at: they add nothing to the Fantasy feed or Alerts.
 _Avoid_: scoreboard, other games
 
 **Fantasy points**:
