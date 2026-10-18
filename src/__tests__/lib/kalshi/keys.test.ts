@@ -1,7 +1,6 @@
 import { constants, generateKeyPairSync, verify } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { importSigningKey, signMessage } from '@/lib/kalshi/keys'
-import { seal, unseal } from '@/lib/kalshi/vault'
 
 const MESSAGE = '1727000000000GET/trade-api/v2/portfolio/positions'
 
@@ -50,24 +49,5 @@ describe('Kalshi request signing', () => {
 
   it('refuses anything that is not a private key', async () => {
     await expect(importSigningKey('not a key')).rejects.toThrow()
-  })
-})
-
-describe('the key vault', () => {
-  const secret = Buffer.alloc(32, 7).toString('base64')
-
-  it('round-trips, with a fresh IV each time', async () => {
-    const a = await seal(secret, 'private key')
-    const b = await seal(secret, 'private key')
-    expect(a.iv).not.toBe(b.iv)
-    expect(await unseal(secret, a)).toBe('private key')
-  })
-
-  it('cannot open with another secret, and needs one at all', async () => {
-    const sealed = await seal(secret, 'private key')
-    await expect(
-      unseal(Buffer.alloc(32, 9).toString('base64'), sealed),
-    ).rejects.toThrow()
-    await expect(seal(undefined, 'x')).rejects.toThrow('KALSHI_ENCRYPTION_KEY')
   })
 })

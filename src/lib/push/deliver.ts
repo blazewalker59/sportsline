@@ -300,6 +300,8 @@ export async function deliverAlerts(
         console.error('Alert push failed', String(res.reason))
     })
   }
+  // Dead subscriptions, and any saved before endpoints were checked that
+  // isn't on a push service (sendPush refuses those as gone, unsent).
   if (gone.size > 0) {
     await db
       .delete(pushSubscriptions)

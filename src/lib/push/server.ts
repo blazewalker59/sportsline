@@ -4,10 +4,10 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import { and, eq } from 'drizzle-orm'
+import { and, desc, eq, notInArray } from 'drizzle-orm'
 import { z } from 'zod'
 import { vapidKeys } from './deliver'
-import { sendPush } from './webpush'
+import { isPushEndpoint, sendPush } from './webpush'
 import { DEFAULT_LEVELS } from './alerts'
 import type { AlertLevels } from './alerts'
 import { getAuth } from '@/lib/auth/server'
@@ -31,8 +31,16 @@ export const getPushKey = createServerFn({ method: 'GET' }).handler(
   },
 )
 
+/** Devices a Viewer keeps Alerts on; saving one more drops the oldest. */
+export const DEVICES_PER_VIEWER = 10
+
+const endpointInput = z
+  .string()
+  .max(1000)
+  .refine(isPushEndpoint, 'That isn’t a push service this app sends to.')
+
 const subscriptionInput = z.object({
-  endpoint: z.string().url().max(1000),
+  endpoint: endpointInput,
   keys: z.object({
     p256dh: z.string().min(40).max(200),
     auth: z.string().min(16).max(100),
@@ -43,9 +51,12 @@ export const savePushSubscription = createServerFn({ method: 'POST' })
   .validator((data: z.input<typeof subscriptionInput>) =>
     subscriptionInput.parse(data),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<{ confirmed: boolean; taken?: true }> => {
     const id = await viewerId()
-    await getDb()
+    const db = getDb()
+    // An endpoint saved by another Viewer stays theirs: the browser must
+    // subscribe afresh (a new endpoint) to move this device over.
+    const saved = await db
       .insert(pushSubscriptions)
       .values({
         endpoint: data.endpoint,
@@ -56,8 +67,30 @@ export const savePushSubscription = createServerFn({ method: 'POST' })
       })
       .onConflictDoUpdate({
         target: pushSubscriptions.endpoint,
-        set: { viewerId: id, p256dh: data.keys.p256dh, auth: data.keys.auth },
+        set: { p256dh: data.keys.p256dh, auth: data.keys.auth },
+        setWhere: eq(pushSubscriptions.viewerId, id),
       })
+      .returning({ endpoint: pushSubscriptions.endpoint })
+    if (saved.length === 0) return { confirmed: false, taken: true }
+    await db
+      .delete(pushSubscriptions)
+      .where(
+        and(
+          eq(pushSubscriptions.viewerId, id),
+          notInArray(
+            pushSubscriptions.endpoint,
+            db
+              .select({ endpoint: pushSubscriptions.endpoint })
+              .from(pushSubscriptions)
+              .where(eq(pushSubscriptions.viewerId, id))
+              .orderBy(
+                desc(pushSubscriptions.createdAt),
+                desc(pushSubscriptions.endpoint),
+              )
+              .limit(DEVICES_PER_VIEWER),
+          ),
+        ),
+      )
     // A confirmation on the device just enabled: proves the whole path
     // (browser → push service → Worker) works, right when it matters.
     const keys = vapidKeys(getCloudflareEnv())
@@ -81,7 +114,7 @@ export const savePushSubscription = createServerFn({ method: 'POST' })
 
 export const deletePushSubscription = createServerFn({ method: 'POST' })
   .validator((data: { endpoint: string }) =>
-    z.object({ endpoint: z.string().url().max(1000) }).parse(data),
+    z.object({ endpoint: z.string().max(1000) }).parse(data),
   )
   .handler(async ({ data }) => {
     const id = await viewerId()

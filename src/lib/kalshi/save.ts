@@ -3,6 +3,7 @@
  * its Legs matched to our Games, Teams and Players. Server only.
  */
 
+import { and, eq, gte } from 'drizzle-orm'
 import { markets as fetchMarkets } from './client'
 import { gameFor, subjectFor } from './matching'
 import { legTitle, rememberMarkets, sqlExcluded } from './markets'
@@ -53,8 +54,39 @@ export async function savePrediction(
     : [m]
   await rememberMarkets(db, [m, ...(combo ? legMarkets : [])])
   const byTicker = new Map(legMarkets.map((x) => [x.ticker, x]))
+  // Legs on one Game share its lookup (which can sync the League's day).
+  const games = new Map<string, ReturnType<typeof gameFor>>()
+  const gameOf = (eventTicker: string) => {
+    if (!games.has(eventTicker))
+      games.set(eventTicker, gameFor(env, account, db, eventTicker))
+    return games.get(eventTicker)!
+  }
+  const rows = await Promise.all(
+    legs.map(async (leg, position) => {
+      const lm = byTicker.get(leg.market_ticker)
+      const { gameId, league } =
+        fields.match === false
+          ? { gameId: null, league: null }
+          : await gameOf(leg.event_ticker)
+      const { teamId, playerId } =
+        fields.match === false
+          ? { teamId: null, playerId: null }
+          : await subjectFor(account, db, lm, league, gameId)
+      return {
+        predictionId: id,
+        position,
+        marketTicker: leg.market_ticker,
+        eventTicker: leg.event_ticker,
+        side: leg.side,
+        title: legTitle(lm, leg.market_ticker),
+        gameId,
+        teamId,
+        playerId,
+      }
+    }),
+  )
   const now = new Date().toISOString()
-  await db
+  const prediction = db
     .insert(predictions)
     .values({
       id,
@@ -96,44 +128,37 @@ export async function savePrediction(
         updatedAt: now,
       },
     })
-  const rows = []
-  for (const [position, leg] of legs.entries()) {
-    const lm = byTicker.get(leg.market_ticker)
-    const matched =
-      fields.match === false
-        ? { gameId: null, league: null }
-        : await gameFor(env, account, db, leg.event_ticker)
-    const { gameId, league } = matched
-    const { teamId, playerId } =
-      fields.match === false
-        ? { teamId: null, playerId: null }
-        : await subjectFor(account, db, lm, league, gameId)
-    rows.push({
-      predictionId: id,
-      position,
-      marketTicker: leg.market_ticker,
-      eventTicker: leg.event_ticker,
-      side: leg.side,
-      title: legTitle(lm, leg.market_ticker),
-      gameId,
-      teamId,
-      playerId,
-    })
-  }
   // Nine columns a row: 10 rows stay under D1's 100 bound parameters, so a
-  // big Combo saves every Leg instead of failing after its Prediction.
+  // big Combo saves every Leg in parts.
+  const legWrites = []
   for (let i = 0; i < rows.length; i += 10) {
-    await db
-      .insert(predictionLegs)
-      .values(rows.slice(i, i + 10))
-      .onConflictDoUpdate({
-        target: [predictionLegs.predictionId, predictionLegs.position],
-        set: {
-          title: sqlExcluded('title'),
-          gameId: sqlExcluded('game_id'),
-          teamId: sqlExcluded('team_id'),
-          playerId: sqlExcluded('player_id'),
-        },
-      })
+    legWrites.push(
+      db
+        .insert(predictionLegs)
+        .values(rows.slice(i, i + 10))
+        .onConflictDoUpdate({
+          target: [predictionLegs.predictionId, predictionLegs.position],
+          set: {
+            title: sqlExcluded('title'),
+            gameId: sqlExcluded('game_id'),
+            teamId: sqlExcluded('team_id'),
+            playerId: sqlExcluded('player_id'),
+          },
+        }),
+    )
   }
+  // One batch: the Prediction is never saved without its Legs, and Legs
+  // past the end (the market now has fewer) go with it.
+  await db.batch([
+    prediction,
+    ...legWrites,
+    db
+      .delete(predictionLegs)
+      .where(
+        and(
+          eq(predictionLegs.predictionId, id),
+          gte(predictionLegs.position, rows.length),
+        ),
+      ),
+  ])
 }

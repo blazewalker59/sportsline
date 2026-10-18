@@ -93,7 +93,7 @@ export const connectEspn = createServerFn({ method: 'POST' })
       const env = getCloudflareEnv()
       const session = {
         swid: bracedSwid(data.swid),
-        espnS2: decodeURIComponent(data.espnS2),
+        espnS2: decodedCookie(data.espnS2),
       }
       try {
         await fanProfile(session)
@@ -110,8 +110,14 @@ export const connectEspn = createServerFn({ method: 'POST' })
         // added by URL.
       }
       const [swid, s2] = await Promise.all([
-        seal(env.ESPN_ENCRYPTION_KEY, session.swid),
-        seal(env.ESPN_ENCRYPTION_KEY, session.espnS2),
+        seal(env.ESPN_ENCRYPTION_KEY, session.swid, {
+          purpose: 'espn-swid',
+          viewerId,
+        }),
+        seal(env.ESPN_ENCRYPTION_KEY, session.espnS2, {
+          purpose: 'espn-s2',
+          viewerId,
+        }),
       ])
       const now = new Date().toISOString()
       const row = {
@@ -138,18 +144,32 @@ export const connectEspn = createServerFn({ method: 'POST' })
     }),
   )
 
+/** espn_s2 as copied is usually URL-encoded; a broken escape isn't one. */
+function decodedCookie(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    throw new Error(
+      'That espn_s2 cookie looks cut off or mangled. Copy it again from espn.com.',
+    )
+  }
+}
+
 /** Forget the cookies and every Fantasy league read with them. */
 export const disconnectEspn = createServerFn({ method: 'POST' }).handler(() =>
   withViewer(async ({ db, viewerId }) => {
-    await db
-      .delete(fantasyLeagues)
-      .where(
-        and(
-          eq(fantasyLeagues.viewerId, viewerId),
-          eq(fantasyLeagues.provider, 'espn'),
+    // In one batch: a failure halfway can't leave the cookies behind.
+    await db.batch([
+      db
+        .delete(fantasyLeagues)
+        .where(
+          and(
+            eq(fantasyLeagues.viewerId, viewerId),
+            eq(fantasyLeagues.provider, 'espn'),
+          ),
         ),
-      )
-    await db.delete(espnAccounts).where(eq(espnAccounts.viewerId, viewerId))
+      db.delete(espnAccounts).where(eq(espnAccounts.viewerId, viewerId)),
+    ])
   }),
 )
 
@@ -245,17 +265,19 @@ export const connectSleeper = createServerFn({ method: 'POST' })
 export const disconnectSleeper = createServerFn({ method: 'POST' }).handler(
   () =>
     withViewer(async ({ db, viewerId }) => {
-      await db
-        .delete(fantasyLeagues)
-        .where(
-          and(
-            eq(fantasyLeagues.viewerId, viewerId),
-            eq(fantasyLeagues.provider, 'sleeper'),
+      await db.batch([
+        db
+          .delete(fantasyLeagues)
+          .where(
+            and(
+              eq(fantasyLeagues.viewerId, viewerId),
+              eq(fantasyLeagues.provider, 'sleeper'),
+            ),
           ),
-        )
-      await db
-        .delete(sleeperAccounts)
-        .where(eq(sleeperAccounts.viewerId, viewerId))
+        db
+          .delete(sleeperAccounts)
+          .where(eq(sleeperAccounts.viewerId, viewerId)),
+      ])
     }),
 )
 
@@ -364,8 +386,9 @@ export const reorderFantasyLeagues = createServerFn({ method: 'POST' })
   )
   .handler(({ data }) =>
     withViewer(async ({ db, viewerId }) => {
-      for (const [position, id] of data.ids.entries())
-        await db
+      // All or nothing: half a reorder would leave positions colliding.
+      const [first, ...rest] = data.ids.map((id, position) =>
+        db
           .update(fantasyLeagues)
           .set({ position })
           .where(
@@ -373,7 +396,9 @@ export const reorderFantasyLeagues = createServerFn({ method: 'POST' })
               eq(fantasyLeagues.id, id),
               eq(fantasyLeagues.viewerId, viewerId),
             ),
-          )
+          ),
+      )
+      if (first) await db.batch([first, ...rest])
     }),
   )
 

@@ -65,14 +65,16 @@ export async function loadSession(
     .get()
   if (!row) return null
   const [swid, espnS2] = await Promise.all([
-    unseal(env.ESPN_ENCRYPTION_KEY, {
-      ciphertext: row.swidCiphertext,
-      iv: row.swidIv,
-    }),
-    unseal(env.ESPN_ENCRYPTION_KEY, {
-      ciphertext: row.s2Ciphertext,
-      iv: row.s2Iv,
-    }),
+    unseal(
+      env.ESPN_ENCRYPTION_KEY,
+      { ciphertext: row.swidCiphertext, iv: row.swidIv },
+      { purpose: 'espn-swid', viewerId },
+    ),
+    unseal(
+      env.ESPN_ENCRYPTION_KEY,
+      { ciphertext: row.s2Ciphertext, iv: row.s2Iv },
+      { purpose: 'espn-s2', viewerId },
+    ),
   ])
   return { swid, espnS2 }
 }

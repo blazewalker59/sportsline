@@ -157,10 +157,11 @@ async function tradeAccount(
   env: CloudflareEnv,
   key: typeof kalshiTradeKeys.$inferSelect,
 ) {
-  const pem = await unseal(env.KALSHI_ENCRYPTION_KEY, {
-    ciphertext: key.keyCiphertext,
-    iv: key.keyIv,
-  })
+  const pem = await unseal(
+    env.KALSHI_ENCRYPTION_KEY,
+    { ciphertext: key.keyCiphertext, iv: key.keyIv },
+    { purpose: 'kalshi-trade', viewerId: key.viewerId },
+  )
   return { keyId: key.keyId, signer: await importSigningKey(pem) }
 }
 

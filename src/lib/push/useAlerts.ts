@@ -71,19 +71,28 @@ export function useAlerts() {
       const key = await getPushKey()
       if (!key) return setState('unsupported')
       const reg = await registration()
-      const sub =
-        (await reg.pushManager.getSubscription()) ??
-        (await reg.pushManager.subscribe({
+      const subscribe = () =>
+        reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: b64urlDecode(key),
-        }))
-      const json = sub.toJSON() as {
-        endpoint: string
-        keys: { p256dh: string; auth: string }
+        })
+      const save = (sub: PushSubscription) => {
+        const json = sub.toJSON() as {
+          endpoint: string
+          keys: { p256dh: string; auth: string }
+        }
+        return savePushSubscription({
+          data: { endpoint: json.endpoint, keys: json.keys },
+        })
       }
-      await savePushSubscription({
-        data: { endpoint: json.endpoint, keys: json.keys },
-      })
+      const sub =
+        (await reg.pushManager.getSubscription()) ?? (await subscribe())
+      // Another Viewer signed in here before: this device gets a fresh
+      // subscription of its own rather than taking over theirs.
+      if ((await save(sub)).taken) {
+        await sub.unsubscribe()
+        await save(await subscribe())
+      }
       setState('on')
     } finally {
       setBusy(false)
