@@ -4,12 +4,14 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { timeAgo, useNow } from '@/components/timeline/format'
 import { createApiToken, revokeApiToken } from '@/lib/agents/server'
 import { apiTokensQuery, useApiTokens } from '@/lib/agents/queries'
 
 const TOKENS_KEY = apiTokensQuery().queryKey
+
+const noSubscription = () => () => {}
 
 export function Tokens({ tradingReady }: { tradingReady: boolean }) {
   const queryClient = useQueryClient()
@@ -32,8 +34,12 @@ export function Tokens({ tradingReady }: { tradingReady: boolean }) {
     mutationFn: (id: string) => revokeApiToken({ data: { id } }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: TOKENS_KEY }),
   })
-  const endpoint =
-    typeof window === 'undefined' ? '/mcp' : `${window.location.origin}/mcp`
+  const endpoint = useSyncExternalStore(
+    noSubscription,
+    () => `${window.location.origin}/mcp`,
+    // The server can't know the address the page was opened at.
+    () => '/mcp',
+  )
 
   return (
     <>

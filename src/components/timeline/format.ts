@@ -1,52 +1,73 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useSyncExternalStore } from 'react'
 
-/** Re-render periodically so relative times stay fresh. */
-export function useNow(intervalMs = 30_000): number {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), intervalMs)
-    return () => clearInterval(id)
-  }, [intervalMs])
-  return now
-}
-
-// One shared clock for every relative time on screen: a single interval
-// while anything shows one, and only those text nodes re-render on a tick.
+// Shared clocks, one per tick interval: a single timer per interval while
+// anything reads it, and only the components reading it re-render.
 const CLOCK_MS = 30_000
-let clockNow = Date.now()
-const clockListeners = new Set<() => void>()
-let clockTimer: ReturnType<typeof setInterval> | null = null
 
-function subscribeClock(onTick: () => void): () => void {
-  clockListeners.add(onTick)
-  if (!clockTimer) {
-    clockNow = Date.now()
-    clockTimer = setInterval(() => {
-      clockNow = Date.now()
-      clockListeners.forEach((l) => l())
-    }, CLOCK_MS)
-  }
-  return () => {
-    clockListeners.delete(onTick)
-    if (clockListeners.size === 0 && clockTimer) {
-      clearInterval(clockTimer)
-      clockTimer = null
-    }
-  }
+interface Clock {
+  now: number
+  listeners: Set<() => void>
+  timer: ReturnType<typeof setInterval> | null
+  subscribe: (onTick: () => void) => () => void
+  read: () => number
 }
 
-const readClock = () => clockNow
+const clocks = new Map<number, Clock>()
+
+function clockFor(intervalMs: number): Clock {
+  const existing = clocks.get(intervalMs)
+  if (existing) return existing
+  const clock: Clock = {
+    now: Date.now(),
+    listeners: new Set(),
+    timer: null,
+    subscribe: (onTick) => {
+      clock.listeners.add(onTick)
+      if (!clock.timer) {
+        clock.now = Date.now()
+        clock.timer = setInterval(() => {
+          clock.now = Date.now()
+          clock.listeners.forEach((l) => l())
+        }, intervalMs)
+      }
+      return () => {
+        clock.listeners.delete(onTick)
+        if (clock.listeners.size === 0 && clock.timer) {
+          clearInterval(clock.timer)
+          clock.timer = null
+        }
+      }
+    },
+    read: () => clock.now,
+  }
+  clocks.set(intervalMs, clock)
+  return clock
+}
+
+// The server and the hydrating client never agree on "now", so neither
+// shows a time relative to it until the client has taken over.
+const hydrating = () => null
+
+/**
+ * "now", ticking every `intervalMs`; null while server rendering and
+ * hydrating, so the HTML matches. Client navigations get a time at once.
+ */
+export function useNow(intervalMs = CLOCK_MS): number | null {
+  const clock = clockFor(intervalMs)
+  return useSyncExternalStore(clock.subscribe, clock.read, hydrating)
+}
 
 /**
  * "now", "4m", "2h" or a clock time, kept fresh by the shared clock. Its
  * own component, so a row showing one needn't re-render every tick.
  */
 export function TimeAgo({ iso }: { iso: string }): string {
-  const now = useSyncExternalStore(subscribeClock, readClock, readClock)
-  return timeAgo(iso, now)
+  return timeAgo(iso, useNow())
 }
 
-export function timeAgo(iso: string, now: number): string {
+/** Blank until there's a client clock (useNow). */
+export function timeAgo(iso: string, now: number | null): string {
+  if (now === null) return ''
   const seconds = Math.max(0, Math.round((now - Date.parse(iso)) / 1000))
   if (seconds < 45) return 'now'
   const minutes = Math.round(seconds / 60)

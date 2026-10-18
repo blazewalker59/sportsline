@@ -94,7 +94,7 @@ function ReactionEntry({
   now,
 }: {
   reaction: MyReaction
-  now: number
+  now: number | null
 }) {
   const team = item.side === 'home' ? item.homeTeam : item.awayTeam
   return (

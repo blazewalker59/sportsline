@@ -43,14 +43,16 @@ export function Pending({ trades }: { trades: Array<TradeView> }) {
         Waiting for you
       </h2>
       {trades.map((t) => {
-        const left = Math.max(0, Date.parse(t.expiresAt) - now)
+        const left =
+          now === null ? null : Math.max(0, Date.parse(t.expiresAt) - now)
         return (
           <article
             key={t.id}
             className="flex flex-col gap-2 rounded-xl border border-accent/40 bg-accent/10 px-3 py-3 text-sm"
           >
             <p className="text-xs text-muted">
-              {t.agentName} proposes · {Math.ceil(left / 60_000)} min left
+              {t.agentName} proposes
+              {left !== null && ` · ${Math.ceil(left / 60_000)} min left`}
             </p>
             <p className="font-semibold">{describeOrder(t, display)}</p>
             <p>{t.marketTitle}</p>

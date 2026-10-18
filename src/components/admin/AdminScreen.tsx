@@ -58,7 +58,7 @@ function Health({ health }: { health: OpsHealth }) {
   const now = useNow(15_000)
   const states = health.jobs.map(jobState)
   const recentErrors = health.errors
-    .filter((e) => now - Date.parse(e.lastAt) < DAY)
+    .filter((e) => now !== null && now - Date.parse(e.lastAt) < DAY)
     .reduce((n, e) => n + e.count, 0)
   return (
     <div className="flex flex-col gap-6">
@@ -169,7 +169,7 @@ function Health({ health }: { health: OpsHealth }) {
   )
 }
 
-function ErrorRow({ error: e, now }: { error: ErrorView; now: number }) {
+function ErrorRow({ error: e, now }: { error: ErrorView; now: number | null }) {
   const [open, setOpen] = useState(false)
   return (
     <li>
