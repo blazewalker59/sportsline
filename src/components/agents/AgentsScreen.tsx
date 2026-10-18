@@ -5,7 +5,7 @@
  * here for you to approve or reject.
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import type {
   BetRecordView,
@@ -23,18 +23,22 @@ import {
   connectTradeKey,
   createApiToken,
   disconnectTradeKey,
-  getApiTokens,
-  getBetRecord,
-  getTrading,
   rejectTradeProposal,
   revokeApiToken,
   setTradeCaps,
 } from '@/lib/agents/server'
+import {
+  apiTokensQuery,
+  tradingQuery,
+  useApiTokens,
+  useBetRecord,
+  useTrading,
+} from '@/lib/agents/queries'
 import { usePriceDisplay, useViewer } from '@/lib/viewer/useViewer'
 import { cn } from '@/lib/utils'
 
-const TOKENS_KEY = ['api-tokens']
-const TRADING_KEY = ['agent-trading']
+const TOKENS_KEY = apiTokensQuery().queryKey
+const TRADING_KEY = tradingQuery().queryKey
 
 const money = (n: number) => `$${n.toFixed(2)}`
 
@@ -56,12 +60,7 @@ export function AgentsScreen() {
 }
 
 function Signed() {
-  // Proposals expire in minutes: keep the page current while it's open.
-  const trading = useQuery({
-    queryKey: TRADING_KEY,
-    queryFn: () => getTrading(),
-    refetchInterval: 15_000,
-  })
+  const trading = useTrading()
   const pending = trading.data?.trades.filter((t) => t.status === 'pending')
   return (
     <div className="flex flex-col gap-6">
@@ -84,10 +83,7 @@ function Signed() {
 function Tokens({ tradingReady }: { tradingReady: boolean }) {
   const queryClient = useQueryClient()
   const now = useNow()
-  const tokens = useQuery({
-    queryKey: TOKENS_KEY,
-    queryFn: () => getApiTokens(),
-  })
+  const tokens = useApiTokens()
   const [name, setName] = useState('')
   const [trade, setTrade] = useState(false)
   const [created, setCreated] = useState<string | null>(null)
@@ -634,10 +630,7 @@ function History({ trades }: { trades: Array<TradeView> }) {
 
 function BetRecord() {
   const display = usePriceDisplay()
-  const record = useQuery({
-    queryKey: ['bet-record'],
-    queryFn: () => getBetRecord(),
-  })
+  const record = useBetRecord()
   const now = useNow()
   const data: BetRecordView | undefined = record.data
   if (!data || data.stats.requests === 0) return null

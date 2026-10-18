@@ -5,7 +5,6 @@
  * (`usePlayerSheet`), so closing it lands exactly where they were.
  */
 
-import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useCallback, useMemo, useState } from 'react'
 import { OpenPlayer } from './playerSheet'
@@ -38,8 +37,7 @@ import {
   useKalshiConnection,
   usePredictions,
 } from '@/lib/kalshi/usePredictions'
-import { getPlayerDetail } from '@/lib/players/detail'
-import { getPlayerPage } from '@/lib/players/server'
+import { usePlayerDetail, usePlayerFirstPage } from '@/lib/players/usePlayer'
 import { cn } from '@/lib/utils'
 import { useViewer } from '@/lib/viewer/useViewer'
 
@@ -71,10 +69,7 @@ function PlayerSheet({
   playerId: string
   onClose: () => void
 }) {
-  const page = useQuery({
-    queryKey: ['player', playerId, 'first'],
-    queryFn: () => getPlayerPage({ data: { playerId } }),
-  })
+  const page = usePlayerFirstPage(playerId)
   const [playId, setPlayId] = useState<string | null>(null)
   const player = page.data?.player
   return (
@@ -204,14 +199,7 @@ export function PlayerDetailSections({
   player: PlayerProfile
   onNavigate?: () => void
 }) {
-  const detail = useQuery({
-    queryKey: ['player-detail', player.id],
-    queryFn: () => getPlayerDetail({ data: { playerId: player.id } }),
-    staleTime: 60_000,
-    // A live Game's line keeps moving.
-    refetchInterval: (q) =>
-      q.state.data?.game?.status === 'live' ? 30_000 : false,
-  })
+  const detail = usePlayerDetail(player.id)
   const overview = detail.data?.overview ?? null
   return (
     <div className="flex flex-col gap-5">

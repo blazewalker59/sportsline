@@ -4,9 +4,8 @@
  * detail in a sheet here.
  */
 
-import { useInfiniteQuery } from '@tanstack/react-query'
 import { useNavigate, useRouter } from '@tanstack/react-router'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect } from 'react'
 import type { TimelineItem } from '@/lib/model/timeline'
 import { AppHeader } from '@/components/layout/AppHeader'
 import {
@@ -20,8 +19,8 @@ import {
 } from '@/components/chat/ChatParts'
 import { PlaySheet } from '@/components/games/PlayDetailScreen'
 import { dayLabel } from '@/components/timeline/DayButton'
-import { sportsDayOf } from '@/lib/model/sportsDay'
-import { getPlayerPage } from '@/lib/players/server'
+import { usePlayerPages } from '@/lib/players/usePlayer'
+import { useToday } from '@/lib/timeline/useToday'
 import { takePlayOpened } from '@/lib/timeline/playSheet'
 
 export function PlayerScreen({
@@ -31,14 +30,8 @@ export function PlayerScreen({
   playerId: string
   playId: string | null
 }) {
-  const [today] = useState(() => sportsDayOf(new Date()))
-  const query = useInfiniteQuery({
-    queryKey: ['player', playerId],
-    queryFn: ({ pageParam }) =>
-      getPlayerPage({ data: { playerId, before: pageParam } }),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (last) => last?.nextBefore ?? undefined,
-  })
+  const today = useToday()
+  const query = usePlayerPages(playerId)
   const first = query.data?.pages[0]
   const items = query.data?.pages.flatMap((p) => p?.items ?? []) ?? []
 

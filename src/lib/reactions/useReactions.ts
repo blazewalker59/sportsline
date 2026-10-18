@@ -1,33 +1,35 @@
 /** Reactions on the client: a Sports Day's tallies, and reacting. */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getReactions, setReaction } from './server'
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
+import { setReaction } from './server'
+import { myReactionsQuery, reactionsQuery } from './queries'
 import type { ItemReactions, Reaction } from './model'
 
-/** Friends' Reactions arrive by polling: they are a nicety, not live data. */
-const REFRESH_MS = 30_000
-
-const key = (sportsDay: string) => ['reactions', sportsDay] as const
-
 export function useReactions(sportsDay: string) {
-  return useQuery({
-    queryKey: key(sportsDay),
-    queryFn: () => getReactions({ data: { sportsDay } }),
-    refetchInterval: REFRESH_MS,
-    staleTime: REFRESH_MS / 2,
-  })
+  return useQuery(reactionsQuery(sportsDay))
+}
+
+/** The Viewer's own Reactions, once signed in. */
+export function useMyReactions(enabled: boolean) {
+  return useInfiniteQuery({ ...myReactionsQuery(), enabled })
 }
 
 /** React (or clear with null), updating the tally before the server answers. */
 export function useSetReaction(sportsDay: string) {
   const queryClient = useQueryClient()
+  const { queryKey } = reactionsQuery(sportsDay)
   return useMutation({
     mutationFn: (v: { itemId: string; emoji: Reaction | null }) =>
       setReaction({ data: v }),
     onMutate: async ({ itemId, emoji }) => {
-      await queryClient.cancelQueries({ queryKey: key(sportsDay) })
+      await queryClient.cancelQueries({ queryKey })
       queryClient.setQueryData<Record<string, ItemReactions>>(
-        key(sportsDay),
+        queryKey,
         (old) => ({
           ...old,
           [itemId]: withMine(old?.[itemId], emoji),
@@ -36,8 +38,10 @@ export function useSetReaction(sportsDay: string) {
     },
     onSettled: () =>
       Promise.all([
-        queryClient.invalidateQueries({ queryKey: key(sportsDay) }),
-        queryClient.invalidateQueries({ queryKey: ['my-reactions'] }),
+        queryClient.invalidateQueries({ queryKey }),
+        queryClient.invalidateQueries({
+          queryKey: myReactionsQuery().queryKey,
+        }),
       ]),
   })
 }

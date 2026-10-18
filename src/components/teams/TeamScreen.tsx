@@ -4,7 +4,7 @@
  * the Player). Opponents link to their own pages.
  */
 
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import type { RosterPlayer, TeamGame, TeamPage } from '@/lib/teams/server'
@@ -16,7 +16,8 @@ import { RowItemMark, rowItemLabel } from '@/components/brand/RowItemMark'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { FollowButton } from '@/components/follows/FollowButton'
 import { gameSearch } from '@/lib/timeline/gameLink'
-import { getTeamPage, openTeamGame } from '@/lib/teams/server'
+import { openTeamGame } from '@/lib/teams/server'
+import { useTeamPage } from '@/lib/teams/queries'
 import { rosterGroups } from '@/lib/teams/positions'
 import { useViewer } from '@/lib/viewer/useViewer'
 import { PlayerButton } from '@/components/players/playerSheet'
@@ -28,11 +29,7 @@ const UPCOMING_SHOWN = 5
 
 export function TeamScreen({ teamId }: { teamId: string }) {
   const { data: viewerState } = useViewer()
-  const page = useQuery({
-    queryKey: ['team', teamId],
-    queryFn: () => getTeamPage({ data: { teamId } }),
-    staleTime: 60_000,
-  })
+  const page = useTeamPage(teamId)
   const [tab, setTab] = useState<'schedule' | 'roster'>('schedule')
   const data = page.data
 

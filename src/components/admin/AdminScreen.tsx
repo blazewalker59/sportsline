@@ -8,17 +8,13 @@ import { useState } from 'react'
 import type { ErrorView, JobView, OpsHealth } from '@/lib/ops/server'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { timeAgo, useNow } from '@/components/timeline/format'
-import { getOpsHealth } from '@/lib/ops/server'
+import { opsHealthQuery } from '@/lib/ops/queries'
 import { cn } from '@/lib/utils'
 
 const DAY = 24 * 3_600_000
 
 export function AdminScreen() {
-  const health = useQuery({
-    queryKey: ['ops-health'],
-    queryFn: () => getOpsHealth(),
-    refetchInterval: 30_000,
-  })
+  const health = useQuery(opsHealthQuery())
   return (
     <div className="mx-auto max-w-2xl px-4 pb-16">
       <AppHeader />

@@ -25,7 +25,7 @@ import {
 import { clockTime } from '@/components/charts/format'
 import { actionWindow, withinWindow } from '@/components/charts/timeWindow'
 import { leadChanges, raceSteps } from '@/lib/fantasy/race'
-import { getMatchupRace } from '@/lib/fantasy/server'
+import { matchupRaceQuery } from '@/lib/fantasy/queries'
 
 const HOUR = 3_600_000
 
@@ -44,12 +44,7 @@ export function MatchupRace({
   leagueId: string
   m: MatchupView
 }) {
-  const race = useQuery({
-    queryKey: ['matchup-race', leagueId, m.matchupPeriod],
-    queryFn: () => getMatchupRace({ data: { leagueId } }),
-    refetchInterval: 2 * 60_000,
-    staleTime: 60_000,
-  })
+  const race = useQuery(matchupRaceQuery(leagueId, m.matchupPeriod))
   const opponent = m.opponent
   // The race so far, ending at the score the sheet shows now.
   const points = useMemo((): Array<RacePoint> => {

@@ -9,19 +9,14 @@ import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
 import { AppHeader } from '@/components/layout/AppHeader'
-import { searchFollowables } from '@/lib/viewer/server'
+import { followablesQuery } from '@/lib/viewer/queries'
 import { useViewer } from '@/lib/viewer/useViewer'
 
 export function FollowsScreen() {
   const { data, isPending } = useViewer()
   const [query, setQuery] = useState('')
   const q = useDebounced(query.trim(), 250)
-  const results = useQuery({
-    queryKey: ['followables', q],
-    queryFn: () => searchFollowables({ data: { q } }),
-    enabled: q.length >= 2,
-    staleTime: 5 * 60_000,
-  })
+  const results = useQuery(followablesQuery(q))
 
   return (
     <div className="mx-auto max-w-xl px-4 pb-16">
