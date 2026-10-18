@@ -17,6 +17,7 @@ import type { TimelineScopeState } from './useTimelineScope'
 import type { GameSummary, TimelineItem } from '@/lib/model/timeline'
 import type { RowItem } from '@/lib/model/leagues'
 import type { Connection } from '@/lib/timeline/useLiveTimeline'
+import type { LeagueMatchup } from '@/lib/fantasy/matchup'
 import { FantasyStrip } from '@/components/fantasy/FantasyParts'
 import { PredictionStrip } from '@/components/predictions/PredictionCard'
 import { PredictionSummary } from '@/components/predictions/PredictionPortfolio'
@@ -68,7 +69,8 @@ export function TimelineTop({
   items: ReadonlyArray<TimelineItem>
   onBox: () => void
   onPrediction: (id: string) => void
-  onMatchup: (id: string) => void
+  /** Open a league's sheet: the Viewer's Matchup, or another in it. */
+  onMatchup: (id: string, other?: LeagueMatchup) => void
 }) {
   const display = s.kalshi.data?.changeDisplay
   return (

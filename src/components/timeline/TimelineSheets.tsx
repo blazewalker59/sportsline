@@ -12,6 +12,7 @@ import type { GameBox } from '@/lib/model/types'
 import type { CatchUp } from '@/lib/timeline/catchup'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { PredictionView } from '@/lib/kalshi/predictionViews'
+import type { LeagueMatchup } from '@/lib/fantasy/matchup'
 import { MatchupSheet } from '@/components/fantasy/FantasyParts'
 import { PredictionSheet } from '@/components/predictions/PredictionSheet'
 import { PlaySheet } from '@/components/games/PlayDetailScreen'
@@ -22,6 +23,7 @@ export function TimelineSheets({
   playId,
   onPlayClose,
   matchup,
+  otherMatchup,
   games,
   onMatchupClose,
   prediction,
@@ -38,6 +40,8 @@ export function TimelineSheets({
   onPlayClose: () => void
   /** The Matchup whose sheet is open, if any. */
   matchup: FantasyLeagueView | null
+  /** Another Matchup in that league, in place of the Viewer's. */
+  otherMatchup?: LeagueMatchup
   /** Today's Games, for each Starter's game state. */
   games: Array<GameSummary>
   onMatchupClose: () => void
@@ -59,7 +63,13 @@ export function TimelineSheets({
       {playId && <PlaySheet playId={playId} onClose={onPlayClose} />}
 
       {matchup && (
-        <MatchupSheet league={matchup} games={games} onClose={onMatchupClose} />
+        <MatchupSheet
+          key={`${matchup.id}:${otherMatchup?.left.teamId ?? 'mine'}`}
+          league={matchup}
+          other={otherMatchup}
+          games={games}
+          onClose={onMatchupClose}
+        />
       )}
 
       {prediction && (
