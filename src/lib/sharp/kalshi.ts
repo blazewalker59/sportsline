@@ -7,7 +7,7 @@
  * Server only.
  */
 
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import { teamOf } from './sources'
 import type { KalshiOffer, MarketKind } from './engine'
 import type { GameRef } from './sources'
@@ -64,7 +64,13 @@ export async function serviceAccount(
     .select({ viewerId: kalshiAccounts.viewerId })
     .from(kalshiAccounts)
     .innerJoin(user, eq(user.id, kalshiAccounts.viewerId))
-    .where(and(inArray(user.email, emails), eq(kalshiAccounts.status, 'ok')))
+    // The admins' emails are lower-cased; a Viewer's may not be.
+    .where(
+      and(
+        inArray(sql`lower(${user.email})`, emails),
+        eq(kalshiAccounts.status, 'ok'),
+      ),
+    )
     .get()
   return row ? loadAccount(env, row.viewerId) : null
 }
