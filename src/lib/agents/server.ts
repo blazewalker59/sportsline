@@ -22,6 +22,7 @@ import { apiTokens, kalshiTradeKeys, tradeProposals } from '@/lib/db/schema'
 import { sportsDayOf } from '@/lib/model/sportsDay'
 import { withViewer } from '@/lib/viewer/session'
 import { viewerTrendRecord } from '@/lib/sharp/trendRecord'
+import { startViewerSync } from '@/lib/live/startViewerSync'
 
 /** Enough for a few Agents; more is likely tokens nobody revoked. */
 const MAX_ACTIVE_TOKENS = 10
@@ -277,9 +278,15 @@ const ProposalId = z.object({ id: z.string().min(1).max(64) })
 export const approveTradeProposal = createServerFn({ method: 'POST' })
   .validator((data: { id: string }) => ProposalId.parse(data))
   .handler(({ data }) =>
-    withViewer(({ db, viewerId }) =>
-      approveTrade(getCloudflareEnv(), db, viewerId, data.id),
-    ),
+    withViewer(async ({ db, viewerId }) => {
+      const env = getCloudflareEnv()
+      const trade = await approveTrade(env, db, viewerId, data.id)
+      // Kalshi's reply was lost: their sync looks the order up.
+      if (trade.status === 'unknown') {
+        await startViewerSync(env, viewerId).catch(() => undefined)
+      }
+      return trade
+    }),
   )
 
 export const rejectTradeProposal = createServerFn({ method: 'POST' })

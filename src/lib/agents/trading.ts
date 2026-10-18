@@ -16,13 +16,19 @@ import {
   lte,
   sql,
 } from 'drizzle-orm'
-import { SPENDING, capProblem, describeOrder, spentOn } from './proposal'
+import {
+  SPENDING,
+  capProblem,
+  describeOrder,
+  spentOn,
+  stored,
+} from './proposal'
 import type { TradeProposal } from './proposal'
 import type { Caller } from './tokens'
 import type { CloudflareEnv, Database } from '@/lib/db'
 import type { OrderIntent } from '@/lib/kalshi/orders'
 import { loadAccount } from '@/lib/kalshi/account'
-import { market as fetchMarket } from '@/lib/kalshi/client'
+import { KalshiError, market as fetchMarket } from '@/lib/kalshi/client'
 import { importSigningKey } from '@/lib/kalshi/keys'
 import { maxCost, placeOrder } from '@/lib/kalshi/orders'
 import { unseal } from '@/lib/kalshi/vault'
@@ -55,7 +61,7 @@ async function spentToday(
       and(
         eq(tradeProposals.viewerId, viewerId),
         eq(tradeProposals.approvedDay, day),
-        inArray(tradeProposals.status, SPENDING),
+        inArray(tradeProposals.status, SPENDING.map(stored)),
       ),
     )
   return rows.reduce((n, p) => n + spentOn(p), 0)
@@ -149,7 +155,7 @@ export async function proposeTrade(
     feesDollars: null,
     error: null,
   }
-  await db.insert(tradeProposals).values(row)
+  await db.insert(tradeProposals).values({ ...row, status: 'pending' })
   await notifyProposal(env, db, row).catch((error: unknown) =>
     reportError(env, 'trading', error, { step: 'notify', id: row.id }),
   )
@@ -164,7 +170,7 @@ function marketTitle(
   return [m.title, sub].filter(Boolean).join(' · ') || 'Kalshi market'
 }
 
-async function tradeAccount(
+export async function tradeAccount(
   env: CloudflareEnv,
   key: typeof kalshiTradeKeys.$inferSelect,
 ) {
@@ -244,13 +250,13 @@ export async function approveTrade(
     )
   }
 
-  const finish = async (set: Partial<TradeProposal>) => {
+  const finish = async ({ status, ...set }: Partial<TradeProposal>) => {
     const [row] = await db
       .update(tradeProposals)
-      .set(set)
+      .set({ ...set, ...(status ? { status: stored(status) } : {}) })
       .where(eq(tradeProposals.id, id))
       .returning()
-    return row
+    return row as TradeProposal
   }
 
   // Today's spending, not counting this order.
@@ -258,20 +264,18 @@ export async function approveTrade(
   const problem = capProblem(claimed.maxCostDollars, key, spent)
   if (problem) return finish({ status: 'failed', error: problem })
 
+  let sent = false
   try {
+    const account = await tradeAccount(env, key)
+    sent = true
     const result = await placeOrder(
-      await tradeAccount(env, key),
+      account,
       claimed.marketTicker,
       claimed,
       claimed.id,
     )
     return finish({
-      status:
-        result.filled === 0
-          ? 'unfilled'
-          : result.filled < claimed.count
-            ? 'partial'
-            : 'filled',
+      status: fillStatus(result.filled, claimed.count),
       orderId: result.orderId,
       filledCount: result.filled,
       avgPriceDollars: result.avgPrice,
@@ -279,11 +283,27 @@ export async function approveTrade(
     })
   } catch (error) {
     await reportError(env, 'trading', error, { step: 'place', id })
+    // Kalshi refused it (4xx): nothing was placed. Anything else (no reply,
+    // a timeout, a 5xx) may have gone through: it's looked up later and
+    // counts in full toward the day's cap meanwhile.
+    const refused =
+      !sent ||
+      (error instanceof KalshiError &&
+        error.status >= 400 &&
+        error.status < 500)
     return finish({
-      status: 'failed',
+      status: refused ? 'failed' : 'unknown',
       error: error instanceof Error ? error.message : String(error),
     })
   }
+}
+
+/** A placed order's status from what filled of it. Pure. */
+export function fillStatus(
+  filled: number,
+  count: number,
+): 'filled' | 'partial' | 'unfilled' {
+  return filled === 0 ? 'unfilled' : filled < count ? 'partial' : 'filled'
 }
 
 /**

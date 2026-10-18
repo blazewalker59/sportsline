@@ -350,7 +350,7 @@ function tradeTools(
       name: 'get_trades',
       title: 'Trade proposals',
       description:
-        "The Viewer's recent trade proposals, newest first, with their status: pending (waiting for the Viewer), rejected, cancelled, expired, placing, filled, partial, unfilled (nothing at the limit) or failed (with the error), and fills.",
+        "The Viewer's recent trade proposals, newest first, with their status: pending (waiting for the Viewer), rejected, cancelled, expired, placing, unknown (Kalshi didn’t confirm it: it may have gone through, and is being checked), filled, partial, unfilled (nothing at the limit) or failed (with the error), and fills.",
       input: z.object({}),
       call: async () => {
         await expireTrades(db, caller.viewerId)

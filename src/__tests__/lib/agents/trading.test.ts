@@ -9,6 +9,7 @@ import { isBun, sqliteDb } from '../../helpers/sqliteDb'
 import type * as Db from '@/lib/db'
 import type { CloudflareEnv } from '@/lib/db'
 import type { serveMcp as ServeMcp } from '@/lib/agents/endpoint'
+import type * as KalshiClient from '@/lib/kalshi/client'
 import type * as Orders from '@/lib/kalshi/orders'
 import type * as Trading from '@/lib/agents/trading'
 
@@ -17,6 +18,12 @@ const state = vi.hoisted(() => ({
   market: { status: 'active' } as Record<string, unknown> | null,
   placed: [] as Array<unknown>,
   pushes: [] as Array<string>,
+  /** What placing an order throws instead of answering. */
+  placeError: null as Error | null,
+  /** Kalshi's record of orders and fills, for reconciling. */
+  orders: [] as Array<Record<string, unknown>>,
+  fills: [] as Array<Record<string, unknown>>,
+  reads: [] as Array<string>,
 }))
 vi.mock('@/lib/db', async (original) => ({
   ...(await original<typeof Db>()),
@@ -33,7 +40,16 @@ vi.mock('@/lib/kalshi/vault', () => ({
 vi.mock('@/lib/kalshi/keys', () => ({
   importSigningKey: () => Promise.resolve({ type: 'ed25519' }),
 }))
-vi.mock('@/lib/kalshi/client', () => ({
+vi.mock('@/lib/kalshi/client', async (original) => ({
+  KalshiError: (await original<typeof KalshiClient>()).KalshiError,
+  signedGet: (_a: unknown, path: string) => {
+    state.reads.push(path)
+    return Promise.resolve(
+      path.startsWith('/portfolio/orders')
+        ? { orders: state.orders }
+        : { fills: state.fills },
+    )
+  },
   market: (_a: unknown, ticker: string) =>
     Promise.resolve(
       state.market && {
@@ -56,6 +72,7 @@ vi.mock('@/lib/kalshi/orders', async (original) => ({
     id: string,
   ) => {
     state.placed.push({ account, ticker, o, id })
+    if (state.placeError) return Promise.reject(state.placeError)
     return Promise.resolve({
       orderId: 'ord-1',
       filled: o.count,
@@ -127,6 +144,10 @@ describe.skipIf(!isBun)('Agent trading', () => {
     state.market = { status: 'active' }
     state.placed = []
     state.pushes = []
+    state.placeError = null
+    state.orders = []
+    state.fills = []
+    state.reads = []
     sqlite.run(
       "INSERT INTO user (id,name,email,email_verified,created_at,updated_at) VALUES ('u1','Viewer','v@example.com',1,0,0)",
     )
@@ -310,6 +331,117 @@ describe.skipIf(!isBun)('Agent trading', () => {
     expect(mine.result?.structuredContent).toMatchObject({
       status: 'cancelled',
     })
+  })
+
+  it('fails an order Kalshi refused, and counts a lost reply in full', async () => {
+    const { KalshiError } = await import('@/lib/kalshi/client')
+    sqlite.run(
+      "UPDATE kalshi_trade_keys SET max_daily_dollars=12 WHERE viewer_id='u1'",
+    )
+    const approve = async () =>
+      trading.approveTrade(
+        env,
+        db,
+        'u1',
+        (await propose()).result!.structuredContent!.id as string,
+      )
+
+    // A 4xx: Kalshi said no, so nothing was placed or spent.
+    state.placeError = new KalshiError(400, 'Kalshi 400: insufficient balance')
+    expect(await approve()).toMatchObject({
+      status: 'failed',
+      error: 'Kalshi 400: insufficient balance',
+    })
+    // No reply, or a 5xx: it may have gone through.
+    state.placeError = new TypeError('Network connection lost')
+    expect(await approve()).toMatchObject({ status: 'unknown' })
+    state.placeError = new KalshiError(502, 'Kalshi 502')
+    expect(await approve()).toMatchObject({ status: 'unknown' })
+    // Two unknowns at their full $5.60 each: a third won't fit in $12.
+    expect((await propose()).result?.content?.[0].text).toMatch(
+      /\$11\.20 has been spent today of the \$12\.00 daily limit/,
+    )
+  })
+
+  it('settles unconfirmed orders from Kalshi’s record, by client order id', async () => {
+    const { reconcileTrades } = await import('@/lib/agents/reconcile')
+    const approve = async () => {
+      const p = (await propose()).result!.structuredContent!.id as string
+      await trading.approveTrade(env, db, 'u1', p)
+      return p
+    }
+    state.placeError = new TypeError('Network connection lost')
+    const went = await approve()
+    const lost = await approve()
+    // One stuck placing (the Worker stopped mid-order).
+    state.placeError = null
+    const stuck = (await propose()).result!.structuredContent!.id as string
+    sqlite.run(
+      `UPDATE trade_proposals SET status='placing', decided_at='${new Date().toISOString()}' WHERE id='${stuck}'`,
+    )
+    state.orders = [
+      {
+        order_id: 'ord-a',
+        client_order_id: 'someone-else',
+        status: 'executed',
+      },
+      {
+        order_id: 'ord-went',
+        client_order_id: went,
+        status: 'executed',
+        fill_count_fp: '4.00',
+      },
+      {
+        order_id: 'ord-stuck',
+        client_order_id: stuck,
+        status: 'canceled',
+        fill_count_fp: '0.00',
+      },
+    ]
+    state.fills = [
+      {
+        order_id: 'ord-went',
+        count_fp: '3.00',
+        yes_price_dollars: '0.5200',
+        no_price_dollars: '0.4800',
+        fee_cost: '0.0600',
+      },
+      {
+        order_id: 'ord-went',
+        count_fp: '1.00',
+        yes_price_dollars: '0.5400',
+        no_price_dollars: '0.4600',
+        fee_cost: '0.0200',
+      },
+    ]
+
+    // Too soon to look: Kalshi may not list it yet.
+    expect(await reconcileTrades(env, 'u1')).toBe(0)
+    expect(state.reads).toEqual([])
+
+    const later = new Date(Date.now() + 4 * 60_000)
+    expect(await reconcileTrades(env, 'u1', later)).toBe(3)
+    const rows = Object.fromEntries(
+      (await trading.recentTrades(db, 'u1')).map((p) => [p.id, p]),
+    )
+    expect(rows[went]).toMatchObject({
+      status: 'partial',
+      orderId: 'ord-went',
+      filledCount: 4,
+      avgPriceDollars: 0.525,
+      error: null,
+    })
+    expect(rows[went].feesDollars).toBeCloseTo(0.08)
+    expect(rows[stuck]).toMatchObject({ status: 'unfilled', filledCount: 0 })
+    expect(rows[lost]).toMatchObject({
+      status: 'failed',
+      error: 'Kalshi has no record of this order, so it wasn’t placed.',
+    })
+    // Read with the trade key, by the market and from just before approval.
+    expect(state.reads[0]).toMatch(
+      /^\/portfolio\/orders\?ticker=KXNHLGAME-26OCT07EDMANA-EDM&min_ts=\d+&limit=200$/,
+    )
+    expect(await reconcileTrades(env, 'u1', later)).toBe(0)
   })
 
   it("won't propose on a market that isn't trading, or without a trade key", async () => {

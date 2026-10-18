@@ -8,15 +8,33 @@ import type { tradeProposals } from '@/lib/db/schema'
 import type { PriceDisplay } from '@/lib/model/price'
 import { formatPrice } from '@/lib/model/price'
 
-export type TradeProposal = typeof tradeProposals.$inferSelect
-type Status = TradeProposal['status']
+type Row = typeof tradeProposals.$inferSelect
+type Stored = Row['status']
+
+/**
+ * A proposal's status. `unknown`: the order was sent but Kalshi's reply
+ * was lost, so it may have gone through; it's looked up on Kalshi later
+ * (reconcile.ts). The column is plain text; the schema's type doesn't
+ * list `unknown` yet, so writes go through `stored`.
+ */
+export type Status = Stored | 'unknown'
+export type TradeProposal = Omit<Row, 'status'> & { status: Status }
+
+/** A status as the schema types the column (it's text: any fits). Pure. */
+export const stored = (s: Status) => s as Stored
+
+/** Sent to Kalshi, but with no outcome recorded yet. */
+export const UNSETTLED: Array<Status> = ['placing', 'unknown']
 
 /** Approved orders that count toward the day's cap. */
-export const SPENDING: Array<Status> = ['placing', 'filled', 'partial']
+export const SPENDING: Array<Status> = [...UNSETTLED, 'filled', 'partial']
 
-/** What an approved order cost (or may yet cost, while it's placing). Pure. */
+/**
+ * What an approved order cost, or may yet cost (all of it) while its
+ * outcome is unknown. Pure.
+ */
 export function spentOn(p: TradeProposal): number {
-  if (p.status === 'placing') return p.maxCostDollars
+  if (UNSETTLED.includes(p.status)) return p.maxCostDollars
   const fees = p.feesDollars ?? 0
   return p.action === 'buy'
     ? (p.filledCount ?? 0) * (p.avgPriceDollars ?? 0) + fees

@@ -75,6 +75,13 @@ vi.mock('@/lib/push/predictionAlerts', () => ({
   },
 }))
 
+vi.mock('@/lib/agents/reconcile', () => ({
+  reconcileTrades: () => {
+    state.calls.push('trades')
+    return Promise.resolve(1)
+  },
+}))
+
 describe.skipIf(!isBun)('ViewerSync', () => {
   let ViewerSync: typeof ViewerSyncClass
   let ctx: MemoryCtx
@@ -224,5 +231,19 @@ describe.skipIf(!isBun)('ViewerSync', () => {
     expect(state.calls).toEqual([])
     expect(jobNames()).toEqual([])
     expect(ctx.alarmSets).toEqual([])
+  })
+
+  it("settles an Agent's unconfirmed orders while there are any", async () => {
+    const loop = sync()
+    await loop.start('u1')
+    await loop.alarm()
+    expect(state.calls).toEqual([])
+    sqlite.run(
+      "INSERT INTO trade_proposals (id,viewer_id,token_id,agent_name,market_ticker,market_title,side,action,count,limit_cents,max_cost_dollars,status,created_at,expires_at,decided_at) VALUES ('t1','u1','tok','Grok','KX-1','Yankees','yes','buy',10,54,5.6,'unknown','2026-10-08T17:00:00Z','2026-10-08T17:10:00Z','2026-10-08T17:01:00Z')",
+    )
+    await loop.syncNow('u1')
+    await loop.alarm()
+    expect(state.calls).toEqual(['trades'])
+    expect(jobNames()).toEqual(['trades:u1'])
   })
 })
