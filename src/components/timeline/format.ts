@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { clockTime, runtimeTimeZone } from '@/lib/time/format'
 
 // Shared clocks, one per tick interval: a single timer per interval while
 // anything reads it, and only the components reading it re-render.
@@ -73,17 +74,8 @@ export function timeAgo(iso: string, now: number | null): string {
   const minutes = Math.round(seconds / 60)
   if (minutes < 60) return `${minutes}m`
   const hours = Math.floor(minutes / 60)
-  // Past about half a day, "117h" means nothing: show the clock time.
+  // Past about half a day, "117h" means nothing: show the clock time. A
+  // clock means the client has taken over, so the zone is the browser's.
   if (hours < 12) return `${hours}h`
-  return new Date(iso).toLocaleTimeString([], {
-    hour: 'numeric',
-    minute: '2-digit',
-  })
-}
-
-export function startTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], {
-    hour: 'numeric',
-    minute: '2-digit',
-  })
+  return clockTime(iso, runtimeTimeZone())
 }

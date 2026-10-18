@@ -10,6 +10,8 @@ import { AppHeader } from '@/components/layout/AppHeader'
 import { timeAgo, useNow } from '@/components/timeline/format'
 import { opsHealthQuery } from '@/lib/ops/queries'
 import { cn } from '@/lib/utils'
+import { dateTime } from '@/lib/time/format'
+import { useTimeZone } from '@/lib/time/useTimeZone'
 
 const DAY = 24 * 3_600_000
 
@@ -171,6 +173,7 @@ function Health({ health }: { health: OpsHealth }) {
 
 function ErrorRow({ error: e, now }: { error: ErrorView; now: number | null }) {
   const [open, setOpen] = useState(false)
+  const timeZone = useTimeZone()
   return (
     <li>
       <button
@@ -193,8 +196,8 @@ function ErrorRow({ error: e, now }: { error: ErrorView; now: number | null }) {
       {open && (
         <div className="px-3 pb-3 text-xs text-muted">
           <p className="mb-1">
-            First seen {new Date(e.firstAt).toLocaleString()} · last{' '}
-            {new Date(e.lastAt).toLocaleString()}
+            First seen {dateTime(e.firstAt, timeZone)} · last{' '}
+            {dateTime(e.lastAt, timeZone)}
           </p>
           {e.details && (
             <pre className="max-h-64 overflow-auto rounded-lg bg-notice p-2 text-[11px] leading-snug whitespace-pre-wrap">

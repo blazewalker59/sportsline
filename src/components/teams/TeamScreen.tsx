@@ -23,6 +23,8 @@ import { useViewer } from '@/lib/viewer/useViewer'
 import { PlayerButton } from '@/components/players/playerSheet'
 import { PredictionsSection } from '@/components/players/PredictionsSection'
 import { cn } from '@/lib/utils'
+import { clockTime, dateLabel } from '@/lib/time/format'
+import { useTimeZone } from '@/lib/time/useTimeZone'
 
 const RESULTS_SHOWN = 10
 const UPCOMING_SHOWN = 5
@@ -249,6 +251,7 @@ function GameRow({
   league: TeamPage['team']['league']
 }) {
   const navigate = useNavigate()
+  const timeZone = useTimeZone()
   const open = useMutation({
     mutationFn: () =>
       openTeamGame({
@@ -285,7 +288,7 @@ function GameRow({
   return (
     <li className="flex min-h-14 items-center gap-2 px-3">
       <span className="w-[4.5rem] shrink-0 text-xs text-muted">
-        {dateLabel(game.startsAt)}
+        {dateLabel(game.startsAt, timeZone)}
       </span>
       {game.opponent.id ? (
         <Link
@@ -323,14 +326,10 @@ function GameRow({
 }
 
 function Outcome({ game }: { game: TeamGame }) {
+  const timeZone = useTimeZone()
   if (game.status === 'scheduled') {
     return (
-      <span className="text-muted">
-        {new Date(game.startsAt).toLocaleTimeString([], {
-          hour: 'numeric',
-          minute: '2-digit',
-        })}
-      </span>
+      <span className="text-muted">{clockTime(game.startsAt, timeZone)}</span>
     )
   }
   if (game.status === 'postponed')
@@ -472,12 +471,4 @@ function Roster({
       ))}
     </div>
   )
-}
-
-function dateLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  })
 }

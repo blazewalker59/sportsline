@@ -12,7 +12,8 @@ import { tooltip } from '@tanstack/charts/tooltip'
 import { useMemo } from 'react'
 import type { TeamGame, TeamPage } from '@/lib/teams/server'
 import { ChartCard } from '@/components/charts/ChartCard'
-import { shortDate } from '@/components/charts/format'
+import { shortDate } from '@/lib/time/format'
+import { useTimeZone } from '@/lib/time/useTimeZone'
 
 /** Past this many games (baseball, hockey, basketball), the latest only. */
 const SHOWN = 20
@@ -30,6 +31,7 @@ const LOSS = '#ef4444'
 const sign = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0')
 
 export function TeamResults({ page }: { page: TeamPage }) {
+  const timeZone = useTimeZone()
   const finals = useMemo(
     () => page.games.filter((g) => g.status === 'final' && g.result),
     [page.games],
@@ -91,11 +93,11 @@ export function TeamResults({ page }: { page: TeamPage }) {
           use: tooltip,
           format(point) {
             const g = (point.datum as Bar).game
-            return `${g.result} ${g.score.team}–${g.score.opponent} ${g.home ? 'vs' : '@'} ${g.opponent.abbreviation} · ${shortDate(g.startsAt)}`
+            return `${g.result} ${g.score.team}–${g.score.opponent} ${g.home ? 'vs' : '@'} ${g.opponent.abbreviation} · ${shortDate(g.startsAt, timeZone)}`
           },
         },
       }),
-    [bars, every],
+    [bars, every, timeZone],
   )
 
   if (bars.length < 2) return null

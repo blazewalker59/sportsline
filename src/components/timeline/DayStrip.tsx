@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react'
 import { shiftSportsDay } from '@/lib/model/sportsDay'
 import { BACKFILL_DAYS } from '@/lib/timeline/days'
 import { cn } from '@/lib/utils'
+import { formatDay } from '@/lib/time/format'
 
 function chip(
   sportsDay: string,
@@ -11,13 +12,9 @@ function chip(
   if (sportsDay === today) return { top: 'Today', bottom: '' }
   if (sportsDay === shiftSportsDay(today, -1))
     return { top: 'Yest', bottom: '' }
-  const d = new Date(`${sportsDay}T12:00:00Z`)
   return {
-    top: d.toLocaleDateString(undefined, { weekday: 'short', timeZone: 'UTC' }),
-    bottom: d.toLocaleDateString(undefined, {
-      day: 'numeric',
-      timeZone: 'UTC',
-    }),
+    top: formatDay(sportsDay, { weekday: 'short' }),
+    bottom: formatDay(sportsDay, { day: 'numeric' }),
   }
 }
 
@@ -66,15 +63,11 @@ export function DayStrip({
                 resetScroll={false}
                 onClick={onPick}
                 aria-current={isSelected ? 'date' : undefined}
-                aria-label={new Date(`${day}T12:00:00Z`).toLocaleDateString(
-                  undefined,
-                  {
-                    weekday: 'long',
-                    month: 'long',
-                    day: 'numeric',
-                    timeZone: 'UTC',
-                  },
-                )}
+                aria-label={formatDay(day, {
+                  weekday: 'long',
+                  month: 'long',
+                  day: 'numeric',
+                })}
                 className={cn(
                   'flex h-11 min-w-11 flex-col items-center justify-center rounded-xl px-2 leading-none transition-colors',
                   isSelected

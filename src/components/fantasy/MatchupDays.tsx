@@ -8,6 +8,7 @@ import { useState } from 'react'
 import { dayLabel, daySportsDay } from './format'
 import type { MatchupView } from '@/lib/fantasy/matchup'
 import { cn } from '@/lib/utils'
+import { formatDay, shortDay } from '@/lib/time/format'
 
 /** A day (its scoring period), or the whole matchup. */
 export type MatchupPart = number | 'summary'
@@ -122,13 +123,14 @@ export function matchupChoices(
       ? [{ part: 'summary' as const, top: 'Summary', bottom: 'All days' }]
       : []),
     ...days.map((d) => {
-      const date = new Date(`${daySportsDay(m, d, now)}T12:00:00Z`)
-      const fmt = (o: Intl.DateTimeFormatOptions) =>
-        date.toLocaleDateString('en-US', { ...o, timeZone: 'UTC' })
+      const day = daySportsDay(m, d, now)
       return {
         part: d,
-        top: d === m.scoringPeriod ? 'Today' : fmt({ weekday: 'short' }),
-        bottom: fmt({ month: 'short', day: 'numeric' }),
+        top:
+          d === m.scoringPeriod
+            ? 'Today'
+            : formatDay(day, { weekday: 'short' }),
+        bottom: shortDay(day),
       }
     }),
   ]

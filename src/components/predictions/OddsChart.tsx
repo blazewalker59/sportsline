@@ -26,7 +26,7 @@ import {
   WINDOWED_MARGIN,
   useTimeWindow,
 } from '@/components/charts/TimeOverview'
-import { clockTime, pct, shortDate } from '@/components/charts/format'
+import { pct } from '@/components/charts/format'
 import {
   actionWindow,
   windowTicks,
@@ -34,6 +34,8 @@ import {
 } from '@/components/charts/timeWindow'
 import { usePredictionDetail } from '@/lib/kalshi/usePredictions'
 import { cn } from '@/lib/utils'
+import { clockTime, shortDate } from '@/lib/time/format'
+import { useTimeZone } from '@/lib/time/useTimeZone'
 
 interface OddsRow {
   kind: 'odds'
@@ -189,15 +191,16 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
   const lineColor = up ? CHART_COLORS.good : CHART_COLORS.bad
   const axis = chanceAxis(Math.max(entry ?? 0, ...rows.map((r) => r.chance)))
   // Over a day and a half, label dates; within one, clock times.
+  const timeZone = useTimeZone()
   const formatTime = (t: number) =>
     view.end - view.start > 36 * 3_600_000
-      ? shortDate(new Date(t))
-      : clockTime(new Date(t))
+      ? shortDate(t, timeZone)
+      : clockTime(t, timeZone)
   // The overview's range reads with the day when the whole spans days.
   const formatRange = (t: number) =>
     end - start > 18 * 3_600_000
-      ? `${shortDate(new Date(t))} ${clockTime(new Date(t))}`
-      : clockTime(new Date(t))
+      ? `${shortDate(t, timeZone)} ${clockTime(t, timeZone)}`
+      : clockTime(t, timeZone)
 
   const definition = useMemo(() => {
     const picking = keyPlaySelection<PlayRow>(
@@ -283,9 +286,18 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
       focus: picking.focus,
       maxFocusDistance: picking.maxFocusDistance,
     })
-    // formatTime only depends on the view.
+    // formatTime only depends on the view and the zone.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shown, shownPlays, lineColor, entry, view, axis.top, keyPlay.selected])
+  }, [
+    shown,
+    shownPlays,
+    lineColor,
+    entry,
+    view,
+    axis.top,
+    keyPlay.selected,
+    timeZone,
+  ])
 
   return (
     <ChartCard
@@ -360,6 +372,7 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
 
 /** A key play as the panel tells it: what, who, and the swing it caused. */
 function PlayDetail({ play }: { play: PlayRow }) {
+  const timeZone = useTimeZone()
   const swing = Math.round((play.after - play.chance) * 100)
   return (
     <>
@@ -374,7 +387,7 @@ function PlayDetail({ play }: { play: PlayRow }) {
           {play.team ? ` · ${play.team}` : ''}
         </span>
         <span className="ml-auto shrink-0 font-normal text-muted tabular-nums">
-          {clockTime(new Date(play.t))}
+          {clockTime(play.t, timeZone)}
         </span>
       </p>
       <p className="line-clamp-2">{play.description}</p>

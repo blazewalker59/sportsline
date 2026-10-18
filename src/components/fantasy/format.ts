@@ -8,6 +8,7 @@ import type { CategoryResult } from '@/lib/fantasy/categories'
 import type { LineupPlayer, MatchupView } from '@/lib/fantasy/matchup'
 import { tally } from '@/lib/fantasy/categories'
 import { shiftSportsDay, sportsDayOf } from '@/lib/model/sportsDay'
+import { weekdayDay } from '@/lib/time/format'
 
 export const pts = (n: number | null) => (n === null ? '—' : n.toFixed(1))
 
@@ -59,12 +60,7 @@ export function dayLabel(
   if (ahead === -1) return 'Yesterday'
   if (ahead === 1) return 'Tomorrow'
   const day = daySportsDay(m, scoringPeriod, now)
-  return new Date(`${day}T12:00:00Z`).toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  })
+  return weekdayDay(day)
 }
 
 /**

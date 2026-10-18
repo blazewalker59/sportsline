@@ -23,6 +23,7 @@ import type { GameState } from './gameState'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { LineupPlayer } from '@/lib/fantasy/matchup'
 import type { GameSummary } from '@/lib/model/timeline'
+import { useTimeZone } from '@/lib/time/useTimeZone'
 import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { PlayerButton } from '@/components/players/playerSheet'
@@ -51,9 +52,10 @@ function PlayerCell({
   onToggle: () => void
   byes?: boolean
 }) {
+  const timeZone = useTimeZone()
   if (!player) return <div className="min-h-14" />
   const right = align === 'right'
-  const state = gameState(player, games)
+  const state = gameState(player, games, timeZone)
   const position = player.positionId
     ? POSITIONS[sport][player.positionId]
     : undefined

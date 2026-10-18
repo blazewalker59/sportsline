@@ -4,25 +4,17 @@
  * the evening they started.
  */
 
-const ROLLOVER_HOURS = 6
+import { dayOf, shiftDay } from '@/lib/time/format'
 
-const easternDate = new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'America/New_York',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-})
+const ROLLOVER_HOURS = 6
 
 /** YYYY-MM-DD Sports Day containing this instant. */
 export function sportsDayOf(instant: Date): string {
-  return easternDate.format(
-    new Date(instant.getTime() - ROLLOVER_HOURS * 3_600_000),
+  return dayOf(
+    instant.getTime() - ROLLOVER_HOURS * 3_600_000,
+    'America/New_York',
   )
 }
 
 /** The Sports Day `days` before or after `sportsDay`. */
-export function shiftSportsDay(sportsDay: string, days: number): string {
-  const d = new Date(`${sportsDay}T12:00:00Z`)
-  d.setUTCDate(d.getUTCDate() + days)
-  return d.toISOString().slice(0, 10)
-}
+export const shiftSportsDay = shiftDay
