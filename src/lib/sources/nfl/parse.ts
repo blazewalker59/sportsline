@@ -14,20 +14,19 @@ import {
   espnHeadshot,
   mapStatus,
   parseScoreboard as parseEspnScoreboard,
+  periodEndMilestone,
   quarterLabel,
   refId,
   teamLogo,
 } from '../espn/common'
-import type { EspnLeague } from '../espn/common'
+import { gameMilestones } from '../common'
 import type {
   EspnCompetitor,
-  NflCorePlay,
-  NflCorePlays,
-  NflRoster,
-  NflScoreboard,
-  NflSummary,
-  NflTeams,
-} from './feed'
+  EspnLeague,
+  EspnScoreboard,
+  EspnTeams,
+} from '../espn/common'
+import type { NflCorePlay, NflCorePlays, NflRoster, NflSummary } from './feed'
 import type {
   GameSnapshot,
   InvolvedPlayer,
@@ -73,7 +72,6 @@ const NO_FOURTH_DOWN_ATTEMPT = new Set([
   'Penalty',
   'Timeout',
 ])
-const FINAL_SEQUENCE = 1_000_000_000
 
 export type FootballLeague = Extract<EspnLeague, 'nfl' | 'cfb'>
 
@@ -182,8 +180,6 @@ export function parseGame(
     }
   })
 
-  const scoreLine = (s: Score) =>
-    `${away.abbreviation} ${s.away}, ${home.abbreviation} ${s.home}`
   const rows = [...(core.items ?? [])].sort(
     (a, b) => Number(a.sequenceNumber) - Number(b.sequenceNumber),
   )
@@ -214,23 +210,19 @@ export function parseGame(
     if (SEGMENT_END_TYPES.has(type) || GAME_END_TYPES.has(type)) {
       const final = GAME_END_TYPES.has(type)
       sawGameEnd ||= final
-      const label = final
-        ? period > 4
-          ? 'Final/OT'
-          : 'Final'
-        : type === 'End of Half'
-          ? 'Halftime'
-          : `End of ${quarterLabel(period)}`
-      milestones.push({
-        kind: 'milestone',
-        milestone: final ? 'final' : 'segment_end',
-        key: final ? 'final' : `end:${period}`,
-        sequence: final ? FINAL_SEQUENCE : sequence,
-        occurredAt,
-        segmentLabel: final ? label : quarterLabel(period),
-        score,
-        description: `${label}: ${scoreLine(score)}`,
-      })
+      milestones.push(
+        periodEndMilestone(
+          { away, home },
+          {
+            period,
+            final,
+            halftime: type === 'End of Half',
+            sequence,
+            occurredAt,
+            score,
+          },
+        ),
+      )
       continue
     }
 
@@ -283,43 +275,19 @@ export function parseGame(
     away: Number(awayC.score ?? previous.away),
     home: Number(homeC.score ?? previous.home),
   }
-  if (plays.length > 0) {
-    const first = plays[0]
-    milestones.push({
-      kind: 'milestone',
-      milestone: 'start',
-      key: 'start',
-      sequence: first.sequence - 1,
-      occurredAt: first.occurredAt,
-      segmentLabel: 'Q1',
-      score: { away: 0, home: 0 },
-      description: `Kickoff: ${away.abbreviation} @ ${home.abbreviation}`,
-    })
-  }
-  if (status === 'final' && !sawGameEnd) {
-    milestones.push({
-      kind: 'milestone',
-      milestone: 'final',
-      key: 'final',
-      sequence: FINAL_SEQUENCE,
-      occurredAt: plays.at(-1)?.occurredAt ?? competition.date,
-      segmentLabel: 'Final',
-      score: finalScore,
-      description: `Final: ${scoreLine(finalScore)}`,
-    })
-  }
-  if (status === 'postponed') {
-    milestones.push({
-      kind: 'milestone',
-      milestone: 'postponed',
-      key: 'postponed',
-      sequence: FINAL_SEQUENCE,
-      occurredAt: competition.date,
-      segmentLabel: '',
-      score: finalScore,
-      description: `${away.abbreviation} @ ${home.abbreviation} postponed`,
-    })
-  }
+  milestones.push(
+    ...gameMilestones(
+      { away, home },
+      {
+        status,
+        plays,
+        startsAt: competition.date,
+        score: finalScore,
+        start: { segmentLabel: 'Q1', verb: 'Kickoff' },
+        finalLabel: sawGameEnd ? null : 'Final',
+      },
+    ),
+  )
 
   const items: Array<SourceItem> = [...plays, ...milestones]
   const lastPlay = rows
@@ -438,14 +406,14 @@ function box(
 }
 
 export function parseScoreboard(
-  scoreboard: NflScoreboard,
+  scoreboard: EspnScoreboard,
   league: FootballLeague = 'nfl',
 ): Array<ScheduledGame> {
   return parseEspnScoreboard(scoreboard, league)
 }
 
 export function parseRoster(
-  teams: NflTeams,
+  teams: EspnTeams,
   rosters: ReadonlyArray<{ teamId: string; roster: NflRoster }>,
   league: FootballLeague = 'nfl',
 ): SourceRoster {

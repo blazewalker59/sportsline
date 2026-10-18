@@ -1,6 +1,7 @@
 /** NHL Source adapter: NHL.com (api-web.nhle.com) plus its stats API. */
 
 import { LIVE_POLL, getJson as jsonFrom } from '../pool'
+import { seasonYear } from '../common'
 import {
   parseClubSchedule,
   parseGame,
@@ -100,6 +101,6 @@ export const nhlAdapter: SourceAdapter = {
  * starts in September and its playoffs run into June.
  */
 export function nhlSeasons(now: Date): Array<string> {
-  const start = now.getUTCFullYear() - (now.getUTCMonth() < 8 ? 1 : 0)
+  const start = seasonYear(now, 8)
   return [`${start}${start + 1}`, `${start - 1}${start}`]
 }
