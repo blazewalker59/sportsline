@@ -76,8 +76,13 @@ export function TimelineSheets({
         <Sheet title={`Live now · ${live.length}`} onClose={onLiveClose}>
           <ol className="flex flex-col gap-3">
             {live.map(({ typing: t, game: g }) => (
-              <li key={g.id} onClick={onLiveClose}>
-                <TypingRow typing={t} game={g} focused={false} />
+              <li key={g.id}>
+                <TypingRow
+                  typing={t}
+                  game={g}
+                  focused={false}
+                  onClick={onLiveClose}
+                />
               </li>
             ))}
           </ol>

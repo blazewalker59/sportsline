@@ -82,10 +82,13 @@ export function TypingRow({
   typing,
   game,
   focused,
+  onClick,
 }: {
   typing: Typing
   game: GameSummary
   focused: boolean
+  /** Also on following the link (closing the sheet it's listed in). */
+  onClick?: () => void
 }) {
   const team =
     typing.side === 'home'
@@ -104,6 +107,7 @@ export function TypingRow({
       })}
       viewTransition
       resetScroll={false}
+      onClick={onClick}
       className={cn('flex items-end gap-2', right && 'flex-row-reverse')}
     >
       {team ? (
