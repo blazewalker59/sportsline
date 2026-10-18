@@ -7,6 +7,12 @@
  * a Play.
  */
 
+import {
+  finalMilestone,
+  postponedMilestone,
+  scoreLine,
+  startMilestone,
+} from '../common'
 import type {
   MlbBoxTeam,
   MlbFeed,
@@ -85,7 +91,6 @@ const ACTION_STEP = 10
 const PA_RESULT_OFFSET = 9_990
 const SEGMENT_END_OFFSET = 9_995
 const START_SEQUENCE = -1
-const FINAL_SEQUENCE = 1_000_000_000
 
 function isActionPlayType(eventType: string): boolean {
   return (
@@ -440,23 +445,18 @@ function gameMilestones(
 ): Array<SourceMilestone> {
   const milestones: Array<SourceMilestone> = []
   const allPlays = feed.liveData.plays.allPlays
-  const scoreLine = (s: Score) =>
-    `${away.abbreviation} ${s.away}, ${home.abbreviation} ${s.home}`
+  const teams = { away, home }
   const lastScore = plays.at(-1)?.score ?? { away: 0, home: 0 }
 
   if (status === 'postponed') {
-    milestones.push({
-      kind: 'milestone',
-      milestone: 'postponed',
-      key: 'postponed',
-      sequence: FINAL_SEQUENCE,
-      occurredAt:
+    milestones.push(
+      postponedMilestone(
+        teams,
         feedTimestamp(feed.metaData?.timeStamp) ??
-        feed.gameData.datetime.dateTime,
-      segmentLabel: '',
-      score: lastScore,
-      description: `${away.abbreviation} @ ${home.abbreviation} postponed`,
-    })
+          feed.gameData.datetime.dateTime,
+        lastScore,
+      ),
+    )
     return milestones
   }
 
@@ -464,16 +464,14 @@ function gameMilestones(
     .flatMap((pa) => pa.playEvents ?? [])
     .find((e) => e.isPitch)
   if (firstPitch) {
-    milestones.push({
-      kind: 'milestone',
-      milestone: 'start',
-      key: 'start',
-      sequence: START_SEQUENCE,
-      occurredAt: firstPitch.startTime ?? '',
-      segmentLabel: 'Top 1st',
-      score: { away: 0, home: 0 },
-      description: `First pitch: ${away.abbreviation} @ ${home.abbreviation}`,
-    })
+    milestones.push(
+      startMilestone(teams, {
+        sequence: START_SEQUENCE,
+        occurredAt: firstPitch.startTime ?? '',
+        segmentLabel: 'Top 1st',
+        verb: 'First pitch',
+      }),
+    )
   }
 
   // A half-inning has ended once a later half begins or it records 3 outs.
@@ -505,7 +503,7 @@ function gameMilestones(
       occurredAt: last.about.endTime ?? last.playEndTime ?? '',
       segmentLabel: label,
       score: s,
-      description: `End of ${label}: ${scoreLine(s)}`,
+      description: `End of ${label}: ${scoreLine(teams, s)}`,
     })
   })
 
@@ -518,7 +516,7 @@ function gameMilestones(
       occurredAt: feedTimestamp(feed.metaData?.timeStamp) ?? '',
       segmentLabel: plays.at(-1)?.segmentLabel ?? '',
       score: lastScore,
-      description: `${feed.gameData.status.detailedState ?? 'Delayed'}: ${scoreLine(lastScore)}`,
+      description: `${feed.gameData.status.detailedState ?? 'Delayed'}: ${scoreLine(teams, lastScore)}`,
     })
   }
 
@@ -528,16 +526,13 @@ function gameMilestones(
       home: feed.liveData.linescore?.teams?.home?.runs ?? lastScore.home,
     }
     const innings = feed.liveData.linescore?.currentInning ?? 9
-    milestones.push({
-      kind: 'milestone',
-      milestone: 'final',
-      key: 'final',
-      sequence: FINAL_SEQUENCE,
-      occurredAt: plays.at(-1)?.occurredAt ?? feed.gameData.datetime.dateTime,
-      segmentLabel: innings > 9 ? `Final/${innings}` : 'Final',
-      score: finalScore,
-      description: `${innings > 9 ? `Final/${innings}` : 'Final'}: ${scoreLine(finalScore)}`,
-    })
+    milestones.push(
+      finalMilestone(teams, {
+        label: innings > 9 ? `Final/${innings}` : 'Final',
+        occurredAt: plays.at(-1)?.occurredAt ?? feed.gameData.datetime.dateTime,
+        score: finalScore,
+      }),
+    )
   }
 
   return milestones

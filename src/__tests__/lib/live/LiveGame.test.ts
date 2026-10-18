@@ -973,6 +973,29 @@ describe.skipIf(!isBun)('LiveGame', () => {
     expect(a.players.filter((p) => p.name.startsWith('#'))).toEqual([])
   })
 
+  it('records more Overturns in one poll than a statement can bind', async () => {
+    const keys = Array.from({ length: 120 }, (_, i) => `td${i}`)
+    const game = instance()
+    await game.track(tracked)
+    state.snap = snap(
+      keys.map((key) =>
+        play(key, { significance: 'scoring', description: 'Touchdown' }),
+      ),
+    )
+    await game.alarm()
+    state.snap = snap(keys.map((key) => play(key, { description: 'Reversed' })))
+    await game.alarm()
+    const stored = await rows()
+    expect(stored.filter((row) => row.status === 'overturned')).toHaveLength(
+      120,
+    )
+    expect(stored.filter((row) => row.kind === 'overturn')).toHaveLength(120)
+    const upserts = state.events
+      .at(-1)
+      ?.filter((event) => event.type === 'upsert')
+    expect(upserts).toHaveLength(240)
+  })
+
   it('gives a Game that gave up one try per wake until a poll succeeds', async () => {
     const game = instance()
     await game.track(tracked)

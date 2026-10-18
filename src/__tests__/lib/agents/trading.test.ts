@@ -35,6 +35,7 @@ vi.mock('@/lib/kalshi/account', () => ({
 }))
 vi.mock('@/lib/kalshi/vault', () => ({
   unseal: () => Promise.resolve('PEM'),
+  isLegacy: () => false,
   seal: () => Promise.resolve({ ciphertext: 'c', iv: 'i' }),
 }))
 vi.mock('@/lib/kalshi/keys', () => ({

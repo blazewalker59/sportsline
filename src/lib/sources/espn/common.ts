@@ -1,13 +1,17 @@
 /**
  * What ESPN's site API looks like the same across Leagues (NFL, college
- * football and NBA all use it): game status, quarter labels, team identity and logos, and
- * the daily scoreboard.
+ * football and NBA all use it): game status, quarters and their ends, team
+ * identity and logos, rosters, and the daily scoreboard.
  */
 
+import { finalMilestone, scoreLine } from '../common'
+import { ROSTER_CONCURRENCY, mapPool } from '../pool'
 import type {
   GameStatus,
   League,
   ScheduledGame,
+  Score,
+  SourceMilestone,
   SourceTeam,
 } from '@/lib/model/types'
 import type { Conference } from '@/lib/model/leagues'
@@ -39,6 +43,16 @@ export interface EspnCompetitor {
   /** College football rankings: the summary's `rank`, the scoreboard's curatedRank (99 when unranked). */
   rank?: number
   curatedRank?: { current?: number }
+}
+
+/** A game summary's header (`/summary?event=`), the same for every ESPN League. */
+export interface EspnSummaryHeader {
+  id: string
+  competitions: Array<{
+    date: string
+    status: EspnStatus
+    competitors: Array<EspnCompetitor>
+  }>
 }
 
 /** ESPN's site-API scoreboard, the same shape for NFL, college football and NBA. */
@@ -78,6 +92,39 @@ export function mapStatus(status: EspnStatus | undefined): GameStatus {
 
 export function quarterLabel(period: number): string {
   return period <= 4 ? `Q${period}` : period === 5 ? 'OT' : `${period - 4}OT`
+}
+
+/**
+ * ESPN's end-of-period row as a Game Milestone: the end of a quarter
+ * ("End of Q1", or "Halftime"), or for the game's end, the Final.
+ */
+export function periodEndMilestone(
+  teams: { away: SourceTeam; home: SourceTeam },
+  end: {
+    period: number
+    final: boolean
+    halftime: boolean
+    sequence: number
+    occurredAt: string
+    score: Score
+  },
+): SourceMilestone {
+  const { period, score, occurredAt } = end
+  if (end.final) {
+    const label = period > 4 ? 'Final/OT' : 'Final'
+    return finalMilestone(teams, { label, occurredAt, score })
+  }
+  const label = end.halftime ? 'Halftime' : `End of ${quarterLabel(period)}`
+  return {
+    kind: 'milestone',
+    milestone: 'segment_end',
+    key: `end:${period}`,
+    sequence: end.sequence,
+    occurredAt,
+    segmentLabel: quarterLabel(period),
+    score,
+    description: `${label}: ${scoreLine(teams, score)}`,
+  }
 }
 
 /** ESPN's dark-background logo, resized: the originals are ~100 KB PNGs. */
@@ -209,6 +256,49 @@ export async function fetchTeamSchedule(
   )
   const games = seasons.flatMap((s) => parseTeamSchedule(s, league))
   return [...new Map(games.map((g) => [g.sourceGameId, g])).values()]
+}
+
+/**
+ * ESPN's team list and each team's roster, a few at a time. `covered`, when
+ * given, is the only teams to keep (college football lists hundreds); their
+ * rosters are fetched whether or not the list names them.
+ */
+export async function espnRosters<TRoster>(
+  site: string,
+  getJson: <T>(url: string) => Promise<T>,
+  covered?: () => Promise<Array<string>>,
+): Promise<{
+  teams: EspnTeams
+  rosters: Array<{ teamId: string; roster: TRoster }>
+}> {
+  const rostersOf = (ids: ReadonlyArray<string>) =>
+    mapPool(ids, ROSTER_CONCURRENCY, async (teamId) => ({
+      teamId,
+      roster: await getJson<TRoster>(`${site}/teams/${teamId}/roster`),
+    }))
+  if (!covered) {
+    const teams = await getJson<EspnTeams>(`${site}/teams`)
+    const ids = (teams.sports?.[0]?.leagues?.[0]?.teams ?? []).map(
+      (t) => t.team.id,
+    )
+    return { teams, rosters: await rostersOf(ids) }
+  }
+  const [ids, all] = await Promise.all([
+    covered(),
+    getJson<EspnTeams>(`${site}/teams?limit=1000`),
+  ])
+  const keep = new Set(ids)
+  const league = all.sports?.[0]?.leagues?.[0]
+  const teams: EspnTeams = {
+    sports: [
+      {
+        leagues: [
+          { teams: (league?.teams ?? []).filter((t) => keep.has(t.team.id)) },
+        ],
+      },
+    ],
+  }
+  return { teams, rosters: await rostersOf(ids) }
 }
 
 export function parseScoreboard(

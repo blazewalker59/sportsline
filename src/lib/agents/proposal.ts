@@ -8,20 +8,14 @@ import type { tradeProposals } from '@/lib/db/schema'
 import type { PriceDisplay } from '@/lib/model/price'
 import { formatPrice } from '@/lib/model/price'
 
-type Row = typeof tradeProposals.$inferSelect
-type Stored = Row['status']
+export type TradeProposal = typeof tradeProposals.$inferSelect
 
 /**
  * A proposal's status. `unknown`: the order was sent but Kalshi's reply
  * was lost, so it may have gone through; it's looked up on Kalshi later
- * (reconcile.ts). The column is plain text; the schema's type doesn't
- * list `unknown` yet, so writes go through `stored`.
+ * (reconcile.ts).
  */
-export type Status = Stored | 'unknown'
-export type TradeProposal = Omit<Row, 'status'> & { status: Status }
-
-/** A status as the schema types the column (it's text: any fits). Pure. */
-export const stored = (s: Status) => s as Stored
+export type Status = TradeProposal['status']
 
 /** Sent to Kalshi, but with no outcome recorded yet. */
 export const UNSETTLED: Array<Status> = ['placing', 'unknown']

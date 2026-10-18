@@ -189,6 +189,20 @@ describe.skipIf(!isBun)('syncLeague', () => {
     expect(tracked).toHaveLength(1)
   })
 
+  it('syncs a day with more Games than a statement can bind', async () => {
+    state.scheduled = Array.from({ length: 120 }, (_, i) => game(i))
+    await sync()
+    expect(await db.select().from(games)).toHaveLength(120)
+    state.scheduled = Array.from({ length: 120 }, (_, i) =>
+      game(i, { startsAt: '2026-10-02T18:00:00.000Z' }),
+    )
+    await sync()
+    const rows = await db.select().from(games)
+    expect(rows.every((r) => r.startsAt === '2026-10-02T18:00:00.000Z')).toBe(
+      true,
+    )
+  })
+
   it('spaces out the first polls of a past day of Finals', async () => {
     state.scheduled = [
       ...Array.from({ length: 4 }, (_, i) =>

@@ -5,19 +5,7 @@
  * Loose on purpose; every field is treated as possibly absent.
  */
 
-import type {
-  EspnCompetitor,
-  EspnScoreboard,
-  EspnStatus,
-  EspnTeams,
-} from '../espn/common'
-
-export type {
-  EspnCompetitor,
-  EspnScoreboard as NflScoreboard,
-  EspnStatus,
-  EspnTeams as NflTeams,
-}
+import type { EspnSummaryHeader } from '../espn/common'
 
 interface Ref {
   $ref?: string
@@ -49,14 +37,7 @@ interface EspnBoxStatistics {
 }
 
 export interface NflSummary {
-  header: {
-    id: string
-    competitions: Array<{
-      date: string
-      status: EspnStatus
-      competitors: Array<EspnCompetitor>
-    }>
-  }
+  header: EspnSummaryHeader
   drives?: { previous?: Array<EspnDrive>; current?: EspnDrive }
   boxscore?: {
     players?: Array<{

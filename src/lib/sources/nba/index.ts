@@ -1,16 +1,11 @@
 /** NBA Source adapter: ESPN's public site API. */
 
-import { fetchTeamSchedule, parseScoreboard } from '../espn/common'
-import {
-  LIVE_POLL,
-  ROSTER_CONCURRENCY,
-  getJson as jsonFrom,
-  mapPool,
-} from '../pool'
+import { espnRosters, fetchTeamSchedule, parseScoreboard } from '../espn/common'
+import { LIVE_POLL, getJson as jsonFrom } from '../pool'
 import { espnAthleteOverview } from '../espn/athlete'
 import { parseGame, parseRoster } from './parse'
 import type { NbaRoster, NbaSummary } from './feed'
-import type { EspnScoreboard, EspnTeams } from '../espn/common'
+import type { EspnScoreboard } from '../espn/common'
 import type { SourceAdapter } from '@/lib/model/types'
 
 const SITE = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba'
@@ -34,14 +29,7 @@ export const nbaAdapter: SourceAdapter = {
     )
   },
   async roster() {
-    const teams = await getJson<EspnTeams>(`${SITE}/teams`)
-    const ids = (teams.sports?.[0]?.leagues?.[0]?.teams ?? []).map(
-      (t) => t.team.id,
-    )
-    const rosters = await mapPool(ids, ROSTER_CONCURRENCY, async (teamId) => ({
-      teamId,
-      roster: await getJson<NbaRoster>(`${SITE}/teams/${teamId}/roster`),
-    }))
+    const { teams, rosters } = await espnRosters<NbaRoster>(SITE, getJson)
     return parseRoster(teams, rosters)
   },
   teamSchedule(team) {

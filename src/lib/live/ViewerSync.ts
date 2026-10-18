@@ -24,7 +24,7 @@ import {
   sleeperAccounts,
   tradeProposals,
 } from '@/lib/db/schema'
-import { UNSETTLED, stored } from '@/lib/agents/proposal'
+import { UNSETTLED } from '@/lib/agents/proposal'
 import { reconcileTrades } from '@/lib/agents/reconcile'
 import { hit } from '@/lib/agents/rateLimit'
 import { syncAccount as syncSleeper } from '@/lib/fantasy/sleeper/sync'
@@ -203,7 +203,7 @@ export class ViewerSync extends DurableObject<CloudflareEnv> {
         .where(
           and(
             eq(tradeProposals.viewerId, viewerId),
-            inArray(tradeProposals.status, UNSETTLED.map(stored)),
+            inArray(tradeProposals.status, UNSETTLED),
           ),
         )
         .limit(1)

@@ -1,21 +1,11 @@
 /** NFL Source adapter: ESPN's public site and core APIs. */
 
-import {
-  LIVE_POLL,
-  ROSTER_CONCURRENCY,
-  getJson as jsonFrom,
-  mapPool,
-} from '../pool'
-import { fetchTeamSchedule } from '../espn/common'
+import { LIVE_POLL, getJson as jsonFrom } from '../pool'
+import { espnRosters, fetchTeamSchedule } from '../espn/common'
 import { espnAthleteOverview } from '../espn/athlete'
 import { drivePlays, parseGame, parseRoster, parseScoreboard } from './parse'
-import type {
-  NflCorePlays,
-  NflRoster,
-  NflScoreboard,
-  NflSummary,
-  NflTeams,
-} from './feed'
+import type { NflCorePlays, NflRoster, NflSummary } from './feed'
+import type { EspnScoreboard } from '../espn/common'
 import type { GameSnapshot, SourceAdapter } from '@/lib/model/types'
 import type { FootballLeague } from './parse'
 
@@ -56,7 +46,7 @@ export const nflAdapter: SourceAdapter = {
   league: 'nfl',
   source: 'espn',
   async schedule(sportsDay) {
-    const scoreboard = await getJson<NflScoreboard>(
+    const scoreboard = await getJson<EspnScoreboard>(
       `${SITE}/scoreboard?dates=${sportsDay.replaceAll('-', '')}`,
     )
     return parseScoreboard(scoreboard)
@@ -65,14 +55,7 @@ export const nflAdapter: SourceAdapter = {
     return footballSnapshot(SITE, CORE, sourceGameId)
   },
   async roster() {
-    const teams = await getJson<NflTeams>(`${SITE}/teams`)
-    const ids = (teams.sports?.[0]?.leagues?.[0]?.teams ?? []).map(
-      (t) => t.team.id,
-    )
-    const rosters = await mapPool(ids, ROSTER_CONCURRENCY, async (teamId) => ({
-      teamId,
-      roster: await getJson<NflRoster>(`${SITE}/teams/${teamId}/roster`),
-    }))
+    const { teams, rosters } = await espnRosters<NflRoster>(SITE, getJson)
     return parseRoster(teams, rosters)
   },
   teamSchedule(team) {

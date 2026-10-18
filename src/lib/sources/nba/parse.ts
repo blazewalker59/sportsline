@@ -14,9 +14,11 @@ import {
   competitorTeam,
   espnHeadshot,
   mapStatus,
+  periodEndMilestone,
   quarterLabel,
   teamLogo,
 } from '../espn/common'
+import { gameMilestones, takesLead } from '../common'
 import type { NbaRoster, NbaSummary } from './feed'
 import type { EspnTeams } from '../espn/common'
 import type {
@@ -32,8 +34,6 @@ import type {
   SourceRoster,
 } from '@/lib/model/types'
 import { sportsDayOf } from '@/lib/model/sportsDay'
-
-const FINAL_SEQUENCE = 1_000_000_000
 
 /** Momentum and officiating moments worth surfacing even when nothing scores. */
 const NOTABLE =
@@ -95,8 +95,6 @@ export function parseGame(summary: NbaSummary): GameSnapshot {
     }
   }
 
-  const scoreLine = (s: Score) =>
-    `${away.abbreviation} ${s.away}, ${home.abbreviation} ${s.home}`
   const rows = [...(summary.plays ?? [])].sort(
     (a, b) => Number(a.sequenceNumber) - Number(b.sequenceNumber),
   )
@@ -118,23 +116,19 @@ export function parseGame(summary: NbaSummary): GameSnapshot {
     if (type === 'End Period' || type === 'End Game') {
       const final = type === 'End Game'
       sawGameEnd ||= final
-      const label = final
-        ? period > 4
-          ? 'Final/OT'
-          : 'Final'
-        : period === 2
-          ? 'Halftime'
-          : `End of ${quarterLabel(period)}`
-      milestones.push({
-        kind: 'milestone',
-        milestone: final ? 'final' : 'segment_end',
-        key: final ? 'final' : `end:${period}`,
-        sequence: final ? FINAL_SEQUENCE : sequence,
-        occurredAt,
-        segmentLabel: final ? label : quarterLabel(period),
-        score,
-        description: `${label}: ${scoreLine(score)}`,
-      })
+      milestones.push(
+        periodEndMilestone(
+          { away, home },
+          {
+            period,
+            final,
+            halftime: period === 2,
+            sequence,
+            occurredAt,
+            score,
+          },
+        ),
+      )
       previous = score
       continue
     }
@@ -185,42 +179,19 @@ export function parseGame(summary: NbaSummary): GameSnapshot {
     away: Number(awayC.score ?? previous.away),
     home: Number(homeC.score ?? previous.home),
   }
-  if (plays.length > 0) {
-    milestones.push({
-      kind: 'milestone',
-      milestone: 'start',
-      key: 'start',
-      sequence: plays[0].sequence - 1,
-      occurredAt: plays[0].occurredAt,
-      segmentLabel: 'Q1',
-      score: { away: 0, home: 0 },
-      description: `Tip-off: ${away.abbreviation} @ ${home.abbreviation}`,
-    })
-  }
-  if (status === 'final' && !sawGameEnd) {
-    milestones.push({
-      kind: 'milestone',
-      milestone: 'final',
-      key: 'final',
-      sequence: FINAL_SEQUENCE,
-      occurredAt: plays.at(-1)?.occurredAt ?? competition.date,
-      segmentLabel: 'Final',
-      score: finalScore,
-      description: `Final: ${scoreLine(finalScore)}`,
-    })
-  }
-  if (status === 'postponed') {
-    milestones.push({
-      kind: 'milestone',
-      milestone: 'postponed',
-      key: 'postponed',
-      sequence: FINAL_SEQUENCE,
-      occurredAt: competition.date,
-      segmentLabel: '',
-      score: finalScore,
-      description: `${away.abbreviation} @ ${home.abbreviation} postponed`,
-    })
-  }
+  milestones.push(
+    ...gameMilestones(
+      { away, home },
+      {
+        status,
+        plays,
+        startsAt: competition.date,
+        score: finalScore,
+        start: { segmentLabel: 'Q1', verb: 'Tip-off' },
+        finalLabel: sawGameEnd ? null : 'Final',
+      },
+    ),
+  )
 
   const items: Array<SourceItem> = [...plays, ...milestones]
   const live = status === 'live' || status === 'delayed'
@@ -246,16 +217,6 @@ export function parseGame(summary: NbaSummary): GameSnapshot {
     items,
     box: box(summary, awayC, homeC),
   }
-}
-
-/** Does this score change give a team the lead it didn't have? */
-export function takesLead(before: Score, after: Score): boolean {
-  const awayNow = after.away > after.home
-  const homeNow = after.home > after.away
-  return (
-    (awayNow && !(before.away > before.home)) ||
-    (homeNow && !(before.home > before.away))
-  )
 }
 
 function significance(

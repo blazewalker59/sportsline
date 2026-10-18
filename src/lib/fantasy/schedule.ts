@@ -12,10 +12,12 @@ import { aliasedTable, and, eq, gte, inArray, lte, or } from 'drizzle-orm'
 import { z } from 'zod'
 import type { GameSummary, TeamRef } from '@/lib/model/timeline'
 import type { League, ScheduledGame, SourceTeam } from '@/lib/model/types'
+import type { Database } from '@/lib/db'
 import { requireViewer } from '@/lib/viewer/session'
 import { teamColors } from '@/lib/brand/teamColors'
 import { getDb } from '@/lib/db'
 import { games, sourceIds, teams } from '@/lib/db/schema'
+import { chunk } from '@/lib/live/identity'
 import { toGameSummary } from '@/lib/live/rows'
 import { shiftSportsDay, sportsDayOf } from '@/lib/model/sportsDay'
 import { LEAGUES } from '@/lib/model/types'
@@ -79,6 +81,52 @@ export function pickGame(
   )
 }
 
+/**
+ * A query binds each Team twice (away or home) beside the window's three
+ * values: 40 at a time stays within D1's 100 parameters.
+ */
+const TEAMS_PER_QUERY = 40
+
+/**
+ * Stored Games in a League's window with any of these Teams, by id or
+ * abbreviation, each with its Teams. A Game can come back more than once.
+ */
+export async function storedMatchupGames(
+  db: Database,
+  league: League,
+  window: { from: string; through: string },
+  ids: ReadonlyArray<string>,
+  abbrevs: ReadonlyArray<string>,
+) {
+  const away = aliasedTable(teams, 'away')
+  const home = aliasedTable(teams, 'home')
+  const inWindow = and(
+    eq(games.league, league),
+    gte(games.sportsDay, window.from),
+    lte(games.sportsDay, window.through),
+  )
+  const load = (teamWhere: ReturnType<typeof or>) =>
+    db
+      .select({ game: games, away, home })
+      .from(games)
+      .innerJoin(away, eq(away.id, games.awayTeamId))
+      .innerJoin(home, eq(home.id, games.homeTeamId))
+      .where(and(inWindow, teamWhere))
+  const loads = [
+    ...chunk(ids, TEAMS_PER_QUERY).map((part) =>
+      load(
+        or(inArray(games.awayTeamId, part), inArray(games.homeTeamId, part)),
+      ),
+    ),
+    ...chunk(abbrevs, TEAMS_PER_QUERY).map((part) =>
+      load(
+        or(inArray(away.abbreviation, part), inArray(home.abbreviation, part)),
+      ),
+    ),
+  ]
+  return (await Promise.all(loads)).flat()
+}
+
 export const getMatchupGames = createServerFn({ method: 'GET' })
   .validator(
     (data: {
@@ -107,35 +155,13 @@ export const getMatchupGames = createServerFn({ method: 'GET' })
     const football = data.league === 'nfl'
     // Monday night's UTC date is the day after the window's Monday.
     const through = football ? shiftSportsDay(window.to, 1) : window.to
-    const away = aliasedTable(teams, 'away')
-    const home = aliasedTable(teams, 'home')
-    const inWindow = and(
-      eq(games.league, data.league),
-      gte(games.sportsDay, window.from),
-      lte(games.sportsDay, through),
+    const loaded = await storedMatchupGames(
+      db,
+      data.league,
+      { from: window.from, through },
+      ids,
+      abbrevs,
     )
-    const load = (teamWhere: ReturnType<typeof or>) =>
-      db
-        .select({ game: games, away, home })
-        .from(games)
-        .innerJoin(away, eq(away.id, games.awayTeamId))
-        .innerJoin(home, eq(home.id, games.homeTeamId))
-        .where(and(inWindow, teamWhere))
-    const loaded = [
-      ...(ids.length > 0
-        ? await load(
-            or(inArray(games.awayTeamId, ids), inArray(games.homeTeamId, ids)),
-          )
-        : []),
-      ...(abbrevs.length > 0
-        ? await load(
-            or(
-              inArray(away.abbreviation, abbrevs),
-              inArray(home.abbreviation, abbrevs),
-            ),
-          )
-        : []),
-    ]
     const seenGame = new Set<string>()
     const stored = loaded.flatMap((r) => {
       if (seenGame.has(r.game.id)) return []
@@ -277,12 +303,18 @@ async function resolveSides(
   const missing = sides.filter((s) => !out.has(s.sourceId))
   const abbrevs = [...new Set(missing.map((s) => s.abbreviation))]
   if (abbrevs.length > 0) {
-    const rows = await db
-      .select()
-      .from(teams)
-      .where(
-        and(eq(teams.league, league), inArray(teams.abbreviation, abbrevs)),
+    const rows = (
+      await Promise.all(
+        chunk(abbrevs, 80).map((part) =>
+          db
+            .select()
+            .from(teams)
+            .where(
+              and(eq(teams.league, league), inArray(teams.abbreviation, part)),
+            ),
+        ),
       )
+    ).flat()
     for (const s of missing) {
       if (out.has(s.sourceId)) continue
       const row = rows.find((r) => r.abbreviation === s.abbreviation)
