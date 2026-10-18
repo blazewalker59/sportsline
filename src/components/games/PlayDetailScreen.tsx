@@ -16,6 +16,8 @@ import { playDetailQuery } from '@/lib/games/queries'
 import { gameSearch, playSearch } from '@/lib/timeline/gameLink'
 import { PlayerButton } from '@/components/players/playerSheet'
 import { cn } from '@/lib/utils'
+import { clockTime } from '@/lib/time/format'
+import { useTimeZone } from '@/lib/time/useTimeZone'
 
 interface MlbPitch extends ZonePitch {
   type: string | null
@@ -209,6 +211,7 @@ function Play({ detail }: { detail: PlayDetail }) {
   const { item, game } = detail
   const mlb = item.league === 'mlb' ? (item.detail as MlbDetail | null) : null
   const overturn = item.kind === 'overturn'
+  const timeZone = useTimeZone()
   return (
     <article className="flex flex-col gap-4">
       <Link
@@ -273,10 +276,7 @@ function Play({ detail }: { detail: PlayDetail }) {
           <PlayText item={item} />
         </h1>
         <p className="mt-1 text-xs text-muted">
-          {new Date(item.occurredAt).toLocaleTimeString([], {
-            hour: 'numeric',
-            minute: '2-digit',
-          })}
+          {clockTime(item.occurredAt, timeZone)}
         </p>
       </header>
 

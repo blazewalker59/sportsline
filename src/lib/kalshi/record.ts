@@ -5,6 +5,8 @@
  * switch ranges without asking the server again.
  */
 
+import { LOCALE, dayOf } from '@/lib/time/format'
+
 export interface RecordLeg {
   /** Kalshi's series: the event ticker's first part ("KXNFLTD"). */
   series: string
@@ -271,18 +273,15 @@ export interface PredictionRecord {
   insights: Array<Insight>
 }
 
-const localDay = (iso: string) => {
-  const d = new Date(iso)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
 const money = (n: number) =>
   `${n < 0 ? '−' : '+'}$${Math.abs(n).toFixed(Math.abs(n) >= 100 ? 0 : 2)}`
 const pct = (n: number) => `${Math.round(n * 100)}%`
 
+/** `timeZone` is the Viewer's: the days the trend is drawn by. */
 export function buildRecord(
   all: ReadonlyArray<RecordEntry>,
   range: Range,
+  timeZone: string,
 ): PredictionRecord {
   const entries = all.filter((e) => inRange(e, range))
   const totals = emptyLine('All')
@@ -339,11 +338,11 @@ export function buildRecord(
   const dayMap = new Map<string, DayPoint>()
   const day = (d: string) => dayMap.get(d) ?? { day: d, staked: 0, pnl: 0 }
   for (const e of entries) {
-    const d = day(localDay(e.madeAt))
+    const d = day(dayOf(e.madeAt, timeZone))
     d.staked += e.cost
     dayMap.set(d.day, d)
     if (e.status !== 'open' && e.pnl !== null) {
-      const s = day(localDay(e.settledAt ?? e.madeAt))
+      const s = day(dayOf(e.settledAt ?? e.madeAt, timeZone))
       s.pnl += e.pnl
       dayMap.set(s.day, s)
     }
@@ -353,7 +352,7 @@ export function buildRecord(
   const bySport = group(entries, sportKey)
   const byMarket = group(entries, marketKey)
   const byComboSize = group(combos, comboSizeKey).sort((a, b) =>
-    a.label.localeCompare(b.label, undefined, { numeric: true }),
+    a.label.localeCompare(b.label, LOCALE, { numeric: true }),
   )
   const record: PredictionRecord = {
     totals: {

@@ -1,15 +1,11 @@
 import { shiftSportsDay } from '@/lib/model/sportsDay'
 import { cn } from '@/lib/utils'
+import { weekdayDay } from '@/lib/time/format'
 
 export function dayLabel(sportsDay: string, today: string): string {
   if (sportsDay === today) return 'Today'
   if (sportsDay === shiftSportsDay(today, -1)) return 'Yesterday'
-  return new Date(`${sportsDay}T12:00:00Z`).toLocaleDateString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  })
+  return weekdayDay(sportsDay)
 }
 
 /** The header's title: the Sports Day on screen; opens the day chips. */

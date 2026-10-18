@@ -19,9 +19,12 @@ import { Sheet } from '@/components/chat/Sheet'
 import { gameSearch } from '@/lib/timeline/gameLink'
 import { PlayerButton } from '@/components/players/playerSheet'
 import { cn } from '@/lib/utils'
+import { weekdayTime } from '@/lib/time/format'
+import { useTimeZone } from '@/lib/time/useTimeZone'
 
 function LegRow({ leg, onNavigate }: { leg: LegView; onNavigate: () => void }) {
   const g = leg.game
+  const timeZone = useTimeZone()
   return (
     <li className="flex flex-col gap-1 px-3 py-2.5">
       <span className="flex items-start gap-2">
@@ -84,11 +87,7 @@ function LegRow({ leg, onNavigate }: { leg: LegView; onNavigate: () => void }) {
               ? (g.situation?.segmentLabel ?? 'Live')
               : g.status === 'final'
                 ? 'Final'
-                : new Date(g.startsAt).toLocaleString([], {
-                    weekday: 'short',
-                    hour: 'numeric',
-                    minute: '2-digit',
-                  })}
+                : weekdayTime(g.startsAt, timeZone)}
           </span>
         </Link>
       )}

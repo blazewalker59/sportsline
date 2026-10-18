@@ -1,9 +1,10 @@
 import { Link } from '@tanstack/react-router'
-import { startTime } from './format'
 import type { GameSummary } from '@/lib/model/timeline'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { cn } from '@/lib/utils'
+import { clockTime } from '@/lib/time/format'
+import { useTimeZone } from '@/lib/time/useTimeZone'
 
 /**
  * The Sports Day's Games as small score cards, live first. Tapping one
@@ -51,6 +52,7 @@ function GameCard({
 }) {
   const live = game.status === 'live' || game.status === 'delayed'
   const started = live || game.status === 'final'
+  const label = status(game, useTimeZone())
   const leader =
     game.score.away === game.score.home
       ? null
@@ -64,7 +66,7 @@ function GameCard({
       viewTransition
       resetScroll={false}
       aria-pressed={selected}
-      aria-label={`${game.awayTeam.abbreviation} ${game.score.away}, ${game.homeTeam.abbreviation} ${game.score.home}, ${status(game)}${selected ? '. Showing only this game; tap to show all' : ''}`}
+      aria-label={`${game.awayTeam.abbreviation} ${game.score.away}, ${game.homeTeam.abbreviation} ${game.score.home}, ${label}${selected ? '. Showing only this game; tap to show all' : ''}`}
       className={cn(
         'relative flex w-[124px] flex-col gap-0.5 rounded-2xl border bg-surface px-2.5 py-1.5 transition-colors',
         selected
@@ -82,7 +84,7 @@ function GameCard({
             live ? 'text-live' : 'text-muted',
           )}
         >
-          {status(game)}
+          {label}
         </span>
       </span>
       {(['away', 'home'] as const).map((side) => {
@@ -149,7 +151,7 @@ export function CornerButton({
   )
 }
 
-function status(game: GameSummary): string {
+function status(game: GameSummary, timeZone: string | null): string {
   switch (game.status) {
     case 'live':
       return game.situation?.segmentLabel ?? 'Live'
@@ -160,6 +162,6 @@ function status(game: GameSummary): string {
     case 'postponed':
       return 'Ppd'
     default:
-      return startTime(game.startsAt)
+      return clockTime(game.startsAt, timeZone)
   }
 }

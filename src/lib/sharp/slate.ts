@@ -41,19 +41,14 @@ import { shiftSportsDay, sportsDayOf } from '@/lib/model/sportsDay'
 import { reportError } from '@/lib/ops/errors'
 import { vapidKeys } from '@/lib/push/deliver'
 import { sendPush } from '@/lib/push/webpush'
+import { zonedParts } from '@/lib/time/format'
 
 /** The slate goes out at this hour, Eastern. */
 export const PUBLISH_HOUR_ET = 10
 
-const easternHour = new Intl.DateTimeFormat('en-US', {
-  timeZone: 'America/New_York',
-  hour: 'numeric',
-  hourCycle: 'h23',
-})
-
 /** Is it time for today's slate (10am Eastern or later)? */
 export function publishDue(now: Date): boolean {
-  return Number(easternHour.format(now)) >= PUBLISH_HOUR_ET
+  return zonedParts(now, 'America/New_York').hour >= PUBLISH_HOUR_ET
 }
 
 type PickRow = typeof sharpPicks.$inferInsert

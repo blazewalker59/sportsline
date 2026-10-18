@@ -13,8 +13,9 @@ import { tooltip } from '@tanstack/charts/tooltip'
 import { useMemo } from 'react'
 import type { PredictionRecord } from '@/lib/kalshi/record'
 import { CHART_COLORS, ChartCard } from '@/components/charts/ChartCard'
-import { shortDate, signedUsd, usd } from '@/components/charts/format'
+import { signedUsd, usd } from '@/components/charts/format'
 import { cn } from '@/lib/utils'
+import { shortDay } from '@/lib/time/format'
 
 interface DayRow {
   /** "Oct 4", the band label. */
@@ -28,7 +29,7 @@ export function RecordTrend({ days }: { days: PredictionRecord['days'] }) {
   const rows = useMemo(() => {
     let running = 0
     return days.map((d): DayRow => ({
-      label: shortDate(d.day),
+      label: shortDay(d.day),
       staked: d.staked,
       pnl: d.pnl,
       running: (running += d.pnl),

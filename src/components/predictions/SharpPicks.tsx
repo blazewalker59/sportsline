@@ -12,7 +12,6 @@ import type { ReactNode } from 'react'
 import type { SharpPick } from '@/lib/sharp/server'
 import type { RecordEntry } from '@/lib/kalshi/record'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
-import { clockTime, shortDate } from '@/components/charts/format'
 import { CalibrationChart } from '@/components/charts/lazy'
 import { calibrationOf } from '@/lib/kalshi/record'
 import { picksRecord } from '@/lib/sharp/record'
@@ -24,6 +23,8 @@ import { usePriceDisplay } from '@/lib/viewer/useViewer'
 import { useStoredValue } from '@/lib/useStoredValue'
 import { StatGrid, StatTile } from '@/components/layout/StatTile'
 import { cn } from '@/lib/utils'
+import { clockTime, shortDay } from '@/lib/time/format'
+import { useTimeZone } from '@/lib/time/useTimeZone'
 
 const cents = (p: number) => `${Math.round(p * 100)}¢`
 const pct1 = (p: number) => `${(p * 100).toFixed(1)}%`
@@ -165,7 +166,7 @@ export function SharpPicksSection() {
           Sharp picks
           {data && (
             <span className="ml-1 font-normal normal-case">
-              · {shortDate(data.day)}
+              · {shortDay(data.day)}
             </span>
           )}
         </h2>
@@ -411,15 +412,18 @@ function GradeChip({ grade }: { grade: SharpPick['grade'] }) {
 }
 
 /** Where the pick stands: its start time, then live, then the result. */
-function statusOf(p: SharpPick): { text: string; tone: 'good' | 'bad' | null } {
+function statusOf(
+  p: SharpPick,
+  timeZone: string | null,
+): { text: string; tone: 'good' | 'bad' | null } {
   if (p.result === 'won') return { text: 'Won', tone: 'good' }
   if (p.result === 'lost') return { text: 'Lost', tone: 'bad' }
   if (Date.now() >= Date.parse(p.startsAt)) return { text: 'Live', tone: null }
-  return { text: clockTime(p.startsAt), tone: null }
+  return { text: clockTime(p.startsAt, timeZone), tone: null }
 }
 
 function StatusText({ pick }: { pick: SharpPick }) {
-  const s = statusOf(pick)
+  const s = statusOf(pick, useTimeZone())
   return (
     <span
       className={cn(
@@ -472,6 +476,7 @@ function KalshiLink({
 function PickRow({ pick: p }: { pick: SharpPick }) {
   const [open, setOpen] = useState(false)
   const display = usePriceDisplay()
+  const timeZone = useTimeZone()
   return (
     <div>
       <button
@@ -506,7 +511,7 @@ function PickRow({ pick: p }: { pick: SharpPick }) {
             for something the books give a {pct1(p.fair)} chance:{' '}
             <b className="text-foreground">{pts(p.edge)}</b>.{' '}
             {p.marketKind && KIND_NAMES[p.marketKind]}, Kalshi{' '}
-            {p.side?.toUpperCase()}, {clockTime(p.startsAt)}.
+            {p.side?.toUpperCase()}, {clockTime(p.startsAt, timeZone)}.
           </p>
           {p.form && (
             <p>

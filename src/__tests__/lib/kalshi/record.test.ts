@@ -70,10 +70,11 @@ describe('a Record', () => {
   ]
 
   it('totals volume and realized results over the range only', () => {
-    const r = buildRecord(entries, {
-      from: new Date('2026-09-25T00:00:00Z'),
-      to: null,
-    })
+    const r = buildRecord(
+      entries,
+      { from: new Date('2026-09-25T00:00:00Z'), to: null },
+      'UTC',
+    )
     expect(r.totals).toMatchObject({
       count: 4,
       staked: 50,
@@ -92,10 +93,26 @@ describe('a Record', () => {
   })
 
   it('takes everything for all time', () => {
-    const r = buildRecord(entries, { from: null, to: null })
+    const r = buildRecord(entries, { from: null, to: null }, 'UTC')
     expect(r.totals.count).toBe(5)
     expect(r.totals.best?.pnl).toBe(100)
     expect(r.totals.worst?.pnl).toBe(-10)
+  })
+
+  it('draws the trend by the Viewer’s days', () => {
+    const late = [
+      entry({
+        madeAt: '2026-10-02T02:00:00Z',
+        settledAt: '2026-10-02T03:00:00Z',
+      }),
+    ]
+    const all = { from: null, to: null }
+    expect(buildRecord(late, all, 'UTC').days.map((d) => d.day)).toEqual([
+      '2026-10-02',
+    ])
+    expect(
+      buildRecord(late, all, 'America/New_York').days.map((d) => d.day),
+    ).toEqual(['2026-10-01'])
   })
 })
 

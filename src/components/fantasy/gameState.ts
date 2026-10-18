@@ -5,6 +5,7 @@
 
 import type { LineupPlayer } from '@/lib/fantasy/matchup'
 import type { GameSummary } from '@/lib/model/timeline'
+import { weekdayTime } from '@/lib/time/format'
 
 export interface GameState {
   game: GameSummary
@@ -25,6 +26,7 @@ export interface GameState {
 export function gameState(
   p: LineupPlayer,
   games: ReadonlyArray<GameSummary>,
+  timeZone: string | null,
 ): GameState | null {
   const abbrev = p.teamAbbrev?.toUpperCase() ?? null
   const byAbbrev = (side: GameSummary['awayTeam']) =>
@@ -47,11 +49,7 @@ export function gameState(
     ? (g.situation?.segmentLabel ?? 'Live')
     : g.status === 'final'
       ? 'Final'
-      : new Date(g.startsAt).toLocaleString([], {
-          weekday: 'short',
-          hour: 'numeric',
-          minute: '2-digit',
-        })
+      : weekdayTime(g.startsAt, timeZone)
   const base = { game: g, home, status, live, upcoming }
   const detail = (g.situation?.detail ?? {}) as {
     possession?: string | null

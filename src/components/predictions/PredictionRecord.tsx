@@ -17,12 +17,14 @@ import { usePredictionRecord } from '@/lib/kalshi/usePredictions'
 import { useStoredValue } from '@/lib/useStoredValue'
 import { StatGrid, StatTile } from '@/components/layout/StatTile'
 import { cn } from '@/lib/utils'
+import { dayOf, formatNumber, shiftDay, startOfDay } from '@/lib/time/format'
+import { useTimeZone } from '@/lib/time/useTimeZone'
 
 type RangeKey = '7d' | '30d' | 'all' | 'custom'
 const RANGE_KEY = 'sportsline:recordRange'
 
 const usd = (n: number) =>
-  `$${Math.abs(n).toLocaleString(undefined, {
+  `$${formatNumber(Math.abs(n), {
     minimumFractionDigits: Math.abs(n) >= 1000 ? 0 : 2,
     maximumFractionDigits: Math.abs(n) >= 1000 ? 0 : 2,
   })}`
@@ -31,10 +33,6 @@ const signed = (n: number) =>
 const pct = (n: number | null) => (n === null ? '—' : `${Math.round(n * 100)}%`)
 const tone = (n: number) =>
   n > 0.004 ? 'text-scoring' : n < -0.004 ? 'text-live' : 'text-muted'
-
-const dayInput = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-const startOfDay = (s: string) => new Date(`${s}T00:00:00`)
 
 const parseRange = (v: string | null): RangeKey =>
   v === '30d' || v === 'all' || v === 'custom' ? v : '7d'
@@ -45,26 +43,34 @@ export function PredictionRecordSection() {
   // so the server can't render it).
   const [stored, setStored] = useStoredValue(RANGE_KEY)
   const key = parseRange(stored)
-  const [custom, setCustom] = useState(() => ({
-    from: dayInput(new Date(Date.now() - 13 * 86_400_000)),
-    to: dayInput(new Date()),
-  }))
+  // Days are the Viewer's. Until the zone is known (a first visit, while
+  // hydrating) UTC's, the same on the server and the client.
+  const timeZone = useTimeZone() ?? 'UTC'
+  // The last two weeks until the Viewer picks. Custom shows only once the
+  // remembered range has loaded, so this never reaches the server's HTML.
+  const [picked, setPicked] = useState<{ from: string; to: string } | null>(
+    null,
+  )
+  const custom = picked ?? {
+    from: shiftDay(dayOf(Date.now(), timeZone), -13),
+    to: dayOf(Date.now(), timeZone),
+  }
   const choose = (k: RangeKey) => setStored(k)
   const range = useMemo((): Range => {
     const now = Date.now()
     if (key === '7d') return { from: new Date(now - 7 * 86_400_000), to: null }
     if (key === '30d')
       return { from: new Date(now - 30 * 86_400_000), to: null }
-    if (key === 'custom') {
-      const to = startOfDay(custom.to)
-      to.setDate(to.getDate() + 1)
-      return { from: startOfDay(custom.from), to }
-    }
+    if (key === 'custom')
+      return {
+        from: startOfDay(custom.from, timeZone),
+        to: startOfDay(shiftDay(custom.to, 1), timeZone),
+      }
     return { from: null, to: null }
-  }, [key, custom])
+  }, [key, custom.from, custom.to, timeZone])
   const record = useMemo(
-    () => (history.data ? buildRecord(history.data, range) : null),
-    [history.data, range],
+    () => (history.data ? buildRecord(history.data, range, timeZone) : null),
+    [history.data, range, timeZone],
   )
   const calibration = useMemo(
     () => (history.data ? calibrationOf(history.data, range) : null),
@@ -116,8 +122,7 @@ export function PredictionRecordSection() {
             value={custom.from}
             max={custom.to}
             onChange={(e) =>
-              e.target.value &&
-              setCustom((c) => ({ ...c, from: e.target.value }))
+              e.target.value && setPicked({ ...custom, from: e.target.value })
             }
             className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-2 py-1.5"
           />
@@ -128,7 +133,7 @@ export function PredictionRecordSection() {
             value={custom.to}
             min={custom.from}
             onChange={(e) =>
-              e.target.value && setCustom((c) => ({ ...c, to: e.target.value }))
+              e.target.value && setPicked({ ...custom, to: e.target.value })
             }
             className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-2 py-1.5"
           />

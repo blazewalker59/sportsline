@@ -27,12 +27,13 @@ import {
 } from '@/components/fantasy/FantasyParts'
 import { FollowButton } from '@/components/follows/FollowButton'
 import { PlaySheet } from '@/components/games/PlayDetailScreen'
-import { startTime } from '@/components/timeline/format'
 import { SPORTS } from '@/lib/fantasy/sports'
 import { useFantasy } from '@/lib/fantasy/useFantasy'
 import { usePlayerDetail, usePlayerFirstPage } from '@/lib/players/usePlayer'
 import { cn } from '@/lib/utils'
 import { useViewer } from '@/lib/viewer/useViewer'
+import { clockTime, dateLabel, formatDate } from '@/lib/time/format'
+import { useTimeZone } from '@/lib/time/useTimeZone'
 
 // ─── The sheet, from anywhere (opened by PlayerSheetProvider) ───────────────
 
@@ -227,13 +228,6 @@ export function PlayerDetailSections({
 
 // ─── The Game now or next ───────────────────────────────────────────────────
 
-const dateLabel = (iso: string) =>
-  new Date(iso).toLocaleDateString([], {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  })
-
 function GameSection({
   game,
   line,
@@ -245,6 +239,7 @@ function GameSection({
   next: PlayerOverview['next']
   onNavigate?: () => void
 }) {
+  const timeZone = useTimeZone()
   if (!game) {
     if (!next) return null
     return (
@@ -255,7 +250,7 @@ function GameSection({
           </span>
           <span className="text-muted">
             {' '}
-            · {dateLabel(next.date)} {startTime(next.date)}
+            · {dateLabel(next.date, timeZone)} {clockTime(next.date, timeZone)}
           </span>
         </div>
       </Section>
@@ -285,9 +280,9 @@ function GameSection({
               'Final'
             ) : (
               <>
-                {dateLabel(game.startsAt)}
+                {dateLabel(game.startsAt, timeZone)}
                 <br />
-                {startTime(game.startsAt)}
+                {clockTime(game.startsAt, timeZone)}
               </>
             )}
           </span>
@@ -426,6 +421,7 @@ function RecentSection({
   recent: PlayerOverview['recent']
   form: PlayerOverview['form']
 }) {
+  const timeZone = useTimeZone()
   return (
     <Section title="Recent games">
       {form && <PlayerForm form={form} recent={recent} />}
@@ -433,7 +429,7 @@ function RecentSection({
         {recent.map((g, i) => (
           <li key={i} className="flex items-center gap-3 px-3 py-2 text-sm">
             <span className="w-14 shrink-0 text-xs text-muted">
-              {g.date ? shortDate(g.date) : ''}
+              {g.date ? numericDate(g.date, timeZone) : ''}
             </span>
             <span className="w-16 shrink-0 font-medium">
               {g.home ? 'vs' : '@'} {g.opponent}
@@ -461,15 +457,12 @@ function RecentSection({
   )
 }
 
-function shortDate(date: string): string {
-  // Plain dates ("2026-09-28") are calendar days, not instants.
-  const d = /^\d{4}-\d{2}-\d{2}$/.test(date)
-    ? new Date(`${date}T12:00:00`)
-    : new Date(date)
-  return d.toLocaleDateString([], { month: 'numeric', day: 'numeric' })
-}
+/** "9/28": plain dates are calendar days, the rest instants. */
+const numericDate = (date: string, timeZone: string | null) =>
+  formatDate(date, timeZone, { month: 'numeric', day: 'numeric' })
 
 function NewsSection({ news }: { news: PlayerOverview['news'] }) {
+  const timeZone = useTimeZone()
   return (
     <Section title="News">
       <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
@@ -486,7 +479,7 @@ function NewsSection({ news }: { news: PlayerOverview['news'] }) {
               </span>
               {n.published && (
                 <span className="text-[11px] text-muted">
-                  {dateLabel(n.published)}
+                  {dateLabel(n.published, timeZone)}
                 </span>
               )}
             </a>
