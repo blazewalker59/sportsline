@@ -10,7 +10,7 @@ import { z } from 'zod'
 import { OpenTeamGameInput, knownIds, openGame } from './games'
 import type { Conference } from '@/lib/model/leagues'
 import type { League, ScheduledGame, SourceTeam } from '@/lib/model/types'
-import { requireViewer } from '@/lib/viewer/session'
+import { viewerMiddleware } from '@/lib/viewer/middleware'
 import { teamColors } from '@/lib/brand/teamColors'
 import { getCloudflareEnv, getDb } from '@/lib/db'
 import { games, players, sourceIds, teams } from '@/lib/db/schema'
@@ -88,11 +88,11 @@ function recordOf(
 }
 
 export const getTeamPage = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
   .validator((data: { teamId: string }) =>
     z.object({ teamId: z.string().min(1).max(200) }).parse(data),
   )
   .handler(async ({ data }): Promise<TeamPage | null> => {
-    await requireViewer()
     const db = getDb()
     const team = await db
       .select()
@@ -241,11 +241,11 @@ export const getTeamPage = createServerFn({ method: 'GET' })
  * far back as a past Sports Day can be backfilled, and a few days ahead.
  */
 export const openTeamGame = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator(
     (data: { league: string; sourceGameId: string; sportsDay: string }) =>
       OpenTeamGameInput.parse(data),
   )
   .handler(async ({ data }): Promise<{ gameId: string } | null> => {
-    await requireViewer()
     return openGame(data, new Date())
   })

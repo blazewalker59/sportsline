@@ -22,6 +22,7 @@ import { sleeperLeagueRowId, syncAccount as syncSleeper } from './sleeper/sync'
 import type { MatchupDay, MatchupView } from './matchup'
 import type { RacePoint } from './race'
 import type { FantasySport } from './sports'
+import { viewerMiddleware } from '@/lib/viewer/middleware'
 import { getCloudflareEnv } from '@/lib/db'
 import {
   espnAccounts,
@@ -30,7 +31,6 @@ import {
   sleeperAccounts,
 } from '@/lib/db/schema'
 import { seal } from '@/lib/kalshi/vault'
-import { sessionViewer, withViewer } from '@/lib/viewer/session'
 import { reportError } from '@/lib/ops/errors'
 import { startViewerSync } from '@/lib/live/startViewerSync'
 
@@ -52,10 +52,10 @@ export interface FantasyLeagueView {
   matchup: MatchupView | null
 }
 
-export const getEspnConnection = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<EspnConnection | null> => {
-    if (!(await sessionViewer())) return null
-    return withViewer(async ({ db, viewerId }) => {
+export const getEspnConnection = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
+  .handler(
+    async ({ context: { db, viewerId } }): Promise<EspnConnection | null> => {
       const row = await db
         .select()
         .from(espnAccounts)
@@ -68,15 +68,15 @@ export const getEspnConnection = createServerFn({ method: 'GET' }).handler(
             syncedAt: row.syncedAt,
           }
         : null
-    })
-  },
-)
+    },
+  )
 
 /**
  * Connect ESPN with the Viewer's session cookies: ESPN must accept them,
  * and they're sealed before they're stored (docs/adr/0004).
  */
 export const connectEspn = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: { swid: string; espnS2: string }) =>
     z
       .object({
@@ -88,8 +88,8 @@ export const connectEspn = createServerFn({ method: 'POST' })
       })
       .parse(data),
   )
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }): Promise<EspnConnection> => {
+  .handler(
+    async ({ data, context: { db, viewerId } }): Promise<EspnConnection> => {
       const env = getCloudflareEnv()
       const session = {
         swid: bracedSwid(data.swid),
@@ -141,7 +141,7 @@ export const connectEspn = createServerFn({ method: 'POST' })
       )
       await startViewerSync(env, viewerId)
       return { status: 'ok', lastError: null, syncedAt: now }
-    }),
+    },
   )
 
 /** espn_s2 as copied is usually URL-encoded; a broken escape isn't one. */
@@ -156,8 +156,9 @@ function decodedCookie(value: string): string {
 }
 
 /** Forget the cookies and every Fantasy league read with them. */
-export const disconnectEspn = createServerFn({ method: 'POST' }).handler(() =>
-  withViewer(async ({ db, viewerId }) => {
+export const disconnectEspn = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
+  .handler(async ({ context: { db, viewerId } }) => {
     // In one batch: a failure halfway can't leave the cookies behind.
     await db.batch([
       db
@@ -170,11 +171,11 @@ export const disconnectEspn = createServerFn({ method: 'POST' }).handler(() =>
         ),
       db.delete(espnAccounts).where(eq(espnAccounts.viewerId, viewerId)),
     ])
-  }),
-)
+  })
 
-export const syncFantasyNow = createServerFn({ method: 'POST' }).handler(() =>
-  withViewer(async ({ db, viewerId }) => {
+export const syncFantasyNow = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
+  .handler(async ({ context: { db, viewerId } }) => {
     const env = getCloudflareEnv()
     const connected = await discoverConnectedLeagues(env, db, viewerId)
     const [espn, sleeperCount] = await Promise.all([
@@ -182,8 +183,7 @@ export const syncFantasyNow = createServerFn({ method: 'POST' }).handler(() =>
       connected.sleeper ? syncSleeper(env, viewerId) : 0,
     ])
     return espn + sleeperCount
-  }),
-)
+  })
 
 export interface SleeperConnection {
   username: string
@@ -192,10 +192,12 @@ export interface SleeperConnection {
   syncedAt: string | null
 }
 
-export const getSleeperConnection = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<SleeperConnection | null> => {
-    if (!(await sessionViewer())) return null
-    return withViewer(async ({ db, viewerId }) => {
+export const getSleeperConnection = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
+  .handler(
+    async ({
+      context: { db, viewerId },
+    }): Promise<SleeperConnection | null> => {
       const row = await db
         .select()
         .from(sleeperAccounts)
@@ -209,12 +211,12 @@ export const getSleeperConnection = createServerFn({ method: 'GET' }).handler(
             syncedAt: row.syncedAt,
           }
         : null
-    })
-  },
-)
+    },
+  )
 
 /** Connect Sleeper by username: public, so nothing secret is kept. */
 export const connectSleeper = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: { username: string }) =>
     z
       .object({
@@ -227,8 +229,8 @@ export const connectSleeper = createServerFn({ method: 'POST' })
       })
       .parse(data),
   )
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }): Promise<SleeperConnection> => {
+  .handler(
+    async ({ data, context: { db, viewerId } }): Promise<SleeperConnection> => {
       const user = await sleeperUser(data.username).catch(() => null)
       if (!user?.user_id)
         throw new Error('Sleeper has no user by that name. Check the spelling.')
@@ -258,157 +260,147 @@ export const connectSleeper = createServerFn({ method: 'POST' })
         lastError: null,
         syncedAt: now,
       }
-    }),
+    },
   )
 
 /** Forget the Sleeper account and its leagues. */
-export const disconnectSleeper = createServerFn({ method: 'POST' }).handler(
-  () =>
-    withViewer(async ({ db, viewerId }) => {
-      await db.batch([
-        db
-          .delete(fantasyLeagues)
-          .where(
-            and(
-              eq(fantasyLeagues.viewerId, viewerId),
-              eq(fantasyLeagues.provider, 'sleeper'),
-            ),
+export const disconnectSleeper = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
+  .handler(async ({ context: { db, viewerId } }) => {
+    await db.batch([
+      db
+        .delete(fantasyLeagues)
+        .where(
+          and(
+            eq(fantasyLeagues.viewerId, viewerId),
+            eq(fantasyLeagues.provider, 'sleeper'),
           ),
-        db
-          .delete(sleeperAccounts)
-          .where(eq(sleeperAccounts.viewerId, viewerId)),
-      ])
-    }),
-)
+        ),
+      db.delete(sleeperAccounts).where(eq(sleeperAccounts.viewerId, viewerId)),
+    ])
+  })
 
 /** Add a league from its ESPN URL (for one discovery missed). */
 export const addFantasyLeague = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: { url: string }) =>
     z.object({ url: z.string().trim().max(500) }).parse(data),
   )
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }) => {
-      const sleeperId = /sleeper\.(?:com|app)\/leagues\/(\d+)/.exec(
-        data.url,
-      )?.[1]
-      if (sleeperId) {
-        const account = await db
-          .select()
-          .from(sleeperAccounts)
-          .where(eq(sleeperAccounts.viewerId, viewerId))
-          .get()
-        if (!account) throw new Error('Connect Sleeper first.')
-        await db
-          .insert(fantasyLeagues)
-          .values({
-            id: sleeperLeagueRowId(viewerId, sleeperId),
-            viewerId,
-            sport: 'football',
-            provider: 'sleeper',
-            leagueId: sleeperId,
-            season: new Date().getUTCFullYear(),
-            name: `League ${sleeperId}`,
-            updatedAt: new Date().toISOString(),
-          })
-          .onConflictDoUpdate({
-            target: fantasyLeagues.id,
-            set: { enabled: true },
-          })
-        await syncSleeper(getCloudflareEnv(), viewerId)
-        return
-      }
-      const parsed = leagueFromUrl(data.url)
-      if (!parsed) {
-        throw new Error(
-          'Paste the league’s URL from fantasy.espn.com (with leagueId= in it) or sleeper.com/leagues/….',
-        )
-      }
-      const env = getCloudflareEnv()
-      const session = await loadSession(env, viewerId)
-      if (!session) throw new Error('Connect ESPN first.')
-      const id = leagueRowId(viewerId, parsed.sport, parsed.leagueId)
+  .handler(async ({ data, context: { db, viewerId } }) => {
+    const sleeperId = /sleeper\.(?:com|app)\/leagues\/(\d+)/.exec(data.url)?.[1]
+    if (sleeperId) {
+      const account = await db
+        .select()
+        .from(sleeperAccounts)
+        .where(eq(sleeperAccounts.viewerId, viewerId))
+        .get()
+      if (!account) throw new Error('Connect Sleeper first.')
       await db
         .insert(fantasyLeagues)
         .values({
-          id,
+          id: sleeperLeagueRowId(viewerId, sleeperId),
           viewerId,
-          sport: parsed.sport,
-          leagueId: parsed.leagueId,
-          season: seasonOf(parsed.sport, new Date()),
-          teamId: parsed.teamId,
-          name: `League ${parsed.leagueId}`,
-          enabled: true,
+          sport: 'football',
+          provider: 'sleeper',
+          leagueId: sleeperId,
+          season: new Date().getUTCFullYear(),
+          name: `League ${sleeperId}`,
           updatedAt: new Date().toISOString(),
         })
         .onConflictDoUpdate({
           target: fantasyLeagues.id,
           set: { enabled: true },
         })
-      const row = (await db
-        .select()
-        .from(fantasyLeagues)
-        .where(eq(fantasyLeagues.id, id))
-        .get())!
-      try {
-        await syncLeague(db, session, row)
-      } catch (error) {
-        throw new Error(
-          error instanceof EspnError && error.status === 404
-            ? 'ESPN has no such league this season.'
-            : 'Couldn’t read that league from ESPN.',
-        )
-      }
-    }),
-  )
+      await syncSleeper(getCloudflareEnv(), viewerId)
+      return
+    }
+    const parsed = leagueFromUrl(data.url)
+    if (!parsed) {
+      throw new Error(
+        'Paste the league’s URL from fantasy.espn.com (with leagueId= in it) or sleeper.com/leagues/….',
+      )
+    }
+    const env = getCloudflareEnv()
+    const session = await loadSession(env, viewerId)
+    if (!session) throw new Error('Connect ESPN first.')
+    const id = leagueRowId(viewerId, parsed.sport, parsed.leagueId)
+    await db
+      .insert(fantasyLeagues)
+      .values({
+        id,
+        viewerId,
+        sport: parsed.sport,
+        leagueId: parsed.leagueId,
+        season: seasonOf(parsed.sport, new Date()),
+        teamId: parsed.teamId,
+        name: `League ${parsed.leagueId}`,
+        enabled: true,
+        updatedAt: new Date().toISOString(),
+      })
+      .onConflictDoUpdate({
+        target: fantasyLeagues.id,
+        set: { enabled: true },
+      })
+    const row = (await db
+      .select()
+      .from(fantasyLeagues)
+      .where(eq(fantasyLeagues.id, id))
+      .get())!
+    try {
+      await syncLeague(db, session, row)
+    } catch (error) {
+      throw new Error(
+        error instanceof EspnError && error.status === 404
+          ? 'ESPN has no such league this season.'
+          : 'Couldn’t read that league from ESPN.',
+      )
+    }
+  })
 
 export const setFantasyLeagueEnabled = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: { id: string; enabled: boolean }) =>
     z.object({ id: z.string().max(300), enabled: z.boolean() }).parse(data),
   )
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }) => {
-      await db
-        .update(fantasyLeagues)
-        .set({ enabled: data.enabled })
-        .where(
-          and(
-            eq(fantasyLeagues.id, data.id),
-            eq(fantasyLeagues.viewerId, viewerId),
-          ),
-        )
-    }),
-  )
+  .handler(async ({ data, context: { db, viewerId } }) => {
+    await db
+      .update(fantasyLeagues)
+      .set({ enabled: data.enabled })
+      .where(
+        and(
+          eq(fantasyLeagues.id, data.id),
+          eq(fantasyLeagues.viewerId, viewerId),
+        ),
+      )
+  })
 
 /** Save the Viewer's order for their leagues (ids, first to last). */
 export const reorderFantasyLeagues = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: { ids: Array<string> }) =>
     z.object({ ids: z.array(z.string().max(300)).max(60) }).parse(data),
   )
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }) => {
-      // All or nothing: half a reorder would leave positions colliding.
-      const [first, ...rest] = data.ids.map((id, position) =>
-        db
-          .update(fantasyLeagues)
-          .set({ position })
-          .where(
-            and(
-              eq(fantasyLeagues.id, id),
-              eq(fantasyLeagues.viewerId, viewerId),
-            ),
-          ),
-      )
-      if (first) await db.batch([first, ...rest])
-    }),
-  )
+  .handler(async ({ data, context: { db, viewerId } }) => {
+    // All or nothing: half a reorder would leave positions colliding.
+    const [first, ...rest] = data.ids.map((id, position) =>
+      db
+        .update(fantasyLeagues)
+        .set({ position })
+        .where(
+          and(eq(fantasyLeagues.id, id), eq(fantasyLeagues.viewerId, viewerId)),
+        ),
+    )
+    if (first) await db.batch([first, ...rest])
+  })
 
 /** The race on a Matchup sheet: this period's score points, oldest first. */
 export const getMatchupRace = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
   .validator((data: { leagueId: string }) =>
     z.object({ leagueId: z.string().max(300) }).parse(data),
   )
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }): Promise<Array<RacePoint>> => {
+  .handler(
+    async ({ data, context: { db, viewerId } }): Promise<Array<RacePoint>> => {
       // Only the Viewer's own league, and only its current period.
       const league = await db
         .select({ matchup: fantasyLeagues.matchup })
@@ -436,11 +428,12 @@ export const getMatchupRace = createServerFn({ method: 'GET' })
           ),
         )
         .orderBy(asc(fantasyScorePoints.at))
-    }),
+    },
   )
 
 /** Another day of a category Matchup, for stepping through its days. */
 export const getMatchupDay = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
   .validator((data: { leagueId: string; scoringPeriod: number }) =>
     z
       .object({
@@ -449,8 +442,8 @@ export const getMatchupDay = createServerFn({ method: 'GET' })
       })
       .parse(data),
   )
-  .handler(({ data }) =>
-    withViewer(async ({ viewerId }): Promise<MatchupDay | null> => {
+  .handler(
+    async ({ data, context: { viewerId } }): Promise<MatchupDay | null> => {
       const env = getCloudflareEnv()
       try {
         return await readDay(env, viewerId, data.leagueId, data.scoringPeriod)
@@ -462,13 +455,15 @@ export const getMatchupDay = createServerFn({ method: 'GET' })
         })
         throw new Error('Couldn’t read that day from ESPN.')
       }
-    }),
+    },
   )
 
-export const getFantasy = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<Array<FantasyLeagueView>> => {
-    if (!(await sessionViewer())) return []
-    return withViewer(async ({ db, viewerId }) => {
+export const getFantasy = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
+  .handler(
+    async ({
+      context: { db, viewerId },
+    }): Promise<Array<FantasyLeagueView>> => {
       const rows = await db
         .select()
         .from(fantasyLeagues)
@@ -492,6 +487,5 @@ export const getFantasy = createServerFn({ method: 'GET' }).handler(
         updatedAt: r.updatedAt,
         matchup: r.matchup ?? null,
       }))
-    })
-  },
-)
+    },
+  )

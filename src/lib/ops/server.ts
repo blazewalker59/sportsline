@@ -8,6 +8,7 @@ import { desc } from 'drizzle-orm'
 import { z } from 'zod'
 import { adminEmails, isAdmin, reportError } from './errors'
 import { isStale } from './jobs'
+import { viewerMiddleware } from '@/lib/viewer/middleware'
 import { getCloudflareEnv, getDb } from '@/lib/db'
 import {
   errorEvents,
@@ -17,7 +18,6 @@ import {
   sleeperAccounts,
   user,
 } from '@/lib/db/schema'
-import { requireViewer } from '@/lib/viewer/session'
 
 export interface JobView {
   name: string
@@ -65,9 +65,9 @@ export interface OpsHealth {
   errors: Array<ErrorView>
 }
 
-export const getOpsHealth = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<OpsHealth | OpsDenied> => {
-    const viewer = await requireViewer()
+export const getOpsHealth = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
+  .handler(async ({ context: { viewer } }): Promise<OpsHealth | OpsDenied> => {
     const env = getCloudflareEnv()
     const admin = isAdmin(env, viewer.email)
     console.log('[ops] health requested', { email: viewer.email, admin })
@@ -119,8 +119,7 @@ export const getOpsHealth = createServerFn({ method: 'GET' }).handler(
         details: context ? JSON.stringify(context, null, 2) : null,
       })),
     }
-  },
-)
+  })
 
 /** Browser errors this isolate has taken per Viewer this minute. */
 const recent = new Map<string, { minute: number; count: number }>()
@@ -128,6 +127,7 @@ const PER_MINUTE = 10
 
 /** A crash or unhandled failure in the browser, reported to the same place. */
 export const reportClientError = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator(
     (data: { message: string; stack?: string; path?: string; kind?: string }) =>
       z
@@ -139,8 +139,7 @@ export const reportClientError = createServerFn({ method: 'POST' })
         })
         .parse(data),
   )
-  .handler(async ({ data }) => {
-    const viewer = await requireViewer()
+  .handler(async ({ data, context: { viewer } }) => {
     const minute = Math.floor(Date.now() / 60_000)
     const seen = recent.get(viewer.id)
     const count = seen?.minute === minute ? seen.count + 1 : 1

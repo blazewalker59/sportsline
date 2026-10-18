@@ -11,10 +11,10 @@ import { coverageWhere } from './coverage'
 import { syncPastDay } from './pastDay'
 import type { GameSummary, TeamRef, TimelineItem } from '@/lib/model/timeline'
 import type { League } from '@/lib/model/types'
+import { viewerMiddleware } from '@/lib/viewer/middleware'
 import { teamColors } from '@/lib/brand/teamColors'
 import { getCloudflareEnv, getDb } from '@/lib/db'
 import { games, teams, timelineItems } from '@/lib/db/schema'
-import { requireViewer } from '@/lib/viewer/session'
 import { shiftSportsDay, sportsDayOf } from '@/lib/model/sportsDay'
 import { syncLeague } from '@/lib/live/schedule'
 import { isRateLimited } from '@/lib/live/pacing'
@@ -42,84 +42,90 @@ export interface TimelinePage {
 }
 
 export const getTimeline = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
   .validator((data: z.input<typeof timelineInput>) => timelineInput.parse(data))
-  .handler(async ({ data }): Promise<TimelinePage> => {
-    const viewer = await requireViewer()
-    const db = getDb()
-    const sportsDay = data.sportsDay ?? sportsDayOf(new Date())
-    const covered = coverageWhere(followsFromParam(data.follows), {
-      sportsDay,
-      includeRoutine: data.includeRoutine,
-      viewerId: viewer.id,
-    })
-    if (!covered) return { sportsDay, items: [], nextBefore: null }
-
-    const t = timelineItems
-    const away = aliasedTable(teams, 'away')
-    const home = aliasedTable(teams, 'home')
-    const rows = await db
-      .select({
-        item: t,
-        ranks: { away: games.awayRank, home: games.homeRank },
-        conferences: { away: games.awayConference, home: games.homeConference },
-        away: {
-          id: away.id,
-          abbreviation: away.abbreviation,
-          logoUrl: away.logoUrl,
-          name: away.name,
-          league: away.league,
-        },
-        home: {
-          id: home.id,
-          abbreviation: home.abbreviation,
-          logoUrl: home.logoUrl,
-          name: home.name,
-          league: home.league,
-        },
+  .handler(
+    async ({ data, context: { db, viewerId } }): Promise<TimelinePage> => {
+      const sportsDay = data.sportsDay ?? sportsDayOf(new Date())
+      const covered = coverageWhere(followsFromParam(data.follows), {
+        sportsDay,
+        includeRoutine: data.includeRoutine,
+        viewerId,
       })
-      .from(t)
-      .innerJoin(games, eq(games.id, t.gameId))
-      .innerJoin(away, eq(away.id, t.awayTeamId))
-      .innerJoin(home, eq(home.id, t.homeTeamId))
-      .where(
-        and(
-          eq(t.sportsDay, sportsDay),
-          covered,
-          data.before ? lt(t.occurredAt, data.before) : undefined,
-        ),
-      )
-      .orderBy(desc(t.occurredAt), desc(t.sequence))
-      .limit(PAGE_SIZE + 1)
+      if (!covered) return { sportsDay, items: [], nextBefore: null }
 
-    const page = rows.slice(0, PAGE_SIZE)
-    return {
-      sportsDay,
-      items: page.map((r) =>
-        toTimelineItem(
-          r.item,
-          {
-            ...withColors(r.away),
-            rank: r.ranks.away,
-            conference: r.conferences.away,
+      const t = timelineItems
+      const away = aliasedTable(teams, 'away')
+      const home = aliasedTable(teams, 'home')
+      const rows = await db
+        .select({
+          item: t,
+          ranks: { away: games.awayRank, home: games.homeRank },
+          conferences: {
+            away: games.awayConference,
+            home: games.homeConference,
           },
-          {
-            ...withColors(r.home),
-            rank: r.ranks.home,
-            conference: r.conferences.home,
+          away: {
+            id: away.id,
+            abbreviation: away.abbreviation,
+            logoUrl: away.logoUrl,
+            name: away.name,
+            league: away.league,
           },
+          home: {
+            id: home.id,
+            abbreviation: home.abbreviation,
+            logoUrl: home.logoUrl,
+            name: home.name,
+            league: home.league,
+          },
+        })
+        .from(t)
+        .innerJoin(games, eq(games.id, t.gameId))
+        .innerJoin(away, eq(away.id, t.awayTeamId))
+        .innerJoin(home, eq(home.id, t.homeTeamId))
+        .where(
+          and(
+            eq(t.sportsDay, sportsDay),
+            covered,
+            data.before ? lt(t.occurredAt, data.before) : undefined,
+          ),
+        )
+        .orderBy(desc(t.occurredAt), desc(t.sequence))
+        .limit(PAGE_SIZE + 1)
+
+      const page = rows.slice(0, PAGE_SIZE)
+      return {
+        sportsDay,
+        items: page.map((r) =>
+          toTimelineItem(
+            r.item,
+            {
+              ...withColors(r.away),
+              rank: r.ranks.away,
+              conference: r.conferences.away,
+            },
+            {
+              ...withColors(r.home),
+              rank: r.ranks.home,
+              conference: r.conferences.home,
+            },
+          ),
         ),
-      ),
-      nextBefore:
-        rows.length > PAGE_SIZE ? (page.at(-1)?.item.occurredAt ?? null) : null,
-    }
-  })
+        nextBefore:
+          rows.length > PAGE_SIZE
+            ? (page.at(-1)?.item.occurredAt ?? null)
+            : null,
+      }
+    },
+  )
 
 export const getGames = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
   .validator((data: { sportsDay?: string }) =>
     z.object({ sportsDay: SPORTS_DAY.optional() }).parse(data),
   )
   .handler(async ({ data }): Promise<Array<GameSummary>> => {
-    await requireViewer()
     const db = getDb()
     const sportsDay = data.sportsDay ?? sportsDayOf(new Date())
     const away = aliasedTable(teams, 'away')
@@ -156,11 +162,11 @@ function withColors(t: {
  * (./pastDay). Returns how many Games the day has after the sync.
  */
 export const ensureSportsDay = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: { sportsDay: string }) =>
     z.object({ sportsDay: SPORTS_DAY }).parse(data),
   )
   .handler(async ({ data }): Promise<{ games: number; loading: boolean }> => {
-    await requireViewer()
     const now = new Date()
     const today = sportsDayOf(now)
     const oldest = shiftSportsDay(today, -BACKFILL_DAYS)

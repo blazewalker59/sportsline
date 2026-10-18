@@ -13,6 +13,7 @@ import { createToken } from './tokens'
 import { CAP_LIMITS } from './caps'
 import type { TradeProposal } from './proposal'
 import type { TrendPickRow, TrendStats } from '@/lib/sharp/trendRecord'
+import { viewerMiddleware } from '@/lib/viewer/middleware'
 import { KalshiError, apiKeys } from '@/lib/kalshi/client'
 import { importSigningKey } from '@/lib/kalshi/keys'
 import { isTradeOnly } from '@/lib/kalshi/scopes'
@@ -20,7 +21,6 @@ import { seal } from '@/lib/kalshi/vault'
 import { getCloudflareEnv } from '@/lib/db'
 import { apiTokens, kalshiTradeKeys, tradeProposals } from '@/lib/db/schema'
 import { sportsDayOf } from '@/lib/model/sportsDay'
-import { withViewer } from '@/lib/viewer/session'
 import { viewerTrendRecord } from '@/lib/sharp/trendRecord'
 import { startViewerSync } from '@/lib/live/startViewerSync'
 
@@ -37,8 +37,9 @@ export interface ApiTokenRow {
 }
 
 /** Your tokens that still work, newest first. */
-export const getApiTokens = createServerFn({ method: 'GET' }).handler(() =>
-  withViewer(({ db, viewerId }): Promise<Array<ApiTokenRow>> =>
+export const getApiTokens = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
+  .handler(async ({ context: { db, viewerId } }): Promise<Array<ApiTokenRow>> =>
     db
       .select({
         id: apiTokens.id,
@@ -51,11 +52,11 @@ export const getApiTokens = createServerFn({ method: 'GET' }).handler(() =>
       .from(apiTokens)
       .where(and(eq(apiTokens.viewerId, viewerId), isNull(apiTokens.revokedAt)))
       .orderBy(desc(apiTokens.createdAt)),
-  ),
-)
+  )
 
 /** A new token, returned this once and never again. */
 export const createApiToken = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: { name: string; trade?: boolean }) =>
     z
       .object({
@@ -64,56 +65,51 @@ export const createApiToken = createServerFn({ method: 'POST' })
       })
       .parse(data),
   )
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }) => {
-      const active = await db
-        .select({ id: apiTokens.id })
-        .from(apiTokens)
-        .where(
-          and(eq(apiTokens.viewerId, viewerId), isNull(apiTokens.revokedAt)),
-        )
-      if (active.length >= MAX_ACTIVE_TOKENS) {
-        throw new Error(
-          `You have ${MAX_ACTIVE_TOKENS} tokens: revoke one to make another`,
-        )
-      }
-      return createToken(
-        db,
-        viewerId,
-        data.name,
-        data.trade ? ['read', 'trade'] : ['read'],
+  .handler(async ({ data, context: { db, viewerId } }) => {
+    const active = await db
+      .select({ id: apiTokens.id })
+      .from(apiTokens)
+      .where(and(eq(apiTokens.viewerId, viewerId), isNull(apiTokens.revokedAt)))
+    if (active.length >= MAX_ACTIVE_TOKENS) {
+      throw new Error(
+        `You have ${MAX_ACTIVE_TOKENS} tokens: revoke one to make another`,
       )
-    }),
-  )
+    }
+    return createToken(
+      db,
+      viewerId,
+      data.name,
+      data.trade ? ['read', 'trade'] : ['read'],
+    )
+  })
 
 /** Stop a token working, at once, withdrawing what its Agent proposed. */
 export const revokeApiToken = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: { id: string }) =>
     z.object({ id: z.string().min(1).max(64) }).parse(data),
   )
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }) => {
-      const at = new Date().toISOString()
-      await db.batch([
-        db
-          .update(apiTokens)
-          .set({ revokedAt: at })
-          .where(
-            and(eq(apiTokens.id, data.id), eq(apiTokens.viewerId, viewerId)),
+  .handler(async ({ data, context: { db, viewerId } }) => {
+    const at = new Date().toISOString()
+    await db.batch([
+      db
+        .update(apiTokens)
+        .set({ revokedAt: at })
+        .where(
+          and(eq(apiTokens.id, data.id), eq(apiTokens.viewerId, viewerId)),
+        ),
+      db
+        .update(tradeProposals)
+        .set({ status: 'cancelled', decidedAt: at })
+        .where(
+          and(
+            eq(tradeProposals.tokenId, data.id),
+            eq(tradeProposals.viewerId, viewerId),
+            eq(tradeProposals.status, 'pending'),
           ),
-        db
-          .update(tradeProposals)
-          .set({ status: 'cancelled', decidedAt: at })
-          .where(
-            and(
-              eq(tradeProposals.tokenId, data.id),
-              eq(tradeProposals.viewerId, viewerId),
-              eq(tradeProposals.status, 'pending'),
-            ),
-          ),
-      ])
-    }),
-  )
+        ),
+    ])
+  })
 
 // ─── Trading (docs/adr/0008) ────────────────────────────────────────────────
 
@@ -131,8 +127,9 @@ export interface TradingState {
   trades: Array<TradeView>
 }
 
-export const getTrading = createServerFn({ method: 'GET' }).handler(() =>
-  withViewer(async ({ db, viewerId }): Promise<TradingState> => {
+export const getTrading = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
+  .handler(async ({ context: { db, viewerId } }): Promise<TradingState> => {
     await expireTrades(db, viewerId)
     const key = await db
       .select()
@@ -162,8 +159,7 @@ export const getTrading = createServerFn({ method: 'GET' }).handler(() =>
         ...trades.filter((t) => t.status !== 'pending'),
       ],
     }
-  }),
-)
+  })
 
 const Caps = z.object({
   maxOrderDollars: z.number().min(1).max(CAP_LIMITS.maxOrderDollars),
@@ -175,6 +171,7 @@ const Caps = z.object({
  * and Kalshi must list it as able to trade but not move money.
  */
 export const connectTradeKey = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator(
     (data: {
       keyId: string
@@ -187,118 +184,112 @@ export const connectTradeKey = createServerFn({ method: 'POST' })
         privateKey: z.string().min(64).max(10_000),
       }).parse(data),
   )
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }) => {
-      const env = getCloudflareEnv()
-      let signer
-      try {
-        signer = await importSigningKey(data.privateKey)
-      } catch {
+  .handler(async ({ data, context: { db, viewerId } }) => {
+    const env = getCloudflareEnv()
+    let signer
+    try {
+      signer = await importSigningKey(data.privateKey)
+    } catch {
+      throw new Error(
+        'That isn’t a private key Kalshi issues. Paste the whole key, including its BEGIN and END lines.',
+      )
+    }
+    let keys
+    try {
+      keys = await apiKeys({ keyId: data.keyId, signer })
+    } catch (error) {
+      if (
+        error instanceof KalshiError &&
+        (error.status === 401 || error.status === 403)
+      ) {
         throw new Error(
-          'That isn’t a private key Kalshi issues. Paste the whole key, including its BEGIN and END lines.',
+          'Kalshi didn’t accept this key. Check the key ID matches the private key, and that the key has the Read scope.',
         )
       }
-      let keys
-      try {
-        keys = await apiKeys({ keyId: data.keyId, signer })
-      } catch (error) {
-        if (
-          error instanceof KalshiError &&
-          (error.status === 401 || error.status === 403)
-        ) {
-          throw new Error(
-            'Kalshi didn’t accept this key. Check the key ID matches the private key, and that the key has the Read scope.',
-          )
-        }
-        throw new Error('Couldn’t reach Kalshi to check the key. Try again.')
-      }
-      const key = keys.find((k) => k.api_key_id === data.keyId)
-      if (!isTradeOnly(key?.scopes)) {
-        throw new Error(
-          'Sportsline needs a key with exactly the Read and Trade scopes: one that can trade but never withdraw or transfer money. Create one in Kalshi with only those.',
-        )
-      }
-      const sealed = await seal(env.KALSHI_ENCRYPTION_KEY, data.privateKey, {
-        purpose: 'kalshi-trade',
-        viewerId,
-      })
-      const row = {
-        viewerId,
-        keyId: data.keyId,
-        keyType: signer.type,
-        keyCiphertext: sealed.ciphertext,
-        keyIv: sealed.iv,
-        scopes: key!.scopes!,
-        maxOrderDollars: data.maxOrderDollars,
-        maxDailyDollars: Math.max(data.maxDailyDollars, data.maxOrderDollars),
-        connectedAt: new Date().toISOString(),
-      }
-      await db
-        .insert(kalshiTradeKeys)
-        .values(row)
-        .onConflictDoUpdate({ target: kalshiTradeKeys.viewerId, set: row })
-    }),
-  )
+      throw new Error('Couldn’t reach Kalshi to check the key. Try again.')
+    }
+    const key = keys.find((k) => k.api_key_id === data.keyId)
+    if (!isTradeOnly(key?.scopes)) {
+      throw new Error(
+        'Sportsline needs a key with exactly the Read and Trade scopes: one that can trade but never withdraw or transfer money. Create one in Kalshi with only those.',
+      )
+    }
+    const sealed = await seal(env.KALSHI_ENCRYPTION_KEY, data.privateKey, {
+      purpose: 'kalshi-trade',
+      viewerId,
+    })
+    const row = {
+      viewerId,
+      keyId: data.keyId,
+      keyType: signer.type,
+      keyCiphertext: sealed.ciphertext,
+      keyIv: sealed.iv,
+      scopes: key!.scopes!,
+      maxOrderDollars: data.maxOrderDollars,
+      maxDailyDollars: Math.max(data.maxDailyDollars, data.maxOrderDollars),
+      connectedAt: new Date().toISOString(),
+    }
+    await db
+      .insert(kalshiTradeKeys)
+      .values(row)
+      .onConflictDoUpdate({ target: kalshiTradeKeys.viewerId, set: row })
+  })
 
 export const setTradeCaps = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: { maxOrderDollars: number; maxDailyDollars: number }) =>
     Caps.parse(data),
   )
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }) => {
-      await db
-        .update(kalshiTradeKeys)
-        .set({
-          maxOrderDollars: data.maxOrderDollars,
-          maxDailyDollars: Math.max(data.maxDailyDollars, data.maxOrderDollars),
-        })
-        .where(eq(kalshiTradeKeys.viewerId, viewerId))
-    }),
-  )
+  .handler(async ({ data, context: { db, viewerId } }) => {
+    await db
+      .update(kalshiTradeKeys)
+      .set({
+        maxOrderDollars: data.maxOrderDollars,
+        maxDailyDollars: Math.max(data.maxDailyDollars, data.maxOrderDollars),
+      })
+      .where(eq(kalshiTradeKeys.viewerId, viewerId))
+  })
 
 /** Forget the trade key; anything waiting on the Viewer is rejected. */
-export const disconnectTradeKey = createServerFn({ method: 'POST' }).handler(
-  () =>
-    withViewer(async ({ db, viewerId }) => {
-      await db
-        .update(tradeProposals)
-        .set({ status: 'rejected', decidedAt: new Date().toISOString() })
-        .where(
-          and(
-            eq(tradeProposals.viewerId, viewerId),
-            eq(tradeProposals.status, 'pending'),
-          ),
-        )
-      await db
-        .delete(kalshiTradeKeys)
-        .where(eq(kalshiTradeKeys.viewerId, viewerId))
-    }),
-)
+export const disconnectTradeKey = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
+  .handler(async ({ context: { db, viewerId } }) => {
+    await db
+      .update(tradeProposals)
+      .set({ status: 'rejected', decidedAt: new Date().toISOString() })
+      .where(
+        and(
+          eq(tradeProposals.viewerId, viewerId),
+          eq(tradeProposals.status, 'pending'),
+        ),
+      )
+    await db
+      .delete(kalshiTradeKeys)
+      .where(eq(kalshiTradeKeys.viewerId, viewerId))
+  })
 
 const ProposalId = z.object({ id: z.string().min(1).max(64) })
 
 /** Approve an Agent's proposal: the order is sent to Kalshi now. */
 export const approveTradeProposal = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: { id: string }) => ProposalId.parse(data))
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }) => {
-      const env = getCloudflareEnv()
-      const trade = await approveTrade(env, db, viewerId, data.id)
-      // Kalshi's reply was lost: their sync looks the order up.
-      if (trade.status === 'unknown') {
-        await startViewerSync(env, viewerId).catch(() => undefined)
-      }
-      return trade
-    }),
-  )
+  .handler(async ({ data, context: { db, viewerId } }) => {
+    const env = getCloudflareEnv()
+    const trade = await approveTrade(env, db, viewerId, data.id)
+    // Kalshi's reply was lost: their sync looks the order up.
+    if (trade.status === 'unknown') {
+      await startViewerSync(env, viewerId).catch(() => undefined)
+    }
+    return trade
+  })
 
 export const rejectTradeProposal = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: { id: string }) => ProposalId.parse(data))
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }) => {
-      await closeTrade(db, viewerId, data.id, 'rejected')
-    }),
-  )
+  .handler(async ({ data, context: { db, viewerId } }) => {
+    await closeTrade(db, viewerId, data.id, 'rejected')
+  })
 
 // ─── find_bet record (docs/adr/0009) ────────────────────────────────────────
 
@@ -308,8 +299,9 @@ export interface BetRecordView {
 }
 
 /** What came of find_bet's picks: placed or not, and how they did. */
-export const getBetRecord = createServerFn({ method: 'GET' }).handler(() =>
-  withViewer(async ({ db, viewerId }): Promise<BetRecordView> => {
+export const getBetRecord = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
+  .handler(async ({ context: { db, viewerId } }): Promise<BetRecordView> => {
     const { stats, picks } = await viewerTrendRecord(db, viewerId)
     return {
       stats,
@@ -317,5 +309,4 @@ export const getBetRecord = createServerFn({ method: 'GET' }).handler(() =>
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
         .slice(0, 15),
     }
-  }),
-)
+  })

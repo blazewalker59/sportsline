@@ -7,6 +7,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { aliasedTable, and, eq, gte, inArray, lte } from 'drizzle-orm'
 import { z } from 'zod'
 import { inChunks } from './inChunks'
+import { viewerMiddleware } from '@/lib/viewer/middleware'
 import {
   kalshiPrices,
   predictionLegs,
@@ -17,7 +18,6 @@ import {
 import { toTimelineItem } from '@/lib/live/rows'
 import { teamRef } from '@/lib/players/cards'
 import { scoringHeadline } from '@/lib/timeline/chat'
-import { withViewer } from '@/lib/viewer/session'
 
 /** A Scoring Play in one of a Prediction's Games: what moved its odds. */
 export interface PredictionMove {
@@ -47,11 +47,15 @@ const MOVES_SHOWN = 60
  * the Scoring Plays in its Games over that time.
  */
 export const getPredictionDetail = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
   .validator((data: { id: string }) =>
     z.object({ id: z.string().min(1).max(400) }).parse(data),
   )
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }): Promise<PredictionDetail | null> => {
+  .handler(
+    async ({
+      data,
+      context: { db, viewerId },
+    }): Promise<PredictionDetail | null> => {
       const p = await db
         .select()
         .from(predictions)
@@ -142,5 +146,5 @@ export const getPredictionDetail = createServerFn({ method: 'GET' })
         entryChance: p.contracts > 0 ? p.cost / p.contracts : null,
         moves,
       }
-    }),
+    },
   )

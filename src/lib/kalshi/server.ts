@@ -12,9 +12,9 @@ import { importSigningKey } from './keys'
 import { isReadOnly } from './scopes'
 import { refreshPrices, syncAccount } from './sync'
 import { seal } from './vault'
+import { viewerMiddleware } from '@/lib/viewer/middleware'
 import { getCloudflareEnv } from '@/lib/db'
 import { kalshiAccounts, predictions } from '@/lib/db/schema'
-import { sessionViewer, withViewer } from '@/lib/viewer/session'
 import { reportError } from '@/lib/ops/errors'
 import { startViewerSync } from '@/lib/live/startViewerSync'
 
@@ -29,11 +29,10 @@ export interface KalshiConnection {
   changeDisplay: ChangeDisplay
 }
 
-export const getKalshiConnection = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<KalshiConnection | null> => {
-    const viewer = await sessionViewer()
-    if (!viewer) return null
-    return withViewer(async ({ db, viewerId }) => {
+export const getKalshiConnection = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
+  .handler(
+    async ({ context: { db, viewerId } }): Promise<KalshiConnection | null> => {
       const row = await db
         .select()
         .from(kalshiAccounts)
@@ -48,9 +47,8 @@ export const getKalshiConnection = createServerFn({ method: 'GET' }).handler(
             changeDisplay: row.changeDisplay,
           }
         : null
-    })
-  },
-)
+    },
+  )
 
 /**
  * Connect a Kalshi account with a read-only key (docs/adr/0003): the key
@@ -58,6 +56,7 @@ export const getKalshiConnection = createServerFn({ method: 'GET' }).handler(
  * read-only. Its private half is sealed before it's stored.
  */
 export const connectKalshi = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: { keyId: string; privateKey: string }) =>
     z
       .object({
@@ -66,8 +65,8 @@ export const connectKalshi = createServerFn({ method: 'POST' })
       })
       .parse(data),
   )
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }): Promise<KalshiConnection> => {
+  .handler(
+    async ({ data, context: { db, viewerId } }): Promise<KalshiConnection> => {
       const env = getCloudflareEnv()
       let signer
       try {
@@ -135,41 +134,40 @@ export const connectKalshi = createServerFn({ method: 'POST' })
         syncedAt: new Date().toISOString(),
         changeDisplay: row.changeDisplay,
       }
-    }),
+    },
   )
 
 /** Show Prediction cards' profit or loss in dollars or percent return. */
 export const setChangeDisplay = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: { display: string }) =>
     z.object({ display: z.enum(['dollars', 'percent']) }).parse(data),
   )
-  .handler(({ data }) =>
-    withViewer(async ({ db, viewerId }) => {
-      await db
-        .update(kalshiAccounts)
-        .set({ changeDisplay: data.display })
-        .where(eq(kalshiAccounts.viewerId, viewerId))
-      return data.display
-    }),
-  )
+  .handler(async ({ data, context: { db, viewerId } }) => {
+    await db
+      .update(kalshiAccounts)
+      .set({ changeDisplay: data.display })
+      .where(eq(kalshiAccounts.viewerId, viewerId))
+    return data.display
+  })
 
 /** Forget the key and every Prediction read with it. */
-export const disconnectKalshi = createServerFn({ method: 'POST' }).handler(() =>
-  withViewer(async ({ db, viewerId }) => {
+export const disconnectKalshi = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
+  .handler(async ({ context: { db, viewerId } }) => {
     // In one batch: a failure halfway can't leave the key behind.
     await db.batch([
       db.delete(predictions).where(eq(predictions.viewerId, viewerId)),
       db.delete(kalshiAccounts).where(eq(kalshiAccounts.viewerId, viewerId)),
     ])
-  }),
-)
+  })
 
-export const syncKalshiNow = createServerFn({ method: 'POST' }).handler(() =>
-  withViewer(async ({ viewerId }) => {
+export const syncKalshiNow = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
+  .handler(async ({ context: { viewerId } }) => {
     const env = getCloudflareEnv()
     const counts = await syncAccount(env, viewerId)
     // Only this Viewer's markets: never read with every Viewer's key.
     await refreshPrices(env, viewerId)
     return counts
-  }),
-)
+  })

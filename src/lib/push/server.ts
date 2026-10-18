@@ -10,26 +10,16 @@ import { vapidKeys } from './deliver'
 import { isPushEndpoint, sendPush } from './webpush'
 import { DEFAULT_LEVELS } from './alerts'
 import type { AlertLevels } from './alerts'
-import { getAuth } from '@/lib/auth/server'
-import { getCloudflareEnv, getDb, serverRequestContext } from '@/lib/db'
+import { viewerMiddleware } from '@/lib/viewer/middleware'
+import { getCloudflareEnv, getDb } from '@/lib/db'
 import { alertSettings, pushSubscriptions } from '@/lib/db/schema'
 
-async function viewerId(): Promise<string> {
-  const headers = serverRequestContext.getStore()?.headers
-  const session = headers
-    ? await getAuth(getCloudflareEnv()).api.getSession({ headers })
-    : null
-  if (!session?.user) throw new Error('Sign in required')
-  return session.user.id
-}
-
 /** The VAPID public key browsers subscribe with; null when Alerts aren't configured. */
-export const getPushKey = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<string | null> => {
-    await viewerId()
-    return getCloudflareEnv().VAPID_PUBLIC_KEY ?? null
-  },
-)
+export const getPushKey = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
+  .handler((): Promise<string | null> =>
+    Promise.resolve(getCloudflareEnv().VAPID_PUBLIC_KEY ?? null),
+  )
 
 /** Devices a Viewer keeps Alerts on; saving one more drops the oldest. */
 export const DEVICES_PER_VIEWER = 10
@@ -48,76 +38,81 @@ const subscriptionInput = z.object({
 })
 
 export const savePushSubscription = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: z.input<typeof subscriptionInput>) =>
     subscriptionInput.parse(data),
   )
-  .handler(async ({ data }): Promise<{ confirmed: boolean; taken?: true }> => {
-    const id = await viewerId()
-    const db = getDb()
-    // An endpoint saved by another Viewer stays theirs: the browser must
-    // subscribe afresh (a new endpoint) to move this device over.
-    const saved = await db
-      .insert(pushSubscriptions)
-      .values({
-        endpoint: data.endpoint,
-        viewerId: id,
-        p256dh: data.keys.p256dh,
-        auth: data.keys.auth,
-        createdAt: new Date().toISOString(),
-      })
-      .onConflictDoUpdate({
-        target: pushSubscriptions.endpoint,
-        set: { p256dh: data.keys.p256dh, auth: data.keys.auth },
-        setWhere: eq(pushSubscriptions.viewerId, id),
-      })
-      .returning({ endpoint: pushSubscriptions.endpoint })
-    if (saved.length === 0) return { confirmed: false, taken: true }
-    await db
-      .delete(pushSubscriptions)
-      .where(
-        and(
-          eq(pushSubscriptions.viewerId, id),
-          notInArray(
-            pushSubscriptions.endpoint,
-            db
-              .select({ endpoint: pushSubscriptions.endpoint })
-              .from(pushSubscriptions)
-              .where(eq(pushSubscriptions.viewerId, id))
-              .orderBy(
-                desc(pushSubscriptions.createdAt),
-                desc(pushSubscriptions.endpoint),
-              )
-              .limit(DEVICES_PER_VIEWER),
+  .handler(
+    async ({
+      data,
+      context: { viewerId: id },
+    }): Promise<{ confirmed: boolean; taken?: true }> => {
+      const db = getDb()
+      // An endpoint saved by another Viewer stays theirs: the browser must
+      // subscribe afresh (a new endpoint) to move this device over.
+      const saved = await db
+        .insert(pushSubscriptions)
+        .values({
+          endpoint: data.endpoint,
+          viewerId: id,
+          p256dh: data.keys.p256dh,
+          auth: data.keys.auth,
+          createdAt: new Date().toISOString(),
+        })
+        .onConflictDoUpdate({
+          target: pushSubscriptions.endpoint,
+          set: { p256dh: data.keys.p256dh, auth: data.keys.auth },
+          setWhere: eq(pushSubscriptions.viewerId, id),
+        })
+        .returning({ endpoint: pushSubscriptions.endpoint })
+      if (saved.length === 0) return { confirmed: false, taken: true }
+      await db
+        .delete(pushSubscriptions)
+        .where(
+          and(
+            eq(pushSubscriptions.viewerId, id),
+            notInArray(
+              pushSubscriptions.endpoint,
+              db
+                .select({ endpoint: pushSubscriptions.endpoint })
+                .from(pushSubscriptions)
+                .where(eq(pushSubscriptions.viewerId, id))
+                .orderBy(
+                  desc(pushSubscriptions.createdAt),
+                  desc(pushSubscriptions.endpoint),
+                )
+                .limit(DEVICES_PER_VIEWER),
+            ),
           ),
-        ),
-      )
-    // A confirmation on the device just enabled: proves the whole path
-    // (browser → push service → Worker) works, right when it matters.
-    const keys = vapidKeys(getCloudflareEnv())
-    if (!keys) return { confirmed: false }
-    const result = await sendPush(
-      {
-        endpoint: data.endpoint,
-        p256dh: data.keys.p256dh,
-        auth: data.keys.auth,
-      },
-      JSON.stringify({
-        title: 'Alerts are on',
-        body: 'Scores for what you follow, key moments in your Predictions and Fantasy Matchups. Tune each in the menu.',
-        url: '/',
-        tag: 'sportsline-welcome',
-      }),
-      keys,
-    ).catch(() => 'failed' as const)
-    return { confirmed: result === 'sent' }
-  })
+        )
+      // A confirmation on the device just enabled: proves the whole path
+      // (browser → push service → Worker) works, right when it matters.
+      const keys = vapidKeys(getCloudflareEnv())
+      if (!keys) return { confirmed: false }
+      const result = await sendPush(
+        {
+          endpoint: data.endpoint,
+          p256dh: data.keys.p256dh,
+          auth: data.keys.auth,
+        },
+        JSON.stringify({
+          title: 'Alerts are on',
+          body: 'Scores for what you follow, key moments in your Predictions and Fantasy Matchups. Tune each in the menu.',
+          url: '/',
+          tag: 'sportsline-welcome',
+        }),
+        keys,
+      ).catch(() => 'failed' as const)
+      return { confirmed: result === 'sent' }
+    },
+  )
 
 export const deletePushSubscription = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: { endpoint: string }) =>
     z.object({ endpoint: z.string().max(1000) }).parse(data),
   )
-  .handler(async ({ data }) => {
-    const id = await viewerId()
+  .handler(async ({ data, context: { viewerId: id } }) => {
     await getDb()
       .delete(pushSubscriptions)
       .where(
@@ -129,9 +124,9 @@ export const deletePushSubscription = createServerFn({ method: 'POST' })
   })
 
 /** The Viewer's Alert levels for each source (defaults until changed). */
-export const getAlertLevels = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<AlertLevels> => {
-    const id = await viewerId()
+export const getAlertLevels = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
+  .handler(async ({ context: { viewerId: id } }): Promise<AlertLevels> => {
     const row = await getDb()
       .select()
       .from(alertSettings)
@@ -144,8 +139,7 @@ export const getAlertLevels = createServerFn({ method: 'GET' }).handler(
           fantasy: row.fantasy,
         }
       : DEFAULT_LEVELS
-  },
-)
+  })
 
 const levelsInput = z.object({
   following: z.enum(['scores', 'finals', 'off']),
@@ -154,12 +148,14 @@ const levelsInput = z.object({
 })
 
 export const setAlertLevels = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
   .validator((data: AlertLevels) => levelsInput.parse(data))
-  .handler(async ({ data }): Promise<AlertLevels> => {
-    const id = await viewerId()
-    await getDb()
-      .insert(alertSettings)
-      .values({ viewerId: id, ...data })
-      .onConflictDoUpdate({ target: alertSettings.viewerId, set: data })
-    return data
-  })
+  .handler(
+    async ({ data, context: { viewerId: id } }): Promise<AlertLevels> => {
+      await getDb()
+        .insert(alertSettings)
+        .values({ viewerId: id, ...data })
+        .onConflictDoUpdate({ target: alertSettings.viewerId, set: data })
+      return data
+    },
+  )

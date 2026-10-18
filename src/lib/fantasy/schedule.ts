@@ -12,7 +12,7 @@ import { aliasedTable, and, eq, gte, inArray, lte, or } from 'drizzle-orm'
 import { z } from 'zod'
 import type { GameSummary, TeamRef } from '@/lib/model/timeline'
 import type { League, ScheduledGame, SourceTeam } from '@/lib/model/types'
-import { requireViewer } from '@/lib/viewer/session'
+import { viewerMiddleware } from '@/lib/viewer/middleware'
 import { teamColors } from '@/lib/brand/teamColors'
 import { getDb } from '@/lib/db'
 import { games, sourceIds, teams } from '@/lib/db/schema'
@@ -80,6 +80,7 @@ export function pickGame(
 }
 
 export const getMatchupGames = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
   .validator(
     (data: {
       league: string
@@ -95,7 +96,6 @@ export const getMatchupGames = createServerFn({ method: 'GET' })
         .parse(data),
   )
   .handler(async ({ data }): Promise<Array<GameSummary>> => {
-    await requireViewer()
     const ids = [...new Set(data.teamIds)]
     const abbrevs = [
       ...new Set((data.abbrevs ?? []).map((a) => a.toUpperCase())),

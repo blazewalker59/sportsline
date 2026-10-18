@@ -12,6 +12,7 @@ import { inChunks } from './inChunks'
 import type { Progress } from './props'
 import type { RecordEntry } from './record'
 import type { GameSummary } from '@/lib/model/timeline'
+import { viewerMiddleware } from '@/lib/viewer/middleware'
 import {
   games,
   kalshiMarkets,
@@ -22,7 +23,6 @@ import {
   teams,
 } from '@/lib/db/schema'
 import { toGameSummary } from '@/lib/live/rows'
-import { sessionViewer, withViewer } from '@/lib/viewer/session'
 
 export interface LegView {
   title: string
@@ -65,11 +65,10 @@ export interface PredictionView {
 const HISTORY_MS = 24 * 3_600_000
 const SETTLED_SHOWN = 100
 
-export const getPredictions = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<Array<PredictionView>> => {
-    const viewer = await sessionViewer()
-    if (!viewer) return []
-    return withViewer(async ({ db, viewerId }) => {
+export const getPredictions = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
+  .handler(
+    async ({ context: { db, viewerId } }): Promise<Array<PredictionView>> => {
       const [open, settled] = await Promise.all([
         db
           .select()
@@ -242,18 +241,17 @@ export const getPredictions = createServerFn({ method: 'GET' }).handler(
             }),
         }
       })
-    })
-  },
-)
+    },
+  )
 
 /**
  * Every Prediction the Viewer has made, compactly, for their Record
  * (record.ts builds it on the device, for any range).
  */
-export const getPredictionRecord = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<Array<RecordEntry>> => {
-    if (!(await sessionViewer())) return []
-    return withViewer(async ({ db, viewerId }) => {
+export const getPredictionRecord = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
+  .handler(
+    async ({ context: { db, viewerId } }): Promise<Array<RecordEntry>> => {
       const rows = await db
         .select()
         .from(predictions)
@@ -317,6 +315,5 @@ export const getPredictionRecord = createServerFn({ method: 'GET' }).handler(
         entryChance: r.contracts > 0 ? r.cost / r.contracts : null,
         legs: legsOf.get(r.id) ?? [],
       }))
-    })
-  },
-)
+    },
+  )

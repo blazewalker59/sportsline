@@ -1,9 +1,12 @@
 import { useEffect } from 'react'
 import { reportClientError } from './server'
 import { isStaleBuild, reloadForNewBuild } from './staleBuild'
+import { isSignInRequired } from '@/lib/userError'
 
 /** Send one browser error to the server's reporter; never throws. */
 export function sendClientError(error: unknown, kind: string): void {
+  // Signed out isn't a fault, and the report would be refused anyway.
+  if (isSignInRequired(error)) return
   const e = error instanceof Error ? error : new Error(String(error))
   void reportClientError({
     data: {
