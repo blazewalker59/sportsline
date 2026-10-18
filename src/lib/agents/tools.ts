@@ -350,7 +350,7 @@ function tradeTools(
       name: 'get_trades',
       title: 'Trade proposals',
       description:
-        "The Viewer's recent trade proposals, newest first, with their status: pending (waiting for the Viewer), rejected, cancelled, expired, placing, filled, partial, unfilled (nothing at the limit) or failed (with the error), and fills.",
+        "The Viewer's recent trade proposals, newest first, with their status: pending (waiting for the Viewer), rejected, cancelled, expired, placing, unknown (Kalshi didn’t confirm it: it may have gone through, and is being checked), filled, partial, unfilled (nothing at the limit) or failed (with the error), and fills.",
       input: z.object({}),
       call: async () => {
         await expireTrades(db, caller.viewerId)
@@ -365,10 +365,17 @@ function tradeTools(
     tool({
       name: 'cancel_trade',
       title: 'Cancel a trade proposal',
-      description: 'Withdraw a proposal the Viewer hasn’t decided yet.',
+      description:
+        'Withdraw a proposal of yours the Viewer hasn’t decided yet.',
       input: z.object({ id: z.string().min(1).max(64) }),
       call: async ({ id }) => {
-        const row = await closeTrade(db, caller.viewerId, id, 'cancelled')
+        const row = await closeTrade(
+          db,
+          caller.viewerId,
+          id,
+          'cancelled',
+          caller.tokenId,
+        )
         if (!row) throw new Error('No pending proposal with that id.')
         return agentTrade(row, Date.now(), display)
       },

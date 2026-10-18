@@ -3,7 +3,8 @@
  * One Viewer's syncing, on their own alarm (docs/adr/0005): Kalshi prices
  * and Prediction Alerts each minute while they hold open Predictions,
  * Kalshi positions every five minutes, ESPN and Sleeper Matchups every
- * two. Each task keeps its own due time and backs off on its own when it
+ * two, as are Agents' orders whose outcome isn't known yet (0008). Each
+ * task keeps its own due time and backs off on its own when it
  * fails, so one Viewer's slow Source never delays another's. With no
  * connected accounts the object stops scheduling itself; it's started when
  * a Viewer connects or opens the app, and the Scheduler's sweep restarts
@@ -13,6 +14,7 @@
 import { DurableObject } from 'cloudflare:workers'
 import { and, eq, inArray } from 'drizzle-orm'
 import type { CloudflareEnv } from '@/lib/db'
+import type { RateWindow } from '@/lib/agents/rateLimit'
 import { dbFromD1 } from '@/lib/db'
 import {
   espnAccounts,
@@ -20,7 +22,11 @@ import {
   kalshiAccounts,
   predictions,
   sleeperAccounts,
+  tradeProposals,
 } from '@/lib/db/schema'
+import { UNSETTLED, stored } from '@/lib/agents/proposal'
+import { reconcileTrades } from '@/lib/agents/reconcile'
+import { hit } from '@/lib/agents/rateLimit'
 import { syncAccount as syncSleeper } from '@/lib/fantasy/sleeper/sync'
 import { syncAccount as syncEspn } from '@/lib/fantasy/sync'
 import { refreshPrices, syncAccount as syncKalshi } from '@/lib/kalshi/sync'
@@ -31,13 +37,14 @@ const MINUTE = 60_000
 /** A failing task waits this long at most before trying again. */
 const MAX_BACKOFF_MS = 30 * MINUTE
 
-type Task = 'kalshiPrices' | 'kalshiPositions' | 'espn' | 'sleeper'
+type Task = 'kalshiPrices' | 'kalshiPositions' | 'espn' | 'sleeper' | 'trades'
 
 const EVERY: Record<Task, number> = {
   kalshiPrices: MINUTE,
   kalshiPositions: 5 * MINUTE,
   espn: 2 * MINUTE,
   sleeper: 2 * MINUTE,
+  trades: 2 * MINUTE,
 }
 
 interface TaskState {
@@ -51,9 +58,18 @@ interface Connected {
   openPredictions: boolean
   espn: boolean
   sleeper: boolean
+  unsettledTrades: boolean
 }
 
 export class ViewerSync extends DurableObject<CloudflareEnv> {
+  /** This Viewer's API tokens' /mcp request counts (rateLimit.ts). */
+  private rates = new Map<string, RateWindow>()
+
+  /** Count an /mcp request by a token: 0, or the seconds to wait. */
+  hitRate(tokenId: string): number {
+    return hit(this.rates, tokenId, Date.now())
+  }
+
   /** Start (or keep) this Viewer's loop. Idempotent and cheap. */
   async start(viewerId: string): Promise<void> {
     if ((await this.ctx.storage.get<string>('viewerId')) !== viewerId)
@@ -80,6 +96,7 @@ export class ViewerSync extends DurableObject<CloudflareEnv> {
       ...(connected.kalshi ? (['kalshiPositions'] as const) : []),
       ...(connected.espn ? (['espn'] as const) : []),
       ...(connected.sleeper ? (['sleeper'] as const) : []),
+      ...(connected.unsettledTrades ? (['trades'] as const) : []),
     ]
     const tasks =
       (await this.ctx.storage.get<Partial<Record<Task, TaskState>>>('tasks')) ??
@@ -146,12 +163,14 @@ export class ViewerSync extends DurableObject<CloudflareEnv> {
         return job(() => syncEspn(env, viewerId))
       case 'sleeper':
         return job(() => syncSleeper(env, viewerId))
+      case 'trades':
+        return job(() => reconcileTrades(env, viewerId))
     }
   }
 
   private async connected(viewerId: string): Promise<Connected> {
     const db = dbFromD1(this.env.DB)
-    const [kalshi, open, espn, sleeper] = await Promise.all([
+    const [kalshi, open, espn, sleeper, unsettled] = await Promise.all([
       db
         .select({ id: kalshiAccounts.viewerId })
         .from(kalshiAccounts)
@@ -178,12 +197,24 @@ export class ViewerSync extends DurableObject<CloudflareEnv> {
         .from(sleeperAccounts)
         .where(eq(sleeperAccounts.viewerId, viewerId))
         .get(),
+      db
+        .select({ id: tradeProposals.id })
+        .from(tradeProposals)
+        .where(
+          and(
+            eq(tradeProposals.viewerId, viewerId),
+            inArray(tradeProposals.status, UNSETTLED.map(stored)),
+          ),
+        )
+        .limit(1)
+        .get(),
     ])
     return {
       kalshi: Boolean(kalshi),
       openPredictions: Boolean(open),
       espn: Boolean(espn),
       sleeper: Boolean(sleeper),
+      unsettledTrades: Boolean(unsettled),
     }
   }
 }

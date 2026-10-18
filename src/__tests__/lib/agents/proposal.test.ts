@@ -50,8 +50,10 @@ describe('trade proposals', () => {
     expect(statusOf({ ...base, status: 'filled' }, at + 1)).toBe('filled')
   })
 
-  it('count what they cost: the most while placing, then the fills', () => {
+  it('count what they cost: the most while placing or unconfirmed, then the fills', () => {
     expect(spentOn({ ...base, status: 'placing' })).toBe(5.6)
+    // Unconfirmed by Kalshi: it may have gone through, so all of it.
+    expect(spentOn({ ...base, status: 'unknown' })).toBe(5.6)
     expect(
       spentOn({
         ...base,

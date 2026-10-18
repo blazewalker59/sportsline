@@ -21,12 +21,13 @@ A proposal lapses after 10 minutes, since prices move. A Viewer has at most five
 
 Kalshi's V2 book is quoted from the YES side (`bid` buys YES, `ask` sells it). Buying NO at 40¢ is sent as selling YES at 60¢, and selling NO as buying YES.
 
-**Limits.** Each Viewer sets a most-per-order and a most-per-day amount: $25 and $100 to start, at most $1,000 and $5,000. They count fees. A day is a Sports Day, and it counts what approved orders actually cost (and the full possible cost of any still being placed).
+**Limits.** Each Viewer sets a most-per-order and a most-per-day amount: $25 and $100 to start, at most $1,000 and $5,000. They count fees. A day is a Sports Day, and it counts what approved orders actually cost (and the full possible cost of any still being placed, or whose outcome is unknown).
 
 **Record.** Every proposal is kept with its outcome:
 - decided: rejected, cancelled or expired;
 - placed: filled, partial, or unfilled at that price;
-- failed, with Kalshi's reason.
+- failed, with Kalshi's reason: Kalshi refused it (a 4xx), so nothing was placed;
+- unknown: the order was sent but no answer came back (no reply, a timeout, a 5xx), so it may have gone through.
 
 Each records who proposed it and its fills. The Agents page shows them, and Agents read them with `get_trades`. Filled contracts appear as Predictions through the read-only sync, as any trade does.
 
@@ -40,4 +41,4 @@ Each records who proposed it and its fills. The Agents page shows them, and Agen
 
 - Trading needs the Viewer at hand: a proposal not approved in 10 minutes lapses.
 - A stolen trade token can only propose. A stolen trade key, together with the database and the Worker secret, can trade within whatever the Viewer's Kalshi balance allows, but can't withdraw.
-- An approval whose reply from Kalshi is lost is recorded as failed. Kalshi still holds the order if it went through, and the read-only sync will show the position.
+- An approval whose reply from Kalshi is lost is recorded as unknown, not failed, and counts in full toward the day's limit. The Viewer's ViewerSync (docs/adr/0005) looks it up on Kalshi by its client order id a few minutes later, as it does any order left placing (the Worker stopped mid-order), and records it as filled, partial or unfilled, or failed if Kalshi has no record of it. It reads with the trade key, or the read-only key once the trade key is gone; with neither, it stays unknown.

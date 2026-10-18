@@ -584,6 +584,7 @@ const STATUS_TEXT: Record<TradeView['status'], string> = {
   cancelled: 'Withdrawn by the agent',
   expired: 'Expired',
   placing: 'Placing…',
+  unknown: 'Checking with Kalshi…',
   filled: 'Filled',
   partial: 'Partly filled',
   unfilled: 'Not filled at that price',
@@ -623,7 +624,15 @@ function History({ trades }: { trades: Array<TradeView> }) {
               ? ` · ${t.filledCount} at ${formatPrice(t.avgPriceDollars ?? 0, display)}, fees ${money(t.feesDollars ?? 0)}`
               : ''}
           </span>
-          {t.error && <span className="text-xs text-live">{t.error}</span>}
+          {t.status === 'unknown' ? (
+            <span className="text-xs text-muted">
+              Kalshi didn’t confirm this order, so it may have gone through.
+              Sportsline is checking, and counts it toward today’s limit
+              meanwhile.
+            </span>
+          ) : (
+            t.error && <span className="text-xs text-live">{t.error}</span>
+          )}
         </li>
       ))}
     </ul>
