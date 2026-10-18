@@ -21,11 +21,12 @@ import type { TradeProposal } from './proposal'
 import type { Caller } from './tokens'
 import type { CloudflareEnv, Database } from '@/lib/db'
 import type { OrderIntent } from '@/lib/kalshi/orders'
+import { dbFromD1 } from '@/lib/db'
 import { loadAccount } from '@/lib/kalshi/account'
 import { KalshiError, market as fetchMarket } from '@/lib/kalshi/client'
 import { importSigningKey } from '@/lib/kalshi/keys'
 import { maxCost, placeOrder } from '@/lib/kalshi/orders'
-import { unseal } from '@/lib/kalshi/vault'
+import { isLegacy, seal, unseal } from '@/lib/kalshi/vault'
 import {
   apiTokens,
   kalshiTradeKeys,
@@ -168,11 +169,23 @@ export async function tradeAccount(
   env: CloudflareEnv,
   key: typeof kalshiTradeKeys.$inferSelect,
 ) {
-  const pem = await unseal(
-    env.KALSHI_ENCRYPTION_KEY,
-    { ciphertext: key.keyCiphertext, iv: key.keyIv },
-    { purpose: 'kalshi-trade', viewerId: key.viewerId },
-  )
+  const context = { purpose: 'kalshi-trade', viewerId: key.viewerId } as const
+  const sealed = { ciphertext: key.keyCiphertext, iv: key.keyIv }
+  const pem = await unseal(env.KALSHI_ENCRYPTION_KEY, sealed, context)
+  // Sealed before keys were bound to their Viewer: bind it now (unless it
+  // was reconnected meanwhile).
+  if (isLegacy(sealed)) {
+    const fresh = await seal(env.KALSHI_ENCRYPTION_KEY, pem, context)
+    await dbFromD1(env.DB)
+      .update(kalshiTradeKeys)
+      .set({ keyCiphertext: fresh.ciphertext, keyIv: fresh.iv })
+      .where(
+        and(
+          eq(kalshiTradeKeys.viewerId, key.viewerId),
+          eq(kalshiTradeKeys.keyCiphertext, key.keyCiphertext),
+        ),
+      )
+  }
   return { keyId: key.keyId, signer: await importSigningKey(pem) }
 }
 

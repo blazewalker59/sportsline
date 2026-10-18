@@ -38,7 +38,7 @@ import {
   sourceIds,
   teams,
 } from '@/lib/db/schema'
-import { unseal } from '@/lib/kalshi/vault'
+import { isLegacy, seal, unseal } from '@/lib/kalshi/vault'
 import { normalizePlayerName } from '@/lib/kalshi/match'
 import { shiftSportsDay, sportsDayOf } from '@/lib/model/sportsDay'
 import { reportError } from '@/lib/ops/errors'
@@ -58,24 +58,44 @@ export async function loadSession(
   env: Pick<CloudflareEnv, 'DB' | 'ESPN_ENCRYPTION_KEY'>,
   viewerId: string,
 ): Promise<EspnSession | null> {
-  const row = await dbFromD1(env.DB)
+  const db = dbFromD1(env.DB)
+  const row = await db
     .select()
     .from(espnAccounts)
     .where(eq(espnAccounts.viewerId, viewerId))
     .get()
   if (!row) return null
+  const swidSealed = { ciphertext: row.swidCiphertext, iv: row.swidIv }
+  const s2Sealed = { ciphertext: row.s2Ciphertext, iv: row.s2Iv }
+  const swidContext = { purpose: 'espn-swid', viewerId } as const
+  const s2Context = { purpose: 'espn-s2', viewerId } as const
   const [swid, espnS2] = await Promise.all([
-    unseal(
-      env.ESPN_ENCRYPTION_KEY,
-      { ciphertext: row.swidCiphertext, iv: row.swidIv },
-      { purpose: 'espn-swid', viewerId },
-    ),
-    unseal(
-      env.ESPN_ENCRYPTION_KEY,
-      { ciphertext: row.s2Ciphertext, iv: row.s2Iv },
-      { purpose: 'espn-s2', viewerId },
-    ),
+    unseal(env.ESPN_ENCRYPTION_KEY, swidSealed, swidContext),
+    unseal(env.ESPN_ENCRYPTION_KEY, s2Sealed, s2Context),
   ])
+  // Sealed before cookies were bound to their Viewer: bind them now (unless
+  // they were reconnected meanwhile).
+  if (isLegacy(swidSealed) || isLegacy(s2Sealed)) {
+    const [freshSwid, freshS2] = await Promise.all([
+      seal(env.ESPN_ENCRYPTION_KEY, swid, swidContext),
+      seal(env.ESPN_ENCRYPTION_KEY, espnS2, s2Context),
+    ])
+    await db
+      .update(espnAccounts)
+      .set({
+        swidCiphertext: freshSwid.ciphertext,
+        swidIv: freshSwid.iv,
+        s2Ciphertext: freshS2.ciphertext,
+        s2Iv: freshS2.iv,
+      })
+      .where(
+        and(
+          eq(espnAccounts.viewerId, viewerId),
+          eq(espnAccounts.swidCiphertext, row.swidCiphertext),
+          eq(espnAccounts.s2Ciphertext, row.s2Ciphertext),
+        ),
+      )
+  }
   return { swid, espnS2 }
 }
 

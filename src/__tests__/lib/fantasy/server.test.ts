@@ -16,7 +16,7 @@ import type * as FantasySync from '@/lib/fantasy/sync'
 import * as caller from '@/lib/fantasy/server'
 // @ts-expect-error The Start compiler's provider split is a query, not a TS path.
 import * as provider from '@/lib/fantasy/server?tss-serverfn-split'
-import { unseal } from '@/lib/kalshi/vault'
+import { isLegacy, unseal } from '@/lib/kalshi/vault'
 import { espnAccounts, fantasyLeagues, sleeperAccounts } from '@/lib/db/schema'
 
 type Opened = Awaited<ReturnType<typeof sqliteDb>>
@@ -152,6 +152,64 @@ describe.skipIf(!isBun)('Fantasy server functions', () => {
     expect(await loadSession(state.env, 'u1')).toEqual({
       swid: SWID,
       espnS2: decodeURIComponent(S2),
+    })
+  })
+
+  it('opens cookies sealed before binding, and binds them', async () => {
+    // Sealed the old way: no version, no associated data.
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new Uint8Array(Buffer.from(SECRET, 'base64')),
+      'AES-GCM',
+      false,
+      ['encrypt'],
+    )
+    const legacy = async (plaintext: string) => {
+      const iv = crypto.getRandomValues(new Uint8Array(12))
+      const ciphertext = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        new TextEncoder().encode(plaintext),
+      )
+      return {
+        ciphertext: Buffer.from(ciphertext).toString('base64'),
+        iv: Buffer.from(iv).toString('base64'),
+      }
+    }
+    const [swid, s2] = await Promise.all([legacy(SWID), legacy(S2)])
+    await opened().db.insert(espnAccounts).values({
+      viewerId: 'u1',
+      swidCiphertext: swid.ciphertext,
+      swidIv: swid.iv,
+      s2Ciphertext: s2.ciphertext,
+      s2Iv: s2.iv,
+      status: 'ok',
+      connectedAt: '2026-10-08T00:00:00Z',
+    })
+    const { loadSession } =
+      await vi.importActual<typeof FantasySync>('@/lib/fantasy/sync')
+
+    expect(await loadSession(state.env, 'u1')).toEqual({
+      swid: SWID,
+      espnS2: S2,
+    })
+    const row = (await opened().db.select().from(espnAccounts).get())!
+    const swidSealed = { ciphertext: row.swidCiphertext, iv: row.swidIv }
+    const s2Sealed = { ciphertext: row.s2Ciphertext, iv: row.s2Iv }
+    expect(isLegacy(swidSealed) || isLegacy(s2Sealed)).toBe(false)
+    expect(
+      await unseal(SECRET, swidSealed, {
+        purpose: 'espn-swid',
+        viewerId: 'u1',
+      }),
+    ).toBe(SWID)
+    expect(
+      await unseal(SECRET, s2Sealed, { purpose: 'espn-s2', viewerId: 'u1' }),
+    ).toBe(S2)
+    // Opens the same way next time.
+    expect(await loadSession(state.env, 'u1')).toEqual({
+      swid: SWID,
+      espnS2: S2,
     })
   })
 

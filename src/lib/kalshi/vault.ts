@@ -72,7 +72,17 @@ export async function seal(
   return { ciphertext: VERSION + toBase64(ciphertext), iv: toBase64(iv) }
 }
 
-/** Sealed before values were bound to their place: worth sealing again. */
+/**
+ * Sealed before values were bound to their place: worth sealing again, and
+ * each reader does once it opens one. Legacy support can go once no such
+ * rows remain, when this counts all zeros:
+ *
+ *   SELECT
+ *     (SELECT count(*) FROM kalshi_accounts WHERE key_ciphertext NOT LIKE 'v1:%'),
+ *     (SELECT count(*) FROM kalshi_trade_keys WHERE key_ciphertext NOT LIKE 'v1:%'),
+ *     (SELECT count(*) FROM espn_accounts WHERE swid_ciphertext NOT LIKE 'v1:%'),
+ *     (SELECT count(*) FROM espn_accounts WHERE s2_ciphertext NOT LIKE 'v1:%');
+ */
 export function isLegacy(sealed: Sealed): boolean {
   return !sealed.ciphertext.startsWith(VERSION)
 }
