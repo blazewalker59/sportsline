@@ -8,7 +8,6 @@ import { and, eq, inArray, notInArray, sql } from 'drizzle-orm'
 import { chunk, resolve } from './identity'
 import { RATE_LIMIT_GRACE_MS, WARMUP_MINUTES, isRateLimited } from './pacing'
 import type { BatchItem } from 'drizzle-orm/batch'
-import type { TrackRequest } from './LiveGame'
 import type { CloudflareEnv, Database } from '@/lib/db'
 import type { Conference } from '@/lib/model/leagues'
 import type { League, ScheduledGame } from '@/lib/model/types'
@@ -82,14 +81,6 @@ const OWNED_BY_LIVE_GAME = ['live', 'delayed', 'final']
 
 /** Between the first polls of Finals woken together to be backfilled. */
 export const BACKFILL_SPACING_MS = 3_000
-
-/**
- * LiveGame.track, holding its first poll back `delayMs`. A LiveGame that
- * doesn't take the delay ignores it and polls at once.
- */
-interface Tracker {
-  track: (game: TrackRequest, delayMs?: number) => Promise<void>
-}
 
 /** When each League's schedule source started answering 429 (this isolate). */
 const rateLimitedSince = new Map<League, number>()
@@ -216,7 +207,7 @@ export async function syncLeague(
       const stub = env.LIVE_GAME.get(env.LIVE_GAME.idFromName(gameId))
       const delayMs =
         g.status === 'final' ? backfills++ * BACKFILL_SPACING_MS : 0
-      return (stub as unknown as Tracker).track(
+      return stub.track(
         {
           gameId,
           league,
