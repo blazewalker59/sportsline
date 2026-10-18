@@ -14,11 +14,16 @@ import {
   leagueRowId,
   loadSession,
   readDay,
+  readLeagueMatchup,
   syncAccount,
   syncLeague,
 } from './sync'
 import { sleeperUser } from './sleeper/client'
-import { sleeperLeagueRowId, syncAccount as syncSleeper } from './sleeper/sync'
+import {
+  readLeagueMatchup as readSleeperLeagueMatchup,
+  sleeperLeagueRowId,
+  syncAccount as syncSleeper,
+} from './sleeper/sync'
 import type { MatchupDay, MatchupView } from './matchup'
 import type { RacePoint } from './race'
 import type { FantasySport } from './sports'
@@ -437,19 +442,28 @@ export const getMatchupRace = createServerFn({ method: 'GET' })
 /** Another day of a category Matchup, for stepping through its days. */
 export const getMatchupDay = createServerFn({ method: 'GET' })
   .middleware([viewerMiddleware])
-  .validator((data: { leagueId: string; scoringPeriod: number }) =>
-    z
-      .object({
-        leagueId: z.string().max(300),
-        scoringPeriod: z.number().int().min(0).max(400),
-      })
-      .parse(data),
+  .validator(
+    (data: { leagueId: string; scoringPeriod: number; teamId?: number }) =>
+      z
+        .object({
+          leagueId: z.string().max(300),
+          scoringPeriod: z.number().int().min(0).max(400),
+          // Another Matchup in the league (its left team), not the Viewer's.
+          teamId: z.number().int().optional(),
+        })
+        .parse(data),
   )
   .handler(
     async ({ data, context: { viewerId } }): Promise<MatchupDay | null> => {
       const env = getCloudflareEnv()
       try {
-        return await readDay(env, viewerId, data.leagueId, data.scoringPeriod)
+        return await readDay(
+          env,
+          viewerId,
+          data.leagueId,
+          data.scoringPeriod,
+          data.teamId,
+        )
       } catch (error) {
         await reportError(env, 'espn', error, {
           viewerId,
@@ -457,6 +471,50 @@ export const getMatchupDay = createServerFn({ method: 'GET' })
           scoringPeriod: data.scoringPeriod,
         })
         throw new UserError('Couldn’t read that day from ESPN.')
+      }
+    },
+  )
+
+/**
+ * Another Matchup in one of the Viewer's leagues, in full: read from its
+ * provider now, as the Viewer's own is on each sync, and never stored.
+ * Null when it isn't one of that league's Matchups any more.
+ */
+export const getLeagueMatchup = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
+  .validator((data: { leagueId: string; teamId: number }) =>
+    z
+      .object({ leagueId: z.string().max(300), teamId: z.number().int() })
+      .parse(data),
+  )
+  .handler(
+    async ({
+      data,
+      context: { db, viewerId },
+    }): Promise<MatchupView | null> => {
+      const env = getCloudflareEnv()
+      const row = await db
+        .select()
+        .from(fantasyLeagues)
+        .where(
+          and(
+            eq(fantasyLeagues.id, data.leagueId),
+            eq(fantasyLeagues.viewerId, viewerId),
+          ),
+        )
+        .get()
+      if (!row) return null
+      const provider = row.provider === 'sleeper' ? 'Sleeper' : 'ESPN'
+      try {
+        return row.provider === 'sleeper'
+          ? await readSleeperLeagueMatchup(db, row, data.teamId)
+          : await readLeagueMatchup(env, viewerId, row, data.teamId)
+      } catch (error) {
+        await reportError(env, row.provider, error, {
+          viewerId,
+          step: 'league-matchup',
+        })
+        throw new UserError(`Couldn’t read that matchup from ${provider}.`)
       }
     },
   )

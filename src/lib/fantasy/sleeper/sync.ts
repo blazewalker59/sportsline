@@ -5,7 +5,7 @@
  */
 
 import { and, eq } from 'drizzle-orm'
-import { storeMatchup } from '../sync'
+import { attachMatchup, isOtherMatchup, storeMatchup } from '../sync'
 import {
   SleeperError,
   league as fetchLeague,
@@ -18,13 +18,14 @@ import {
   weekProjections,
   weekStats,
 } from './client'
-import { myRoster, readSleeperMatchup } from './read'
+import { myRoster, readSleeperLeagueMatchups, readSleeperMatchup } from './read'
 import type {
   SleeperPlayerInfo,
   SleeperState,
   SleeperWeekEntry,
 } from './client'
 import type { WeekData } from './read'
+import type { MatchupView } from '../matchup'
 import type { CloudflareEnv, Database } from '@/lib/db'
 import { dbFromD1 } from '@/lib/db'
 import { fantasyLeagues, sleeperAccounts } from '@/lib/db/schema'
@@ -91,29 +92,21 @@ async function weekData(state: SleeperState): Promise<WeekData> {
   }
 }
 
-/** Read one league's Matchup this week and store it. */
-async function syncLeague(
-  db: Database,
-  row: typeof fantasyLeagues.$inferSelect,
-  userId: string,
+/**
+ * A league this week, as its Matchups are read: the league, its rosters
+ * and managers, the week's Matchups, and who its players are.
+ */
+async function readWeek(
+  leagueId: string,
   state: SleeperState,
   data: WeekData,
-): Promise<void> {
+): Promise<Omit<Parameters<typeof readSleeperMatchup>[0], 'mine'>> {
   const [league, rosterList, users, weekMatchups] = await Promise.all([
-    fetchLeague(row.leagueId),
-    fetchRosters(row.leagueId),
-    leagueUsers(row.leagueId),
-    fetchMatchups(row.leagueId, state.week).catch(() => []),
+    fetchLeague(leagueId),
+    fetchRosters(leagueId),
+    leagueUsers(leagueId),
+    fetchMatchups(leagueId, state.week).catch(() => []),
   ])
-  const mine = myRoster(rosterList, userId)
-  if (!mine) {
-    await storeMatchup(db, row, null, {
-      season: Number(state.season),
-      teamId: null,
-      lastError: 'Couldn’t find your team in this league.',
-    })
-    return
-  }
   // Rostered players the weekly feeds don't carry (byes, injured reserve).
   const ids = [
     ...new Set(
@@ -125,20 +118,62 @@ async function syncLeague(
     const p = await sleeperPlayer(id).catch(() => null)
     if (p) info.set(id, p)
   }
-  const view = readSleeperMatchup({
+  return {
     league,
     rosters: rosterList,
     users,
     matchups: weekMatchups,
     week: state.week,
-    mine,
     data: { ...data, info },
-  })
+  }
+}
+
+/** Read one league's Matchup this week and store it. */
+async function syncLeague(
+  db: Database,
+  row: typeof fantasyLeagues.$inferSelect,
+  userId: string,
+  state: SleeperState,
+  data: WeekData,
+): Promise<void> {
+  const week = await readWeek(row.leagueId, state, data)
+  const mine = myRoster(week.rosters, userId)
+  if (!mine) {
+    await storeMatchup(db, row, null, {
+      season: Number(state.season),
+      teamId: null,
+      lastError: 'Couldn’t find your team in this league.',
+    })
+    return
+  }
+  const view = readSleeperMatchup({ ...week, mine })
+  view.others = readSleeperLeagueMatchups(week, mine.roster_id)
   await storeMatchup(db, row, view, {
     season: Number(state.season),
     teamId: mine.roster_id,
     lastError: null,
   })
+}
+
+/**
+ * Another Matchup in a Viewer's Sleeper league, read in full now and not
+ * stored: roster `teamId` on the left, as the league's scoreboard
+ * (`others`) has it. Null when that isn't one of its Matchups.
+ */
+export async function readLeagueMatchup(
+  db: Database,
+  row: typeof fantasyLeagues.$inferSelect,
+  teamId: number,
+): Promise<MatchupView | null> {
+  if (row.provider !== 'sleeper') return null
+  if (!row.matchup || !isOtherMatchup(row.matchup, teamId)) return null
+  const state = await sleeperState()
+  const week = await readWeek(row.leagueId, state, await weekData(state))
+  const roster = week.rosters.find((r) => r.roster_id === teamId)
+  if (!roster) return null
+  const view = readSleeperMatchup({ ...week, mine: roster })
+  await attachMatchup(db, row, view)
+  return view
 }
 
 /** Bring one Viewer's Sleeper leagues up to date. */

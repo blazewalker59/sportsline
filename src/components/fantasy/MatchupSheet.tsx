@@ -3,7 +3,9 @@
  * the categories in a category league (or the race in a points league),
  * and both Lineups. A category Matchup steps through its days: the
  * categories keep the Matchup's totals with the day's figures under them,
- * and the Lineups are that day's.
+ * and the Lineups are that day's. Another Matchup in the league ("League
+ * Matchups") opens the same way, read when it opens, without the race
+ * (only the Viewer's own is recorded).
  */
 
 import { useQuery } from '@tanstack/react-query'
@@ -16,25 +18,69 @@ import { dayLabel, daySportsDay, pts, scoreText, sideRecord } from './format'
 import type { MatchupPart } from './MatchupDays'
 import type { CategoryDay } from './CategoryBars'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
-import type { LineupPlayer, MatchupSide } from '@/lib/fantasy/matchup'
+import type {
+  LeagueMatchup,
+  LeagueMatchupSide,
+  LineupPlayer,
+  MatchupSide,
+  MatchupView,
+} from '@/lib/fantasy/matchup'
 import type { GameSummary } from '@/lib/model/timeline'
 import { MatchupRace } from '@/components/charts/lazy'
 import { Sheet } from '@/components/chat/Sheet'
-import { matchupDayQuery, matchupGamesQuery } from '@/lib/fantasy/queries'
+import {
+  leagueMatchupQuery,
+  matchupDayQuery,
+  matchupGamesQuery,
+} from '@/lib/fantasy/queries'
 import { SPORTS } from '@/lib/fantasy/sports'
 import { cn } from '@/lib/utils'
 
+/**
+ * Another Matchup's scoreboard as a Matchup with no Lineups yet, so its
+ * sheet opens on the scores while the rest is read.
+ */
+function previewOf(own: MatchupView, other: LeagueMatchup): MatchupView {
+  const side = (s: LeagueMatchupSide): MatchupSide => ({
+    ...s,
+    projected: null,
+    lineup: [],
+  })
+  return {
+    ...own,
+    mine: side(other.left),
+    opponent: other.right ? side(other.right) : null,
+    categories: own.categories ? [] : null,
+    ties: other.ties,
+    today: null,
+  }
+}
+
 export function MatchupSheet({
   league,
+  other,
   games = [],
   onClose,
 }: {
   league: FantasyLeagueView
+  /** Another Matchup in the league, in place of the Viewer's. */
+  other?: LeagueMatchup
   /** Today's Games, for each Player's game state. */
   games?: ReadonlyArray<GameSummary>
   onClose: () => void
 }) {
-  const m = league.matchup!
+  const otherTeam = other?.left.teamId
+  const read = useQuery({
+    ...leagueMatchupQuery(league.id, otherTeam ?? 0),
+    enabled: otherTeam !== undefined,
+  })
+  // The Viewer's own Matchup, or the other one once it's read.
+  const m =
+    other === undefined
+      ? league.matchup!
+      : (read.data ?? previewOf(league.matchup!, other))
+  const reading = other !== undefined && !read.data
+  const source = league.provider === 'sleeper' ? 'Sleeper' : 'ESPN Fantasy'
   // Every Lineup Team's Game this matchup (a Thursday Final, a Monday
   // night kickoff), behind today's live ones.
   const lineup = [...m.mine.lineup, ...(m.opponent?.lineup ?? [])]
@@ -44,9 +90,10 @@ export function MatchupSheet({
   const abbrevs = [
     ...new Set(lineup.flatMap((p) => (p.teamAbbrev ? [p.teamAbbrev] : []))),
   ]
-  const week = useQuery(
-    matchupGamesQuery(league.id, SPORTS[m.sport].league, teamIds, abbrevs),
-  )
+  const week = useQuery({
+    ...matchupGamesQuery(league.id, SPORTS[m.sport].league, teamIds, abbrevs),
+    enabled: !reading,
+  })
   const allGames = useMemo(
     () => [...games, ...(week.data ?? [])],
     [games, week.data],
@@ -63,8 +110,8 @@ export function MatchupSheet({
   const day = summary ? m.scoringPeriod : part
   const today = day === m.scoringPeriod
   const past = useQuery({
-    ...matchupDayQuery(league.id, day, m.scoringPeriod),
-    enabled: !today && !summary,
+    ...matchupDayQuery(league.id, day, m.scoringPeriod, otherTeam),
+    enabled: !today && !summary && !reading,
   })
   const label = dayLabel(m, day)
   const categoryDay: CategoryDay | undefined = summary
@@ -123,7 +170,7 @@ export function MatchupSheet({
           </span>
         )}
       </header>
-      {m.categories && (
+      {m.categories && !reading && (
         <MatchupDays
           m={m}
           days={days}
@@ -135,9 +182,17 @@ export function MatchupSheet({
       {m.categories && m.categories.length > 0 ? (
         <CategoryBars m={m} categories={m.categories} day={categoryDay} />
       ) : (
-        <MatchupRace leagueId={league.id} m={m} />
+        other === undefined && <MatchupRace leagueId={league.id} m={m} />
       )}
-      {!today && !summary && !past.data ? (
+      {reading ? (
+        <p className="rounded-xl border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
+          {read.isError
+            ? read.error.message
+            : read.isSuccess
+              ? 'This matchup isn’t in the league’s schedule any more.'
+              : 'Loading lineups…'}
+        </p>
+      ) : !today && !summary && !past.data ? (
         <p className="rounded-xl border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
           {past.isError
             ? 'Couldn’t read that day from ESPN.'
@@ -184,8 +239,8 @@ export function MatchupSheet({
       )}
       <p className="text-[11px] text-muted">
         {m.categories
-          ? 'Read from ESPN Fantasy: categories through yesterday plus today’s starters, refreshed every couple of minutes; the figure under each total is the day’s. Step through the matchup’s days with ‹ ›, or tap the day for any day or the whole matchup’s summary; switch sides above the lineup, and scroll it sideways for every category.'
-          : 'Read from ESPN Fantasy. Points refresh every couple of minutes; tap a player’s points for the breakdown.'}
+          ? `Read from ${source}: categories through yesterday plus today’s starters, refreshed every couple of minutes; the figure under each total is the day’s. Step through the matchup’s days with ‹ ›, or tap the day for any day or the whole matchup’s summary; switch sides above the lineup, and scroll it sideways for every category.`
+          : `Read from ${source}. Points refresh every couple of minutes; tap a player’s points for the breakdown.`}
       </p>
     </Sheet>
   )

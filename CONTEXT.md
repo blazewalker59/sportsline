@@ -187,6 +187,10 @@ _Avoid_: roster, depth chart
 The Viewer's Fantasy team against its opponent this scoring period, decided by fantasy points (or categories), live while their Starters play.
 _Avoid_: game (a Game is real), fixture
 
+**League Matchups**:
+The other Matchups in a Viewer's Fantasy league this scoring period, between teams that aren't the Viewer's: their scores kept with each sync, each opening in full (both Lineups) when the Viewer opens it. Read only to look at: they add nothing to the Fantasy feed or Alerts.
+_Avoid_: scoreboard, other games
+
 **Fantasy points**:
 What a Player's real stats are worth under a Fantasy league's scoring, totalled over a Lineup's Starters.
 _Avoid_: score (a Game's), FP
