@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import type { LegView, PredictionView } from '@/lib/kalshi/server'
+import type { LegView, PredictionView } from '@/lib/kalshi/predictionViews'
 import { LegDots, MAX_LEG_DOTS } from '@/components/predictions/PredictionParts'
 import { PredictionCard } from '@/components/predictions/PredictionCard'
 

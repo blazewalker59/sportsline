@@ -6,7 +6,7 @@
 
 import type { Scope } from '@/lib/model/scope'
 import type { Follow, GameSummary } from '@/lib/model/timeline'
-import type { PredictionView } from '@/lib/kalshi/server'
+import type { PredictionView } from '@/lib/kalshi/predictionViews'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { League } from '@/lib/model/types'
 import { parseScope } from '@/lib/model/scope'

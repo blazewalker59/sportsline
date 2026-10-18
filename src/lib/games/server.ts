@@ -16,7 +16,7 @@ import type {
   TimelinePlayer,
 } from '@/lib/model/timeline'
 import type { GameBox } from '@/lib/model/types'
-import { requireViewer } from '@/lib/viewer/session'
+import { viewerMiddleware } from '@/lib/viewer/middleware'
 import { playerCards } from '@/lib/players/cards'
 import { toGameSummary, toTimelineItem } from '@/lib/live/rows'
 import { formatLine, mlbLinesAsOf } from '@/lib/leagues/mlb/stats'
@@ -67,9 +67,9 @@ function asItem(row: ItemRow, game: GameSummary): TimelineItem {
 const ID = z.string().min(1).max(200)
 
 export const getGameDetail = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
   .validator((data: { gameId: string }) => z.object({ gameId: ID }).parse(data))
   .handler(async ({ data }): Promise<GameDetail | null> => {
-    await requireViewer()
     const db = getDb()
     let game = await loadGame(db, data.gameId)
     if (!game) return null
@@ -99,9 +99,9 @@ export const getGameDetail = createServerFn({ method: 'GET' })
   })
 
 export const getPlayDetail = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
   .validator((data: { playId: string }) => z.object({ playId: ID }).parse(data))
   .handler(async ({ data }): Promise<PlayDetail | null> => {
-    await requireViewer()
     const db = getDb()
     const row = await db
       .select()

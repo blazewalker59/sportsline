@@ -2,10 +2,11 @@
  * A minimal Model Context Protocol server (docs/adr/0007): JSON-RPC over
  * one POST per message, answered with JSON (MCP's Streamable HTTP without
  * the optional event stream), offering tools only. Pure: the tools carry
- * their own data access.
+ * their own data access, and the caller reports their failures.
  */
 
 import { z } from 'zod'
+import { GENERIC_MESSAGE, UserError } from '@/lib/userError'
 
 /** Newest first; a client asking for one we don't know gets the newest. */
 const PROTOCOL_VERSIONS = [
@@ -75,6 +76,8 @@ export async function handleMcp(
   message: unknown,
   tools: ReadonlyArray<McpTool>,
   instructions?: string,
+  /** A tool failed with something other than a UserError. */
+  onToolError?: (tool: string, error: unknown) => Promise<void>,
 ): Promise<JsonRpcResponse | null> {
   const parsed = Message.safeParse(message)
   if (!parsed.success) return error(null, INVALID_REQUEST, 'Invalid request')
@@ -125,7 +128,11 @@ export async function handleMcp(
       try {
         return ok(toolResult(await t.call(args.data)))
       } catch (e) {
-        return ok(toolError(e instanceof Error ? e.message : String(e)))
+        // A UserError is written for the model to read; anything else (a
+        // D1 failure, Kalshi's response body) is reported, not repeated.
+        if (e instanceof UserError) return ok(toolError(e.message))
+        await onToolError?.(t.name, e)
+        return ok(toolError(GENERIC_MESSAGE))
       }
     }
     default:

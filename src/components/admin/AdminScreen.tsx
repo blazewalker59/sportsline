@@ -29,8 +29,7 @@ export function AdminScreen() {
           <span className="font-semibold text-foreground">
             {health.data.email}
           </span>
-          , which isn’t an admin
-          {health.data.adminsConfigured === 0 && ' (no admins are configured)'}.
+          , which isn’t an admin.
         </p>
       ) : (
         <Health health={health.data} />

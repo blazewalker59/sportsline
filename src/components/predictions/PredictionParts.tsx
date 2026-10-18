@@ -4,11 +4,8 @@
  * Leg's Progress.
  */
 
-import type {
-  ChangeDisplay,
-  LegView,
-  PredictionView,
-} from '@/lib/kalshi/server'
+import type { ChangeDisplay } from '@/lib/kalshi/server'
+import type { LegView, PredictionView } from '@/lib/kalshi/predictionViews'
 import type { Progress } from '@/lib/kalshi/props'
 import type { GameSummary } from '@/lib/model/timeline'
 import { cn } from '@/lib/utils'

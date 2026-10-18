@@ -83,6 +83,8 @@ export async function serveMcp(
       caller.scopes.includes('trade')
         ? `${instructions(display)} ${TRADE_INSTRUCTIONS}`
         : instructions(display),
+      (tool, error) =>
+        reportError(env, 'mcp', error, { viewerId: caller.viewerId, tool }),
     )
     return reply === null
       ? new Response(null, { status: 202 })

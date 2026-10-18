@@ -17,7 +17,8 @@ import * as caller from '@/lib/kalshi/server'
 import * as provider from '@/lib/kalshi/server?tss-serverfn-split'
 import { loadAccount } from '@/lib/kalshi/account'
 import { isLegacy, unseal } from '@/lib/kalshi/vault'
-import { kalshiAccounts, predictions } from '@/lib/db/schema'
+import { errorEvents, kalshiAccounts, predictions } from '@/lib/db/schema'
+import { GENERIC_MESSAGE, UserError } from '@/lib/userError'
 
 type Opened = Awaited<ReturnType<typeof sqliteDb>>
 
@@ -35,6 +36,7 @@ const state = vi.hoisted(() => ({
   env: {} as CloudflareEnv,
   refreshed: [] as Array<Array<unknown>>,
   imported: [] as Array<string>,
+  syncError: null as Error | null,
 }))
 
 vi.mock('@/lib/db', async (original) => ({
@@ -69,7 +71,10 @@ vi.mock('@/lib/kalshi/client', async (original) => ({
 }))
 
 vi.mock('@/lib/kalshi/sync', () => ({
-  syncAccount: () => Promise.resolve({ open: 1, settled: 0 }),
+  syncAccount: () =>
+    state.syncError
+      ? Promise.reject(state.syncError)
+      : Promise.resolve({ open: 1, settled: 0 }),
   refreshPrices: (...args: Array<unknown>) => {
     state.refreshed.push(args)
     return Promise.resolve(0)
@@ -119,6 +124,7 @@ describe.skipIf(!isBun)('Kalshi server functions', () => {
     } as unknown as CloudflareEnv
     state.refreshed = []
     state.imported = []
+    state.syncError = null
     opened().sqlite.run(
       "INSERT INTO user (id,name,email,email_verified,created_at,updated_at) VALUES ('u1','V','v@example.com',1,0,0),('u2','W','w@example.com',1,0,0)",
     )
@@ -152,6 +158,23 @@ describe.skipIf(!isBun)('Kalshi server functions', () => {
     const synced = await call('syncKalshiNow')
     expect(synced.result).toEqual({ open: 1, settled: 0 })
     expect(state.refreshed).toEqual([[state.env, 'u1']])
+  })
+
+  it('tells the Viewer what to fix, and reports what isn’t theirs', async () => {
+    const refused = await call('connectKalshi', {
+      keyId: 'key-99999',
+      privateKey: PEM,
+    })
+    expect(refused.error).toBeInstanceOf(UserError)
+    expect((refused.error as Error).message).toMatch(/read-only keys/)
+
+    state.syncError = new Error('D1_ERROR: no such column: key_ciphertext')
+    const failed = await call('syncKalshiNow')
+    expect(failed.error).not.toBeInstanceOf(UserError)
+    expect((failed.error as Error).message).toBe(GENERIC_MESSAGE)
+    const [reported] = await opened().db.select().from(errorEvents)
+    expect(reported.scope).toBe('server-fn')
+    expect(reported.message).toContain('D1_ERROR')
   })
 
   it('disconnects all at once, or not at all', async () => {

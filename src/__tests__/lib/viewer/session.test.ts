@@ -1,5 +1,5 @@
 /**
- * The signed-in Viewer: no session, a session, and withViewer scoping.
+ * The signed-in Viewer: no session, a session, one lookup per request.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
   session: null as {
     user: { id: string; name: string; email: string; image?: string | null }
   } | null,
+  lookups: 0,
 }))
 
 vi.mock('@/lib/db', async (original) => {
@@ -27,7 +28,10 @@ vi.mock('@/lib/db', async (original) => {
 vi.mock('@/lib/auth/server', () => ({
   getAuth: () => ({
     api: {
-      getSession: () => Promise.resolve(state.session),
+      getSession: () => {
+        state.lookups++
+        return Promise.resolve(state.session)
+      },
     },
   }),
 }))
@@ -50,7 +54,7 @@ describe('session viewer', () => {
     expect(signedOut).toBeNull()
   })
 
-  it('returns the profile and scopes withViewer to that Viewer', async () => {
+  it('returns the profile, read afresh each request', async () => {
     state.session = {
       user: { id: 'u1', name: 'Viewer', email: 'v@example.com' },
     }
@@ -73,29 +77,24 @@ describe('session viewer', () => {
         image: 'https://photo',
       },
     }
-    const required = await serverRequestContext.run(
+    const fresh = await serverRequestContext.run(
       { headers: new Headers({ cookie: 'session' }), env: state.env },
-      () => session.requireViewer(),
+      () => session.sessionViewer(),
     )
-    expect(required.image).toBe('https://photo')
-    const seen = await serverRequestContext.run(
-      { headers: new Headers(), env: state.env },
-      () =>
-        session.withViewer(({ db, viewerId }) => {
-          expect(db).toBe(state.db)
-          return Promise.resolve(viewerId)
-        }),
-    )
-    expect(seen).toBe('u1')
+    expect(fresh?.image).toBe('https://photo')
   })
 
-  it('refuses a signed-out Viewer', async () => {
-    await expect(session.requireViewer()).rejects.toThrow('Sign in required')
+  it('looks the session up once per request', async () => {
+    state.session = {
+      user: { id: 'u1', name: 'Viewer', email: 'v@example.com' },
+    }
+    state.lookups = 0
     const { serverRequestContext } = await import('@/lib/db')
-    await expect(
-      serverRequestContext.run({ headers: new Headers(), env: state.env }, () =>
-        session.withViewer(() => Promise.resolve('nope')),
-      ),
-    ).rejects.toThrow('Sign in required')
+    const [a, b] = await serverRequestContext.run(
+      { headers: new Headers({ cookie: 'session' }), env: state.env },
+      () => Promise.all([session.sessionViewer(), session.sessionViewer()]),
+    )
+    expect(a).toBe(b)
+    expect(state.lookups).toBe(1)
   })
 })

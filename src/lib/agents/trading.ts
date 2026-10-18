@@ -38,6 +38,7 @@ import { reportError } from '@/lib/ops/errors'
 import { vapidKeys } from '@/lib/push/deliver'
 import { sendPush } from '@/lib/push/webpush'
 import { priceDisplayOf } from '@/lib/viewer/prefs'
+import { UserError } from '@/lib/userError'
 
 /** Prices move: a proposal not decided in this long lapses. */
 export const PROPOSAL_TTL_MS = 10 * 60_000
@@ -85,7 +86,7 @@ export async function proposeTrade(
 ): Promise<TradeProposal> {
   const key = await tradeKeyRow(db, caller.viewerId)
   if (!key) {
-    throw new Error(
+    throw new UserError(
       'Trading isn’t set up: the Viewer needs to connect a Kalshi trade key on Sportsline’s Agents page.',
     )
   }
@@ -101,7 +102,7 @@ export async function proposeTrade(
     )
     .get()
   if ((pending?.n ?? 0) >= MAX_PENDING) {
-    throw new Error(
+    throw new UserError(
       `${MAX_PENDING} proposals are already waiting for the Viewer. Wait for them to be decided, or cancel one.`,
     )
   }
@@ -111,9 +112,9 @@ export async function proposeTrade(
   const reader =
     (await loadAccount(env, caller.viewerId)) ?? (await tradeAccount(env, key))
   const m = await fetchMarket(reader, input.marketTicker).catch(() => null)
-  if (!m) throw new Error(`No Kalshi market ${input.marketTicker}.`)
+  if (!m) throw new UserError(`No Kalshi market ${input.marketTicker}.`)
   if (m.status !== 'active') {
-    throw new Error(
+    throw new UserError(
       `Kalshi market ${input.marketTicker} isn’t open for trading (${m.status ?? 'unknown status'}).`,
     )
   }
@@ -124,7 +125,7 @@ export async function proposeTrade(
     key,
     await spentToday(db, caller.viewerId, sportsDayOf(now)),
   )
-  if (problem) throw new Error(problem)
+  if (problem) throw new UserError(problem)
 
   const row: TradeProposal = {
     id: crypto.randomUUID(),
@@ -225,7 +226,7 @@ export async function approveTrade(
   now = new Date(),
 ): Promise<TradeProposal> {
   const key = await tradeKeyRow(db, viewerId)
-  if (!key) throw new Error('Connect a Kalshi trade key first.')
+  if (!key) throw new UserError('Connect a Kalshi trade key first.')
   const day = sportsDayOf(now)
   // One click wins: only a live, pending proposal, from a token that still
   // works, moves to placing.
@@ -253,7 +254,7 @@ export async function approveTrade(
     )
     .returning()
   if (!claimed) {
-    throw new Error(
+    throw new UserError(
       'This proposal has already been decided, has expired, or its Agent’s token was revoked.',
     )
   }
