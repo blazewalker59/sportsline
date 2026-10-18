@@ -4,12 +4,13 @@
  * gesture) with the image still rendering: ClipboardItem takes a promise.
  */
 
-import { domToBlob } from 'modern-screenshot'
-
 /** A logo that won't load must not hold up the copy. */
 const IMAGE_TIMEOUT_MS = 3_000
 
 export async function captureNode(node: HTMLElement): Promise<Blob> {
+  // Only a Reaction needs the renderer: load it then, in parallel with the
+  // logos, not with the Timeline.
+  const renderer = import('modern-screenshot')
   // Logos are lazy-loaded, and lazy images off-screen never load: the
   // capture would wait on them forever.
   const images = [...node.querySelectorAll('img')]
@@ -23,6 +24,7 @@ export async function captureNode(node: HTMLElement): Promise<Blob> {
     ),
   )
   const background = getComputedStyle(document.body).backgroundColor
+  const { domToBlob } = await renderer
   return domToBlob(node, {
     scale: Math.min(3, Math.max(2, window.devicePixelRatio || 2)),
     backgroundColor: background,

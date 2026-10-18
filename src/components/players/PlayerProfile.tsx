@@ -7,8 +7,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { useCallback, useMemo, useState } from 'react'
-import { OpenPlayer } from './playerSheet'
+import { useMemo, useState } from 'react'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { LineupPlayer } from '@/lib/fantasy/matchup'
 import type { PlayerLine } from '@/lib/players/detail'
@@ -43,28 +42,11 @@ import { getPlayerPage } from '@/lib/players/server'
 import { cn } from '@/lib/utils'
 import { useViewer } from '@/lib/viewer/useViewer'
 
-// ─── The sheet, from anywhere ───────────────────────────────────────────────
-
-export function PlayerSheetProvider({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  const [playerId, setPlayerId] = useState<string | null>(null)
-  const close = useCallback(() => setPlayerId(null), [])
-  return (
-    <OpenPlayer.Provider value={setPlayerId}>
-      {children}
-      {playerId && (
-        <PlayerSheet key={playerId} playerId={playerId} onClose={close} />
-      )}
-    </OpenPlayer.Provider>
-  )
-}
+// ─── The sheet, from anywhere (opened by PlayerSheetProvider) ───────────────
 
 const RECENT_PLAYS = 5
 
-function PlayerSheet({
+export function PlayerSheet({
   playerId,
   onClose,
 }: {

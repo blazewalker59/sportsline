@@ -1,29 +1,36 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { z } from 'zod'
+import * as z from 'zod/mini'
 import { TimelineScreen } from '@/components/timeline/TimelineScreen'
 import { parseScope } from '@/lib/model/scope'
 
+/** An optional string param; anything malformed is dropped, not an error. */
+const optional = (max: number) =>
+  z.catch(z.optional(z.string().check(z.maxLength(max))), undefined)
+
+// zod/mini: these schemas sit in the app's entry chunk, and the classic
+// API's chained methods can't be tree-shaken.
 const search = z.object({
   /** A past Sports Day to show instead of today (YYYY-MM-DD). */
-  day: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional()
-    .catch(undefined),
+  day: z.catch(
+    z.optional(z.string().check(z.regex(/^\d{4}-\d{2}-\d{2}$/))),
+    undefined,
+  ),
   /** Filter the Timeline to one Game (its thread and box score). */
-  game: z.string().max(200).optional().catch(undefined),
+  game: optional(200),
   /** Which Plays to draw from: all, following, or a League code. */
-  scope: z
-    .string()
-    .optional()
-    .transform((v) => parseScope(v))
-    .catch(undefined),
+  scope: z.catch(
+    z.pipe(
+      z.optional(z.string()),
+      z.transform((v) => parseScope(v)),
+    ),
+    undefined,
+  ),
   /** A Play whose detail is open in a sheet over the Timeline. */
-  play: z.string().max(240).optional().catch(undefined),
+  play: optional(240),
   /** Narrow the Timeline to one Prediction's Games and Players. */
-  prediction: z.string().max(400).optional().catch(undefined),
+  prediction: optional(400),
   /** Narrow the Timeline to one Fantasy Matchup's Starters (its league row). */
-  matchup: z.string().max(200).optional().catch(undefined),
+  matchup: optional(200),
 })
 
 export const Route = createFileRoute('/')({
