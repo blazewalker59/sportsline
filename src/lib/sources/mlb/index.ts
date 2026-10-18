@@ -1,6 +1,6 @@
 /** MLB Source adapter: MLB StatsAPI (statsapi.mlb.com). */
 
-import { getJson as jsonFrom } from '../pool'
+import { LIVE_POLL, getJson as jsonFrom } from '../pool'
 import {
   parseFeed,
   parsePlayerOverview,
@@ -18,6 +18,7 @@ import type { SourceAdapter } from '@/lib/model/types'
 
 const BASE = 'https://statsapi.mlb.com/api'
 const getJson = jsonFrom('MLB StatsAPI')
+const pollJson = jsonFrom('MLB StatsAPI', LIVE_POLL)
 
 export const mlbAdapter: SourceAdapter = {
   league: 'mlb',
@@ -29,7 +30,7 @@ export const mlbAdapter: SourceAdapter = {
     return parseSchedule(schedule)
   },
   async snapshot(sourceGameId) {
-    const feed = await getJson<MlbFeed>(
+    const feed = await pollJson<MlbFeed>(
       `${BASE}/v1.1/game/${encodeURIComponent(sourceGameId)}/feed/live`,
     )
     return parseFeed(feed)

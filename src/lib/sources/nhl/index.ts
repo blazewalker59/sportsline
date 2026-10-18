@@ -1,6 +1,6 @@
 /** NHL Source adapter: NHL.com (api-web.nhle.com) plus its stats API. */
 
-import { getJson as jsonFrom } from '../pool'
+import { LIVE_POLL, getJson as jsonFrom } from '../pool'
 import {
   parseClubSchedule,
   parseGame,
@@ -29,6 +29,7 @@ const STATS = 'https://api.nhle.com/stats/rest/en'
  */
 const LIVE_POLL_SECONDS = 10
 const getJson = jsonFrom('NHL')
+const pollJson = jsonFrom('NHL', LIVE_POLL)
 
 export const nhlAdapter: SourceAdapter = {
   league: 'nhl',
@@ -41,14 +42,25 @@ export const nhlAdapter: SourceAdapter = {
   },
   async snapshot(sourceGameId) {
     const id = encodeURIComponent(sourceGameId)
+    let fallback: string | undefined
     const [pbp, box] = await Promise.all([
-      getJson<NhlPlayByPlay>(`${WEB}/gamecenter/${id}/play-by-play`),
+      pollJson<NhlPlayByPlay>(`${WEB}/gamecenter/${id}/play-by-play`),
       // The box score is a nicety; a failure here must not stop the Plays.
-      getJson<NhlBoxscore>(`${WEB}/gamecenter/${id}/boxscore`).catch(
-        () => null,
+      // Without it the box is only goals from the Plays, so the snapshot
+      // says so and LiveGame keeps any full box it already stored.
+      pollJson<NhlBoxscore>(`${WEB}/gamecenter/${id}/boxscore`).catch(
+        (error: unknown) => {
+          fallback = `NHL boxscore unavailable: ${error instanceof Error ? error.message : String(error)}`
+          console.warn(`[source] ${fallback}`)
+          return null
+        },
       ),
     ])
-    return { ...parseGame(pbp, box), pollHintSeconds: LIVE_POLL_SECONDS }
+    const game = {
+      ...parseGame(pbp, box),
+      pollHintSeconds: LIVE_POLL_SECONDS,
+    }
+    return fallback ? { ...game, fallback, boxPartial: true } : game
   },
   async roster() {
     // Season bios list every player with their current team in a few calls;

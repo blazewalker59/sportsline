@@ -1,7 +1,12 @@
 /** NBA Source adapter: ESPN's public site API. */
 
 import { fetchTeamSchedule, parseScoreboard } from '../espn/common'
-import { ROSTER_CONCURRENCY, getJson as jsonFrom, mapPool } from '../pool'
+import {
+  LIVE_POLL,
+  ROSTER_CONCURRENCY,
+  getJson as jsonFrom,
+  mapPool,
+} from '../pool'
 import { espnAthleteOverview } from '../espn/athlete'
 import { parseGame, parseRoster } from './parse'
 import type { NbaRoster, NbaSummary } from './feed'
@@ -10,6 +15,7 @@ import type { SourceAdapter } from '@/lib/model/types'
 
 const SITE = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba'
 const getJson = jsonFrom('ESPN')
+const pollJson = jsonFrom('ESPN', LIVE_POLL)
 
 export const nbaAdapter: SourceAdapter = {
   league: 'nba',
@@ -22,7 +28,7 @@ export const nbaAdapter: SourceAdapter = {
   },
   async snapshot(sourceGameId) {
     return parseGame(
-      await getJson<NbaSummary>(
+      await pollJson<NbaSummary>(
         `${SITE}/summary?event=${encodeURIComponent(sourceGameId)}`,
       ),
     )

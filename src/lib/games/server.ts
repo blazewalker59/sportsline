@@ -74,7 +74,9 @@ export const getGameDetail = createServerFn({ method: 'GET' })
     let game = await loadGame(db, data.gameId)
     if (!game) return null
     // A finished Game with no box score (it ended before box scores were
-    // stored, or its Source omitted it): ask its LiveGame to read it once.
+    // stored, or its Source omitted it): ask its LiveGame to read it. The
+    // LiveGame throttles these (every page view asks) and skips one while
+    // its own alarm is due; only a refresh that polled is worth a reload.
     if (!game.box && game.summary.status === 'final') {
       const env = getCloudflareEnv()
       const refreshed = await env.LIVE_GAME.get(

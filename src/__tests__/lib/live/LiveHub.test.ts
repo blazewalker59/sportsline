@@ -6,7 +6,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { installWebSocketGlobals, memoryCtx } from '../../helpers/durable'
 import type { FakeSocket, MemoryCtx } from '../../helpers/durable'
 import type { LiveHub as LiveHubClass } from '@/lib/live/LiveHub'
-import type { TimelineEvent, TimelineItem } from '@/lib/model/timeline'
+import type {
+  GameSummary,
+  TimelineEvent,
+  TimelineItem,
+} from '@/lib/model/timeline'
 
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class {
@@ -57,6 +61,34 @@ function item(overrides: Partial<TimelineItem> = {}): TimelineItem {
     players: [],
     detail: null,
     ...overrides,
+  }
+}
+
+function gameEvent(overrides: Partial<GameSummary> = {}): TimelineEvent {
+  return {
+    type: 'game',
+    game: {
+      id: 'gm_1',
+      league: 'mlb',
+      sportsDay: '2026-10-08',
+      status: 'live',
+      startsAt: '2026-10-08T17:00:00.000Z',
+      awayTeam: {
+        id: 'tm_away',
+        abbreviation: 'NYY',
+        logoUrl: null,
+        name: 'Yankees',
+      },
+      homeTeam: {
+        id: 'tm_home',
+        abbreviation: 'BOS',
+        logoUrl: null,
+        name: 'Red Sox',
+      },
+      score: { away: 0, home: 0 },
+      situation: null,
+      ...overrides,
+    },
   }
 }
 
@@ -161,6 +193,60 @@ describe('LiveHub', () => {
     yankees.failSend = true
     hub.publish(events)
     expect(yankees.sent).toHaveLength(1)
+  })
+
+  it('sends a scoreboard only where Follows cover its Game', () => {
+    const all = connect(
+      '/live?follows=league:mlb,league:nba,league:nfl,league:nhl,league:cfb&routine=1',
+    )
+    const nba = connect('/live?follows=league:nba')
+    const player = connect('/live?follows=player:pl_judge')
+    const prediction = connect('/live?follows=game:gm_1')
+    const top25 = connect('/live?follows=top25:cfb')
+    const sec = connect('/live?follows=conference:sec')
+
+    hub.publish([gameEvent()])
+    // The Timeline's socket asks for every League: its games strip sees all.
+    expect(JSON.parse(all.sent[0] ?? '[]')).toHaveLength(1)
+    expect(nba.sent).toEqual([])
+    expect(player.sent).toEqual([])
+    expect(JSON.parse(prediction.sent[0] ?? '[]')).toHaveLength(1)
+    expect(top25.sent).toEqual([])
+
+    hub.publish([
+      gameEvent({
+        id: 'gm_2',
+        league: 'cfb',
+        awayTeam: {
+          id: 'tm_a',
+          abbreviation: 'UGA',
+          logoUrl: null,
+          name: 'Georgia',
+          rank: 3,
+          conference: 'sec',
+        },
+      }),
+    ])
+    expect(top25.sent).toHaveLength(1)
+    expect(sec.sent).toHaveLength(1)
+    expect(all.sent).toHaveLength(2)
+    expect(prediction.sent).toHaveLength(1)
+  })
+
+  it('serializes one payload per distinct filter', () => {
+    const sockets = Array.from({ length: 5 }, () =>
+      connect('/live?follows=league:mlb&routine=1'),
+    )
+    const other = connect('/live?follows=team:tm_home')
+    const stringify = vi.spyOn(JSON, 'stringify')
+    hub.publish([gameEvent(), { type: 'upsert', item: item() }])
+    const payloads = stringify.mock.calls.filter(([value]) =>
+      Array.isArray(value),
+    )
+    stringify.mockRestore()
+    expect(payloads).toHaveLength(2)
+    expect(new Set(sockets.map((s) => s.sent[0])).size).toBe(1)
+    expect(other.sent).toHaveLength(1)
   })
 
   it('answers a close with a code it is allowed to send', () => {
