@@ -4,7 +4,7 @@
  * patterns worth noticing, and where they win and lose.
  */
 
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import type {
   Calibration,
   Line,
@@ -14,6 +14,8 @@ import type {
 import { CalibrationChart, RecordTrend } from '@/components/charts/lazy'
 import { buildRecord, calibrationOf, winRate } from '@/lib/kalshi/record'
 import { usePredictionRecord } from '@/lib/kalshi/usePredictions'
+import { useStoredValue } from '@/lib/useStoredValue'
+import { StatGrid, StatTile } from '@/components/layout/StatTile'
 import { cn } from '@/lib/utils'
 
 type RangeKey = '7d' | '30d' | 'all' | 'custom'
@@ -34,33 +36,20 @@ const dayInput = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const startOfDay = (s: string) => new Date(`${s}T00:00:00`)
 
-function readRange(): RangeKey {
-  try {
-    const v = localStorage.getItem(RANGE_KEY)
-    return v === '30d' || v === 'all' || v === 'custom' ? v : '7d'
-  } catch {
-    return '7d'
-  }
-}
+const parseRange = (v: string | null): RangeKey =>
+  v === '30d' || v === 'all' || v === 'custom' ? v : '7d'
 
 export function PredictionRecordSection() {
   const history = usePredictionRecord()
   // The remembered range loads after the first render (it's on the device,
   // so the server can't render it).
-  const [key, setKey] = useState<RangeKey>('7d')
-  useEffect(() => setKey(readRange()), [])
+  const [stored, setStored] = useStoredValue(RANGE_KEY)
+  const key = parseRange(stored)
   const [custom, setCustom] = useState(() => ({
     from: dayInput(new Date(Date.now() - 13 * 86_400_000)),
     to: dayInput(new Date()),
   }))
-  const choose = (k: RangeKey) => {
-    setKey(k)
-    try {
-      localStorage.setItem(RANGE_KEY, k)
-    } catch {
-      // Remembering the range is a convenience.
-    }
-  }
+  const choose = (k: RangeKey) => setStored(k)
   const range = useMemo((): Range => {
     const now = Date.now()
     if (key === '7d') return { from: new Date(now - 7 * 86_400_000), to: null }
@@ -168,32 +157,32 @@ function RecordBody({
   const t = r.totals
   return (
     <>
-      <div className="grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-border bg-border">
-        <Stat label="Volume" value={usd(t.staked)} />
-        <Stat
+      <StatGrid>
+        <StatTile label="Volume" value={usd(t.staked)} />
+        <StatTile
           label="Predictions"
           value={String(t.count)}
           sub={t.open > 0 ? `${t.open} open` : undefined}
         />
-        <Stat
+        <StatTile
           label="Net P&L"
           value={signed(t.pnl)}
           className={tone(t.pnl)}
           sub={t.settled > 0 ? `${t.settled} settled` : 'none settled'}
         />
-        <Stat
+        <StatTile
           label="Win rate"
           value={pct(winRate(t))}
           sub={`${t.won}–${t.lost}`}
         />
-        <Stat
+        <StatTile
           label="Return"
           value={pct(t.roi)}
           className={t.roi === null ? undefined : tone(t.roi)}
           sub="on settled"
         />
-        <Stat label="Avg stake" value={usd(t.avgStake)} />
-      </div>
+        <StatTile label="Avg stake" value={usd(t.avgStake)} />
+      </StatGrid>
 
       {r.days.length > 1 && <RecordTrend days={r.days} />}
 
@@ -253,35 +242,6 @@ function RecordBody({
         {t.open > 0 && <span>Open stake: {usd(t.openStaked)}</span>}
       </p>
     </>
-  )
-}
-
-function Stat({
-  label,
-  value,
-  sub,
-  className,
-}: {
-  label: string
-  value: string
-  sub?: string
-  className?: string
-}) {
-  return (
-    <div className="flex flex-col bg-surface px-3 py-2">
-      <span className="text-[10px] font-semibold tracking-wide text-muted uppercase">
-        {label}
-      </span>
-      <span
-        className={cn(
-          'text-lg leading-tight font-bold tabular-nums',
-          className,
-        )}
-      >
-        {value}
-      </span>
-      {sub && <span className="text-[11px] text-muted">{sub}</span>}
-    </div>
   )
 }
 

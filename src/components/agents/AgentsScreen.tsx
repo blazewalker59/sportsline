@@ -13,6 +13,7 @@ import type {
   TradingState,
 } from '@/lib/agents/server'
 import { AppHeader } from '@/components/layout/AppHeader'
+import { StatGrid, StatTile } from '@/components/layout/StatTile'
 import { PriceDisplayToggle } from '@/components/predictions/PriceDisplayToggle'
 import { timeAgo, useNow } from '@/components/timeline/format'
 import { CAP_LIMITS, DEFAULT_CAPS } from '@/lib/agents/caps'
@@ -643,10 +644,7 @@ function BetRecord() {
   if (!data || data.stats.requests === 0) return null
   const s = data.stats
   const tile = (label: string, value: string) => (
-    <div className="flex flex-col rounded-xl border border-border bg-surface px-3 py-2">
-      <span className="text-lg font-bold tabular-nums">{value}</span>
-      <span className="text-[11px] text-muted">{label}</span>
-    </div>
+    <StatTile label={label} value={value} />
   )
   return (
     <section className="flex flex-col gap-3">
@@ -658,7 +656,7 @@ function BetRecord() {
         picks: placed on Kalshi after they were suggested (by you or an approved
         trade), and how those did.
       </p>
-      <div className="grid grid-cols-3 gap-2">
+      <StatGrid>
         {tile('asks', String(s.requests))}
         {tile('picks offered', String(s.picksOffered))}
         {tile('placed', String(s.placed))}
@@ -668,7 +666,7 @@ function BetRecord() {
           s.winRate === null ? '—' : `${Math.round(s.winRate * 100)}%`,
         )}
         {tile('profit', `${s.pnl < 0 ? '−' : ''}${money(Math.abs(s.pnl))}`)}
-      </div>
+      </StatGrid>
       <p className="text-xs text-muted">
         {s.pending} placed still open · skipped picks went {s.skipped.won}–
         {s.skipped.lost}
