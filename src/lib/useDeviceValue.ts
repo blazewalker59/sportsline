@@ -1,9 +1,24 @@
 import { useSyncExternalStore } from 'react'
 
-/** Storage changes in another tab of the app. */
+/** This tab changed something a device value reads. */
+const CHANGED = 'sportsline:device-value'
+
+/**
+ * Tell this tab's useDeviceValue readers to read again, after writing what
+ * they read (`storage` events only reach other tabs).
+ */
+export function notifyDeviceValue(): void {
+  window.dispatchEvent(new Event(CHANGED))
+}
+
+/** Storage changes in another tab of the app, or a write in this one. */
 function subscribe(onChange: () => void): () => void {
   window.addEventListener('storage', onChange)
-  return () => window.removeEventListener('storage', onChange)
+  window.addEventListener(CHANGED, onChange)
+  return () => {
+    window.removeEventListener('storage', onChange)
+    window.removeEventListener(CHANGED, onChange)
+  }
 }
 
 /**

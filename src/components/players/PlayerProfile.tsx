@@ -6,8 +6,9 @@
  */
 
 import { Link } from '@tanstack/react-router'
-import { useCallback, useMemo, useState } from 'react'
-import { OpenPlayer } from './playerSheet'
+import { useMemo, useState } from 'react'
+import { PredictionsSection } from './PredictionsSection'
+import { Section } from './Section'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { LineupPlayer } from '@/lib/fantasy/matchup'
 import type { PlayerLine } from '@/lib/players/detail'
@@ -26,43 +27,18 @@ import {
 } from '@/components/fantasy/FantasyParts'
 import { FollowButton } from '@/components/follows/FollowButton'
 import { PlaySheet } from '@/components/games/PlayDetailScreen'
-import {
-  PredictionCard,
-  PredictionSheet,
-} from '@/components/predictions/PredictionParts'
 import { startTime } from '@/components/timeline/format'
 import { SPORTS } from '@/lib/fantasy/sports'
 import { useFantasy } from '@/lib/fantasy/useFantasy'
-import {
-  useKalshiConnection,
-  usePredictions,
-} from '@/lib/kalshi/usePredictions'
 import { usePlayerDetail, usePlayerFirstPage } from '@/lib/players/usePlayer'
 import { cn } from '@/lib/utils'
 import { useViewer } from '@/lib/viewer/useViewer'
 
-// ─── The sheet, from anywhere ───────────────────────────────────────────────
-
-export function PlayerSheetProvider({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  const [playerId, setPlayerId] = useState<string | null>(null)
-  const close = useCallback(() => setPlayerId(null), [])
-  return (
-    <OpenPlayer.Provider value={setPlayerId}>
-      {children}
-      {playerId && (
-        <PlayerSheet key={playerId} playerId={playerId} onClose={close} />
-      )}
-    </OpenPlayer.Provider>
-  )
-}
+// ─── The sheet, from anywhere (opened by PlayerSheetProvider) ───────────────
 
 const RECENT_PLAYS = 5
 
-function PlayerSheet({
+export function PlayerSheet({
   playerId,
   onClose,
 }: {
@@ -246,23 +222,6 @@ export function PlayerDetailSections({
         </>
       )}
     </div>
-  )
-}
-
-function Section({
-  title,
-  children,
-}: {
-  title: string
-  children: React.ReactNode
-}) {
-  return (
-    <section>
-      <h2 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-        {title}
-      </h2>
-      {children}
-    </section>
   )
 }
 
@@ -634,46 +593,4 @@ function fantasyEntries(
       return player && team ? [{ league, side, team: team.name, player }] : []
     })
   })
-}
-
-/** The Viewer's open Predictions with a Leg on this Player (or Team). */
-export function PredictionsSection({
-  playerId,
-  teamId,
-}: {
-  playerId?: string
-  teamId?: string
-}) {
-  const { data: predictions } = usePredictions()
-  const { data: connection } = useKalshiConnection()
-  const [selected, setSelected] = useState<string | null>(null)
-  const mine = (predictions ?? []).filter(
-    (p) =>
-      p.status === 'open' &&
-      p.legs.some((l) =>
-        playerId ? l.playerId === playerId : teamId && l.teamId === teamId,
-      ),
-  )
-  if (mine.length === 0) return null
-  const open = mine.find((p) => p.id === selected)
-  return (
-    <Section title="Your predictions">
-      <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none]">
-        <ul className="flex gap-2">
-          {mine.map((p) => (
-            <li key={p.id} className="flex shrink-0">
-              <PredictionCard
-                prediction={p}
-                display={connection?.changeDisplay}
-                onSelect={() => setSelected(p.id)}
-              />
-            </li>
-          ))}
-        </ul>
-      </div>
-      {open && (
-        <PredictionSheet prediction={open} onClose={() => setSelected(null)} />
-      )}
-    </Section>
-  )
 }

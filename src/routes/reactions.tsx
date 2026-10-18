@@ -1,11 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { z } from 'zod'
+import * as z from 'zod/mini'
 import { ReactionsScreen } from '@/components/reactions/ReactionsScreen'
 
 export const Route = createFileRoute('/reactions')({
   validateSearch: z.object({
     /** A Play whose detail is open in a sheet over the list. */
-    play: z.string().max(240).optional().catch(undefined),
+    play: z.catch(z.optional(z.string().check(z.maxLength(240))), undefined),
   }),
   component: function ReactionsRoute() {
     const { play } = Route.useSearch()

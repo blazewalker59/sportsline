@@ -14,6 +14,43 @@ const EXIT_MS = 220
 
 /** Open sheets, newest last: Escape closes only the top one. */
 const open: Array<symbol> = []
+/** The page's scroll lock from before the first sheet opened. */
+let pageOverflow = ''
+
+const FOCUSABLE =
+  'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+
+/**
+ * Make everything on the page but `node` inert (unfocusable, hidden from
+ * assistive tech), as a modal must. Returns the undo: only what this sheet
+ * made inert, so a sheet over a sheet leaves the first one's work alone.
+ */
+function inertOthers(node: HTMLElement): () => void {
+  const made: Array<Element> = []
+  for (const el of Array.from(document.body.children)) {
+    if (el.contains(node) || el.hasAttribute('inert')) continue
+    el.setAttribute('inert', '')
+    made.push(el)
+  }
+  return () => made.forEach((el) => el.removeAttribute('inert'))
+}
+
+/** Keep Tab cycling within `node`. */
+function trapTab(e: KeyboardEvent, node: HTMLElement) {
+  const items = Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE))
+  if (items.length === 0) return
+  const first = items[0]
+  const last = items[items.length - 1]
+  const active = document.activeElement
+  const inside = active instanceof Node && node.contains(active)
+  if (e.shiftKey && (!inside || active === first)) {
+    e.preventDefault()
+    last.focus()
+  } else if (!e.shiftKey && (!inside || active === last)) {
+    e.preventDefault()
+    first.focus()
+  }
+}
 
 /**
  * A bottom sheet over the Timeline (box score, Play Detail), so drilling
@@ -30,6 +67,7 @@ export function Sheet({
   onClose: () => void
   children: React.ReactNode
 }) {
+  const root = useRef<HTMLDivElement>(null)
   const close = useRef<HTMLButtonElement>(null)
   const body = useRef<HTMLDivElement>(null)
   const [drag, setDrag] = useState(0)
@@ -40,26 +78,66 @@ export function Sheet({
     active: boolean
   } | null>(null)
 
-  const dismiss = useCallback(() => {
-    setLeaving(true)
-    setTimeout(onClose, EXIT_MS)
-  }, [onClose])
-
+  // The latest onClose, so a parent's inline handler doesn't re-run the
+  // open/close effect (and bounce focus) on every render.
+  const onCloseRef = useRef(onClose)
   useEffect(() => {
+    onCloseRef.current = onClose
+  })
+  const exit = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const dismiss = useCallback(() => {
+    if (exit.current) return
+    setLeaving(true)
+    exit.current = setTimeout(() => onCloseRef.current(), EXIT_MS)
+  }, [])
+  useEffect(
+    () => () => {
+      if (exit.current) clearTimeout(exit.current)
+    },
+    [],
+  )
+
+  // Whatever had focus when the sheet opened gets it back on close.
+  const opener = useRef<HTMLElement | null>(null)
+  // On the body, so a sheet opened from another sheet isn't laid out
+  // inside it (the sheet's transform would trap a fixed child).
+  const portal = useSyncExternalStore(
+    noSubscribe,
+    () => true,
+    () => false,
+  )
+  useEffect(() => {
+    const node = root.current
+    if (!node) return
     const me = Symbol('sheet')
+    // The first sheet locks the page's scroll and the last one out frees
+    // it, whatever order a stack of them unmounts in.
+    if (open.length === 0) {
+      pageOverflow = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+    }
     open.push(me)
+    if (!opener.current && document.activeElement instanceof HTMLElement) {
+      opener.current = document.activeElement
+    }
+    const restoreInert = inertOthers(node)
     close.current?.focus({ preventScroll: true })
-    const onKey = (e: KeyboardEvent) =>
-      e.key === 'Escape' && open.at(-1) === me && dismiss()
+    const onKey = (e: KeyboardEvent) => {
+      if (open.at(-1) !== me) return
+      if (e.key === 'Escape') dismiss()
+      else if (e.key === 'Tab') trapTab(e, node)
+    }
     window.addEventListener('keydown', onKey)
-    const overflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
     return () => {
       open.splice(open.indexOf(me), 1)
+      if (open.length === 0) document.body.style.overflow = pageOverflow
       window.removeEventListener('keydown', onKey)
-      document.body.style.overflow = overflow
+      restoreInert()
+      if (opener.current?.isConnected) {
+        opener.current.focus({ preventScroll: true })
+      }
     }
-  }, [dismiss])
+  }, [dismiss, portal])
 
   const onTouchStart = (e: React.TouchEvent, fromContent: boolean) => {
     // A sheet opened from this one is its child in React: keep its swipes.
@@ -94,15 +172,9 @@ export function Sheet({
   }
 
   const dragging = gesture.current?.active && drag > 0
-  // On the body, so a sheet opened from another sheet isn't laid out
-  // inside it (the sheet's transform would trap a fixed child).
-  const portal = useSyncExternalStore(
-    noSubscribe,
-    () => true,
-    () => false,
-  )
   const sheet = (
     <div
+      ref={root}
       className="fixed inset-0 z-30 flex flex-col justify-end"
       role="dialog"
       aria-modal="true"

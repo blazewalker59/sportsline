@@ -19,7 +19,6 @@ export function TimelineFeed({
   entries,
   typing,
   gameId,
-  now,
   dimmed,
   loading,
   recap,
@@ -33,7 +32,6 @@ export function TimelineFeed({
   entries: ReadonlyArray<FeedEntry>
   typing: Array<{ typing: Typing; game: GameSummary }>
   gameId: string | null
-  now: number
   dimmed: boolean
   loading: boolean
   recap: CatchUp | null
@@ -81,7 +79,10 @@ export function TimelineFeed({
       {entries.map((entry, i) => (
         <li
           key={entry.type === 'notice' ? entry.item.id : entry.id}
-          className="flex flex-col gap-3"
+          // Off-screen rows skip layout and paint until scrolled near; each
+          // keeps its last measured height so the scrollbar holds still (the
+          // clip margin spares the Reaction pills' shadow).
+          className="flex flex-col gap-3 [contain-intrinsic-size:auto_96px] [content-visibility:auto] [overflow-clip-margin:8px]"
         >
           {i === dividerAt && i > 0 && <ReadDivider count={newCount} />}
           {entry.type === 'notice' ? (
@@ -89,10 +90,10 @@ export function TimelineFeed({
               className="flex flex-col"
               style={{ viewTransitionName: vtName(entry.item.id) }}
             >
-              <Notice item={entry.item} now={now} showLeague={!gameId} />
+              <Notice item={entry.item} showLeague={!gameId} />
             </div>
           ) : (
-            <Cluster entry={entry} now={now} focused={Boolean(gameId)} />
+            <Cluster entry={entry} focused={Boolean(gameId)} />
           )}
         </li>
       ))}

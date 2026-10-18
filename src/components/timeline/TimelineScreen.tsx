@@ -8,7 +8,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useRouter } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNow } from './format'
 import { entryTime } from './FeedRows'
 import { FeedFooter, TimelineFeed } from './TimelineFeed'
 import { TimelineSheets } from './TimelineSheets'
@@ -137,7 +136,6 @@ function Timeline({
   // Only today's Timeline moves the Read Marker; browsing history must not.
   useReadMarkerWriter(timeline.items, viewer !== null && isToday && !gameId)
   const backfill = usePastDay(sportsDay, isToday, timeline.reload)
-  const now = useNow()
   // Today's Timeline socket already carries the Game's events.
   const game = useLiveGame(gameId, { shared: isToday })
   const [boxOpen, setBoxOpen] = useState(false)
@@ -298,7 +296,6 @@ function Timeline({
           entries={entries}
           typing={typing}
           gameId={gameId}
-          now={now}
           dimmed={dimmed}
           loading={timeline.loading}
           recap={recap}
@@ -349,7 +346,6 @@ function Timeline({
         }
         onPredictionClose={() => setPredictionOpen(null)}
         recap={recapOpen ? recap : null}
-        now={now}
         onRecapClose={() => setRecapOpen(false)}
         live={liveOpen && typing.length > 1 ? typing : null}
         onLiveClose={() => setLiveOpen(false)}

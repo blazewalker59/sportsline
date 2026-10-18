@@ -1,11 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { LegView, PredictionView } from '@/lib/kalshi/server'
-import {
-  LegDots,
-  MAX_LEG_DOTS,
-  PredictionCard,
-} from '@/components/predictions/PredictionParts'
+import { LegDots, MAX_LEG_DOTS } from '@/components/predictions/PredictionParts'
+import { PredictionCard } from '@/components/predictions/PredictionCard'
 
 const leg = (i: number): LegView => ({
   title: `Leg ${i}`,
