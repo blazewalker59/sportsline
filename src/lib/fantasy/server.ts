@@ -93,7 +93,7 @@ export const connectEspn = createServerFn({ method: 'POST' })
       const env = getCloudflareEnv()
       const session = {
         swid: bracedSwid(data.swid),
-        espnS2: decodeURIComponent(data.espnS2),
+        espnS2: decodedCookie(data.espnS2),
       }
       try {
         await fanProfile(session)
@@ -143,6 +143,17 @@ export const connectEspn = createServerFn({ method: 'POST' })
       return { status: 'ok', lastError: null, syncedAt: now }
     }),
   )
+
+/** espn_s2 as copied is usually URL-encoded; a broken escape isn't one. */
+function decodedCookie(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    throw new Error(
+      'That espn_s2 cookie looks cut off or mangled. Copy it again from espn.com.',
+    )
+  }
+}
 
 /** Forget the cookies and every Fantasy league read with them. */
 export const disconnectEspn = createServerFn({ method: 'POST' }).handler(() =>
