@@ -220,7 +220,8 @@ export const syncKalshiNow = createServerFn({ method: 'POST' }).handler(() =>
   withViewer(async ({ viewerId }) => {
     const env = getCloudflareEnv()
     const counts = await syncAccount(env, viewerId)
-    await refreshPrices(env)
+    // Only this Viewer's markets: never read with every Viewer's key.
+    await refreshPrices(env, viewerId)
     return counts
   }),
 )
