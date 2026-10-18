@@ -52,6 +52,8 @@ export async function reportError(
   scope: string,
   error: unknown,
   context: Record<string, unknown> = {},
+  /** Push the admins about it (at most every few hours); else only log. */
+  { notify = true }: { notify?: boolean } = {},
 ): Promise<void> {
   const message = messageOf(error).slice(0, 500)
   const stack = error instanceof Error ? error.stack?.slice(0, 2000) : undefined
@@ -83,8 +85,9 @@ export async function reportError(
       .returning()
       .get()
     const quiet =
-      row.notifiedAt !== null &&
-      Date.now() - Date.parse(row.notifiedAt) < NOTIFY_EVERY_MS
+      !notify ||
+      (row.notifiedAt !== null &&
+        Date.now() - Date.parse(row.notifiedAt) < NOTIFY_EVERY_MS)
     if (!quiet) {
       await db
         .update(errorEvents)

@@ -8,7 +8,7 @@
 
 import { DurableObject } from 'cloudflare:workers'
 import { eq, inArray, sql } from 'drizzle-orm'
-import { diffItems, fingerprint, keepInvolved } from './diff'
+import { diffItems, fingerprint, involvedShare, keepInvolved } from './diff'
 import { resolve } from './identity'
 import { isRateLimited, nextPollDelay, retryAfterFailure } from './pacing'
 import { itemRow, toTimelineItem } from './rows'
@@ -49,6 +49,11 @@ const FALLBACKS_KEY = 'fallbacks'
  * row (minutes, live): then it's reported, and again each as many more.
  */
 export const FALLBACK_REPORT_EVERY = 30
+/**
+ * A fallback naming players on fewer plays than this is losing them, and
+ * pushes the admins; above it (the core API runs 85–96%) it's only logged.
+ */
+export const FALLBACK_LOSSY_BELOW = 0.75
 // D1 caps bound parameters per statement at 100.
 const ITEM_ROWS_PER_INSERT = 3
 const PLAYER_ROWS_PER_INSERT = 45
@@ -93,8 +98,8 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
     let delay: number | null
     try {
       const snapshot = await sourceFor(game.league).snapshot(game.sourceGameId)
-      await this.apply(game, snapshot)
-      await this.noteFallback(game, snapshot.fallback)
+      const items = await this.apply(game, snapshot)
+      await this.noteFallback(game, snapshot.fallback, items)
       await this.ctx.storage.put(ERRORS_KEY, 0)
       await this.ctx.storage.delete(RATE_LIMITED_KEY)
       delay = nextPollDelay(
@@ -126,10 +131,14 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
     if (delay !== null) await this.ctx.storage.setAlarm(Date.now() + delay)
   }
 
-  /** Count polls in a row on the Source's fallback; report one that lasts. */
+  /**
+   * Count polls in a row on the Source's fallback; log one that lasts, and
+   * push the admins only when it's losing who was Involved.
+   */
   private async noteFallback(
     game: TrackRequest,
     fallback: string | undefined,
+    items: ReadonlyArray<SourceItem>,
   ): Promise<void> {
     if (!fallback) {
       await this.ctx.storage.delete(FALLBACKS_KEY)
@@ -139,11 +148,18 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
       ((await this.ctx.storage.get<number>(FALLBACKS_KEY)) ?? 0) + 1
     await this.ctx.storage.put(FALLBACKS_KEY, fallbacks)
     if (fallbacks % FALLBACK_REPORT_EVERY === 0) {
+      const share = involvedShare(items)
+      const lossy = share !== null && share < FALLBACK_LOSSY_BELOW
       await reportError(
         this.env,
-        'source-fallback',
+        lossy ? 'source-fallback-lossy' : 'source-fallback',
         new Error(`${game.league}: ${fallback}`),
-        { gameId: game.gameId, fallbacks },
+        {
+          gameId: game.gameId,
+          fallbacks,
+          involvedShare: share === null ? null : Math.round(share * 100) / 100,
+        },
+        { notify: lossy },
       )
     }
   }
@@ -160,10 +176,11 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
     return this.seen
   }
 
+  /** Record a snapshot's changes; gives back its items as recorded. */
   private async apply(
     game: TrackRequest,
     snapshot: GameSnapshot,
-  ): Promise<void> {
+  ): Promise<ReadonlyArray<SourceItem>> {
     const seen = await this.loadSeen()
     // On a fallback, keep the players a play was seen with before.
     const items = snapshot.fallback
@@ -438,6 +455,7 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
         )
       }
     }
+    return items
   }
 
   /**
