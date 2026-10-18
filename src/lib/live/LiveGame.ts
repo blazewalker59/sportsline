@@ -8,8 +8,14 @@
 
 import { DurableObject } from 'cloudflare:workers'
 import { eq, inArray, sql } from 'drizzle-orm'
-import { diffItems, fingerprint, involvedShare, keepInvolved } from './diff'
-import { resolve } from './identity'
+import {
+  diffItems,
+  fingerprint,
+  hash,
+  involvedShare,
+  keepInvolved,
+} from './diff'
+import { chunk, resolve } from './identity'
 import { isRateLimited, nextPollDelay, retryAfterFailure } from './pacing'
 import { itemRow, toTimelineItem } from './rows'
 import type { BatchItem } from 'drizzle-orm/batch'
@@ -40,8 +46,22 @@ const RATE_LIMITED_KEY = 'rateLimitedSince'
 const ALERT_LOG_KEY = 'alertLog'
 const ALERT_WINDOW_MS = 15 * 60_000
 const ALERTS_PER_WINDOW = 6
-/** Give up after this many consecutive failed polls; the cron re-wakes live Games. */
+/**
+ * Give up after this many consecutive failed polls; the schedule sync
+ * re-wakes live Games (track), each for one more try until a poll succeeds.
+ */
 const MAX_CONSECUTIVE_ERRORS = 20
+/** What the games row was last written with (status, score, Situation, box). */
+const GAME_HASH_KEY = 'gameHash'
+/** Set once a full box score (not just the Plays') is stored. */
+const FULL_BOX_KEY = 'fullBox'
+/** Slow polls of a final Game while its box score is only the Plays'. */
+const BOX_RETRIES_KEY = 'boxRetries'
+export const BOX_RETRY_MS = 5 * 60_000
+export const MAX_BOX_RETRIES = 12
+/** When refresh() last polled; page views of a Game ask at most this often. */
+const REFRESHED_KEY = 'refreshedAt'
+export const REFRESH_EVERY_MS = 5 * 60_000
 /** Consecutive polls the Source answered with its fallback. */
 const FALLBACKS_KEY = 'fallbacks'
 /**
@@ -71,8 +91,15 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
   private seen: Map<string, SeenItem> | null = null
   /** Source → Sportsline player ids already resolved, so box scores don't re-query. */
   private knownPlayers = new Map<string, string>()
+  /** The poll in progress, so the next waits its turn (see exclusive). */
+  private polling: Promise<unknown> = Promise.resolve()
 
-  /** Start (or keep) tracking this Game. Idempotent; the cron calls it every minute. */
+  /**
+   * Start (or keep) tracking this Game. Idempotent; the schedule sync calls
+   * it every minute. It deliberately leaves the error count alone: a Game
+   * that gave up after MAX_CONSECUTIVE_ERRORS gets one try per wake, not
+   * another full run of fast retries, until a poll succeeds and resets it.
+   */
   async track(game: TrackRequest): Promise<void> {
     await this.ctx.storage.put(GAME_KEY, game)
     const alarm = await this.ctx.storage.getAlarm()
@@ -81,18 +108,43 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
 
   /**
    * Poll the Source once more, outside the alarm loop: e.g. to fill in the
-   * box score of a Game that finished before box scores were stored.
-   * False if this LiveGame never tracked the Game.
+   * box score of a Game that finished before box scores were stored. True
+   * when it polled; false if this LiveGame never tracked the Game, an alarm
+   * is due to poll anyway, or it polled within REFRESH_EVERY_MS.
    */
   async refresh(): Promise<boolean> {
-    const game = await this.ctx.storage.get<TrackRequest>(GAME_KEY)
-    if (!game) return false
-    const snapshot = await sourceFor(game.league).snapshot(game.sourceGameId)
-    await this.apply(game, snapshot)
-    return true
+    return this.exclusive(async () => {
+      const game = await this.ctx.storage.get<TrackRequest>(GAME_KEY)
+      if (!game) return false
+      if ((await this.ctx.storage.getAlarm()) !== null) return false
+      const last = await this.ctx.storage.get<number>(REFRESHED_KEY)
+      if (last !== undefined && Date.now() - last < REFRESH_EVERY_MS) {
+        return false
+      }
+      // Stamped before the fetch, so a failing Source is throttled too.
+      await this.ctx.storage.put(REFRESHED_KEY, Date.now())
+      const snapshot = await sourceFor(game.league).snapshot(game.sourceGameId)
+      await this.apply(game, snapshot)
+      return true
+    })
   }
 
-  async alarm(): Promise<void> {
+  alarm(): Promise<void> {
+    return this.exclusive(() => this.poll())
+  }
+
+  /**
+   * Run polls one at a time. Input gates don't hold across a Source fetch,
+   * so a refresh() and the alarm could otherwise both diff against the same
+   * `seen` and record, publish and Alert the same changes twice.
+   */
+  private exclusive<T>(run: () => Promise<T>): Promise<T> {
+    const next = this.polling.then(run)
+    this.polling = next.catch(() => undefined)
+    return next
+  }
+
+  private async poll(): Promise<void> {
     const game = await this.ctx.storage.get<TrackRequest>(GAME_KEY)
     if (!game) return
     let delay: number | null
@@ -102,12 +154,13 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
       await this.noteFallback(game, snapshot.fallback, items)
       await this.ctx.storage.put(ERRORS_KEY, 0)
       await this.ctx.storage.delete(RATE_LIMITED_KEY)
-      delay = nextPollDelay(
-        snapshot.status,
-        snapshot.startsAt,
-        new Date(),
-        snapshot.pollHintSeconds,
-      )
+      delay =
+        nextPollDelay(
+          snapshot.status,
+          snapshot.startsAt,
+          new Date(),
+          snapshot.pollHintSeconds,
+        ) ?? (await this.boxRetryDelay(snapshot))
     } catch (error) {
       const errors = ((await this.ctx.storage.get<number>(ERRORS_KEY)) ?? 0) + 1
       await this.ctx.storage.put(ERRORS_KEY, errors)
@@ -129,6 +182,22 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
       delay = errors >= MAX_CONSECUTIVE_ERRORS ? null : retry.delayMs
     }
     if (delay !== null) await this.ctx.storage.setAlarm(Date.now() + delay)
+  }
+
+  /**
+   * A Game that's over stops polling, unless its box score is still only
+   * the Plays' (the Source's failed): then it checks back every
+   * BOX_RETRY_MS, MAX_BOX_RETRIES times, for the full one.
+   */
+  private async boxRetryDelay(snapshot: GameSnapshot): Promise<number | null> {
+    if (snapshot.status !== 'final' || !snapshot.boxPartial) {
+      await this.ctx.storage.delete(BOX_RETRIES_KEY)
+      return null
+    }
+    const retries =
+      ((await this.ctx.storage.get<number>(BOX_RETRIES_KEY)) ?? 0) + 1
+    await this.ctx.storage.put(BOX_RETRIES_KEY, retries)
+    return retries > MAX_BOX_RETRIES ? null : BOX_RETRY_MS
   }
 
   /**
@@ -216,14 +285,15 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
       const ids = [
         ...new Set(unnamed.flatMap((p) => playerIds.get(p.sourceId) ?? [])),
       ]
-      const known = new Map(
-        (
-          await db
-            .select({ id: players.id, name: players.name })
-            .from(players)
-            .where(inArray(players.id, ids.slice(0, 90)))
-        ).map((r) => [r.id, r.name]),
-      )
+      const known = new Map<string, string>()
+      // D1 caps bound parameters per statement at 100.
+      for (const part of chunk(ids, 90)) {
+        const named = await db
+          .select({ id: players.id, name: players.name })
+          .from(players)
+          .where(inArray(players.id, part))
+        for (const r of named) known.set(r.id, r.name)
+      }
       for (const p of unnamed) {
         const name = known.get(playerIds.get(p.sourceId) ?? '')
         if (name && !name.startsWith('#')) p.name = name
@@ -302,28 +372,39 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
 
     // ── Persist (D1 is the record) ──────────────────────────────────────
     const statements: Array<BatchItem<'sqlite'>> = []
-    statements.push(
-      db
-        .update(games)
-        .set({
-          status: snapshot.status,
-          awayScore: snapshot.score.away,
-          homeScore: snapshot.score.home,
-          situation: snapshot.situation,
-          box,
-          // Only a Source that ranks teams (college football) sets these.
-          ...(snapshot.away.rank !== undefined
-            ? {
-                awayRank: snapshot.away.rank,
-                homeRank: snapshot.home.rank ?? null,
-                awayConference: snapshot.away.conference ?? null,
-                homeConference: snapshot.home.conference ?? null,
-              }
-            : {}),
-          updatedAt: now,
-        })
-        .where(eq(games.id, game.gameId)),
-    )
+    // A box that's only the Plays' never replaces a full one.
+    const keepBox =
+      snapshot.boxPartial &&
+      Boolean(await this.ctx.storage.get<boolean>(FULL_BOX_KEY))
+    const gameFields = {
+      status: snapshot.status,
+      awayScore: snapshot.score.away,
+      homeScore: snapshot.score.home,
+      situation: snapshot.situation,
+      ...(keepBox ? {} : { box }),
+      // Only a Source that ranks teams (college football) sets these.
+      ...(snapshot.away.rank !== undefined
+        ? {
+            awayRank: snapshot.away.rank,
+            homeRank: snapshot.home.rank ?? null,
+            awayConference: snapshot.away.conference ?? null,
+            homeConference: snapshot.home.conference ?? null,
+          }
+        : {}),
+    }
+    // Most polls change no Play and leave the game as it was: then neither
+    // the row (box JSON and all) is rewritten nor a `game` event sent.
+    const gameHash = hash(JSON.stringify(gameFields))
+    const gameChanged =
+      gameHash !== (await this.ctx.storage.get<string>(GAME_HASH_KEY))
+    if (gameChanged) {
+      statements.push(
+        db
+          .update(games)
+          .set({ ...gameFields, updatedAt: now })
+          .where(eq(games.id, game.gameId)),
+      )
+    }
     for (let i = 0; i < upserts.length; i += ITEM_ROWS_PER_INSERT) {
       statements.push(
         db
@@ -371,8 +452,10 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
           .onConflictDoNothing(),
       )
     }
-    const [first, ...rest] = statements
-    await db.batch([first, ...rest])
+    if (statements.length > 0) {
+      const [first, ...rest] = statements
+      await db.batch([first, ...rest])
+    }
 
     // Remember only once D1 has the changes, so a failed write is retried.
     await this.ctx.storage.put(
@@ -390,6 +473,10 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
     if (removedKeys.length > 0) await this.ctx.storage.delete(removedKeys)
     this.seen = nextSeen
     if (backfilling) await this.ctx.storage.put(POLLED_KEY, true)
+    if (gameChanged) await this.ctx.storage.put(GAME_HASH_KEY, gameHash)
+    if (box && !snapshot.boxPartial) {
+      await this.ctx.storage.put(FULL_BOX_KEY, true)
+    }
 
     // ── Publish (the Hub is a relay, never a store) ─────────────────────
     const overturnedRows =
@@ -412,20 +499,24 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
       conference: snapshot.home.conference ?? null,
     }
     const events: Array<TimelineEvent> = [
-      {
-        type: 'game',
-        game: {
-          id: game.gameId,
-          league: game.league,
-          sportsDay: game.sportsDay,
-          status: snapshot.status,
-          startsAt: snapshot.startsAt,
-          awayTeam: away,
-          homeTeam: home,
-          score: snapshot.score,
-          situation: snapshot.situation,
-        },
-      },
+      ...(gameChanged
+        ? [
+            {
+              type: 'game' as const,
+              game: {
+                id: game.gameId,
+                league: game.league,
+                sportsDay: game.sportsDay,
+                status: snapshot.status,
+                startsAt: snapshot.startsAt,
+                awayTeam: away,
+                homeTeam: home,
+                score: snapshot.score,
+                situation: snapshot.situation,
+              },
+            },
+          ]
+        : []),
       ...[...upserts, ...overturnedRows].map((row) => ({
         type: 'upsert' as const,
         item: toTimelineItem(row, away, home),
@@ -436,8 +527,18 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
         gameId: game.gameId,
       })),
     ]
-    const hub = this.env.LIVE_HUB.get(this.env.LIVE_HUB.idFromName('global'))
-    await hub.publish(events)
+    if (events.length > 0) {
+      // The poll doesn't wait on the relay, and the relay failing (the
+      // changes are already recorded) must not cost the Alerts below.
+      const hub = this.env.LIVE_HUB.get(this.env.LIVE_HUB.idFromName('global'))
+      this.ctx.waitUntil(
+        Promise.resolve()
+          .then(() => hub.publish(events))
+          .catch((error: unknown) =>
+            reportError(this.env, 'live-hub', error, { gameId: game.gameId }),
+          ),
+      )
+    }
 
     // Alerts (CONTEXT.md): only news, never backfilled history; a failure
     // here must never stop the Game being tracked.
@@ -454,6 +555,10 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
           reportError(this.env, 'alerts', error, { gameId: game.gameId }),
         )
       }
+    }
+    // The cap only matters while a Game can still score.
+    if (snapshot.status === 'final') {
+      await this.ctx.storage.delete(ALERT_LOG_KEY)
     }
     return items
   }
@@ -506,7 +611,11 @@ function storedBox(
   }
 }
 
-/** Columns an upsert may overwrite (everything but the identity columns). */
+/**
+ * Columns an upsert may overwrite (everything but the identity columns).
+ * `status` stays out: an Overturned Play stays struck through (CONTEXT.md,
+ * "Overturn"), and a later Revision only changes its facts ("Revision").
+ */
 const UPDATABLE_COLUMNS = [
   'sequence',
   'occurred_at',

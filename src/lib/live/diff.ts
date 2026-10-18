@@ -101,7 +101,7 @@ export function diffItems(
 }
 
 /** FNV-1a, 32-bit: cheap, stable change detection (not security). */
-function hash(text: string): string {
+export function hash(text: string): string {
   let h = 0x811c9dc5
   for (let i = 0; i < text.length; i++) {
     h ^= text.charCodeAt(i)

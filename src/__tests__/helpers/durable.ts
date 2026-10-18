@@ -60,10 +60,18 @@ export function memoryCtx() {
   let alarm: number | null = null
   const alarmSets: Array<number> = []
   const sockets: Array<FakeSocket> = []
+  const pending: Array<Promise<unknown>> = []
   return {
     data,
     alarmSets,
     sockets,
+    waitUntil: (promise: Promise<unknown>): void => {
+      pending.push(promise)
+    },
+    /** Wait for everything handed to waitUntil so far. */
+    settle: async (): Promise<void> => {
+      await Promise.all(pending.splice(0))
+    },
     storage: {
       get: <T>(key: string): Promise<T | undefined> =>
         Promise.resolve(data.get(key) as T | undefined),
