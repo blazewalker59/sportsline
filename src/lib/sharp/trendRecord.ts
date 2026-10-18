@@ -22,12 +22,17 @@ import {
   trendPicks,
 } from '@/lib/db/schema'
 import { markets } from '@/lib/kalshi/client'
+import { chunk } from '@/lib/live/identity'
 
 export type TrendPickRow = typeof trendPicks.$inferSelect
 export type BetRequestRow = typeof betRequests.$inferSelect
 
 /** Picks are followed this long for a placement or a result. */
 const FOLLOW_DAYS = 7
+/** Viewers, or markets, per statement: both lists fit in D1's 100 values. */
+const CHUNK = 40
+/** Trend pick rows per insert: 17 values each. */
+const PICK_ROWS_PER_INSERT = 5
 
 /** Store an ask and what it answered with. */
 export async function recordRequest(
@@ -58,29 +63,28 @@ export async function recordRequest(
     reason: answer.reason,
     createdAt: at,
   })
-  if (answer.picks.length > 0) {
-    await db.insert(trendPicks).values(
-      answer.picks.map((p, i) => ({
-        id: `${requestId}:${i + 1}`,
-        requestId,
-        viewerId: caller.viewerId,
-        rank: i + 1,
-        marketTicker: p.ticker,
-        side: p.side,
-        marketKind: p.key.kind,
-        title: p.title,
-        gameLabel: p.gameLabel,
-        league: p.league,
-        gameId: p.key.gameId,
-        startsAt: p.startsAt,
-        price: p.price,
-        fair: p.fair,
-        trendChance: p.trendChance,
-        edge: p.edge,
-        createdAt: at,
-      })),
-    )
-  }
+  const rows = answer.picks.map((p, i): typeof trendPicks.$inferInsert => ({
+    id: `${requestId}:${i + 1}`,
+    requestId,
+    viewerId: caller.viewerId,
+    rank: i + 1,
+    marketTicker: p.ticker,
+    side: p.side,
+    marketKind: p.key.kind,
+    title: p.title,
+    gameLabel: p.gameLabel,
+    league: p.league,
+    gameId: p.key.gameId,
+    startsAt: p.startsAt,
+    price: p.price,
+    fair: p.fair,
+    trendChance: p.trendChance,
+    edge: p.edge,
+    createdAt: at,
+  }))
+  // A six-leg combo's rows bind more than D1's 100 values in one insert.
+  for (const part of chunk(rows, PICK_ROWS_PER_INSERT))
+    await db.insert(trendPicks).values(part)
   return requestId
 }
 
@@ -167,27 +171,37 @@ export async function trackTrendPicks(
 
   // Placements: the Viewers' Predictions on these markets, and Agents'
   // approved proposals that filled (before the sync has seen them).
-  const held = await db
-    .select()
-    .from(predictions)
-    .where(
-      and(
-        inArray(predictions.viewerId, viewers),
-        inArray(predictions.marketTicker, tickers),
-        eq(predictions.kind, 'single'),
-      ),
-    )
-  const filled = await db
-    .select()
-    .from(tradeProposals)
-    .where(
-      and(
-        inArray(tradeProposals.viewerId, viewers),
-        inArray(tradeProposals.marketTicker, tickers),
-        eq(tradeProposals.action, 'buy'),
-        inArray(tradeProposals.status, ['filled', 'partial']),
-      ),
-    )
+  // Viewers by markets, a slice of each a statement: D1 binds 100 values.
+  const held: Array<typeof predictions.$inferSelect> = []
+  const filled: Array<typeof tradeProposals.$inferSelect> = []
+  for (const someViewers of chunk(viewers, CHUNK))
+    for (const someTickers of chunk(tickers, CHUNK)) {
+      held.push(
+        ...(await db
+          .select()
+          .from(predictions)
+          .where(
+            and(
+              inArray(predictions.viewerId, someViewers),
+              inArray(predictions.marketTicker, someTickers),
+              eq(predictions.kind, 'single'),
+            ),
+          )),
+      )
+      filled.push(
+        ...(await db
+          .select()
+          .from(tradeProposals)
+          .where(
+            and(
+              inArray(tradeProposals.viewerId, someViewers),
+              inArray(tradeProposals.marketTicker, someTickers),
+              eq(tradeProposals.action, 'buy'),
+              inArray(tradeProposals.status, ['filled', 'partial']),
+            ),
+          )),
+      )
+    }
   const byAgent = (viewerId: string, ticker: string, side: string) =>
     filled.find(
       (t) =>

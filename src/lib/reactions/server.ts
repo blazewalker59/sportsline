@@ -57,6 +57,14 @@ export const setReaction = createServerFn({ method: 'POST' })
           )
         return
       }
+      // Only to an item on the Timeline (the foreign key would refuse
+      // anything else, less helpfully).
+      const item = await db
+        .select({ id: timelineItems.id })
+        .from(timelineItems)
+        .where(eq(timelineItems.id, data.itemId))
+        .get()
+      if (!item) throw new Error('No such Play')
       await db
         .insert(reactions)
         .values({
