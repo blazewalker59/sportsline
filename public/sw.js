@@ -24,14 +24,41 @@ self.addEventListener('push', (event) => {
   )
 })
 
+/**
+ * Ask an open tab to route to `url` itself (src/lib/push/serviceWorker.ts),
+ * resolving whether it answered: a tab still loading, or on an older build,
+ * doesn't.
+ */
+function askToNavigate(client, url) {
+  return new Promise((resolve) => {
+    const channel = new MessageChannel()
+    const timer = setTimeout(() => resolve(false), 1500)
+    channel.port1.onmessage = () => {
+      clearTimeout(timer)
+      resolve(true)
+    }
+    client.postMessage({ type: 'sportsline:navigate', url }, [channel.port2])
+  })
+}
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const url = new URL(event.notification.data?.url || '/', self.location.origin).href
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
-      const open = windows.find((w) => new URL(w.url).origin === self.location.origin)
-      if (open) return open.focus().then(() => open.navigate(url))
-      return self.clients.openWindow(url)
-    }),
+    (async () => {
+      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      const open =
+        windows.find((w) => w.focused && new URL(w.url).origin === self.location.origin) ??
+        windows.find((w) => new URL(w.url).origin === self.location.origin)
+      if (!open) return self.clients.openWindow(url)
+      try {
+        const tab = (await open.focus()) ?? open
+        if (await askToNavigate(tab, url)) return
+        // navigate() rejects for a tab this worker doesn't control.
+        await tab.navigate(url)
+      } catch {
+        await self.clients.openWindow(url)
+      }
+    })(),
   )
 })
