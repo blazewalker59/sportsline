@@ -19,6 +19,7 @@ import type { AlertLevels, AlertReason } from './alerts'
 import type { CloudflareEnv, Database } from '@/lib/db'
 import type { TimelineItem } from '@/lib/model/timeline'
 import type { VapidKeys } from './webpush'
+import { chunk } from '@/lib/live/identity'
 import {
   alertSettings,
   fantasyLeagues,
@@ -302,10 +303,11 @@ export async function deliverAlerts(
   }
   // Dead subscriptions, and any saved before endpoints were checked that
   // isn't on a push service (sendPush refuses those as gone, unsent).
-  if (gone.size > 0) {
+  // A hundred at a time: D1 binds at most 100 parameters.
+  for (const part of chunk([...gone], 100)) {
     await db
       .delete(pushSubscriptions)
-      .where(inArray(pushSubscriptions.endpoint, [...gone]))
+      .where(inArray(pushSubscriptions.endpoint, part))
   }
   return { sent, pruned: gone.size }
 }

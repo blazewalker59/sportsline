@@ -77,6 +77,8 @@ export const FALLBACK_LOSSY_BELOW = 0.75
 // D1 caps bound parameters per statement at 100.
 const ITEM_ROWS_PER_INSERT = 3
 const PLAYER_ROWS_PER_INSERT = 45
+/** Ids a statement matches with `inArray`, beside a few other values. */
+const IDS_PER_STATEMENT = 90
 
 export interface TrackRequest extends TrackedGame {
   awayTeam: TrackedGame['awayTeam'] & { name: string }
@@ -288,8 +290,7 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
         ...new Set(unnamed.flatMap((p) => playerIds.get(p.sourceId) ?? [])),
       ]
       const known = new Map<string, string>()
-      // D1 caps bound parameters per statement at 100.
-      for (const part of chunk(ids, 90)) {
+      for (const part of chunk(ids, IDS_PER_STATEMENT)) {
         const named = await db
           .select({ id: players.id, name: players.name })
           .from(players)
@@ -418,27 +419,23 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
           }),
       )
     }
-    if (overturnedIds.length > 0) {
+    for (const part of chunk(overturnedIds, IDS_PER_STATEMENT)) {
       statements.push(
         db
           .update(timelineItems)
           .set({ status: 'overturned', revisedAt: now })
-          .where(inArray(timelineItems.id, overturnedIds)),
+          .where(inArray(timelineItems.id, part)),
       )
     }
     const affected = [...upserts.map((r) => r.id), ...removedIds]
-    if (affected.length > 0) {
-      for (let i = 0; i < affected.length; i += 90) {
-        statements.push(
-          db
-            .delete(itemPlayers)
-            .where(inArray(itemPlayers.itemId, affected.slice(i, i + 90))),
-        )
-      }
-    }
-    if (removedIds.length > 0) {
+    for (const part of chunk(affected, IDS_PER_STATEMENT)) {
       statements.push(
-        db.delete(timelineItems).where(inArray(timelineItems.id, removedIds)),
+        db.delete(itemPlayers).where(inArray(itemPlayers.itemId, part)),
+      )
+    }
+    for (const part of chunk(removedIds, IDS_PER_STATEMENT)) {
+      statements.push(
+        db.delete(timelineItems).where(inArray(timelineItems.id, part)),
       )
     }
     const links = upserts.flatMap((r) =>
@@ -479,13 +476,16 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
     }
 
     // ── Publish (the Hub is a relay, never a store) ─────────────────────
-    const overturnedRows =
-      overturnedIds.length > 0
-        ? await db
+    const overturnedRows = (
+      await Promise.all(
+        chunk(overturnedIds, IDS_PER_STATEMENT).map((part) =>
+          db
             .select()
             .from(timelineItems)
-            .where(inArray(timelineItems.id, overturnedIds))
-        : []
+            .where(inArray(timelineItems.id, part)),
+        ),
+      )
+    ).flat()
     const away = {
       ...game.awayTeam,
       colors: teamColors(game.league, game.awayTeam.name),
