@@ -14,6 +14,7 @@
 import { DurableObject } from 'cloudflare:workers'
 import { and, eq, inArray } from 'drizzle-orm'
 import type { CloudflareEnv } from '@/lib/db'
+import type { RateWindow } from '@/lib/agents/rateLimit'
 import { dbFromD1 } from '@/lib/db'
 import {
   espnAccounts,
@@ -25,6 +26,7 @@ import {
 } from '@/lib/db/schema'
 import { UNSETTLED, stored } from '@/lib/agents/proposal'
 import { reconcileTrades } from '@/lib/agents/reconcile'
+import { hit } from '@/lib/agents/rateLimit'
 import { syncAccount as syncSleeper } from '@/lib/fantasy/sleeper/sync'
 import { syncAccount as syncEspn } from '@/lib/fantasy/sync'
 import { refreshPrices, syncAccount as syncKalshi } from '@/lib/kalshi/sync'
@@ -60,6 +62,14 @@ interface Connected {
 }
 
 export class ViewerSync extends DurableObject<CloudflareEnv> {
+  /** This Viewer's API tokens' /mcp request counts (rateLimit.ts). */
+  private rates = new Map<string, RateWindow>()
+
+  /** Count an /mcp request by a token: 0, or the seconds to wait. */
+  hitRate(tokenId: string): number {
+    return hit(this.rates, tokenId, Date.now())
+  }
+
   /** Start (or keep) this Viewer's loop. Idempotent and cheap. */
   async start(viewerId: string): Promise<void> {
     if ((await this.ctx.storage.get<string>('viewerId')) !== viewerId)

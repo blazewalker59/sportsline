@@ -8,6 +8,8 @@ import { isBun, sqliteDb } from '../../helpers/sqliteDb'
 import type { CloudflareEnv } from '@/lib/db'
 import type * as Db from '@/lib/db'
 import type { serveMcp as ServeMcp } from '@/lib/agents/endpoint'
+import type { RateWindow } from '@/lib/agents/rateLimit'
+import { hit } from '@/lib/agents/rateLimit'
 
 const state = vi.hoisted(() => ({ db: null as unknown }))
 vi.mock('@/lib/db', async (original) => ({
@@ -17,7 +19,20 @@ vi.mock('@/lib/db', async (original) => ({
 vi.mock('@/lib/ops/errors', () => ({ reportError: () => Promise.resolve() }))
 
 const URL_ = 'https://sportsline.dev/mcp'
-const env = { DB: {} } as CloudflareEnv
+// Each Viewer's ViewerSync, counting their tokens' requests.
+const rates = new Map<string, Map<string, RateWindow>>()
+const env = {
+  DB: {},
+  VIEWER_SYNC: {
+    idFromName: (viewerId: string) => viewerId,
+    get: (viewerId: string) => ({
+      hitRate: (tokenId: string) => {
+        if (!rates.has(viewerId)) rates.set(viewerId, new Map())
+        return Promise.resolve(hit(rates.get(viewerId)!, tokenId, Date.now()))
+      },
+    }),
+  },
+} as unknown as CloudflareEnv
 let token = ''
 
 function post(body: unknown, headers: Record<string, string> = {}) {
@@ -146,5 +161,37 @@ describe.skipIf(!isBun)('/mcp', () => {
     )
     expect(bad.status).toBe(400)
     expect(await bad.json()).toMatchObject({ error: { code: -32700 } })
+  })
+
+  it('limits each token to 60 requests a minute', async () => {
+    const { createToken } = await import('@/lib/agents/tokens')
+    const busy = (await createToken(state.db as never, 'u1', 'Busy')).token
+    const ping = (bearer: string) =>
+      serveMcp(
+        post(
+          { jsonrpc: '2.0', id: 1, method: 'ping' },
+          { authorization: `Bearer ${bearer}` },
+        ),
+        env,
+      )
+    for (let i = 0; i < 60; i++) expect((await ping(busy)).status).toBe(200)
+    const over = await ping(busy)
+    expect(over.status).toBe(429)
+    expect(Number(over.headers.get('retry-after'))).toBeGreaterThan(0)
+    expect(await over.json()).toMatchObject({
+      jsonrpc: '2.0',
+      id: null,
+      error: { code: -32000, message: expect.stringMatching(/at most 60/) },
+    })
+    // Another token of the same Viewer has its own allowance.
+    expect((await ping(token)).status).toBe(200)
+  })
+
+  it('lets requests through when the counter can’t be reached', async () => {
+    const res = await serveMcp(
+      post({ jsonrpc: '2.0', id: 1, method: 'ping' }),
+      { DB: {} } as CloudflareEnv,
+    )
+    expect(res.status).toBe(200)
   })
 })

@@ -246,4 +246,11 @@ describe.skipIf(!isBun)('ViewerSync', () => {
     expect(state.calls).toEqual(['trades'])
     expect(jobNames()).toEqual(['trades:u1'])
   })
+
+  it('counts each token’s /mcp requests apart', () => {
+    const loop = sync()
+    for (let i = 0; i < 60; i++) expect(loop.hitRate('tok')).toBe(0)
+    expect(loop.hitRate('tok')).toBe(60)
+    expect(loop.hitRate('other')).toBe(0)
+  })
 })
