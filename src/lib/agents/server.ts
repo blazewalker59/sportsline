@@ -202,7 +202,10 @@ export const connectTradeKey = createServerFn({ method: 'POST' })
           'Sportsline needs a key with exactly the Read and Trade scopes: one that can trade but never withdraw or transfer money. Create one in Kalshi with only those.',
         )
       }
-      const sealed = await seal(env.KALSHI_ENCRYPTION_KEY, data.privateKey)
+      const sealed = await seal(env.KALSHI_ENCRYPTION_KEY, data.privateKey, {
+        purpose: 'kalshi-trade',
+        viewerId,
+      })
       const row = {
         viewerId,
         keyId: data.keyId,

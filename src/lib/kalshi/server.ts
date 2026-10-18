@@ -153,7 +153,10 @@ export const connectKalshi = createServerFn({ method: 'POST' })
           'This key can trade. Sportsline only accepts read-only keys: create one with only the Read scope in Kalshi.',
         )
       }
-      const sealed = await seal(env.KALSHI_ENCRYPTION_KEY, data.privateKey)
+      const sealed = await seal(env.KALSHI_ENCRYPTION_KEY, data.privateKey, {
+        purpose: 'kalshi-read',
+        viewerId,
+      })
       const now = new Date().toISOString()
       const row = {
         viewerId,

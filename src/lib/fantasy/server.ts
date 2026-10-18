@@ -110,8 +110,14 @@ export const connectEspn = createServerFn({ method: 'POST' })
         // added by URL.
       }
       const [swid, s2] = await Promise.all([
-        seal(env.ESPN_ENCRYPTION_KEY, session.swid),
-        seal(env.ESPN_ENCRYPTION_KEY, session.espnS2),
+        seal(env.ESPN_ENCRYPTION_KEY, session.swid, {
+          purpose: 'espn-swid',
+          viewerId,
+        }),
+        seal(env.ESPN_ENCRYPTION_KEY, session.espnS2, {
+          purpose: 'espn-s2',
+          viewerId,
+        }),
       ])
       const now = new Date().toISOString()
       const row = {

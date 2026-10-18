@@ -1,7 +1,25 @@
 /**
  * Kalshi private keys at rest (docs/adr/0003): AES-GCM under
- * KALSHI_ENCRYPTION_KEY, a 32-byte key held only as a Worker secret.
+ * KALSHI_ENCRYPTION_KEY, a 32-byte key held only as a Worker secret. ESPN
+ * cookies are sealed the same way under their own (docs/adr/0004).
+ *
+ * Each ciphertext is bound to what it is and whose (the GCM associated
+ * data), so a database write can't move a sealed value to another row or
+ * Viewer: it simply won't open there. Ciphertexts carry a version prefix;
+ * an unprefixed one is from before binding, and opens without it.
  */
+
+/** What a sealed value is: each opens only as the same purpose. */
+export type VaultPurpose =
+  'kalshi-read' | 'kalshi-trade' | 'espn-swid' | 'espn-s2'
+
+/** A sealed value's place: its purpose and the Viewer it belongs to. */
+export interface VaultContext {
+  purpose: VaultPurpose
+  viewerId: string
+}
+
+const VERSION = 'v1:'
 
 export interface Sealed {
   /** base64 ciphertext (with the GCM tag). */
@@ -35,27 +53,48 @@ async function vaultKey(secret: string | undefined): Promise<CryptoKey> {
   ])
 }
 
+function additionalData(context: VaultContext): Uint8Array<ArrayBuffer> {
+  // Purposes have no colon, so the first one ends it.
+  return new TextEncoder().encode(`${context.purpose}:${context.viewerId}`)
+}
+
 export async function seal(
   secret: string | undefined,
   plaintext: string,
+  context: VaultContext,
 ): Promise<Sealed> {
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const ciphertext = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
+    { name: 'AES-GCM', iv, additionalData: additionalData(context) },
     await vaultKey(secret),
     new TextEncoder().encode(plaintext),
   )
-  return { ciphertext: toBase64(ciphertext), iv: toBase64(iv) }
+  return { ciphertext: VERSION + toBase64(ciphertext), iv: toBase64(iv) }
+}
+
+/** Sealed before values were bound to their place: worth sealing again. */
+export function isLegacy(sealed: Sealed): boolean {
+  return !sealed.ciphertext.startsWith(VERSION)
 }
 
 export async function unseal(
   secret: string | undefined,
   sealed: Sealed,
+  context: VaultContext,
 ): Promise<string> {
+  const legacy = isLegacy(sealed)
   const plaintext = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: fromBase64(sealed.iv) },
+    legacy
+      ? { name: 'AES-GCM', iv: fromBase64(sealed.iv) }
+      : {
+          name: 'AES-GCM',
+          iv: fromBase64(sealed.iv),
+          additionalData: additionalData(context),
+        },
     await vaultKey(secret),
-    fromBase64(sealed.ciphertext),
+    fromBase64(
+      legacy ? sealed.ciphertext : sealed.ciphertext.slice(VERSION.length),
+    ),
   )
   return new TextDecoder().decode(plaintext)
 }
