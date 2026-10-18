@@ -5,6 +5,7 @@ import {
   MAX_REMOVALS_PER_POLL,
   diffItems,
   fingerprint,
+  involvedShare,
   keepInvolved,
 } from '@/lib/live/diff'
 
@@ -122,5 +123,15 @@ describe('keepInvolved', () => {
     ])
     expect(a.kind === 'play' && a.involved).toEqual([cook])
     expect(b.kind === 'play' && b.involved).toEqual([])
+  })
+})
+
+describe('involvedShare', () => {
+  it('is the share of plays naming anyone, and nothing without plays', () => {
+    const allen = { sourceId: '1', name: 'Josh Allen', role: 'passer' }
+    expect(involvedShare([play('a', { involved: [allen] }), play('b')])).toBe(
+      0.5,
+    )
+    expect(involvedShare([])).toBeNull()
   })
 })

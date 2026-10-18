@@ -26,6 +26,8 @@ const state = vi.hoisted(() => ({
   events: [] as Array<Array<{ type: string }>>,
   hubThrows: false,
   reports: [] as Array<string>,
+  /** Whether each report would push the admins. */
+  notified: [] as Array<boolean>,
   alertBatches: 0,
   allowLog: [] as Array<boolean>,
   extraAllows: 0,
@@ -61,8 +63,15 @@ vi.mock('@/lib/sources', () => ({
 }))
 
 vi.mock('@/lib/ops/errors', () => ({
-  reportError: (_env: unknown, scope: string) => {
+  reportError: (
+    _env: unknown,
+    scope: string,
+    _error: unknown,
+    _context: unknown,
+    options?: { notify?: boolean },
+  ) => {
     state.reports.push(scope)
+    state.notified.push(options?.notify ?? true)
     return Promise.resolve()
   },
 }))
@@ -195,6 +204,7 @@ describe.skipIf(!isBun)('LiveGame', () => {
     state.events = []
     state.hubThrows = false
     state.reports = []
+    state.notified = []
     state.alertBatches = 0
     state.allowLog = []
     state.extraAllows = 0
@@ -584,7 +594,9 @@ describe.skipIf(!isBun)('LiveGame', () => {
     await poll(FALLBACK_REPORT_EVERY - 1, 'core plays unavailable')
     expect(state.reports).toEqual([])
     await poll(1, 'core plays unavailable')
-    expect(state.reports).toEqual(['source-fallback'])
+    // No play names anyone: it's losing them, so the admins hear of it.
+    expect(state.reports).toEqual(['source-fallback-lossy'])
+    expect(state.notified).toEqual([true])
 
     // The Source answering in full starts the count over.
     await poll(1)
@@ -595,6 +607,26 @@ describe.skipIf(!isBun)('LiveGame', () => {
     // Still on it: reported again each as many polls more.
     await poll(FALLBACK_REPORT_EVERY, 'core plays unavailable')
     expect(state.reports).toHaveLength(3)
+  })
+
+  it('only logs a fallback that still names who was Involved', async () => {
+    const { FALLBACK_REPORT_EVERY } = await import('@/lib/live/LiveGame')
+    const game = instance()
+    await game.track(tracked)
+    const judge = { sourceId: '99', name: 'Aaron Judge', role: 'batter' }
+    state.snap = snap(
+      [
+        play('a', { involved: [judge] }),
+        play('b', { sequence: 2, involved: [judge] }),
+        play('c', { sequence: 3, involved: [judge] }),
+        play('d', { sequence: 4 }),
+      ],
+      { fallback: 'core plays unavailable' },
+    )
+    for (let i = 0; i < FALLBACK_REPORT_EVERY; i++) await game.alarm()
+    // Three of four plays: as good as the Source in full, so logged quietly.
+    expect(state.reports).toEqual(['source-fallback'])
+    expect(state.notified).toEqual([false])
   })
 
   it('retries a failed poll, reports a 429 only after it lasts, and gives up', async () => {

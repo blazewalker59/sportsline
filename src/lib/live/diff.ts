@@ -57,6 +57,13 @@ export function keepInvolved(
   })
 }
 
+/** The share of plays naming anyone Involved; null with no plays. */
+export function involvedShare(items: ReadonlyArray<SourceItem>): number | null {
+  const plays = items.filter((i) => i.kind === 'play')
+  if (plays.length === 0) return null
+  return plays.filter((p) => p.involved.length > 0).length / plays.length
+}
+
 export function diffItems(
   seen: ReadonlyMap<string, SeenItem>,
   items: ReadonlyArray<SourceItem>,
