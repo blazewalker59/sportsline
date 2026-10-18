@@ -21,7 +21,12 @@ import { EspnError, fanProfile, leagueViews } from './client'
 import { discoverLeagues } from './discovery'
 import { liveProjected } from './liveProjection'
 import { countsInMatchupWindow, matchupWindow } from './schedule'
-import { myTeamId, readMatchup, readMatchupDay } from './matchup'
+import {
+  myTeamId,
+  readLeagueMatchups,
+  readMatchup,
+  readMatchupDay,
+} from './matchup'
 import { MLB_PRO_TEAMS, NFL_PRO_TEAMS, SPORTS, seasonOf } from './sports'
 import type { EspnSession } from './client'
 import type { LineupPlayer, MatchupDay, MatchupView } from './matchup'
@@ -346,6 +351,24 @@ export async function attachOurs(
 }
 
 /**
+ * A Matchup's Players matched to ours, with their Teams; Sleeper's sides
+ * get a live projection too (Sleeper sends none).
+ */
+export async function attachMatchup(
+  db: Database,
+  row: Pick<typeof fantasyLeagues.$inferSelect, 'id' | 'sport' | 'provider'>,
+  view: MatchupView,
+): Promise<void> {
+  await attachOurs(db, row, [
+    ...view.mine.lineup,
+    ...(view.opponent?.lineup ?? []),
+    ...(view.mine.summary ?? []),
+    ...(view.opponent?.summary ?? []),
+  ])
+  if (row.provider === 'sleeper') await projectLive(db, view)
+}
+
+/**
  * Store a league's Matchup (any provider's): its Players mapped to ours
  * (with headshots), their Teams' logos, and who's in it for the feed.
  */
@@ -356,14 +379,7 @@ export async function storeMatchup(
   set: { season: number; teamId: number | null; lastError: string | null },
 ): Promise<void> {
   if (view) {
-    await attachOurs(db, row, [
-      ...view.mine.lineup,
-      ...(view.opponent?.lineup ?? []),
-      ...(view.mine.summary ?? []),
-      ...(view.opponent?.summary ?? []),
-    ])
-    // Sleeper sends no live projection: work it out from each Starter's Game.
-    if (row.provider === 'sleeper') await projectLive(db, view)
+    await attachMatchup(db, row, view)
     await db
       .delete(fantasyPlayers)
       .where(eq(fantasyPlayers.leagueRowId, row.id))
@@ -526,6 +542,8 @@ export async function syncLeague(
   }
   const teamId = myTeamId(league, session.swid, row.teamId)
   const view = teamId === null ? null : readMatchup(row.sport, league, teamId)
+  if (view && teamId !== null)
+    view.others = readLeagueMatchups(row.sport, league, teamId)
   await storeMatchup(db, row, view, {
     season,
     teamId,
@@ -539,13 +557,16 @@ export async function syncLeague(
  * Another day of a Viewer's category Matchup, read from ESPN on demand
  * and not stored (an earlier day is final; a later one has Lineups but no
  * stats yet). Null when the league isn't theirs, isn't a category league
- * on ESPN, or the day isn't another day of its current Matchup.
+ * on ESPN, the day isn't another day of its current Matchup, or `teamId`
+ * isn't in one of its other Matchups.
  */
 export async function readDay(
   env: Pick<CloudflareEnv, 'DB' | 'ESPN_ENCRYPTION_KEY'>,
   viewerId: string,
   rowId: string,
   scoringPeriod: number,
+  /** Another Matchup's left team (LeagueMatchup); the Viewer's by default. */
+  teamId?: number,
 ): Promise<MatchupDay | null> {
   const db = dbFromD1(env.DB)
   const row = await db
@@ -560,6 +581,8 @@ export async function readDay(
     return null
   if (!m.days?.includes(scoringPeriod) || scoringPeriod === m.scoringPeriod)
     return null
+  const team = teamId ?? row.teamId
+  if (teamId !== undefined && !isOtherMatchup(m, teamId)) return null
   const session = await loadSession(env, viewerId)
   if (!session) return null
   const league = await leagueViews(
@@ -569,9 +592,35 @@ export async function readDay(
     row.leagueId,
     scoringPeriod,
   )
-  const day = readMatchupDay(row.sport, league, row.teamId, scoringPeriod)
+  const day = readMatchupDay(row.sport, league, team, scoringPeriod)
   if (day) await attachOurs(db, row, [...day.mine, ...(day.opponent ?? [])])
   return day
+}
+
+/** Whether `teamId` is the left team of one of the league's other Matchups. */
+export function isOtherMatchup(m: MatchupView, teamId: number): boolean {
+  return m.others?.some((o) => o.left.teamId === teamId) ?? false
+}
+
+/**
+ * Another Matchup in a Viewer's ESPN league, read in full now and not
+ * stored: `teamId` on the left, as the league's scoreboard (`others`) has
+ * it. Null when the league isn't theirs or that isn't one of its Matchups.
+ */
+export async function readLeagueMatchup(
+  env: Pick<CloudflareEnv, 'DB' | 'ESPN_ENCRYPTION_KEY'>,
+  viewerId: string,
+  row: typeof fantasyLeagues.$inferSelect,
+  teamId: number,
+): Promise<MatchupView | null> {
+  if (row.viewerId !== viewerId || row.provider !== 'espn') return null
+  if (!row.matchup || !isOtherMatchup(row.matchup, teamId)) return null
+  // A public league reads without cookies (docs/adr/0004).
+  const session = await loadSession(env, viewerId)
+  const league = await leagueViews(session, row.sport, row.season, row.leagueId)
+  const view = readMatchup(row.sport, league, teamId)
+  if (view) await attachMatchup(dbFromD1(env.DB), row, view)
+  return view
 }
 
 /** Bring one Viewer's Fantasy leagues up to date. */

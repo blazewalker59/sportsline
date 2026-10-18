@@ -7,7 +7,13 @@
  */
 
 import { NFL_PRO_TEAMS } from '../sports'
-import type { LineupPlayer, MatchupSide, MatchupView } from '../matchup'
+import { asLeagueMatchup } from '../matchup'
+import type {
+  LeagueMatchup,
+  LineupPlayer,
+  MatchupSide,
+  MatchupView,
+} from '../matchup'
 import type {
   SleeperLeague,
   SleeperMatchup,
@@ -350,4 +356,40 @@ export function readSleeperMatchup(input: {
       ? sideOf(league, theirRoster, theirMatchup, users, data)
       : null,
   }
+}
+
+/**
+ * Every other Matchup in the league this week, each read the way the
+ * Viewer's is (its lower roster on the left), in matchup order; then any
+ * roster Sleeper pairs with no one this week (a bye).
+ */
+export function readSleeperLeagueMatchups(
+  input: Omit<Parameters<typeof readSleeperMatchup>[0], 'mine'>,
+  myRosterId: number,
+): Array<LeagueMatchup> {
+  const myMatchup = input.matchups.find((m) => m.roster_id === myRosterId)
+  const others = input.matchups
+    .filter(
+      (m) =>
+        m.roster_id !== myRosterId &&
+        (m.matchup_id == null || m.matchup_id !== myMatchup?.matchup_id),
+    )
+    .sort(
+      (a, b) =>
+        (a.matchup_id ?? Infinity) - (b.matchup_id ?? Infinity) ||
+        a.roster_id - b.roster_id,
+    )
+  const paired = new Set<number>()
+  const lefts = others.filter((m) => {
+    if (m.matchup_id == null) return true
+    if (paired.has(m.matchup_id)) return false
+    paired.add(m.matchup_id)
+    return true
+  })
+  return lefts.flatMap((m) => {
+    const roster = input.rosters.find((r) => r.roster_id === m.roster_id)
+    return roster
+      ? [asLeagueMatchup(readSleeperMatchup({ ...input, mine: roster }))]
+      : []
+  })
 }

@@ -7,6 +7,7 @@ import { queryOptions } from '@tanstack/react-query'
 import {
   getEspnConnection,
   getFantasy,
+  getLeagueMatchup,
   getMatchupDay,
   getMatchupRace,
   getSleeperConnection,
@@ -82,10 +83,25 @@ export function matchupDayQuery(
   leagueId: string,
   scoringPeriod: number,
   currentPeriod: number,
+  /** Another Matchup in the league (its left team), not the Viewer's. */
+  teamId?: number,
 ) {
   return queryOptions({
-    queryKey: ['matchup-day', leagueId, scoringPeriod] as const,
-    queryFn: () => getMatchupDay({ data: { leagueId, scoringPeriod } }),
+    queryKey: ['matchup-day', leagueId, scoringPeriod, teamId ?? null] as const,
+    queryFn: () => getMatchupDay({ data: { leagueId, scoringPeriod, teamId } }),
     staleTime: scoringPeriod < currentPeriod ? Infinity : 5 * 60_000,
+  })
+}
+
+/**
+ * Another Matchup in the Viewer's league, read from its provider while
+ * its sheet is open, as often as the Viewer's own Matchup refreshes.
+ */
+export function leagueMatchupQuery(leagueId: string, teamId: number) {
+  return queryOptions({
+    queryKey: ['league-matchup', leagueId, teamId] as const,
+    queryFn: () => getLeagueMatchup({ data: { leagueId, teamId } }),
+    refetchInterval: 2 * 60_000,
+    staleTime: REFRESH_MS,
   })
 }

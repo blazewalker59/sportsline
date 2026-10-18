@@ -185,6 +185,47 @@ export interface MatchupView {
   today?: Array<CategoryResult> | null
   /** The matchup's scoring periods (days), first to last. */
   days?: Array<number>
+  /**
+   * The league's other Matchups this period, as scores: the Viewer's own
+   * Matchup only (each opens in full on demand, readLeagueMatchup).
+   */
+  others?: Array<LeagueMatchup>
+}
+
+/** One side of another Matchup in the league, as its scoreboard shows it. */
+export interface LeagueMatchupSide {
+  teamId: number
+  name: string
+  abbrev: string
+  logo: string | null
+  record: string | null
+  /** Fantasy points, or in a category league the categories it leads. */
+  score: number
+}
+
+/** Another Matchup in the Viewer's league: two teams, or one on a bye. */
+export interface LeagueMatchup {
+  left: LeagueMatchupSide
+  right: LeagueMatchupSide | null
+  /** Category leagues: categories neither side leads. */
+  ties?: number
+}
+
+/** A Matchup read as if `left` were the Viewer's, down to its scores. */
+export function asLeagueMatchup(view: MatchupView): LeagueMatchup {
+  const side = (s: MatchupSide): LeagueMatchupSide => ({
+    teamId: s.teamId,
+    name: s.name,
+    abbrev: s.abbrev,
+    logo: s.logo,
+    record: s.record,
+    score: s.score,
+  })
+  return {
+    left: side(view.mine),
+    right: view.opponent ? side(view.opponent) : null,
+    ...(view.ties ? { ties: view.ties } : {}),
+  }
 }
 
 /**
@@ -547,6 +588,26 @@ export function readMatchup(
     }
   }
   return view
+}
+
+/**
+ * Every other Matchup in the league this period, each read the way the
+ * Viewer's is (its away team on the left), in ESPN's schedule order.
+ */
+export function readLeagueMatchups(
+  sport: FantasySport,
+  league: WireLeague,
+  mine: number,
+): Array<LeagueMatchup> {
+  const period = league.status?.currentMatchupPeriod ?? 1
+  return (league.schedule ?? []).flatMap((game) => {
+    if (game.matchupPeriodId !== period) return []
+    const ids = [game.away?.teamId, game.home?.teamId]
+    if (ids.includes(mine)) return []
+    const left = ids.find((id) => id !== undefined)
+    const view = left === undefined ? null : readMatchup(sport, league, left)
+    return view ? [asLeagueMatchup(view)] : []
+  })
 }
 
 /**
