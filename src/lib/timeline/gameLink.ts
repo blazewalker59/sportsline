@@ -13,6 +13,16 @@ export function gameSearch(
     : { game: gameId }
 }
 
+/** Search params that open a Play's sheet over the Timeline, on its Sports Day. */
+export function playSearch(
+  playId: string,
+  sportsDay: string,
+): { play: string; day?: string } {
+  return sportsDay < sportsDayOf(new Date())
+    ? { play: playId, day: sportsDay }
+    : { play: playId }
+}
+
 /** A valid, unique view-transition-name for a Timeline element. */
 export function vtName(id: string): string {
   return `m-${id.replace(/[^a-zA-Z0-9_-]/g, '_')}`
