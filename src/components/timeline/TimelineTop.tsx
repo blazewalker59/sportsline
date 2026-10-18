@@ -18,10 +18,8 @@ import type { GameSummary, TimelineItem } from '@/lib/model/timeline'
 import type { RowItem } from '@/lib/model/leagues'
 import type { Connection } from '@/lib/timeline/useLiveTimeline'
 import { FantasyStrip } from '@/components/fantasy/FantasyParts'
-import {
-  PredictionStrip,
-  PredictionSummary,
-} from '@/components/predictions/PredictionParts'
+import { PredictionStrip } from '@/components/predictions/PredictionCard'
+import { PredictionSummary } from '@/components/predictions/PredictionPortfolio'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { withViewTransition } from '@/lib/viewTransition'
 import { cn } from '@/lib/utils'

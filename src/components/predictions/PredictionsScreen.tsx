@@ -4,15 +4,9 @@
  */
 
 import { useState } from 'react'
-import {
-  PredictionSheet,
-  PredictionSummary,
-  Sparkline,
-  money,
-  pct,
-  profitOf,
-  profitText,
-} from './PredictionParts'
+import { Sparkline, money, pct, profitOf, profitText } from './PredictionParts'
+import { PredictionSheet } from './PredictionSheet'
+import { PredictionSummary } from './PredictionPortfolio'
 import { PredictionRecordSection } from './PredictionRecord'
 import { SharpPicksSection } from './SharpPicks'
 import { PriceDisplayToggle } from './PriceDisplayToggle'

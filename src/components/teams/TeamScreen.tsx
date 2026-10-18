@@ -20,7 +20,7 @@ import { getTeamPage, openTeamGame } from '@/lib/teams/server'
 import { rosterGroups } from '@/lib/teams/positions'
 import { useViewer } from '@/lib/viewer/useViewer'
 import { PlayerButton } from '@/components/players/playerSheet'
-import { PredictionsSection } from '@/components/players/PlayerProfile'
+import { PredictionsSection } from '@/components/players/PredictionsSection'
 import { cn } from '@/lib/utils'
 
 const RESULTS_SHOWN = 10
