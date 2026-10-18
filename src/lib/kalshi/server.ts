@@ -211,8 +211,11 @@ export const setChangeDisplay = createServerFn({ method: 'POST' })
 /** Forget the key and every Prediction read with it. */
 export const disconnectKalshi = createServerFn({ method: 'POST' }).handler(() =>
   withViewer(async ({ db, viewerId }) => {
-    await db.delete(predictions).where(eq(predictions.viewerId, viewerId))
-    await db.delete(kalshiAccounts).where(eq(kalshiAccounts.viewerId, viewerId))
+    // In one batch: a failure halfway can't leave the key behind.
+    await db.batch([
+      db.delete(predictions).where(eq(predictions.viewerId, viewerId)),
+      db.delete(kalshiAccounts).where(eq(kalshiAccounts.viewerId, viewerId)),
+    ])
   }),
 )
 

@@ -147,15 +147,18 @@ export const connectEspn = createServerFn({ method: 'POST' })
 /** Forget the cookies and every Fantasy league read with them. */
 export const disconnectEspn = createServerFn({ method: 'POST' }).handler(() =>
   withViewer(async ({ db, viewerId }) => {
-    await db
-      .delete(fantasyLeagues)
-      .where(
-        and(
-          eq(fantasyLeagues.viewerId, viewerId),
-          eq(fantasyLeagues.provider, 'espn'),
+    // In one batch: a failure halfway can't leave the cookies behind.
+    await db.batch([
+      db
+        .delete(fantasyLeagues)
+        .where(
+          and(
+            eq(fantasyLeagues.viewerId, viewerId),
+            eq(fantasyLeagues.provider, 'espn'),
+          ),
         ),
-      )
-    await db.delete(espnAccounts).where(eq(espnAccounts.viewerId, viewerId))
+      db.delete(espnAccounts).where(eq(espnAccounts.viewerId, viewerId)),
+    ])
   }),
 )
 
@@ -251,17 +254,19 @@ export const connectSleeper = createServerFn({ method: 'POST' })
 export const disconnectSleeper = createServerFn({ method: 'POST' }).handler(
   () =>
     withViewer(async ({ db, viewerId }) => {
-      await db
-        .delete(fantasyLeagues)
-        .where(
-          and(
-            eq(fantasyLeagues.viewerId, viewerId),
-            eq(fantasyLeagues.provider, 'sleeper'),
+      await db.batch([
+        db
+          .delete(fantasyLeagues)
+          .where(
+            and(
+              eq(fantasyLeagues.viewerId, viewerId),
+              eq(fantasyLeagues.provider, 'sleeper'),
+            ),
           ),
-        )
-      await db
-        .delete(sleeperAccounts)
-        .where(eq(sleeperAccounts.viewerId, viewerId))
+        db
+          .delete(sleeperAccounts)
+          .where(eq(sleeperAccounts.viewerId, viewerId)),
+      ])
     }),
 )
 
@@ -370,8 +375,9 @@ export const reorderFantasyLeagues = createServerFn({ method: 'POST' })
   )
   .handler(({ data }) =>
     withViewer(async ({ db, viewerId }) => {
-      for (const [position, id] of data.ids.entries())
-        await db
+      // All or nothing: half a reorder would leave positions colliding.
+      const [first, ...rest] = data.ids.map((id, position) =>
+        db
           .update(fantasyLeagues)
           .set({ position })
           .where(
@@ -379,7 +385,9 @@ export const reorderFantasyLeagues = createServerFn({ method: 'POST' })
               eq(fantasyLeagues.id, id),
               eq(fantasyLeagues.viewerId, viewerId),
             ),
-          )
+          ),
+      )
+      if (first) await db.batch([first, ...rest])
     }),
   )
 
