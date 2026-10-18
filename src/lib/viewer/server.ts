@@ -289,7 +289,13 @@ export const setFollow = createServerFn({ method: 'POST' })
 
 const ISO = z.string().datetime({ offset: true })
 
-/** Move the Read Marker forward (never back: a stale tab can't rewind it). */
+/**
+ * Move the Read Marker forward (never back: a stale tab can't rewind it).
+ * Markers are compared as text, as Plays' occurredAt are, so each is
+ * stored in UTC and no later than now: an offset or a future time would
+ * sort wrong and pin the marker. A stored one that doesn't (written before
+ * this rule) gives way to the new one.
+ */
 export const markRead = createServerFn({ method: 'POST' })
   .validator((data: { readAt: string }) =>
     z.object({ readAt: ISO }).parse(data),
@@ -297,13 +303,23 @@ export const markRead = createServerFn({ method: 'POST' })
   .handler(({ data }) =>
     withViewer(async ({ db, viewerId }) => {
       const now = new Date().toISOString()
+      const sent = Date.parse(data.readAt)
+      const at = Math.min(sent, Date.parse(now))
+      const utc = new Date(at).toISOString()
+      // Keep whole seconds whole, as a Source's "…:05Z" occurredAt is: its
+      // "…:05.000Z" would sort before the very Play it marks.
+      const readAt =
+        at === sent && !/\.\d/.test(data.readAt)
+          ? utc.replace('.000Z', 'Z')
+          : utc
+      const stored = sql`case when ${readMarkers.readAt} like '%Z' and ${readMarkers.readAt} <= ${now} then ${readMarkers.readAt} else '' end`
       await db
         .insert(readMarkers)
-        .values({ viewerId, readAt: data.readAt, updatedAt: now })
+        .values({ viewerId, readAt, updatedAt: now })
         .onConflictDoUpdate({
           target: readMarkers.viewerId,
           set: {
-            readAt: sql`max(${readMarkers.readAt}, excluded.read_at)`,
+            readAt: sql`max(${stored}, excluded.read_at)`,
             updatedAt: now,
           },
         })
