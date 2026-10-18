@@ -4,10 +4,11 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import { desc } from 'drizzle-orm'
+import { and, count, desc, eq, gte } from 'drizzle-orm'
 import { z } from 'zod'
-import { adminEmails, isAdmin, reportError } from './errors'
+import { fingerprintOf, isAdmin, messageOf, reportError } from './errors'
 import { isStale } from './jobs'
+import type { Database } from '@/lib/db'
 import { viewerMiddleware } from '@/lib/viewer/middleware'
 import { getCloudflareEnv, getDb } from '@/lib/db'
 import {
@@ -51,11 +52,11 @@ export interface ErrorView {
   details: string | null
 }
 
-/** Why there's nothing to show: who the server sees, and who's an admin. */
+/** Why there's nothing to show: who the server sees. Nothing about who
+ * the admins are, or how many. */
 export interface OpsDenied {
   denied: true
   email: string
-  adminsConfigured: number
 }
 
 export interface OpsHealth {
@@ -69,14 +70,10 @@ export const getOpsHealth = createServerFn({ method: 'GET' })
   .middleware([viewerMiddleware])
   .handler(async ({ context: { viewer } }): Promise<OpsHealth | OpsDenied> => {
     const env = getCloudflareEnv()
-    const admin = isAdmin(env, viewer.email)
-    console.log('[ops] health requested', { email: viewer.email, admin })
-    if (!admin)
-      return {
-        denied: true,
-        email: viewer.email,
-        adminsConfigured: adminEmails(env).length,
-      }
+    if (!isAdmin(env, viewer.email)) {
+      console.warn('[ops] health denied', { viewerId: viewer.id })
+      return { denied: true, email: viewer.email }
+    }
     const db = getDb()
     const [jobs, errors, users, kalshi, espn, sleeper] = await Promise.all([
       db.select().from(jobRuns),
@@ -121,9 +118,45 @@ export const getOpsHealth = createServerFn({ method: 'GET' })
     }
   })
 
-/** Browser errors this isolate has taken per Viewer this minute. */
+/** Browser errors this isolate has taken per Viewer this minute: a cheap
+ * first filter, before D1 is asked. */
 const recent = new Map<string, { minute: number; count: number }>()
 const PER_MINUTE = 10
+
+/** Each kind of browser error is recorded at most this often. */
+const KIND_EVERY_MS = 60_000
+/** New kinds of browser error recorded per hour, across every Viewer. */
+const NEW_KINDS_PER_HOUR = 30
+
+/**
+ * Whether to record a browser error, bounded across isolates by what
+ * error_events already holds: a kind seen in the last minute only adds to
+ * its count's story once a minute, and new kinds stop once an hour has
+ * brought plenty (a flood of made-up messages can't fill the table, or
+ * page the admins, without end).
+ */
+async function worthRecording(
+  db: Database,
+  fingerprint: string,
+  now: number,
+): Promise<boolean> {
+  const seen = await db
+    .select({ lastAt: errorEvents.lastAt })
+    .from(errorEvents)
+    .where(eq(errorEvents.fingerprint, fingerprint))
+    .get()
+  if (seen) return now - Date.parse(seen.lastAt) >= KIND_EVERY_MS
+  const [fresh] = await db
+    .select({ n: count() })
+    .from(errorEvents)
+    .where(
+      and(
+        eq(errorEvents.scope, 'client'),
+        gte(errorEvents.firstAt, new Date(now - 3_600_000).toISOString()),
+      ),
+    )
+  return fresh.n < NEW_KINDS_PER_HOUR
+}
 
 /** A crash or unhandled failure in the browser, reported to the same place. */
 export const reportClientError = createServerFn({ method: 'POST' })
@@ -139,14 +172,18 @@ export const reportClientError = createServerFn({ method: 'POST' })
         })
         .parse(data),
   )
-  .handler(async ({ data, context: { viewer } }) => {
-    const minute = Math.floor(Date.now() / 60_000)
+  .handler(async ({ data, context: { viewer, db } }) => {
+    const now = Date.now()
+    const minute = Math.floor(now / 60_000)
     const seen = recent.get(viewer.id)
-    const count = seen?.minute === minute ? seen.count + 1 : 1
-    recent.set(viewer.id, { minute, count })
-    if (count > PER_MINUTE) return
+    const taken = seen?.minute === minute ? seen.count + 1 : 1
+    recent.set(viewer.id, { minute, count: taken })
+    if (taken > PER_MINUTE) return
     const error = new Error(data.message)
     if (data.stack) error.stack = data.stack
+    // As reportError groups it.
+    const kind = fingerprintOf('client', messageOf(error).slice(0, 500))
+    if (!(await worthRecording(db, kind, now))) return
     await reportError(getCloudflareEnv(), 'client', error, {
       viewerId: viewer.id,
       path: data.path,
