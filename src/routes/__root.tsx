@@ -15,6 +15,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import { PlayerSheetProvider } from '@/components/players/PlayerProfile'
 import { Landing } from '@/components/landing/Landing'
 import { useViewer } from '@/lib/viewer/useViewer'
+import { ensureViewer } from '@/lib/viewer/queries'
 import { sendClientError, useClientErrors } from '@/lib/ops/useClientErrors'
 import { isStaleBuild, reloadForNewBuild } from '@/lib/ops/staleBuild'
 
@@ -23,6 +24,11 @@ interface MyRouterContext {
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
+  // The session first, so the server renders the app (or the Landing) rather
+  // than a splash, and every loader below knows who's asking.
+  beforeLoad: async ({ context }) => ({
+    viewerState: await ensureViewer(context.queryClient),
+  }),
   head: () => ({
     meta: [
       { charSet: 'utf-8' },

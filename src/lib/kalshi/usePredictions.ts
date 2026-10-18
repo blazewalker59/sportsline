@@ -4,40 +4,32 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   connectKalshi,
   disconnectKalshi,
-  getKalshiConnection,
-  getPredictionDetail,
-  getPredictionRecord,
-  getPredictions,
   setChangeDisplay,
   syncKalshiNow,
 } from './server'
+import {
+  kalshiConnectionQuery,
+  predictionDetailQuery,
+  predictionRecordQuery,
+  predictionsQuery,
+} from './queries'
 import type { ChangeDisplay, KalshiConnection } from './server'
 import { useViewer } from '@/lib/viewer/useViewer'
 
-const CONNECTION_KEY = ['kalshi-connection'] as const
-const PREDICTIONS_KEY = ['predictions'] as const
-/** Odds refresh on the server each minute; check in a bit more often. */
-const REFRESH_MS = 30_000
+const CONNECTION_KEY = kalshiConnectionQuery().queryKey
+const PREDICTIONS_KEY = predictionsQuery().queryKey
 
 export function useKalshiConnection() {
   const { data: viewerState } = useViewer()
   return useQuery({
-    queryKey: CONNECTION_KEY,
-    queryFn: () => getKalshiConnection(),
+    ...kalshiConnectionQuery(),
     enabled: Boolean(viewerState?.viewer),
-    staleTime: 60_000,
   })
 }
 
 export function usePredictions() {
   const connection = useKalshiConnection()
-  return useQuery({
-    queryKey: PREDICTIONS_KEY,
-    queryFn: () => getPredictions(),
-    enabled: Boolean(connection.data),
-    refetchInterval: REFRESH_MS,
-    staleTime: REFRESH_MS / 2,
-  })
+  return useQuery({ ...predictionsQuery(), enabled: Boolean(connection.data) })
 }
 
 export function useConnectKalshi() {
@@ -91,26 +83,15 @@ export function useSetChangeDisplay() {
   })
 }
 
-/** Every Prediction made, for the Record (built per range on the device). */
-/**
- * One Prediction's whole odds history and the plays in its Games, for its
- * sheet; refreshed with the odds (a point a minute) while it's open.
- */
+/** One Prediction's odds history and the plays in its Games, for its sheet. */
 export function usePredictionDetail(id: string) {
-  return useQuery({
-    queryKey: ['prediction-detail', id],
-    queryFn: () => getPredictionDetail({ data: { id } }),
-    refetchInterval: REFRESH_MS,
-    staleTime: REFRESH_MS / 2,
-  })
+  return useQuery(predictionDetailQuery(id))
 }
 
 export function usePredictionRecord() {
   const connection = useKalshiConnection()
   return useQuery({
-    queryKey: ['prediction-record'],
-    queryFn: () => getPredictionRecord(),
+    ...predictionRecordQuery(),
     enabled: Boolean(connection.data),
-    staleTime: 5 * 60_000,
   })
 }
