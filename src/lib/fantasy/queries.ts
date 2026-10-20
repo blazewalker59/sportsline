@@ -15,8 +15,11 @@ import {
 import { getMatchupGames } from './schedule'
 import type { League } from '@/lib/model/types'
 
-/** Matchups refresh on the server every two minutes. */
-const REFRESH_MS = 60_000
+/**
+ * Matchups refresh on the server every thirty seconds while a Game is
+ * live (two minutes otherwise); reading what's stored is cheap.
+ */
+const REFRESH_MS = 20_000
 
 export function espnConnectionQuery() {
   return queryOptions({
@@ -102,6 +105,6 @@ export function leagueMatchupQuery(leagueId: string, teamId: number) {
     queryKey: ['league-matchup', leagueId, teamId] as const,
     queryFn: () => getLeagueMatchup({ data: { leagueId, teamId } }),
     refetchInterval: 2 * 60_000,
-    staleTime: REFRESH_MS,
+    staleTime: 60_000,
   })
 }
