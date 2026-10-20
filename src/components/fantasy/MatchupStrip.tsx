@@ -4,7 +4,7 @@
  * shows its other Matchups ("League Matchups") under the strip.
  */
 
-import { categoryRecord, pts, scoreText } from './format'
+import { categoryRecord, matchupAge, pts, scoreText } from './format'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type {
   LeagueMatchup,
@@ -13,6 +13,7 @@ import type {
 } from '@/lib/fantasy/matchup'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { CornerButton } from '@/components/timeline/GameStrip'
+import { useNow } from '@/components/timeline/format'
 import { SPORTS } from '@/lib/fantasy/sports'
 import { cn } from '@/lib/utils'
 
@@ -48,6 +49,7 @@ function MatchupCard({
   onSelect: () => void
 }) {
   const m = league.matchup!
+  const age = matchupAge(m, useNow())
   const lead =
     m.opponent && m.mine.score !== m.opponent.score
       ? m.mine.score > m.opponent.score
@@ -72,7 +74,23 @@ function MatchupCard({
     >
       <span className="flex items-center gap-1.5 text-[11px] font-semibold text-muted">
         <LeagueLogo league={SPORTS[m.sport].league} size={14} />
-        <span className="truncate">{m.leagueName}</span>
+        <span className="min-w-0 flex-1 truncate">{m.leagueName}</span>
+        {age && (
+          <span
+            title={
+              age.stale
+                ? (league.lastError ?? 'These scores haven’t updated lately')
+                : 'Updated'
+            }
+            className={cn(
+              'shrink-0 tabular-nums',
+              age.stale && 'text-amber-600 dark:text-amber-400',
+            )}
+          >
+            {age.stale && '⚠ '}
+            {age.label}
+          </span>
+        )}
       </span>
       <SideRow m={m} side={m.mine} leading={lead === 'mine'} />
       {m.opponent ? (

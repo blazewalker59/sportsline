@@ -411,7 +411,7 @@ export async function storeMatchup(
       teamId: set.teamId,
       name: view?.leagueName ?? row.name,
       teamName: view?.mine.name ?? row.teamName,
-      matchup: view,
+      matchup: view && { ...view, asOf: new Date().toISOString() },
       lastError: set.lastError,
       updatedAt: new Date().toISOString(),
     })

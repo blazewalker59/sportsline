@@ -254,6 +254,8 @@ describe.skipIf(!isBun)('ESPN fantasy sync', () => {
       ),
     ) as MatchupView
     expect(mapped.mine.lineup[0]?.playerId).toBe('pl_judge')
+    // Stamped when read, so the Viewer can see how old the scores are.
+    expect(Number.isNaN(Date.parse(mapped.asOf ?? ''))).toBe(false)
     expect(mapped.mine.lineup[0]?.teamAbbrev).toBe('NYY')
     const points = (
       sqlite as unknown as {

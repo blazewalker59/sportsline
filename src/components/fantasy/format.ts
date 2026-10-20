@@ -9,6 +9,7 @@ import type { LineupPlayer, MatchupView } from '@/lib/fantasy/matchup'
 import { tally } from '@/lib/fantasy/categories'
 import { shiftSportsDay, sportsDayOf } from '@/lib/model/sportsDay'
 import { weekdayDay } from '@/lib/time/format'
+import { timeAgo } from '@/components/timeline/format'
 
 export const pts = (n: number | null) => (n === null ? '—' : n.toFixed(1))
 
@@ -25,6 +26,25 @@ export function sideRecord(m: MatchupView, side: 'mine' | 'opponent'): string {
   const theirs = m.opponent?.score ?? 0
   const [won, lost] = side === 'mine' ? [mine, theirs] : [theirs, mine]
   return `${won}–${lost}${m.ties ? `–${m.ties}` : ''}`
+}
+
+/** Past this, a Matchup's scores are behind even its slowest sync. */
+export const STALE_MS = 3 * 60_000
+
+/**
+ * How old a Matchup's scores are ("now", "4m"), and whether that's older
+ * than its syncing explains. Null before it's been stamped or there's a
+ * client clock.
+ */
+export function matchupAge(
+  m: Pick<MatchupView, 'asOf'>,
+  now: number | null,
+): { label: string; stale: boolean } | null {
+  if (!m.asOf || now === null) return null
+  return {
+    label: timeAgo(m.asOf, now),
+    stale: now - Date.parse(m.asOf) > STALE_MS,
+  }
 }
 
 /** "6–3–1": categories won, lost and tied (from the Viewer's side). */

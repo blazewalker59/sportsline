@@ -190,6 +190,11 @@ export interface MatchupView {
    * Matchup only (each opens in full on demand, readLeagueMatchup).
    */
   others?: Array<LeagueMatchup>
+  /**
+   * When it was read from its provider, once stored: a failed sync keeps
+   * the last one, so its age is how old the scores are.
+   */
+  asOf?: string
 }
 
 /** One side of another Matchup in the league, as its scoreboard shows it. */

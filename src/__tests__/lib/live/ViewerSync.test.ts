@@ -189,6 +189,39 @@ describe.skipIf(!isBun)('ViewerSync', () => {
     expect(tasks?.espn.dueAt).toBe(NOW + 12 * MINUTE + 2 * MINUTE)
   })
 
+  it('reads Matchups every thirty seconds while a Game is live in a League their Fantasy leagues play in', async () => {
+    sqlite.run(
+      "INSERT INTO espn_accounts (viewer_id,swid_ciphertext,swid_iv,s2_ciphertext,s2_iv,status,connected_at) VALUES ('u1','s','i','s2','i','ok','2026-10-01T00:00:00Z')",
+    )
+    sqlite.run(
+      "INSERT INTO fantasy_leagues (id,viewer_id,sport,league_id,season,name,updated_at) VALUES ('u1~football~7','u1','football','7',2026,'Office','x')",
+    )
+    sqlite.run(
+      "INSERT INTO teams (id,league,name,abbreviation) VALUES ('tm_sf','nfl','San Francisco 49ers','SF'),('tm_wsh','nfl','Washington Commanders','WSH'),('tm_nyy','mlb','New York Yankees','NYY'),('tm_bos','mlb','Boston Red Sox','BOS')",
+    )
+    // A live Game in another League doesn't count.
+    sqlite.run(
+      "INSERT INTO games (id,league,sports_day,starts_at,status,away_team_id,home_team_id,updated_at) VALUES ('gm_mlb','mlb','2026-10-08','2026-10-08T17:00:00Z','live','tm_nyy','tm_bos',''),('gm_nfl','nfl','2026-10-08','2026-10-08T17:00:00Z','scheduled','tm_sf','tm_wsh','')",
+    )
+    const loop = sync()
+    await loop.start('u1')
+    await loop.alarm()
+    const dueAt = async () =>
+      (await ctx.storage.get<{ espn: { dueAt: number } }>('tasks'))?.espn.dueAt
+    expect(await dueAt()).toBe(NOW + 2 * MINUTE)
+
+    sqlite.run("UPDATE games SET status = 'live' WHERE id = 'gm_nfl'")
+    vi.setSystemTime(NOW + 2 * MINUTE)
+    await loop.alarm()
+    expect(await dueAt()).toBe(NOW + 2 * MINUTE + 30_000)
+
+    // A disabled league doesn't count either.
+    sqlite.run('UPDATE fantasy_leagues SET enabled = 0')
+    vi.setSystemTime(NOW + 2 * MINUTE + 30_000)
+    await loop.alarm()
+    expect(await dueAt()).toBe(NOW + 4 * MINUTE + 30_000)
+  })
+
   it('waits at least five seconds, and looks for new Predictions within five minutes', async () => {
     sqlite.run(
       "INSERT INTO kalshi_accounts (viewer_id,key_id,key_type,key_ciphertext,key_iv,scopes,status,connected_at) VALUES ('u1','k','ed25519','c','i','[]','ok','2026-10-01T00:00:00Z')",

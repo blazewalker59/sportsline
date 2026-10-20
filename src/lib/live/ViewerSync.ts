@@ -3,12 +3,13 @@
  * One Viewer's syncing, on their own alarm (docs/adr/0005): Kalshi prices
  * and Prediction Alerts each minute while they hold open Predictions,
  * Kalshi positions every five minutes, ESPN and Sleeper Matchups every
- * two, as are Agents' orders whose outcome isn't known yet (0008). Each
- * task keeps its own due time and backs off on its own when it
- * fails, so one Viewer's slow Source never delays another's. With no
- * connected accounts the object stops scheduling itself; it's started when
- * a Viewer connects or opens the app, and the Scheduler's sweep restarts
- * any that should be running.
+ * two (thirty seconds while a Game is live in a League the Viewer's
+ * Fantasy leagues play in), as are Agents' orders whose outcome isn't
+ * known yet (0008). Each task keeps its own due time and backs off on its
+ * own when it fails, so one Viewer's slow Source never delays another's.
+ * With no connected accounts the object stops scheduling itself; it's
+ * started when a Viewer connects or opens the app, and the Scheduler's
+ * sweep restarts any that should be running.
  */
 
 import { DurableObject } from 'cloudflare:workers'
@@ -18,6 +19,8 @@ import type { RateWindow } from '@/lib/agents/rateLimit'
 import { dbFromD1 } from '@/lib/db'
 import {
   espnAccounts,
+  fantasyLeagues,
+  games,
   jobRuns,
   kalshiAccounts,
   predictions,
@@ -29,6 +32,7 @@ import { reconcileTrades } from '@/lib/agents/reconcile'
 import { hit } from '@/lib/agents/rateLimit'
 import { syncAccount as syncSleeper } from '@/lib/fantasy/sleeper/sync'
 import { syncAccount as syncEspn } from '@/lib/fantasy/sync'
+import { SPORTS } from '@/lib/fantasy/sports'
 import { refreshPrices, syncAccount as syncKalshi } from '@/lib/kalshi/sync'
 import { runJob } from '@/lib/ops/jobs'
 import { sendPredictionAlerts } from '@/lib/push/predictionAlerts'
@@ -47,6 +51,12 @@ const EVERY: Record<Task, number> = {
   trades: 2 * MINUTE,
 }
 
+/** Matchups move with every play: read them this often while it's live. */
+const WHILE_LIVE: Partial<Record<Task, number>> = {
+  espn: 30_000,
+  sleeper: 30_000,
+}
+
 interface TaskState {
   dueAt: number
   failures: number
@@ -59,6 +69,8 @@ interface Connected {
   espn: boolean
   sleeper: boolean
   unsettledTrades: boolean
+  /** A Game is live in a League one of their Fantasy leagues plays in. */
+  fantasyLive: boolean
 }
 
 export class ViewerSync extends DurableObject<CloudflareEnv> {
@@ -124,6 +136,9 @@ export class ViewerSync extends DurableObject<CloudflareEnv> {
     // Nothing connected (or everything disconnected): stop until started.
     if (wanted.length === 0) return
 
+    // A Game going live mid-wait is picked up at the next due time.
+    const every = (t: Task) =>
+      (connected.fantasyLive ? WHILE_LIVE[t] : undefined) ?? EVERY[t]
     const now = Date.now()
     for (const task of wanted) {
       const state = tasks[task] ?? { dueAt: 0, failures: 0 }
@@ -131,13 +146,13 @@ export class ViewerSync extends DurableObject<CloudflareEnv> {
       const ok = await this.run(task, viewerId)
       const failures = ok ? 0 : state.failures + 1
       const wait = ok
-        ? EVERY[task]
+        ? every(task)
         : Math.min(MAX_BACKOFF_MS, EVERY[task] * 2 ** failures)
       tasks[task] = { dueAt: Date.now() + wait, failures }
     }
     await this.ctx.storage.put('tasks', tasks)
     const next = Math.min(
-      ...wanted.map((t) => tasks[t]?.dueAt ?? now + EVERY[t]),
+      ...wanted.map((t) => tasks[t]?.dueAt ?? now + every(t)),
       // Holding no open Predictions: look again for new ones in five minutes.
       now + 5 * MINUTE,
     )
@@ -170,7 +185,7 @@ export class ViewerSync extends DurableObject<CloudflareEnv> {
 
   private async connected(viewerId: string): Promise<Connected> {
     const db = dbFromD1(this.env.DB)
-    const [kalshi, open, espn, sleeper, unsettled] = await Promise.all([
+    const [kalshi, open, espn, sleeper, unsettled, sports] = await Promise.all([
       db
         .select({ id: kalshiAccounts.viewerId })
         .from(kalshiAccounts)
@@ -208,13 +223,37 @@ export class ViewerSync extends DurableObject<CloudflareEnv> {
         )
         .limit(1)
         .get(),
+      db
+        .selectDistinct({ sport: fantasyLeagues.sport })
+        .from(fantasyLeagues)
+        .where(
+          and(
+            eq(fantasyLeagues.viewerId, viewerId),
+            eq(fantasyLeagues.enabled, true),
+          ),
+        ),
     ])
+    const leagues = [...new Set(sports.map((s) => SPORTS[s.sport].league))]
+    const live =
+      leagues.length > 0 &&
+      (await db
+        .select({ id: games.id })
+        .from(games)
+        .where(
+          and(
+            inArray(games.league, leagues),
+            inArray(games.status, ['live', 'delayed']),
+          ),
+        )
+        .limit(1)
+        .get())
     return {
       kalshi: Boolean(kalshi),
       openPredictions: Boolean(open),
       espn: Boolean(espn),
       sleeper: Boolean(sleeper),
       unsettledTrades: Boolean(unsettled),
+      fantasyLive: Boolean(live),
     }
   }
 }
