@@ -22,6 +22,10 @@ const state = vi.hoisted(() => ({
   viewError: null as Error | null,
   topics: [] as Array<unknown>,
   cards: null as Array<unknown> | null,
+  pool: [] as Array<unknown>,
+  waivers: [] as Array<unknown>,
+  weekViews: new Map<number, unknown>(),
+  weekReads: [] as Array<number>,
   reports: [] as Array<string>,
 }))
 
@@ -56,8 +60,18 @@ vi.mock('@/lib/fantasy/client', async (original) => {
       state.profileError
         ? Promise.reject(state.profileError)
         : Promise.resolve(state.profile),
-    leagueViews: () => {
+    leagueViews: (
+      _s: unknown,
+      _sport: unknown,
+      _season: unknown,
+      _id: unknown,
+      period?: number,
+    ) => {
       if (state.viewError) return Promise.reject(state.viewError)
+      if (period !== undefined && state.weekViews.has(period)) {
+        state.weekReads.push(period)
+        return Promise.resolve(state.weekViews.get(period))
+      }
       return Promise.resolve(state.views)
     },
     leagueActivity: () => Promise.resolve(state.topics),
@@ -65,6 +79,8 @@ vi.mock('@/lib/fantasy/client', async (original) => {
       state.cards
         ? Promise.resolve(state.cards)
         : Promise.reject(new Error('ESPN 400')),
+    playerPool: () => Promise.resolve(state.pool),
+    waiverClaims: () => Promise.resolve(state.waivers),
   }
 })
 
@@ -92,6 +108,10 @@ describe.skipIf(!isBun)('ESPN fantasy sync', () => {
     state.viewError = null
     state.topics = []
     state.cards = []
+    state.pool = []
+    state.waivers = []
+    state.weekViews = new Map()
+    state.weekReads = []
     state.reports = []
     sqlite.run(
       "INSERT INTO user (id,name,email,email_verified,created_at,updated_at) VALUES ('u1','V','v@example.com',1,0,0)",
@@ -554,8 +574,157 @@ describe.skipIf(!isBun)('ESPN fantasy sync', () => {
       'Player 1',
       'Rostered Name',
     ])
+    // The most rostered Players name who a lookup by id didn't.
+    state.pool = [{ id: 1, fullName: 'Josh Allen', proTeamId: 2 }]
+    const pooled = await sync.readActivity(env, 'u1', row)
+    expect(pooled?.entries[0].items[0].player.name).toBe('Josh Allen')
     // Not the Viewer's league: nothing read.
     expect(await sync.readActivity(env, 'u2', row)).toBeNull()
+  })
+
+  it('names a Player ESPN didn’t from ours, and shows a contested claim', async () => {
+    const { fantasyLeagues } = await import('@/lib/db/schema')
+    sqlite.run(
+      "INSERT INTO players (id,league,name) VALUES ('pl_allen','nfl','Josh Allen')",
+    )
+    sqlite.run(
+      "INSERT INTO source_ids (entity,source,source_id,internal_id) VALUES ('player','espn','3918298','pl_allen')",
+    )
+    sqlite.run(
+      "INSERT INTO fantasy_leagues (id,viewer_id,sport,provider,league_id,season,name,updated_at) VALUES ('u1~football~ours','u1','football','espn','ours',2026,'Ours','x')",
+    )
+    const row = (await db.select().from(fantasyLeagues)).find(
+      (l) => l.id === 'u1~football~ours',
+    )!
+    state.topics = [
+      {
+        id: 'w',
+        date: 1,
+        messages: [{ messageTypeId: 180, targetId: 3918298, to: 5, from: 12 }],
+      },
+    ]
+    state.cards = []
+    state.waivers = [
+      {
+        status: 'EXECUTED',
+        scoringPeriodId: 6,
+        bidAmount: 12,
+        teamId: 5,
+        items: [{ playerId: 3918298, type: 'ADD' }],
+      },
+      {
+        status: 'FAILED_LOWBID',
+        scoringPeriodId: 6,
+        bidAmount: 3,
+        teamId: 8,
+        items: [{ playerId: 3918298, type: 'ADD' }],
+      },
+    ]
+    const read = await sync.readActivity(env, 'u1', row)
+    expect(read?.entries[0].items[0].player).toMatchObject({
+      name: 'Josh Allen',
+      playerId: 'pl_allen',
+    })
+    expect(read?.entries[0].claims).toEqual([
+      { teamId: 5, bid: 12, won: true },
+      { teamId: 8, bid: 3, won: false },
+    ])
+  })
+
+  it('reads each finished week for What-if standings once it’s final', async () => {
+    const { fantasyLeagues, fantasyWhatIf } = await import('@/lib/db/schema')
+    const { readWhatIf } = await import('@/lib/fantasy/whatIfRead')
+    sqlite.run(
+      "INSERT INTO fantasy_leagues (id,viewer_id,sport,provider,league_id,season,name,updated_at) VALUES ('u1~football~wi','u1','football','espn','wi',2026,'WI','x')",
+    )
+    const row = (await db.select().from(fantasyLeagues)).find(
+      (l) => l.id === 'u1~football~wi',
+    )!
+    row.matchup = { matchupPeriod: 4 } as MatchupView
+    const week = (n: number) => ({
+      settings: {
+        scheduleSettings: { matchupPeriods: { [String(n)]: [n] } },
+        rosterSettings: { lineupSlotCounts: { '0': 1 } },
+      },
+      teams: [
+        { id: 1, abbrev: 'A', name: 'Alpha' },
+        { id: 2, abbrev: 'B', name: 'Beta' },
+      ],
+      schedule: [
+        {
+          matchupPeriodId: n,
+          winner: 'AWAY',
+          home: {
+            teamId: 1,
+            totalPoints: 10,
+            rosterForCurrentScoringPeriod: {
+              entries: [
+                {
+                  lineupSlotId: 0,
+                  playerPoolEntry: {
+                    player: {
+                      id: 1,
+                      eligibleSlots: [0],
+                      stats: [
+                        {
+                          scoringPeriodId: n,
+                          statSourceId: 0,
+                          appliedTotal: 10,
+                        },
+                      ],
+                    },
+                  },
+                },
+                {
+                  lineupSlotId: 20,
+                  playerPoolEntry: {
+                    player: {
+                      id: 2,
+                      eligibleSlots: [0, 20],
+                      stats: [
+                        {
+                          scoringPeriodId: n,
+                          statSourceId: 0,
+                          appliedTotal: 30,
+                        },
+                      ],
+                    },
+                  },
+                },
+              ],
+            },
+          },
+          away: {
+            teamId: 2,
+            totalPoints: 20,
+            rosterForCurrentScoringPeriod: { entries: [] },
+          },
+        },
+      ],
+    })
+    for (const n of [1, 2, 3]) state.weekViews.set(n, week(n))
+    const first = await readWhatIf(env, 'u1', row)
+    expect(state.weekReads.sort()).toEqual([1, 2, 3])
+    expect(first?.weeks).toBe(3)
+    expect(first?.rows[0]).toMatchObject({
+      teamId: 1,
+      wins: 0,
+      losses: 3,
+      whatIfWins: 3,
+      benchLeft: 60,
+      flips: 3,
+    })
+    // Weeks 1 and 2 are final; last week is read again.
+    state.weekReads = []
+    await readWhatIf(env, 'u1', row)
+    expect(state.weekReads).toEqual([3])
+    expect(
+      (await db.select().from(fantasyWhatIf)).map((w) => [w.week, w.final]),
+    ).toEqual([
+      [1, true],
+      [2, true],
+      [3, false],
+    ])
   })
 
   it('reads an earlier day of a category Matchup on demand', async () => {

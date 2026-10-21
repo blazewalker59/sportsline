@@ -82,6 +82,8 @@ export interface SleeperTransaction {
   transaction_id: string
   type?: 'free_agent' | 'waiver' | 'trade' | 'commissioner' | string
   status?: string
+  /** The week it was made in. */
+  leg?: number
   /** When it went through (ms). */
   status_updated?: number
   created?: number

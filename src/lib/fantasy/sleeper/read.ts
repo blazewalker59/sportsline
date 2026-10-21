@@ -8,15 +8,21 @@
 
 import { NFL_PRO_TEAMS } from '../sports'
 import { asLeagueMatchup } from '../matchup'
-import { kindOf, newestFirst } from '../activity'
+import { byBid, kindOf, newestFirst } from '../activity'
 import { ranked } from '../standings'
 import type {
   ActivityEntry,
   ActivityItem,
   ActivityPlayer,
   LeagueActivity,
+  WaiverClaim,
 } from '../activity'
 import type { Standings } from '../standings'
+import type {
+  WhatIfMatchupInput,
+  WhatIfPlayer,
+  WhatIfSideInput,
+} from '../whatIf'
 import type {
   LeagueMatchup,
   LineupPlayer,
@@ -403,6 +409,22 @@ export function readSleeperActivity(input: {
   info: ReadonlyMap<string, SleeperPlayerInfo>
 }): LeagueActivity {
   const { transactions: txs, rosters: rs, users, info } = input
+  // Every claim in a waiver run on a Player, won or lost.
+  const runs = new Map<string, Array<WaiverClaim>>()
+  for (const t of txs) {
+    if (t.type !== 'waiver') continue
+    for (const [id, roster] of Object.entries(t.adds ?? {})) {
+      const key = `${t.leg ?? 0}:${id}`
+      runs.set(key, [
+        ...(runs.get(key) ?? []),
+        {
+          teamId: roster,
+          bid: t.settings?.waiver_bid ?? null,
+          won: t.status === 'complete',
+        },
+      ])
+    }
+  }
   const entries = txs.flatMap((t): Array<ActivityEntry> => {
     if (t.status !== 'complete') return []
     const adds = Object.entries(t.adds ?? {})
@@ -441,6 +463,9 @@ export function readSleeperActivity(input: {
           : (t.roster_ids ?? []).slice(0, 1),
         items,
         bid: waiver ? (t.settings?.waiver_bid ?? null) : null,
+        ...claimsOf(
+          waiver ? runs.get(`${t.leg ?? 0}:${adds[0]?.[0]}`) : undefined,
+        ),
       },
     ]
   })
@@ -451,6 +476,94 @@ export function readSleeperActivity(input: {
     }),
     entries: newestFirst(entries),
   }
+}
+
+function claimsOf(run: ReadonlyArray<WaiverClaim> | undefined): {
+  claims?: Array<WaiverClaim>
+} {
+  return run && run.length > 1 ? { claims: byBid(run) } : {}
+}
+
+/** The starting slots each position can fill, Sleeper's flex slots among them. */
+const ELIGIBLE: Record<string, ReadonlyArray<string>> = {
+  QB: ['QB', 'SUPER_FLEX'],
+  RB: ['RB', 'FLEX', 'WRRB_FLEX', 'SUPER_FLEX'],
+  WR: ['WR', 'FLEX', 'WRRB_FLEX', 'REC_FLEX', 'SUPER_FLEX'],
+  TE: ['TE', 'FLEX', 'REC_FLEX', 'SUPER_FLEX'],
+  K: ['K'],
+  DEF: ['DEF'],
+  DL: ['DL', 'IDP_FLEX'],
+  LB: ['LB', 'IDP_FLEX'],
+  DB: ['DB', 'IDP_FLEX'],
+}
+
+/**
+ * One finished week of a Sleeper league as What-if input (whatIf.ts): its
+ * starting slots and each matchup's two rosters, every Player they could
+ * have started (not the taxi squad) eligible by position.
+ */
+export function readSleeperWhatIfWeek(input: {
+  league: SleeperLeague
+  rosters: ReadonlyArray<SleeperRoster>
+  users: ReadonlyArray<SleeperUser>
+  matchups: ReadonlyArray<SleeperMatchup>
+  info: ReadonlyMap<string, SleeperPlayerInfo>
+  week: number
+}): { slots: Array<string>; matchups: Array<WhatIfMatchupInput> } | null {
+  const { league, rosters: rs, users, matchups: ms, info, week } = input
+  const slots = (league.roster_positions ?? []).filter(
+    (p) => !NOT_STARTING.has(p),
+  )
+  if (slots.length === 0) return null
+  const positionOf = (id: string) =>
+    info.get(id)?.position ?? (/^[A-Z]{2,3}$/.test(id) ? 'DEF' : '')
+  const side = (m: SleeperMatchup): WhatIfSideInput | null => {
+    const roster = rs.find((r) => r.roster_id === m.roster_id)
+    if (!roster) return null
+    const taxi = new Set(roster.taxi ?? [])
+    const starters = m.starters ?? []
+    const started = new Set(starters)
+    const player = (id: string, slot: string): WhatIfPlayer => {
+      const p = info.get(id)
+      return {
+        id,
+        name:
+          [p?.first_name, p?.last_name].filter(Boolean).join(' ') || `#${id}`,
+        points: round(m.players_points?.[id] ?? 0),
+        slot,
+        starter: slot !== 'BN',
+        eligible: ELIGIBLE[positionOf(id)] ?? [],
+      }
+    }
+    const team = teamOf(roster, users)
+    return {
+      teamId: team.teamId,
+      name: team.name,
+      abbrev: team.abbrev,
+      total: round(m.custom_points ?? m.points ?? 0),
+      roster: [
+        ...starters.flatMap((id, i) =>
+          id === '0' ? [] : [player(id, slots[i] ?? 'BN')],
+        ),
+        ...(m.players ?? [])
+          .filter((id) => !started.has(id) && !taxi.has(id))
+          .map((id) => player(id, 'BN')),
+      ],
+    }
+  }
+  const byMatchup = new Map<number, Array<SleeperMatchup>>()
+  for (const m of ms)
+    if (m.matchup_id != null)
+      byMatchup.set(m.matchup_id, [...(byMatchup.get(m.matchup_id) ?? []), m])
+  const matchups = [...byMatchup.values()].flatMap(
+    (pair): Array<WhatIfMatchupInput> => {
+      if (pair.length !== 2) return []
+      const home = side(pair[0])
+      const away = side(pair[1])
+      return home && away ? [{ period: week, home, away }] : []
+    },
+  )
+  return matchups.length > 0 ? { slots, matchups } : null
 }
 
 /** Every roster in the league as a Matchup side this week. */

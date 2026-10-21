@@ -6,6 +6,7 @@ import {
   readSleeperActivity,
   readSleeperMatchup,
   readSleeperStandings,
+  readSleeperWhatIfWeek,
 } from '@/lib/fantasy/sleeper/read'
 
 const data: WeekData = {
@@ -280,6 +281,40 @@ describe('reading a Sleeper league’s Activity', () => {
     ],
   })
 
+  it('gives a contested claim every team’s claim, the winner’s among them', () => {
+    expect(activity.entries.find((e) => e.id === 'fa')?.claims).toBeUndefined()
+    const contested = readSleeperActivity({
+      rosters: [mine, theirs],
+      users,
+      info: data.info,
+      transactions: [
+        {
+          transaction_id: 'won',
+          type: 'waiver',
+          status: 'complete',
+          leg: 6,
+          adds: { '9000': 7 },
+          roster_ids: [7],
+          settings: { waiver_bid: 12 },
+        },
+        {
+          transaction_id: 'lost',
+          type: 'waiver',
+          status: 'failed',
+          leg: 6,
+          adds: { '9000': 3 },
+          roster_ids: [3],
+          settings: { waiver_bid: 20 },
+        },
+      ],
+    })
+    expect(contested.entries.map((e) => e.id)).toEqual(['won'])
+    expect(contested.entries[0].claims).toEqual([
+      { teamId: 3, bid: 20, won: false },
+      { teamId: 7, bid: 12, won: true },
+    ])
+  })
+
   it('names each roster’s team', () => {
     expect(activity.teams).toEqual([
       { teamId: 3, name: 'Bronx Bombers', abbrev: 'BB' },
@@ -311,5 +346,47 @@ describe('reading a Sleeper league’s Activity', () => {
       ['Patrick Mahomes', 7, 3],
       ['Lions D/ST', 3, 7],
     ])
+  })
+})
+
+describe('reading a Sleeper week for What-if standings', () => {
+  const week = readSleeperWhatIfWeek({
+    league,
+    rosters: [{ ...mine, taxi: ['7777'] }, theirs],
+    users: [],
+    info: data.info,
+    week: 3,
+    matchups: [
+      {
+        roster_id: 3,
+        matchup_id: 1,
+        points: 40,
+        starters: ['4046', '0', '9000', 'DET'],
+        players: ['4046', '9000', 'DET', '6794', '7777'],
+        players_points: {
+          '4046': 20,
+          '9000': 10,
+          DET: 10,
+          '6794': 30,
+          '7777': 50,
+        },
+      },
+      { roster_id: 7, matchup_id: 1, points: 55, starters: [], players: [] },
+    ],
+  })!
+
+  it('reads the league’s starting slots and each roster, eligible by position', () => {
+    expect(week.slots).toEqual(['QB', 'WR', 'SUPER_FLEX', 'DEF'])
+    const home = week.matchups[0].home
+    expect(home.total).toBe(40)
+    expect(home.roster.map((r) => [r.id, r.slot, r.starter])).toEqual([
+      ['4046', 'QB', true],
+      // The empty slot ('0') is no one.
+      ['9000', 'SUPER_FLEX', true],
+      ['DET', 'DEF', true],
+      // The taxi squad couldn't have started.
+      ['6794', 'BN', false],
+    ])
+    expect(home.roster.find((r) => r.id === '6794')?.eligible).toContain('WR')
   })
 })

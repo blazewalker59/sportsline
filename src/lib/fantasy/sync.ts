@@ -23,8 +23,15 @@ import {
   leagueActivity,
   leagueViews,
   playerCards,
+  playerPool,
+  waiverClaims,
 } from './client'
-import { espnActivityPlayerIds, readEspnActivity } from './activity'
+import {
+  attachClaims,
+  espnActivityPlayerIds,
+  espnClaims,
+  readEspnActivity,
+} from './activity'
 import { discoverLeagues } from './discovery'
 import { liveProjected } from './liveProjection'
 import { countsInMatchupWindow, matchupWindow } from './schedule'
@@ -40,7 +47,7 @@ import { readStandings } from './standings'
 import { scoringLeaders } from './leaders'
 import { injuryEvents, rostersDue, rostersOf, whoHasOptions } from './whoHas'
 import type { ActivityPlayer, LeagueActivity } from './activity'
-import type { EspnSession } from './client'
+import type { EspnSession, PlayerCard } from './client'
 import type { LeagueCategory } from './categories'
 import type { ScoringLeaders } from './leaders'
 import type { Standings } from './standings'
@@ -588,7 +595,9 @@ export async function keepLeague(
   const events = due ? injuryEvents(row.rosters, input.sides, input.mine) : []
   await attachOurs(db, row, [
     ...leaders.players,
+    ...(leaders.positions ?? []).flatMap((p) => p.players),
     ...leaders.categories.map((c) => c.player),
+    ...(leaders.matchupCategories ?? []).map((c) => c.player),
     ...events.map((e) => e.player),
   ])
   const teamsIn = input.sides.map((s) => ({ teamId: s.teamId, name: s.name }))
@@ -766,14 +775,24 @@ export async function readActivity(
     row.leagueId,
   )
   const ids = espnActivityPlayerIds(topics)
-  const cards = await playerCards(
-    session,
-    row.sport,
-    row.season,
-    row.leagueId,
-    ids,
-  ).catch(() => [])
+  const [cards, waivers] = await Promise.all([
+    playerCards(session, row.sport, row.season, row.leagueId, ids).catch(
+      (): Array<PlayerCard> => [],
+    ),
+    waiverClaims(session, row.sport, row.season, row.leagueId),
+  ])
   const known = new Map(cards.map((c) => [c.id, c]))
+  // ESPN may not honour a lookup by id for every Player: its most
+  // rostered Players name the rest.
+  if (ids.some((id) => !known.get(id)?.fullName)) {
+    const pool = await playerPool(
+      session,
+      row.sport,
+      row.season,
+      row.leagueId,
+    ).catch((): Array<PlayerCard> => [])
+    for (const c of pool) if (!known.get(c.id)?.fullName) known.set(c.id, c)
+  }
   const rostered = new Map(
     (row.rosters?.teams ?? []).flatMap((t) =>
       t.players.map((p) => [p.espnId, p.name] as const),
@@ -786,7 +805,7 @@ export async function readActivity(
       const card = known.get(espnId)
       p = {
         espnId,
-        name: card?.fullName ?? rostered.get(espnId) ?? `Player ${espnId}`,
+        name: card?.fullName ?? rostered.get(espnId) ?? unnamed(espnId),
         positionId: card?.defaultPositionId ?? null,
         proTeamId: card?.proTeamId ?? null,
       }
@@ -795,7 +814,11 @@ export async function readActivity(
     return p
   }
   const entries = readEspnActivity(topics, playerOf)
-  await attachOurs(dbFromD1(env.DB), row, [...named.values()])
+  attachClaims(entries, espnClaims(waivers))
+  const db = dbFromD1(env.DB)
+  const everyone = [...named.values()]
+  await attachOurs(db, row, everyone)
+  await nameFromOurs(db, everyone)
   const leagueTeams =
     row.standings?.rows.map(({ teamId, name, abbrev }) => ({
       teamId,
@@ -809,6 +832,33 @@ export async function readActivity(
     })) ??
     []
   return { teams: leagueTeams, entries }
+}
+
+const unnamed = (espnId: number) => `Player ${espnId}`
+
+/**
+ * Players ESPN didn't name, named from ours: ESPN's ids are our Source's
+ * in football and basketball, so a match by id has their name.
+ */
+async function nameFromOurs(
+  db: Database,
+  everyone: ReadonlyArray<ActivityPlayer>,
+): Promise<void> {
+  const missing = everyone.filter(
+    (p) => p.name === unnamed(p.espnId) && p.playerId,
+  )
+  if (missing.length === 0) return
+  const rows = await db
+    .select({ id: players.id, name: players.name })
+    .from(players)
+    .where(
+      inArray(
+        players.id,
+        missing.map((p) => p.playerId!),
+      ),
+    )
+  const names = new Map(rows.map((r) => [r.id, r.name]))
+  for (const p of missing) p.name = names.get(p.playerId!) ?? p.name
 }
 
 /** Bring one Viewer's Fantasy leagues up to date. */

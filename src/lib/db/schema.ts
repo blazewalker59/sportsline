@@ -20,6 +20,7 @@ import {
 import type { FantasySport } from '@/lib/fantasy/sports'
 import type { MatchupView } from '@/lib/fantasy/matchup'
 import type { ScoringLeaders } from '@/lib/fantasy/leaders'
+import type { WhatIfMatchup } from '@/lib/fantasy/whatIf'
 import type { Standings } from '@/lib/fantasy/standings'
 import type {
   LeagueRosters,
@@ -581,6 +582,31 @@ export const fantasyPlayers = sqliteTable(
   (table) => [
     primaryKey({ columns: [table.leagueRowId, table.espnId, table.side] }),
     index('fantasy_players_player_idx').on(table.playerId),
+  ],
+)
+
+/**
+ * A finished week of a football points league, analyzed for its What-if
+ * standings (fantasy/whatIf.ts): read once it's final, so the season's
+ * weeks are each read from the provider once.
+ */
+export const fantasyWhatIf = sqliteTable(
+  'fantasy_what_if',
+  {
+    leagueRowId: text('league_row_id')
+      .notNull()
+      .references(() => fantasyLeagues.id, { onDelete: 'cascade' }),
+    season: integer('season').notNull(),
+    week: integer('week').notNull(),
+    matchups: text('matchups', { mode: 'json' })
+      .$type<Array<WhatIfMatchup>>()
+      .notNull(),
+    /** Past stat corrections: read again until it is. */
+    final: integer('final', { mode: 'boolean' }).notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.leagueRowId, table.season, table.week] }),
   ],
 )
 

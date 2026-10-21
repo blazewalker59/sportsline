@@ -218,6 +218,13 @@
       "when": 1792552067346,
       "tag": "0030_fantasy_leaders_who_has",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1792554267592,
+      "tag": "0031_fantasy_what_if",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,11 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { ActivityPlayer, LeagueActivity } from '@/lib/fantasy/activity'
-import { ActivityFeed, activityDays } from '@/components/fantasy/ActivityFeed'
+import {
+  ActivityFeed,
+  activityDays,
+  tradeSides,
+} from '@/components/fantasy/ActivityFeed'
 
 const player = (espnId: number, name: string): ActivityPlayer => ({
   espnId,
@@ -29,6 +33,18 @@ const activity: LeagueActivity = {
           fromTeamId: 9,
           toTeamId: 3,
         },
+        {
+          action: 'add',
+          player: player(11, 'Bijan Robinson'),
+          fromTeamId: 3,
+          toTeamId: 9,
+        },
+        {
+          action: 'add',
+          player: player(12, 'Dalton Kincaid'),
+          fromTeamId: 9,
+          toTeamId: 3,
+        },
       ],
       bid: null,
     },
@@ -52,6 +68,10 @@ const activity: LeagueActivity = {
         },
       ],
       bid: 12,
+      claims: [
+        { teamId: 9, bid: 12, won: true },
+        { teamId: 3, bid: 8, won: false },
+      ],
     },
   ],
 }
@@ -84,9 +104,26 @@ describe('ActivityFeed', () => {
     expect(html).toContain('Keon Coleman')
   })
 
-  it('says where a traded Player went', () => {
+  it('lists each side of a trade together, by who gets them', () => {
     expect(html).toContain('Bronx Bombers ⇄ Taco Corp')
-    expect(html).toContain('→ Bronx Bombers')
+    expect(
+      tradeSides(activity.entries[0]).map((side) => [
+        side.teamId,
+        side.items.map((i) => i.player.name),
+      ]),
+    ).toEqual([
+      [3, ['Josh Allen', 'Dalton Kincaid']],
+      [9, ['Bijan Robinson']],
+    ])
+    expect(html).toContain('To Bronx Bombers')
+    expect(html).toContain('To Taco Corp')
+  })
+
+  it('opens a contested waiver claim to every team’s claim', () => {
+    expect(html).toContain('1 other claim ›')
+    expect(html).toContain('Won')
+    expect(html).toContain('Lost')
+    expect(html).toContain('$8')
   })
 
   it('says when there’s nothing yet', () => {

@@ -71,6 +71,37 @@ describe('scoringLeaders in a points league', () => {
     expect(leaders.players[2].mine).toBe(true)
   })
 
+  it('ranks each position’s Players', () => {
+    const qb = (id: number, pts: number) => ({
+      ...player(id, pts),
+      positionId: 1,
+    })
+    const rb = (id: number, pts: number) => ({
+      ...player(id, pts),
+      positionId: 2,
+    })
+    const read = scoringLeaders({
+      sport: 'football',
+      scoringPeriod: 5,
+      sides: [
+        side(1, 0, [qb(1, 20), rb(2, 30)]),
+        side(2, 0, [qb(3, 25), rb(4, 0)]),
+      ],
+      mine: null,
+      categories: null,
+    })
+    expect(
+      read.positions?.map((g) => [
+        g.positionId,
+        g.players.map((p) => p.espnId),
+      ]),
+    ).toEqual([
+      [1, [3, 1]],
+      // No points: not a leader.
+      [2, [2]],
+    ])
+  })
+
   it('ranks every team by its score', () => {
     expect(leaders.teams.map((t) => [t.teamId, t.score, t.mine])).toEqual([
       [2, 120.7, true],
@@ -117,6 +148,19 @@ describe('scoringLeaders in a category league', () => {
     expect(labels).not.toContain('TO')
     expect(leaders.players).toEqual([])
     expect(leaders.teams).toEqual([])
+  })
+
+  it('names the matchup’s leaders from each side’s whole-matchup lines', () => {
+    const sides = readTeamSides('basketball', league)
+    expect(leaders.matchupCategories?.length).toBeGreaterThan(0)
+    for (const c of leaders.matchupCategories ?? []) {
+      const best = Math.max(
+        ...sides.flatMap((s) =>
+          (s.summary ?? []).map((p) => p.dayStats?.[c.statId] ?? 0),
+        ),
+      )
+      expect(c.player.points).toBe(best)
+    }
   })
 
   it('picks the most of each among every team’s Players today', () => {

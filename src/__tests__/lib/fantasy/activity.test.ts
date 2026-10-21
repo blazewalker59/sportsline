@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import type { ActivityPlayer, WireTopic } from '@/lib/fantasy/activity'
 import {
   ACTIVITY_LIMIT,
+  attachClaims,
   espnActivityPlayerIds,
+  espnClaims,
   kindOf,
   readEspnActivity,
 } from '@/lib/fantasy/activity'
@@ -124,5 +126,75 @@ describe('kindOf', () => {
     expect(kindOf([drop], false)).toBe('drop')
     expect(kindOf([add, drop], false)).toBe('add_drop')
     expect(kindOf([add, drop], true)).toBe('waiver')
+  })
+})
+
+describe('waiver claims', () => {
+  const waivers = [
+    {
+      status: 'FAILED_INVALIDPLAYERSOURCE',
+      scoringPeriodId: 6,
+      bidAmount: 20,
+      teamId: 2,
+      items: [{ playerId: 4, type: 'ADD' }],
+    },
+    {
+      status: 'EXECUTED',
+      scoringPeriodId: 6,
+      bidAmount: 12,
+      teamId: 5,
+      items: [
+        { playerId: 4, type: 'ADD' },
+        { playerId: 9, type: 'DROP' },
+      ],
+    },
+    {
+      status: 'FAILED_LOWBID',
+      scoringPeriodId: 6,
+      bidAmount: 7,
+      teamId: 8,
+      items: [{ playerId: 4, type: 'ADD' }],
+    },
+    // Alone in its run: nothing to compare.
+    {
+      status: 'EXECUTED',
+      scoringPeriodId: 6,
+      bidAmount: 1,
+      teamId: 3,
+      items: [{ playerId: 50, type: 'ADD' }],
+    },
+  ]
+
+  it('groups each run’s claims on a Player, highest bid first', () => {
+    expect(espnClaims(waivers).get(4)).toEqual([
+      [
+        { teamId: 2, bid: 20, won: false },
+        { teamId: 5, bid: 12, won: true },
+        { teamId: 8, bid: 7, won: false },
+      ],
+    ])
+  })
+
+  it('gives a contested claim its competing claims, not an uncontested one', () => {
+    const entries = readEspnActivity(
+      [
+        {
+          id: 'w',
+          date: 2,
+          messages: [{ messageTypeId: 180, targetId: 4, to: 5, from: 12 }],
+        },
+        {
+          id: 'solo',
+          date: 1,
+          messages: [{ messageTypeId: 180, targetId: 50, to: 3, from: 1 }],
+        },
+      ],
+      playerOf,
+    )
+    attachClaims(entries, espnClaims(waivers))
+    expect(
+      entries.find((e) => e.id === 'w')?.claims?.map((c) => c.teamId),
+    ).toEqual([2, 5, 8])
+    expect(entries.find((e) => e.id === 'solo')?.claims).toBeUndefined()
   })
 })

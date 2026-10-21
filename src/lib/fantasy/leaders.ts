@@ -2,8 +2,9 @@
  * A Fantasy league's Scoring leaders (CONTEXT.md, "Scoring leaders"): its
  * top Players and teams this scoring period, read from every team's
  * Lineup in the same league data as the Matchup, so they cost no extra
- * read. Points leagues rank Fantasy points; category leagues name each
- * counting Category's leader today. Pure.
+ * read. Points leagues rank Fantasy points, overall and by position;
+ * category leagues name each counting Category's leader, today and over
+ * the whole matchup. Pure.
  */
 
 import { formatCategory, isRate } from './categories'
@@ -49,18 +50,32 @@ export interface TeamLeader {
   mine: boolean
 }
 
+export interface PositionLeaders {
+  /** ESPN's position id (fantasy/sports.ts). */
+  positionId: number
+  /** Best first. */
+  players: Array<LeaderPlayer>
+}
+
 export interface ScoringLeaders {
   scoringPeriod: number
   /** Points leagues: the top Players this scoring period, best first. */
   players: Array<LeaderPlayer>
+  /** Points leagues: each position's top Players this scoring period. */
+  positions?: Array<PositionLeaders>
   /** Category leagues: each counting Category's leader today. */
   categories: Array<CategoryLeader>
+  /** Category leagues: each counting Category's leader over the matchup. */
+  matchupCategories?: Array<CategoryLeader>
   /** Points leagues: every team's score this matchup, best first. */
   teams: Array<TeamLeader>
 }
 
 /** How many Players the leaders list. */
 export const TOP_PLAYERS = 10
+
+/** How many Players each position lists. */
+export const TOP_AT_POSITION = 15
 
 function leaderOf(
   p: LineupPlayer,
@@ -112,14 +127,17 @@ export function scoringLeaders(input: {
     const counted = categories.filter(
       (c) => !c.reverse && !isRate(sport, c.statId),
     )
-    return {
-      scoringPeriod: input.scoringPeriod,
-      players: [],
-      teams: [],
-      categories: counted.flatMap((c) => {
+    // The matchup's lines: each side's summary (who counted, and how much).
+    const matchup = sides.flatMap((side) =>
+      (side.summary ?? []).map((p) => ({ p, side })),
+    )
+    const leadersOf = (
+      lines: ReadonlyArray<{ p: LineupPlayer; side: MatchupSide }>,
+    ): Array<CategoryLeader> =>
+      counted.flatMap((c) => {
         let best: { p: LineupPlayer; side: MatchupSide; n: number } | null =
           null
-        for (const { p, side } of everyone) {
+        for (const { p, side } of lines) {
           const n = p.dayStats?.[c.statId] ?? 0
           if (n > 0 && (!best || n > best.n)) best = { p, side, n }
         }
@@ -133,20 +151,38 @@ export function scoringLeaders(input: {
               },
             ]
           : []
-      }),
+      })
+    return {
+      scoringPeriod: input.scoringPeriod,
+      players: [],
+      teams: [],
+      categories: leadersOf(everyone),
+      matchupCategories: leadersOf(matchup),
     }
   }
+  const scored = everyone
+    .filter(({ p }) => p.points !== null && p.points > 0)
+    .sort(
+      (a, b) =>
+        b.p.points! - a.p.points! || Number(b.p.starter) - Number(a.p.starter),
+    )
+  const positionIds = [
+    ...new Set(
+      scored.flatMap(({ p }) => (p.positionId === null ? [] : [p.positionId])),
+    ),
+  ].sort((a, b) => a - b)
   return {
     scoringPeriod: input.scoringPeriod,
-    players: everyone
-      .filter(({ p }) => p.points !== null && p.points > 0)
-      .sort(
-        (a, b) =>
-          b.p.points! - a.p.points! ||
-          Number(b.p.starter) - Number(a.p.starter),
-      )
+    players: scored
       .slice(0, TOP_PLAYERS)
       .map(({ p, side }) => leaderOf(p, side, mine, p.points!)),
+    positions: positionIds.map((positionId) => ({
+      positionId,
+      players: scored
+        .filter(({ p }) => p.positionId === positionId)
+        .slice(0, TOP_AT_POSITION)
+        .map(({ p, side }) => leaderOf(p, side, mine, p.points!)),
+    })),
     categories: [],
     teams: [...sides]
       .sort((a, b) => b.score - a.score || a.teamId - b.teamId)
