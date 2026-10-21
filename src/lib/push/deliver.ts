@@ -215,7 +215,8 @@ async function fantasyRecipients(
   )) {
     if (byEndpoint.has(r.endpoint) || !r.playerId) continue
     const level = (await levels(r.viewerId)).fantasy
-    if (!fantasyEvent(item, r.playerId, r.side, level, now)) continue
+    const event = fantasyEvent(item, r.playerId, r.side, level, now)
+    if (!event) continue
     const m = r.matchup
     const name =
       item.players
@@ -232,6 +233,7 @@ async function fantasyRecipients(
         side: r.side,
         matchupId: r.leagueRowId,
         player: name,
+        event,
         matchup:
           m && m.opponent
             ? `${m.leagueName} ${m.mine.score}–${m.opponent.score}`

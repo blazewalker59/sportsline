@@ -2,8 +2,8 @@
  * A Fantasy Matchup in full (CONTEXT.md, "Matchup"): both sides' scores,
  * the categories in a category league (or the race in a points league),
  * and both Lineups. A category Matchup steps through its days: the
- * categories keep the Matchup's totals with the day's figures under them,
- * and the Lineups are that day's. Another Matchup in the league ("League
+ * categories show the Matchup's totals or, toggled, the day's, and the
+ * Lineups are that day's. Another Matchup in the league ("League
  * Matchups") opens the same way, read when it opens, without the race
  * (only the Viewer's own is recorded).
  */
@@ -239,7 +239,7 @@ export function MatchupSheet({
       )}
       <p className="text-[11px] text-muted">
         {m.categories
-          ? `Read from ${source}: categories through yesterday plus today’s starters, refreshed every couple of minutes; the figure under each total is the day’s. Step through the matchup’s days with ‹ ›, or tap the day for any day or the whole matchup’s summary; switch sides above the lineup, and scroll it sideways for every category.`
+          ? `Read from ${source}: categories through yesterday plus today’s starters, refreshed every couple of minutes; toggle above the categories between the whole matchup and the day. Step through the matchup’s days with ‹ ›, or tap the day for any day or the whole matchup’s summary; switch sides above the lineup, and scroll it sideways for every category.`
           : `Read from ${source}. Points refresh every couple of minutes; tap a player’s points for the breakdown.`}
       </p>
     </Sheet>

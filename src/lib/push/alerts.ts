@@ -10,6 +10,11 @@
 import type { TimelineItem } from '@/lib/model/timeline'
 import { notableLead, scoringHeadline } from '@/lib/timeline/chat'
 import { segmentDescription } from '@/lib/timeline/format'
+import {
+  BASKETBALL_MILESTONE_CREDIT,
+  BASKETBALL_MILESTONE_LABEL,
+  isBasketballMilestone,
+} from '@/lib/fantasy/basketballMilestones'
 
 /** An item older than this when first seen is history, not news. */
 const STALE_MS = 15 * 60_000
@@ -54,17 +59,61 @@ const fresh = (item: TimelineItem, now: number) =>
 const activePlay = (item: TimelineItem, now: number) =>
   item.kind === 'play' && item.status === 'active' && fresh(item, now)
 
+/** NBA lead changes only interrupt in a close fourth quarter or overtime. */
+function nbaClutch(item: TimelineItem): boolean {
+  if (item.league !== 'nba') return true
+  const late = /^(?:Q4|(?:\d+)?OT)\b/.test(item.segmentLabel)
+  return late && Math.abs(item.score.away - item.score.home) <= 5
+}
+
+type ResolvedCredit = { id: string; credit: string }
+
+function resolvedCredits(item: TimelineItem): ReadonlyArray<ResolvedCredit> {
+  const detail = item.detail
+  if (!detail || typeof detail !== 'object' || Array.isArray(detail)) return []
+  const credits = detail.credits
+  if (!Array.isArray(credits)) return []
+  return credits.filter((credit): credit is ResolvedCredit =>
+    Boolean(
+      credit &&
+      typeof credit === 'object' &&
+      !Array.isArray(credit) &&
+      typeof credit.id === 'string' &&
+      typeof credit.credit === 'string',
+    ),
+  )
+}
+
+function basketballMilestoneLabels(
+  item: TimelineItem,
+  playerId?: string,
+): Array<string> {
+  return resolvedCredits(item).flatMap((credit) => {
+    if (playerId && credit.id !== playerId) return []
+    if (!credit.credit.startsWith(BASKETBALL_MILESTONE_CREDIT)) return []
+    const milestone = credit.credit.slice(BASKETBALL_MILESTONE_CREDIT.length)
+    return isBasketballMilestone(milestone)
+      ? [BASKETBALL_MILESTONE_LABEL[milestone]]
+      : []
+  })
+}
+
 /**
  * Could this item Alert anyone at any level? (Fresh Finals, Overturns,
- * Scoring Plays, and long gains for Fantasy.) LiveGame skips the rest.
+ * Scoring Plays, and Fantasy big plays or NBA milestones.) LiveGame skips
+ * the rest.
  */
 export function isAlertCandidate(item: TimelineItem, now: number): boolean {
   if (!fresh(item, now)) return false
   if (item.kind === 'milestone') return item.milestone === 'final'
-  if (item.kind === 'overturn') return true
+  if (item.kind === 'overturn') return nbaClutch(item)
   if (item.status !== 'active') return false
   const yards = (item.detail as { yards?: number | null } | null)?.yards ?? 0
-  return item.significance === 'scoring' || yards >= BIG_GAIN_YARDS
+  return (
+    basketballMilestoneLabels(item).length > 0 ||
+    (item.significance === 'scoring' && nbaClutch(item)) ||
+    yards >= BIG_GAIN_YARDS
+  )
 }
 
 /** For a Team or Player Follow: Scoring Plays, Overturns, Finals. */
@@ -76,8 +125,12 @@ export function isFollowingAlertable(
   if (level === 'off' || !fresh(item, now)) return false
   if (item.kind === 'milestone') return item.milestone === 'final'
   if (level === 'finals') return false
-  if (item.kind === 'overturn') return true
-  return item.significance === 'scoring' && item.status === 'active'
+  if (item.kind === 'overturn') return nbaClutch(item)
+  return (
+    item.significance === 'scoring' &&
+    item.status === 'active' &&
+    nbaClutch(item)
+  )
 }
 
 /**
@@ -92,7 +145,8 @@ export function isPredictionPlayAlertable(
   return (
     level === 'scores' &&
     activePlay(item, now) &&
-    item.significance === 'scoring'
+    item.significance === 'scoring' &&
+    nbaClutch(item)
   )
 }
 
@@ -115,19 +169,30 @@ const CREDITED: Partial<Record<TimelineItem['league'], ReadonlySet<string>>> = {
 const BIG_GAIN_YARDS = 25
 
 /**
- * A Fantasy key event for this Starter: their score ("score"), or, for the
- * Viewer's own Starter, a big play ("big"). Kickers count for field goals,
- * not extra points.
+ * A Fantasy key event for this Starter: their score, an NBA stat milestone,
+ * or, for the Viewer's own Starter, a big play. Kickers count for field
+ * goals, not extra points.
  */
+export interface FantasyAlertEvent {
+  kind: 'score' | 'big' | 'milestone'
+  headline: string
+}
+
 export function fantasyEvent(
   item: TimelineItem,
   playerId: string,
   side: 'mine' | 'opponent',
   level: AlertLevels['fantasy'],
   now: number,
-): 'score' | 'big' | null {
+): FantasyAlertEvent | null {
   if (level === 'off' || (level === 'mine' && side === 'opponent')) return null
   if (!activePlay(item, now)) return null
+  if (item.league === 'nba') {
+    const labels = basketballMilestoneLabels(item, playerId)
+    return labels.length > 0
+      ? { kind: 'milestone', headline: labels.join(' · ') }
+      : null
+  }
   const credited = CREDITED[item.league === 'cfb' ? 'nfl' : item.league]
   const roles = item.players
     .filter((p) => p.id === playerId)
@@ -136,10 +201,13 @@ export function fantasyEvent(
   if (roles.length === 0) return null
   const fieldGoal = /Field Goal Good/i.test(item.playType ?? '')
   if (roles.every((r) => r === 'kicker') && !fieldGoal) return null
-  if (item.significance === 'scoring') return 'score'
+  if (item.significance === 'scoring')
+    return { kind: 'score', headline: headline(item) }
   if (side === 'opponent') return null
   const yards = (item.detail as { yards?: number | null } | null)?.yards ?? 0
-  return item.league === 'nfl' && yards >= BIG_GAIN_YARDS ? 'big' : null
+  return item.league === 'nfl' && yards >= BIG_GAIN_YARDS
+    ? { kind: 'big', headline: `${yards} yards` }
+    : null
 }
 
 function scoreLine(item: TimelineItem): string {
@@ -182,6 +250,7 @@ export type AlertReason =
       matchup: string | null
       /** The Matchup's league row: opens the Timeline narrowed to it. */
       matchupId?: string
+      event?: FantasyAlertEvent
     }
 
 /**
@@ -203,7 +272,10 @@ export function alertMessage(
       final: true,
     }
   }
-  const what = headline(item)
+  const what =
+    reason.source === 'fantasy' && reason.event
+      ? reason.event.headline
+      : headline(item)
   const where = `${scoreLine(item)} · ${item.segmentLabel}`
   const play = `&play=${encodeURIComponent(item.id)}${day}`
   // Each source opens its own view: the Game for a Follow, the Prediction
