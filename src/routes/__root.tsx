@@ -14,6 +14,7 @@ import { THEME_BOOT, THEME_COLOR_BOOT } from '../lib/theme'
 import type { QueryClient } from '@tanstack/react-query'
 import { PlayerSheetProvider } from '@/components/players/PlayerSheetProvider'
 import { Landing } from '@/components/landing/LazyLanding'
+import { WhoHasPopup } from '@/components/fantasy/LazyWhoHas'
 import { useViewer } from '@/lib/viewer/useViewer'
 import { ensureViewer } from '@/lib/viewer/queries'
 import { sendClientError, useClientErrors } from '@/lib/ops/useClientErrors'
@@ -84,7 +85,8 @@ function Root() {
 
 /**
  * Sportsline is for signed-in Viewers: a visitor sees the Landing, a
- * Viewer the app (where a Player opens as a sheet over any screen). Local
+ * Viewer the app (where a Player opens as a sheet over any screen, and a
+ * Who Has? encounter may pop up as it opens). Local
  * preview pages (/zz-dev…) skip the gate in development.
  */
 function Gate() {
@@ -97,6 +99,7 @@ function Gate() {
   return (
     <PlayerSheetProvider>
       <Outlet />
+      <WhoHasPopup />
     </PlayerSheetProvider>
   )
 }

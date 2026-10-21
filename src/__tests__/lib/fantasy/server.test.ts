@@ -17,7 +17,12 @@ import * as caller from '@/lib/fantasy/server'
 // @ts-expect-error The Start compiler's provider split is a query, not a TS path.
 import * as provider from '@/lib/fantasy/server?tss-serverfn-split'
 import { isLegacy, unseal } from '@/lib/kalshi/vault'
-import { espnAccounts, fantasyLeagues, sleeperAccounts } from '@/lib/db/schema'
+import {
+  espnAccounts,
+  fantasyLeagues,
+  sleeperAccounts,
+  whoHas,
+} from '@/lib/db/schema'
 
 type Opened = Awaited<ReturnType<typeof sqliteDb>>
 
@@ -288,5 +293,81 @@ describe.skipIf(!isBun)('Fantasy server functions', () => {
       ['a', 1],
       ['b', 2],
     ])
+  })
+
+  it('offers an open Who Has? once, then keeps the Viewer’s record', async () => {
+    await league('espn-1', 'espn')
+    const encounter = (id: string, createdAt: string) => ({
+      id,
+      viewerId: 'u1',
+      leagueRowId: 'espn-1',
+      player: {
+        espnId: 1,
+        name: 'Josh Allen',
+        positionId: 1,
+        proTeamId: 2,
+      },
+      status: 'OUT',
+      ownerTeamId: 3,
+      options: [
+        { teamId: 3, name: 'Owner' },
+        { teamId: 4, name: 'Decoy' },
+      ],
+      createdAt,
+    })
+    await opened()
+      .db.insert(whoHas)
+      .values([
+        encounter('fresh', new Date().toISOString()),
+        // Past its window: never offered.
+        encounter('stale', '2026-01-01T00:00:00Z'),
+      ])
+    type Got = Awaited<ReturnType<typeof caller.getWhoHas>>
+    const got = await call<Got>('getWhoHas')
+    expect(got.result?.encounter).toMatchObject({
+      id: 'fresh',
+      sport: 'football',
+      leagueName: 'espn-1',
+      status: 'OUT',
+    })
+    expect(got.result?.record).toEqual({ right: 0, answered: 0 })
+
+    type Answer = Awaited<ReturnType<typeof caller.answerWhoHas>>
+    const answered = await call<Answer>('answerWhoHas', {
+      id: 'fresh',
+      teamId: 3,
+    })
+    expect(answered.result).toEqual({
+      ownerTeamId: 3,
+      record: { right: 1, answered: 1 },
+    })
+    // Answered once: a second answer doesn't change it.
+    await call('answerWhoHas', { id: 'fresh', teamId: 4 })
+    expect((await call<Got>('getWhoHas')).result).toEqual({
+      encounter: null,
+      record: { right: 1, answered: 1 },
+    })
+  })
+
+  it('passes on a Who Has? with no guess, outside the record', async () => {
+    await league('espn-1', 'espn')
+    await opened()
+      .db.insert(whoHas)
+      .values({
+        id: 'pass',
+        viewerId: 'u1',
+        leagueRowId: 'espn-1',
+        player: { espnId: 1, name: 'Josh Allen', positionId: 1, proTeamId: 2 },
+        status: 'OUT',
+        ownerTeamId: 3,
+        options: [{ teamId: 3, name: 'Owner' }],
+        createdAt: new Date().toISOString(),
+      })
+    await call('answerWhoHas', { id: 'pass', teamId: null })
+    type Got = Awaited<ReturnType<typeof caller.getWhoHas>>
+    expect((await call<Got>('getWhoHas')).result).toEqual({
+      encounter: null,
+      record: { right: 0, answered: 0 },
+    })
   })
 })

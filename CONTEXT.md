@@ -191,6 +191,26 @@ _Avoid_: game (a Game is real), fixture
 The other Matchups in a Viewer’s Fantasy league this scoring period, between teams that aren’t the Viewer’s: their scores kept with each sync and shown under the Timeline’s Fantasy cards while the Viewer’s Matchup in that league is selected, each opening in full (both Lineups) when tapped. Read only to look at: they add nothing to the Fantasy feed or Alerts.
 _Avoid_: scoreboard, other games
 
+**Standings**:
+Every Fantasy team in a Viewer’s Fantasy league first to last: its record, Fantasy points for and against (points leagues only) and streak, with how many make the playoffs. Kept with each sync, read from the same league data as the Matchup; ESPN’s own order, Sleeper’s placed by record, then points for. Shown on the league’s page.
+_Avoid_: table, rankings
+
+**Scoring leaders**:
+A Viewer’s Fantasy league’s best this scoring period, read with each sync from every team’s Lineup: in a points league its top Players by Fantasy points (a bench Player counts, marked) and every team’s score this Matchup; in a category league each counting Category’s leader today. Shown on the league’s page.
+_Avoid_: leaderboard, top performers
+
+**Injury Event**:
+A notable Player on another team in a Viewer’s Fantasy league turning doubtful, out or injured, seen between two of the league’s rosters (kept about hourly). Notable: rostered in 80% of ESPN’s leagues, or a Starter where ownership isn’t known (Sleeper).
+_Avoid_: injury alert (an Alert is a push)
+
+**Who Has?**:
+A guessing game made from an Injury Event: the next time the Viewer opens the app it pops up once, asking which of four teams in the league has the Player. Answered or passed on, it never comes back; offered for two days. The Viewer’s record of right guesses is kept.
+_Avoid_: quiz, trivia
+
+**League activity**:
+A Viewer’s Fantasy league’s recent moves, newest first: adds, drops, waiver claims (with a winning bid, where the league bids) and trades, each by the team that made it. Read from the provider while the Viewer looks at the league’s page, never stored; Sleeper’s this week and last.
+_Avoid_: transactions (that’s the providers’ word), moves log
+
 **Fantasy points**:
 What a Player's real stats are worth under a Fantasy league's scoring, totalled over a Lineup's Starters.
 _Avoid_: score (a Game's), FP

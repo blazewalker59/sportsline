@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   addFantasyLeague,
+  answerWhoHas,
   connectEspn,
   connectSleeper,
   disconnectEspn,
@@ -15,7 +16,9 @@ import {
   espnConnectionQuery,
   fantasyQuery,
   sleeperConnectionQuery,
+  whoHasQuery,
 } from './queries'
+import { fantasyLeagueQuery } from './leagueQuery'
 import type { FantasyLeagueView } from './server'
 import { useViewer } from '@/lib/viewer/useViewer'
 
@@ -55,6 +58,15 @@ export function useFantasyConnected(): {
 export function useFantasy() {
   const { connected } = useFantasyConnected()
   return useQuery({ ...fantasyQuery(), enabled: connected })
+}
+
+/** One of the Viewer's leagues, with its Standings. */
+export function useFantasyLeague(leagueId: string) {
+  const { data: viewerState } = useViewer()
+  return useQuery({
+    ...fantasyLeagueQuery(leagueId),
+    enabled: Boolean(viewerState?.viewer),
+  })
 }
 
 function useRefreshAll() {
@@ -136,5 +148,19 @@ export function useDisconnectSleeper() {
   return useMutation({
     mutationFn: () => disconnectSleeper(),
     onSuccess: refresh,
+  })
+}
+
+/** A Who Has? encounter to offer, once the Viewer has a Fantasy league. */
+export function useWhoHas() {
+  const { connected } = useFantasyConnected()
+  return useQuery({ ...whoHasQuery(), enabled: connected })
+}
+
+/** Answer (or pass on, with no team) a Who Has? encounter. */
+export function useAnswerWhoHas() {
+  return useMutation({
+    mutationFn: (v: { id: string; teamId: number | null }) =>
+      answerWhoHas({ data: v }),
   })
 }

@@ -3,7 +3,9 @@ import type { WeekData } from '@/lib/fantasy/sleeper/read'
 import {
   myRoster,
   proTeamId,
+  readSleeperActivity,
   readSleeperMatchup,
+  readSleeperStandings,
 } from '@/lib/fantasy/sleeper/read'
 
 const data: WeekData = {
@@ -159,5 +161,155 @@ describe('reading a Sleeper Matchup', () => {
       myRoster([theirs, { ...mine, owner_id: 'x', co_owners: ['me'] }], 'me')
         ?.roster_id,
     ).toBe(3)
+  })
+})
+
+describe('reading a Sleeper league’s Standings', () => {
+  const users = [
+    {
+      user_id: 'me',
+      display_name: 'me',
+      metadata: { team_name: 'Bronx Bombers' },
+    },
+    { user_id: 'them', display_name: 'rival' },
+  ]
+  const rosters = [
+    {
+      ...theirs,
+      settings: { wins: 3, losses: 1, fpts: 480, fpts_decimal: 25 },
+      metadata: { streak: '2W' },
+    },
+    {
+      ...mine,
+      settings: {
+        wins: 3,
+        losses: 1,
+        fpts: 512,
+        fpts_decimal: 4,
+        fpts_against: 430,
+        fpts_against_decimal: 50,
+      },
+      metadata: { streak: '1L' },
+    },
+  ]
+
+  it('ranks by record, then points for, the Viewer’s team marked', () => {
+    const s = readSleeperStandings({
+      league: { ...league, settings: { playoff_teams: 6 } },
+      rosters,
+      users,
+      mine: 3,
+    })!
+    expect(s.playoffTeams).toBe(6)
+    expect(s.rows[0]).toMatchObject({
+      teamId: 3,
+      rank: 1,
+      name: 'Bronx Bombers',
+      pointsFor: 512.04,
+      pointsAgainst: 430.5,
+      streak: 'L1',
+      mine: true,
+    })
+    expect(s.rows[1]).toMatchObject({
+      teamId: 7,
+      rank: 2,
+      name: 'rival',
+      pointsFor: 480.25,
+      pointsAgainst: null,
+      streak: 'W2',
+      mine: false,
+    })
+  })
+
+  it('has none without rosters', () => {
+    expect(
+      readSleeperStandings({ league, rosters: [], users, mine: null }),
+    ).toBeNull()
+  })
+})
+
+describe('reading a Sleeper league’s Activity', () => {
+  const users = [
+    {
+      user_id: 'me',
+      display_name: 'me',
+      metadata: { team_name: 'Bronx Bombers' },
+    },
+    { user_id: 'them', display_name: 'rival' },
+  ]
+  const activity = readSleeperActivity({
+    rosters: [mine, theirs],
+    users,
+    info: data.info,
+    transactions: [
+      {
+        transaction_id: 'fa',
+        type: 'free_agent',
+        status: 'complete',
+        status_updated: Date.parse('2026-10-18T15:00:00Z'),
+        adds: { '9000': 3 },
+        drops: { '6794': 3 },
+        roster_ids: [3],
+      },
+      {
+        transaction_id: 'claim',
+        type: 'waiver',
+        status: 'complete',
+        status_updated: Date.parse('2026-10-19T09:00:00Z'),
+        adds: { '4046': 7 },
+        roster_ids: [7],
+        settings: { waiver_bid: 31 },
+      },
+      {
+        transaction_id: 'deal',
+        type: 'trade',
+        status: 'complete',
+        status_updated: Date.parse('2026-10-20T01:00:00Z'),
+        adds: { '4046': 3, DET: 7 },
+        drops: { '4046': 7, DET: 3 },
+        roster_ids: [7, 3],
+      },
+      // A claim that lost: not a move.
+      {
+        transaction_id: 'lost',
+        type: 'waiver',
+        status: 'failed',
+        adds: { '9000': 7 },
+        roster_ids: [7],
+      },
+    ],
+  })
+
+  it('names each roster’s team', () => {
+    expect(activity.teams).toEqual([
+      { teamId: 3, name: 'Bronx Bombers', abbrev: 'BB' },
+      { teamId: 7, name: 'rival', abbrev: 'RIVA' },
+    ])
+  })
+
+  it('reads completed moves newest first', () => {
+    expect(activity.entries.map((e) => [e.id, e.kind, e.teamIds])).toEqual([
+      ['deal', 'trade', [3, 7]],
+      ['claim', 'waiver', [7]],
+      ['fa', 'add_drop', [3]],
+    ])
+    expect(activity.entries[1].bid).toBe(31)
+  })
+
+  it('names Players the way a Lineup does, defenses included', () => {
+    const fa = activity.entries.find((e) => e.id === 'fa')!
+    expect(
+      fa.items.map((i) => [i.action, i.player.name, i.player.sourcePlayerId]),
+    ).toEqual([
+      ['add', 'Terry McLaurin', '9000'],
+      ['drop', 'Justin Jefferson', '6794'],
+    ])
+    const deal = activity.entries.find((e) => e.id === 'deal')!
+    expect(
+      deal.items.map((i) => [i.player.name, i.fromTeamId, i.toTeamId]),
+    ).toEqual([
+      ['Patrick Mahomes', 7, 3],
+      ['Lions D/ST', 3, 7],
+    ])
   })
 })

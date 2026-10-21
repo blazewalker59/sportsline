@@ -42,6 +42,7 @@ export interface SleeperLeague {
   sport?: string
   roster_positions?: Array<string>
   scoring_settings?: Record<string, number>
+  settings?: { playoff_teams?: number } | null
 }
 
 export interface SleeperRoster {
@@ -52,7 +53,18 @@ export interface SleeperRoster {
   starters?: Array<string> | null
   reserve?: Array<string> | null
   taxi?: Array<string> | null
-  settings?: { wins?: number; losses?: number; ties?: number } | null
+  /** Season points come as a whole part and its hundredths. */
+  settings?: {
+    wins?: number
+    losses?: number
+    ties?: number
+    fpts?: number
+    fpts_decimal?: number
+    fpts_against?: number
+    fpts_against_decimal?: number
+  } | null
+  /** `streak`: "3W", "1L". */
+  metadata?: { streak?: string } | null
 }
 
 export interface SleeperMatchup {
@@ -63,6 +75,21 @@ export interface SleeperMatchup {
   starters?: Array<string> | null
   players?: Array<string> | null
   players_points?: Record<string, number> | null
+}
+
+/** A league's add, drop, waiver claim or trade. */
+export interface SleeperTransaction {
+  transaction_id: string
+  type?: 'free_agent' | 'waiver' | 'trade' | 'commissioner' | string
+  status?: string
+  /** When it went through (ms). */
+  status_updated?: number
+  created?: number
+  /** Player id → the roster it joined / left. */
+  adds?: Record<string, number> | null
+  drops?: Record<string, number> | null
+  roster_ids?: Array<number>
+  settings?: { waiver_bid?: number } | null
 }
 
 export interface SleeperState {
@@ -123,3 +150,8 @@ export const weekProjections = (season: string, week: number) =>
 /** One player, for one the weekly feeds don't carry. */
 export const sleeperPlayer = (id: string) =>
   get<SleeperPlayerInfo | null>(`${APP}/players/nfl/${encodeURIComponent(id)}`)
+/** A league's moves in one week ("round"), newest first. */
+export const transactions = (id: string, week: number) =>
+  get<Array<SleeperTransaction>>(
+    `${API}/league/${encodeURIComponent(id)}/transactions/${week}`,
+  )

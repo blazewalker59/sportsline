@@ -110,7 +110,7 @@ const HEADSHOT_LEAGUE: Record<FantasyLeagueView['sport'], string> = {
 
 export function headshotOf(
   sport: FantasyLeagueView['sport'],
-  p: LineupPlayer,
+  p: Pick<LineupPlayer, 'espnId' | 'sourcePlayerId' | 'headshot' | 'teamLogo'>,
 ): string | null {
   if (p.espnId < 0) return p.teamLogo ?? null
   // Another provider's Player: the headshot we matched them to, if any.

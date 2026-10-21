@@ -4,7 +4,7 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, desc, eq, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { EspnError, bracedSwid, fanProfile } from './client'
 import { discoverConnectedLeagues } from './discoverNow'
@@ -13,6 +13,7 @@ import { seasonOf } from './sports'
 import {
   leagueRowId,
   loadSession,
+  readActivity,
   readDay,
   readLeagueMatchup,
   syncAccount,
@@ -20,13 +21,20 @@ import {
 } from './sync'
 import { sleeperUser } from './sleeper/client'
 import {
+  readActivity as readSleeperActivity,
   readLeagueMatchup as readSleeperLeagueMatchup,
   sleeperLeagueRowId,
   syncAccount as syncSleeper,
 } from './sleeper/sync'
+import { WHO_HAS_FOR_MS } from './whoHas'
 import type { MatchupDay, MatchupView } from './matchup'
 import type { RacePoint } from './race'
 import type { FantasySport } from './sports'
+import type { LeagueActivity } from './activity'
+import type { ScoringLeaders } from './leaders'
+import type { Standings } from './standings'
+import type { WhoHasOption, WhoHasPlayer } from './whoHas'
+import type { Database } from '@/lib/db'
 import { viewerMiddleware } from '@/lib/viewer/middleware'
 import { getCloudflareEnv } from '@/lib/db'
 import {
@@ -34,6 +42,7 @@ import {
   fantasyLeagues,
   fantasyScorePoints,
   sleeperAccounts,
+  whoHas,
 } from '@/lib/db/schema'
 import { seal } from '@/lib/kalshi/vault'
 import { reportError } from '@/lib/ops/errors'
@@ -519,6 +528,235 @@ export const getLeagueMatchup = createServerFn({ method: 'GET' })
     },
   )
 
+/**
+ * One of the Viewer's leagues for its page: the league, its Standings and
+ * its Scoring leaders.
+ */
+export interface FantasyLeaguePage {
+  league: FantasyLeagueView
+  standings: Standings | null
+  leaders: ScoringLeaders | null
+}
+
+export const getFantasyLeague = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
+  .validator((data: { leagueId: string }) =>
+    z.object({ leagueId: z.string().max(300) }).parse(data),
+  )
+  .handler(
+    async ({
+      data,
+      context: { db, viewerId },
+    }): Promise<FantasyLeaguePage | null> => {
+      const row = await db
+        .select({
+          ...LEAGUE_VIEW,
+          standings: fantasyLeagues.standings,
+          leaders: fantasyLeagues.leaders,
+        })
+        .from(fantasyLeagues)
+        .where(
+          and(
+            eq(fantasyLeagues.id, data.leagueId),
+            eq(fantasyLeagues.viewerId, viewerId),
+          ),
+        )
+        .get()
+      return row
+        ? {
+            league: leagueView(row),
+            standings: row.standings ?? null,
+            leaders: row.leaders ?? null,
+          }
+        : null
+    },
+  )
+
+/** A Who Has? encounter as it's offered: the Player and four teams. */
+export interface WhoHasView {
+  id: string
+  sport: FantasySport
+  leagueName: string
+  player: WhoHasPlayer
+  status: string
+  options: Array<WhoHasOption>
+}
+
+export interface WhoHasRecord {
+  right: number
+  answered: number
+}
+
+/**
+ * A Who Has? encounter to offer now, if any: one of the Viewer's open
+ * ones (fresh, unanswered, in a league they show), picked at random.
+ */
+export const getWhoHas = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
+  .handler(
+    async ({
+      context: { db, viewerId },
+    }): Promise<{ encounter: WhoHasView | null; record: WhoHasRecord }> => {
+      const since = new Date(Date.now() - WHO_HAS_FOR_MS).toISOString()
+      const [open, record] = await Promise.all([
+        db
+          .select({
+            id: whoHas.id,
+            sport: fantasyLeagues.sport,
+            leagueName: fantasyLeagues.name,
+            player: whoHas.player,
+            status: whoHas.status,
+            options: whoHas.options,
+          })
+          .from(whoHas)
+          .innerJoin(fantasyLeagues, eq(fantasyLeagues.id, whoHas.leagueRowId))
+          .where(
+            and(
+              eq(whoHas.viewerId, viewerId),
+              isNull(whoHas.answeredAt),
+              gte(whoHas.createdAt, since),
+              eq(fantasyLeagues.enabled, true),
+            ),
+          )
+          .limit(20),
+        whoHasRecord(db, viewerId),
+      ])
+      const encounter =
+        open.length === 0 ? null : open[Math.floor(Math.random() * open.length)]
+      return { encounter, record }
+    },
+  )
+
+async function whoHasRecord(
+  db: Database,
+  viewerId: string,
+): Promise<WhoHasRecord> {
+  const row = await db
+    .select({
+      answered: sql<number>`count(${whoHas.guessTeamId})`,
+      right: sql<number>`coalesce(sum(${whoHas.guessTeamId} = ${whoHas.ownerTeamId}), 0)`,
+    })
+    .from(whoHas)
+    .where(eq(whoHas.viewerId, viewerId))
+    .get()
+  return {
+    right: Number(row?.right ?? 0),
+    answered: Number(row?.answered ?? 0),
+  }
+}
+
+/**
+ * Answer a Who Has? encounter (or pass on it, with no team): it's never
+ * offered again. Says who has the Player, and the Viewer's record.
+ */
+export const answerWhoHas = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
+  .validator((data: { id: string; teamId: number | null }) =>
+    z
+      .object({
+        id: z.string().max(400),
+        teamId: z.number().int().nullable(),
+      })
+      .parse(data),
+  )
+  .handler(
+    async ({
+      data,
+      context: { db, viewerId },
+    }): Promise<{ ownerTeamId: number; record: WhoHasRecord } | null> => {
+      const row = await db
+        .select()
+        .from(whoHas)
+        .where(and(eq(whoHas.id, data.id), eq(whoHas.viewerId, viewerId)))
+        .get()
+      if (!row) return null
+      if (row.answeredAt === null)
+        await db
+          .update(whoHas)
+          .set({
+            answeredAt: new Date().toISOString(),
+            guessTeamId: data.teamId,
+          })
+          .where(eq(whoHas.id, row.id))
+      return {
+        ownerTeamId: row.ownerTeamId,
+        record: await whoHasRecord(db, viewerId),
+      }
+    },
+  )
+
+/** The columns a league's view reads (not its Standings, leaders or rosters). */
+const LEAGUE_VIEW = {
+  id: fantasyLeagues.id,
+  sport: fantasyLeagues.sport,
+  provider: fantasyLeagues.provider,
+  name: fantasyLeagues.name,
+  teamName: fantasyLeagues.teamName,
+  enabled: fantasyLeagues.enabled,
+  lastError: fantasyLeagues.lastError,
+  updatedAt: fantasyLeagues.updatedAt,
+  matchup: fantasyLeagues.matchup,
+}
+
+function leagueView(
+  r: Pick<typeof fantasyLeagues.$inferSelect, keyof typeof LEAGUE_VIEW>,
+): FantasyLeagueView {
+  return {
+    id: r.id,
+    sport: r.sport,
+    provider: r.provider,
+    name: r.name,
+    teamName: r.teamName,
+    enabled: r.enabled,
+    lastError: r.lastError,
+    updatedAt: r.updatedAt,
+    matchup: r.matchup ?? null,
+  }
+}
+
+/**
+ * A Viewer's league's Activity, read from its provider while they look
+ * (never stored).
+ */
+export const getLeagueActivity = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
+  .validator((data: { leagueId: string }) =>
+    z.object({ leagueId: z.string().max(300) }).parse(data),
+  )
+  .handler(
+    async ({
+      data,
+      context: { db, viewerId },
+    }): Promise<LeagueActivity | null> => {
+      const env = getCloudflareEnv()
+      const row = await db
+        .select()
+        .from(fantasyLeagues)
+        .where(
+          and(
+            eq(fantasyLeagues.id, data.leagueId),
+            eq(fantasyLeagues.viewerId, viewerId),
+          ),
+        )
+        .get()
+      if (!row) return null
+      const provider = row.provider === 'sleeper' ? 'Sleeper' : 'ESPN'
+      try {
+        return row.provider === 'sleeper'
+          ? await readSleeperActivity(db, row)
+          : await readActivity(env, viewerId, row)
+      } catch (error) {
+        await reportError(env, row.provider, error, {
+          viewerId,
+          step: 'league-activity',
+        })
+        throw new UserError(
+          `Couldn’t read the league’s activity from ${provider}.`,
+        )
+      }
+    },
+  )
+
 export const getFantasy = createServerFn({ method: 'GET' })
   .middleware([viewerMiddleware])
   .handler(
@@ -526,7 +764,7 @@ export const getFantasy = createServerFn({ method: 'GET' })
       context: { db, viewerId },
     }): Promise<Array<FantasyLeagueView>> => {
       const rows = await db
-        .select()
+        .select(LEAGUE_VIEW)
         .from(fantasyLeagues)
         .where(eq(fantasyLeagues.viewerId, viewerId))
         // The Viewer's order; leagues they haven't placed after, by sport.
@@ -537,16 +775,6 @@ export const getFantasy = createServerFn({ method: 'GET' })
           fantasyLeagues.sport,
           fantasyLeagues.name,
         )
-      return rows.map((r) => ({
-        id: r.id,
-        sport: r.sport,
-        provider: r.provider,
-        name: r.name,
-        teamName: r.teamName,
-        enabled: r.enabled,
-        lastError: r.lastError,
-        updatedAt: r.updatedAt,
-        matchup: r.matchup ?? null,
-      }))
+      return rows.map(leagueView)
     },
   )

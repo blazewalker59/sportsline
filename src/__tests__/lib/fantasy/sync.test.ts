@@ -20,6 +20,8 @@ const state = vi.hoisted(() => ({
   profileError: null as Error | null,
   views: null as unknown,
   viewError: null as Error | null,
+  topics: [] as Array<unknown>,
+  cards: null as Array<unknown> | null,
   reports: [] as Array<string>,
 }))
 
@@ -58,6 +60,11 @@ vi.mock('@/lib/fantasy/client', async (original) => {
       if (state.viewError) return Promise.reject(state.viewError)
       return Promise.resolve(state.views)
     },
+    leagueActivity: () => Promise.resolve(state.topics),
+    playerCards: () =>
+      state.cards
+        ? Promise.resolve(state.cards)
+        : Promise.reject(new Error('ESPN 400')),
   }
 })
 
@@ -83,6 +90,8 @@ describe.skipIf(!isBun)('ESPN fantasy sync', () => {
     state.profileError = null
     state.views = null
     state.viewError = null
+    state.topics = []
+    state.cards = []
     state.reports = []
     sqlite.run(
       "INSERT INTO user (id,name,email,email_verified,created_at,updated_at) VALUES ('u1','V','v@example.com',1,0,0)",
@@ -239,6 +248,8 @@ describe.skipIf(!isBun)('ESPN fantasy sync', () => {
       season: 2026,
       teamId: 1,
       lastError: null,
+      standings: null,
+      leaders: null,
     })
     const mapped = JSON.parse(
       String(
@@ -271,6 +282,8 @@ describe.skipIf(!isBun)('ESPN fantasy sync', () => {
       season: 2026,
       teamId: 1,
       lastError: null,
+      standings: null,
+      leaders: null,
     })
     expect(
       (
@@ -350,6 +363,8 @@ describe.skipIf(!isBun)('ESPN fantasy sync', () => {
       season: 2026,
       teamId: 8,
       lastError: null,
+      standings: null,
+      leaders: null,
     })
     const matchup = JSON.parse(
       String(
@@ -370,6 +385,177 @@ describe.skipIf(!isBun)('ESPN fantasy sync', () => {
       teamId: 'tm_buf',
       teamAbbrev: 'BUF',
     })
+  })
+
+  it('keeps the league’s Standings with its Matchup', async () => {
+    const { fantasyLeagues } = await import('@/lib/db/schema')
+    sqlite.run(
+      "INSERT INTO fantasy_leagues (id,viewer_id,sport,provider,league_id,season,name,updated_at) VALUES ('u1~football~st','u1','football','sleeper','L',2026,'Standings','x')",
+    )
+    const row = (await db.select().from(fantasyLeagues)).find(
+      (league) => league.id === 'u1~football~st',
+    )
+    const standings = {
+      rows: [
+        {
+          teamId: 8,
+          name: 'Mine',
+          abbrev: 'MINE',
+          logo: null,
+          rank: 1,
+          wins: 3,
+          losses: 1,
+          ties: 0,
+          pointsFor: 512.04,
+          pointsAgainst: 430.5,
+          streak: 'W2',
+          mine: true,
+        },
+      ],
+      playoffTeams: 6,
+    }
+    await sync.storeMatchup(db, row!, sleeperAllen(), {
+      season: 2026,
+      teamId: 8,
+      lastError: null,
+      standings,
+      leaders: null,
+    })
+    const stored = (await db.select().from(fantasyLeagues)).find(
+      (league) => league.id === 'u1~football~st',
+    )
+    expect(stored?.standings).toEqual(standings)
+  })
+
+  it('keeps rosters hourly, an Injury Event between two becoming Who Has?', async () => {
+    const { fantasyLeagues, whoHas } = await import('@/lib/db/schema')
+    const { readTeamSides } = await import('@/lib/fantasy/matchup')
+    const { rostersOf } = await import('@/lib/fantasy/whoHas')
+    sqlite.run(
+      "INSERT INTO fantasy_leagues (id,viewer_id,sport,provider,league_id,season,name,updated_at) VALUES ('u1~basketball~wh','u1','basketball','espn','wh',2026,'Hoops','x')",
+    )
+    const league = basketball as unknown as WireLeague
+    const sides = readTeamSides('basketball', league)
+    const theirs = sides.find((s) => s.teamId === 1)!
+    const hurt = theirs.lineup.find((p) => p.starter && !p.injury)!
+    const row = (await db.select().from(fantasyLeagues)).find(
+      (l) => l.id === 'u1~basketball~wh',
+    )!
+    const now = new Date('2026-10-20T12:00:00Z')
+    // Kept two hours ago, all healthy; now one of team 1's Starters is out.
+    row.rosters = rostersOf(sides, new Date(now.getTime() - 2 * 3_600_000))
+    hurt.injury = 'OUT'
+    const kept = await sync.keepLeague(
+      db,
+      row,
+      { scoringPeriod: 1, sides, mine: 2, categories: null },
+      now,
+    )
+    expect(kept.rosters?.at).toBe(now.toISOString())
+    expect(kept.leaders.teams).toHaveLength(2)
+    const encounters = await db.select().from(whoHas)
+    expect(encounters).toHaveLength(1)
+    expect(encounters[0]).toMatchObject({
+      id: `u1~basketball~wh~${hurt.espnId}~OUT`,
+      viewerId: 'u1',
+      status: 'OUT',
+      ownerTeamId: 1,
+      answeredAt: null,
+    })
+    expect(encounters[0].player.name).toBe(hurt.name)
+    expect(encounters[0].options.map((o) => o.teamId).sort()).toEqual([1, 2])
+
+    // Kept a minute ago: not due, and nothing new.
+    row.rosters = kept.rosters!
+    const again = await sync.keepLeague(
+      db,
+      row,
+      { scoringPeriod: 1, sides, mine: 2, categories: null },
+      new Date(now.getTime() + 60_000),
+    )
+    expect(again.rosters).toBeUndefined()
+    expect(await db.select().from(whoHas)).toHaveLength(1)
+  })
+
+  it('reads ESPN Activity, naming Players from ESPN or else the rosters', async () => {
+    const { fantasyLeagues } = await import('@/lib/db/schema')
+    sqlite.run(
+      "INSERT INTO fantasy_leagues (id,viewer_id,sport,provider,league_id,season,name,updated_at) VALUES ('u1~football~act','u1','football','espn','act',2026,'Act','x')",
+    )
+    const row = (await db.select().from(fantasyLeagues)).find(
+      (l) => l.id === 'u1~football~act',
+    )!
+    row.standings = {
+      rows: [
+        {
+          teamId: 3,
+          name: 'Bronx Bombers',
+          abbrev: 'BB',
+          logo: null,
+          rank: 1,
+          wins: 1,
+          losses: 0,
+          ties: 0,
+          pointsFor: null,
+          pointsAgainst: null,
+          streak: null,
+          mine: true,
+        },
+      ],
+      playoffTeams: null,
+    }
+    row.rosters = {
+      at: '2026-10-20T00:00:00Z',
+      teams: [
+        {
+          teamId: 3,
+          name: 'Bronx Bombers',
+          abbrev: 'BB',
+          players: [
+            {
+              espnId: 2,
+              name: 'Rostered Name',
+              injury: null,
+              starter: true,
+              owned: null,
+            },
+          ],
+        },
+      ],
+    }
+    state.topics = [
+      {
+        id: 't1',
+        date: Date.parse('2026-10-19T12:00:00Z'),
+        messages: [
+          { messageTypeId: 178, targetId: 1, to: 3 },
+          { messageTypeId: 179, targetId: 2, to: 3 },
+        ],
+      },
+    ]
+    state.cards = [
+      { id: 1, fullName: 'Josh Allen', proTeamId: 2, defaultPositionId: 1 },
+    ]
+    const read = await sync.readActivity(env, 'u1', row)
+    expect(read?.teams).toEqual([
+      { teamId: 3, name: 'Bronx Bombers', abbrev: 'BB' },
+    ])
+    expect(
+      read?.entries[0].items.map((i) => [i.player.name, i.player.teamAbbrev]),
+    ).toEqual([
+      ['Josh Allen', 'BUF'],
+      ['Rostered Name', null],
+    ])
+
+    // ESPN's lookup failing leaves the rosters' names.
+    state.cards = null
+    const fallback = await sync.readActivity(env, 'u1', row)
+    expect(fallback?.entries[0].items.map((i) => i.player.name)).toEqual([
+      'Player 1',
+      'Rostered Name',
+    ])
+    // Not the Viewer's league: nothing read.
+    expect(await sync.readActivity(env, 'u2', row)).toBeNull()
   })
 
   it('reads an earlier day of a category Matchup on demand', async () => {

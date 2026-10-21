@@ -7,10 +7,12 @@ import { queryOptions } from '@tanstack/react-query'
 import {
   getEspnConnection,
   getFantasy,
+  getLeagueActivity,
   getLeagueMatchup,
   getMatchupDay,
   getMatchupRace,
   getSleeperConnection,
+  getWhoHas,
 } from './server'
 import { getMatchupGames } from './schedule'
 import type { League } from '@/lib/model/types'
@@ -106,5 +108,29 @@ export function leagueMatchupQuery(leagueId: string, teamId: number) {
     queryFn: () => getLeagueMatchup({ data: { leagueId, teamId } }),
     refetchInterval: 2 * 60_000,
     staleTime: 60_000,
+  })
+}
+
+/**
+ * A Who Has? encounter to offer, asked once each time the app opens:
+ * never refetched, so it can't pop up again mid-visit.
+ */
+export function whoHasQuery() {
+  return queryOptions({
+    queryKey: ['who-has'] as const,
+    queryFn: () => getWhoHas(),
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
+}
+
+/** A league's Activity, read from its provider while its tab is open. */
+export function leagueActivityQuery(leagueId: string) {
+  return queryOptions({
+    queryKey: ['league-activity', leagueId] as const,
+    queryFn: () => getLeagueActivity({ data: { leagueId } }),
+    refetchInterval: 5 * 60_000,
+    staleTime: 2 * 60_000,
   })
 }
