@@ -6,7 +6,7 @@
  */
 
 import { Link } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { PredictionsSection } from './PredictionsSection'
 import { Section } from './Section'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
@@ -332,7 +332,7 @@ function LineTable({ line }: { line: PlayerLine }) {
     <div className="border-t border-border px-3 py-2">
       <p className="mb-1 text-[11px] font-semibold text-muted">{line.title}</p>
       <div className="overflow-x-auto [scrollbar-width:none]">
-        <table className="w-full text-center text-xs tabular-nums">
+        <table className="w-full text-center text-xs whitespace-nowrap tabular-nums">
           <thead>
             <tr className="text-muted">
               {line.columns.map((c, i) => (
@@ -448,13 +448,29 @@ function RecentSection({
               {g.score && <span className="text-muted">{g.score}</span>}
             </span>
             <span className="min-w-0 flex-1 text-right text-xs leading-snug tabular-nums">
-              {g.line}
+              <StatLine line={g.line} />
             </span>
           </li>
         ))}
       </ul>
     </Section>
   )
+}
+
+/**
+ * "5-13 FG · 2-2 FT · …", wrapping only between stats: left alone, a
+ * browser breaks after the hyphen in "5-13".
+ */
+function StatLine({ line }: { line: string }) {
+  const stats = line.split(' · ')
+  return stats.map((stat, i) => (
+    <Fragment key={i}>
+      <span className="whitespace-nowrap">
+        {stat}
+        {i < stats.length - 1 && ' ·'}
+      </span>{' '}
+    </Fragment>
+  ))
 }
 
 /** "9/28": plain dates are calendar days, the rest instants. */
