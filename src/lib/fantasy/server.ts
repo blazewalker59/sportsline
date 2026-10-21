@@ -27,10 +27,12 @@ import {
   syncAccount as syncSleeper,
 } from './sleeper/sync'
 import { WHO_HAS_FOR_MS } from './whoHas'
+import { readWhatIf } from './whatIfRead'
 import type { MatchupDay, MatchupView } from './matchup'
 import type { RacePoint } from './race'
 import type { FantasySport } from './sports'
 import type { LeagueActivity } from './activity'
+import type { LeagueWhatIf } from './whatIfRead'
 import type { ScoringLeaders } from './leaders'
 import type { Standings } from './standings'
 import type { WhoHasOption, WhoHasPlayer } from './whoHas'
@@ -753,6 +755,45 @@ export const getLeagueActivity = createServerFn({ method: 'GET' })
         throw new UserError(
           `Couldn’t read the league’s activity from ${provider}.`,
         )
+      }
+    },
+  )
+
+/**
+ * A football points league's What-if standings: finished weeks not yet
+ * kept are read from the provider now.
+ */
+export const getWhatIf = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
+  .validator((data: { leagueId: string }) =>
+    z.object({ leagueId: z.string().max(300) }).parse(data),
+  )
+  .handler(
+    async ({
+      data,
+      context: { db, viewerId },
+    }): Promise<LeagueWhatIf | null> => {
+      const env = getCloudflareEnv()
+      const row = await db
+        .select()
+        .from(fantasyLeagues)
+        .where(
+          and(
+            eq(fantasyLeagues.id, data.leagueId),
+            eq(fantasyLeagues.viewerId, viewerId),
+          ),
+        )
+        .get()
+      if (!row) return null
+      try {
+        return await readWhatIf(env, viewerId, row)
+      } catch (error) {
+        await reportError(env, row.provider, error, {
+          viewerId,
+          step: 'what-if',
+        })
+        const provider = row.provider === 'sleeper' ? 'Sleeper' : 'ESPN'
+        throw new UserError(`Couldn’t read past weeks from ${provider}.`)
       }
     },
   )

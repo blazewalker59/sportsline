@@ -7,7 +7,7 @@
 import { SPORTS } from './sports'
 import { ACTIVITY_LIMIT, ESPN_ACTIVITY_TYPES } from './activity'
 import type { FantasySport } from './sports'
-import type { WireTopic } from './activity'
+import type { WireTopic, WireWaiver } from './activity'
 import type { WireLeague } from './matchup'
 import { BROWSER_USER_AGENT, fetchWithRetry } from '@/lib/sources/pool'
 
@@ -103,6 +103,76 @@ export async function leagueActivity(
   return res.topics ?? []
 }
 
+/**
+ * A league's waiver claims, losing ones too. ESPN has served them at two
+ * paths; an empty list when neither does.
+ */
+export async function waiverClaims(
+  session: EspnSession | null,
+  sport: FantasySport,
+  season: number,
+  leagueId: string,
+): Promise<Array<WireWaiver>> {
+  const base = leagueUrl(sport, season, leagueId)
+  const filter = { transactions: { filterType: { value: ['WAIVER'] } } }
+  for (const url of [
+    `${base}/transactions/?view=mTransactions2`,
+    `${base}?view=mTransactions2`,
+  ]) {
+    const res = await get<{ transactions?: Array<WireWaiver> }>(
+      url,
+      session,
+      filter,
+    ).catch(() => null)
+    if (res?.transactions?.length) return res.transactions
+  }
+  return []
+}
+
+/**
+ * The league's most rostered Players at every slot, to name those a
+ * lookup by id didn't: ESPN honours this where it may not `filterIds`.
+ */
+export async function playerPool(
+  session: EspnSession | null,
+  sport: FantasySport,
+  season: number,
+  leagueId: string,
+): Promise<Array<PlayerCard>> {
+  const res = await get<{
+    players?: Array<{
+      id?: number
+      player?: Omit<PlayerCard, 'id'> & { id?: number }
+    }>
+  }>(`${leagueUrl(sport, season, leagueId)}?view=kona_player_info`, session, {
+    players: {
+      filterSlotIds: { value: Array.from({ length: 26 }, (_, i) => i) },
+      sortPercOwned: { sortPriority: 1, sortAsc: false },
+      limit: 2000,
+      offset: 0,
+    },
+  })
+  return cardsOf(res.players)
+}
+
+export interface PlayerCard {
+  id: number
+  fullName?: string
+  proTeamId?: number
+  defaultPositionId?: number
+}
+
+function cardsOf(
+  players:
+    | Array<{ id?: number; player?: Omit<PlayerCard, 'id'> & { id?: number } }>
+    | undefined,
+): Array<PlayerCard> {
+  return (players ?? []).flatMap((e) => {
+    const id = e.player?.id ?? e.id
+    return id === undefined ? [] : [{ ...e.player, id }]
+  })
+}
+
 /** Who some Players are (name, pro team, position), by ESPN id. */
 export async function playerCards(
   session: EspnSession | null,
@@ -110,32 +180,17 @@ export async function playerCards(
   season: number,
   leagueId: string,
   ids: ReadonlyArray<number>,
-): Promise<
-  Array<{
-    id: number
-    fullName?: string
-    proTeamId?: number
-    defaultPositionId?: number
-  }>
-> {
+): Promise<Array<PlayerCard>> {
   if (ids.length === 0) return []
   const res = await get<{
     players?: Array<{
       id?: number
-      player?: {
-        id?: number
-        fullName?: string
-        proTeamId?: number
-        defaultPositionId?: number
-      }
+      player?: Omit<PlayerCard, 'id'> & { id?: number }
     }>
   }>(`${leagueUrl(sport, season, leagueId)}?view=kona_playercard`, session, {
     players: { filterIds: { value: ids }, limit: ids.length },
   })
-  return (res.players ?? []).flatMap((e) => {
-    const id = e.player?.id ?? e.id
-    return id === undefined ? [] : [{ ...e.player, id }]
-  })
+  return cardsOf(res.players)
 }
 
 /**

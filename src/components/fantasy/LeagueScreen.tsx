@@ -10,15 +10,15 @@ import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { ActivityFeed } from './ActivityFeed'
 import { MatchupSheet } from './FantasyParts'
-import { headshotOf, pts, scoreText, sideRecord } from './format'
+import { LeadersView } from './LeadersView'
+import { Segmented } from './Segmented'
+import { WhatIfTable } from './WhatIfTable'
+import { scoreText, sideRecord } from './format'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
-import type { LeaderPlayer, ScoringLeaders } from '@/lib/fantasy/leaders'
-import type { FantasySport } from '@/lib/fantasy/sports'
 import type { Standings } from '@/lib/fantasy/standings'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
-import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
-import { leagueActivityQuery } from '@/lib/fantasy/queries'
+import { leagueActivityQuery, whatIfQuery } from '@/lib/fantasy/queries'
 import { SPORTS } from '@/lib/fantasy/sports'
 import { useFantasyLeague } from '@/lib/fantasy/useFantasy'
 import { gamesQuery } from '@/lib/timeline/queries'
@@ -129,12 +129,11 @@ export function LeagueScreen({ leagueId }: { leagueId: string }) {
             </>
           ) : tab === 'activity' ? (
             <ActivityTab league={league} />
-          ) : page.data?.standings ? (
-            <StandingsTable standings={page.data.standings} />
           ) : (
-            <p className="text-sm text-muted">
-              Standings show after the league’s next sync.
-            </p>
+            <StandingsTab
+              league={league}
+              standings={page.data?.standings ?? null}
+            />
           )}
           {open && league.matchup && (
             <MatchupSheet
@@ -145,6 +144,60 @@ export function LeagueScreen({ leagueId }: { leagueId: string }) {
             />
           )}
         </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The Standings, and in a football points league a choice of its
+ * What-if standings, read when chosen.
+ */
+function StandingsTab({
+  league,
+  standings,
+}: {
+  league: FantasyLeagueView
+  standings: Standings | null
+}) {
+  const whatIfs = league.sport === 'football' && !league.matchup?.categories
+  const [view, setView] = useState<'real' | 'whatIf'>('real')
+  const whatIf = useQuery({
+    ...whatIfQuery(league.id),
+    enabled: whatIfs && view === 'whatIf',
+  })
+  return (
+    <div className="flex flex-col gap-3">
+      {whatIfs && (
+        <Segmented
+          label="Standings"
+          options={[
+            { key: 'real', label: 'Standings' },
+            { key: 'whatIf', label: 'What if' },
+          ]}
+          value={view}
+          onChange={setView}
+        />
+      )}
+      {view === 'whatIf' ? (
+        whatIf.isPending ? (
+          <p className="text-sm text-muted">Reading past weeks…</p>
+        ) : whatIf.isError ? (
+          <p className="text-sm text-live">{whatIf.error.message}</p>
+        ) : whatIf.data ? (
+          <WhatIfTable
+            whatIf={whatIf.data}
+            mine={league.matchup?.mine.teamId ?? null}
+          />
+        ) : (
+          <p className="text-sm text-muted">No What-if standings here.</p>
+        )
+      ) : standings ? (
+        <StandingsTable standings={standings} />
+      ) : (
+        <p className="text-sm text-muted">
+          Standings show after the league’s next sync.
+        </p>
       )}
     </div>
   )
@@ -208,122 +261,6 @@ function ThisMatchup({
         )}
       </span>
     </button>
-  )
-}
-
-/**
- * The league's Scoring leaders: its top Players and every team's score
- * (points leagues), or each counting Category's leader today. Football's
- * scoring period is the week; the other sports' is the day.
- */
-export function LeadersView({
-  sport,
-  leaders,
-}: {
-  sport: FantasySport
-  leaders: ScoringLeaders
-}) {
-  const when = sport === 'football' ? 'this week' : 'today'
-  const heading = 'mb-2 text-xs font-bold tracking-wide text-muted uppercase'
-  const list =
-    'divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface'
-  if (leaders.categories.length > 0)
-    return (
-      <section>
-        <h2 className={heading}>Category leaders {when}</h2>
-        <ul className={list}>
-          {leaders.categories.map((c) => (
-            <li
-              key={c.statId}
-              className={cn(
-                'flex items-center gap-2.5 px-3 py-2',
-                c.player.mine && 'bg-notice',
-              )}
-            >
-              <span className="w-10 shrink-0 text-xs font-bold text-muted">
-                {c.label}
-              </span>
-              <LeaderName sport={sport} p={c.player} />
-              <span className="shrink-0 text-sm font-bold tabular-nums">
-                {c.value}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
-    )
-  return (
-    <>
-      {leaders.players.length > 0 && (
-        <section>
-          <h2 className={heading}>Top scorers {when}</h2>
-          <ol className={list}>
-            {leaders.players.map((p, i) => (
-              <li
-                key={`${p.fantasyTeamId}-${p.espnId}`}
-                className={cn(
-                  'flex items-center gap-2.5 px-3 py-2',
-                  p.mine && 'bg-notice',
-                )}
-              >
-                <span className="w-4 shrink-0 text-xs text-muted tabular-nums">
-                  {i + 1}
-                </span>
-                <LeaderName sport={sport} p={p} />
-                <span className="shrink-0 text-sm font-bold tabular-nums">
-                  {pts(p.points)}
-                </span>
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
-      {leaders.teams.length > 0 && (
-        <section>
-          <h2 className={heading}>Team scores this matchup</h2>
-          <ol className={list}>
-            {leaders.teams.map((t, i) => (
-              <li
-                key={t.teamId}
-                className={cn(
-                  'flex items-center gap-2.5 px-3 py-2 text-sm',
-                  t.mine && 'bg-notice font-semibold',
-                )}
-              >
-                <span className="w-4 shrink-0 text-xs text-muted tabular-nums">
-                  {i + 1}
-                </span>
-                <span className="min-w-0 flex-1 truncate">{t.name}</span>
-                <span className="shrink-0 font-bold tabular-nums">
-                  {pts(t.score)}
-                </span>
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
-    </>
-  )
-}
-
-/** A leader's headshot and name, with their Team and Fantasy team. */
-function LeaderName({ sport, p }: { sport: FantasySport; p: LeaderPlayer }) {
-  return (
-    <>
-      <PlayerAvatar
-        name={p.name}
-        headshotUrl={headshotOf(sport, p)}
-        size={28}
-      />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold">{p.name}</span>
-        <span className="block truncate text-[11px] text-muted">
-          {[p.teamAbbrev, p.fantasyTeam, p.starter ? null : 'bench']
-            .filter(Boolean)
-            .join(' · ')}
-        </span>
-      </span>
-    </>
   )
 }
 

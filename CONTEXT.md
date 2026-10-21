@@ -196,7 +196,7 @@ Every Fantasy team in a Viewer’s Fantasy league first to last: its record, Fan
 _Avoid_: table, rankings
 
 **Scoring leaders**:
-A Viewer’s Fantasy league’s best this scoring period, read with each sync from every team’s Lineup: in a points league its top Players by Fantasy points (a bench Player counts, marked) and every team’s score this Matchup; in a category league each counting Category’s leader today. Shown on the league’s page.
+A Viewer’s Fantasy league’s best this scoring period, read with each sync from every team’s Lineup: in a points league its top Players by Fantasy points, overall or at each position (a bench Player counts, marked), and every team’s score this Matchup; in a category league each counting Category’s leader, today or over the whole Matchup. Shown on the league’s page.
 _Avoid_: leaderboard, top performers
 
 **Injury Event**:
@@ -208,8 +208,12 @@ A guessing game made from an Injury Event: the next time the Viewer opens the ap
 _Avoid_: quiz, trivia
 
 **League activity**:
-A Viewer’s Fantasy league’s recent moves, newest first: adds, drops, waiver claims (with a winning bid, where the league bids) and trades, each by the team that made it. Read from the provider while the Viewer looks at the league’s page, never stored; Sleeper’s this week and last.
+A Viewer’s Fantasy league’s recent moves, newest first: adds, drops, waiver claims (with a winning bid, where the league bids, and every other team’s claim on the same Player) and trades (each team’s haul together), each by the team that made it. Read from the provider while the Viewer looks at the league’s page, never stored; Sleeper’s this week and last.
 _Avoid_: transactions (that’s the providers’ word), moves log
+
+**What-if standings**:
+A football points league’s standings had every team started its best lineup each finished week, against its opponents’ real scores: each team’s what-if record beside its real one, the points its best lineups would have added, and the losses a best lineup would have won (and whether one swap would have). Each week is read from the provider once it’s final, and kept.
+_Avoid_: optimal standings, power rankings
 
 **Fantasy points**:
 What a Player's real stats are worth under a Fantasy league's scoring, totalled over a Lineup's Starters.

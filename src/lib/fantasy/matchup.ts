@@ -19,6 +19,7 @@ import {
 } from './categories'
 import { SPORTS, slotName } from './sports'
 import type { CategoryResult, LeagueCategory, Stats } from './categories'
+import type { WhatIfMatchupInput, WhatIfPlayer } from './whatIf'
 import type { FantasySport } from './sports'
 
 // ─── ESPN's shapes (loose) ─────────────────────────────────────────────────
@@ -48,6 +49,8 @@ interface WireEntry {
       stats?: Array<WireStat>
       /** Share of ESPN's leagues that roster the Player. */
       ownership?: { percentOwned?: number }
+      /** The lineup slots the Player can fill. */
+      eligibleSlots?: Array<number>
     }
   }
 }
@@ -83,6 +86,8 @@ export interface WireLeague {
       matchupPeriods?: Record<string, Array<number>>
       playoffTeamCount?: number
     }
+    /** How many of each lineup slot the league starts, by slot id. */
+    rosterSettings?: { lineupSlotCounts?: Record<string, number> }
     scoringSettings?: {
       scoringType?: string
       scoringItems?: Array<{ statId?: number; isReverseItem?: boolean }>
@@ -687,4 +692,75 @@ export function readMatchupDay(
     mine: mine.lineup,
     opponent: opponent?.lineup ?? null,
   }
+}
+
+/** ESPN's injured reserve slot: never a Player who could have started. */
+const IR_SLOT = 21
+
+/**
+ * One finished week of a points league, from league views read for that
+ * scoring period, as What-if input (whatIf.ts): the league's starting
+ * slots and each decided matchup's sides. Null when the week is one of a
+ * matchup's several (a two-week playoff round) or none are decided.
+ */
+export function readWhatIfWeek(
+  sport: FantasySport,
+  league: WireLeague,
+  scoringPeriod: number,
+): { slots: Array<string>; matchups: Array<WhatIfMatchupInput> } | null {
+  const period = periodOf(league, scoringPeriod) ?? scoringPeriod
+  const days =
+    league.settings?.scheduleSettings?.matchupPeriods?.[String(period)]
+  if (days && days.length > 1) return null
+  const notStarting = SPORTS[sport].notStarting
+  const slots = Object.entries(
+    league.settings?.rosterSettings?.lineupSlotCounts ?? {},
+  ).flatMap(([id, count]) =>
+    notStarting.has(Number(id)) ? [] : Array<string>(count).fill(id),
+  )
+  if (slots.length === 0) return null
+  const side = (w: WireSide | undefined) => {
+    const team = league.teams?.find((t) => t.id === w?.teamId)
+    if (!w || !team) return null
+    const roster = (w.rosterForCurrentScoringPeriod?.entries ?? []).flatMap(
+      (e): Array<WhatIfPlayer> => {
+        const p = e.playerPoolEntry?.player
+        const id = p?.id ?? e.playerId
+        const slot = e.lineupSlotId ?? 20
+        if (id === undefined || slot === IR_SLOT) return []
+        const line = p?.stats?.find((s) => periodLine(s, scoringPeriod, 0))
+        return [
+          {
+            id: String(id),
+            name: p?.fullName ?? `#${id}`,
+            points: round(
+              line?.appliedTotal ?? e.playerPoolEntry?.appliedStatTotal ?? 0,
+            ),
+            slot: String(slot),
+            starter: !notStarting.has(slot),
+            eligible: (p?.eligibleSlots ?? [])
+              .filter((s) => !notStarting.has(s))
+              .map(String),
+          },
+        ]
+      },
+    )
+    return {
+      teamId: team.id,
+      name: teamName(team),
+      abbrev: team.abbrev ?? teamName(team).slice(0, 4).toUpperCase(),
+      total: round(w.totalPoints ?? 0),
+      roster,
+    }
+  }
+  const matchups = (league.schedule ?? []).flatMap(
+    (g): Array<WhatIfMatchupInput> => {
+      if (g.matchupPeriodId !== period) return []
+      if (!g.winner || g.winner === 'UNDECIDED') return []
+      const home = side(g.home)
+      const away = side(g.away)
+      return home && away ? [{ period, home, away }] : []
+    },
+  )
+  return matchups.length > 0 ? { slots, matchups } : null
 }

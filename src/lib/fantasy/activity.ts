@@ -45,6 +45,18 @@ export interface ActivityEntry {
   items: Array<ActivityItem>
   /** A waiver claim's winning bid (FAAB), when the league bids. */
   bid: number | null
+  /**
+   * A waiver claim's competing claims for the same Player in the same
+   * waiver run, the winner's among them, highest bid first. Only when
+   * another team claimed too.
+   */
+  claims?: Array<WaiverClaim>
+}
+
+export interface WaiverClaim {
+  teamId: number
+  bid: number | null
+  won: boolean
 }
 
 export interface ActivityTeam {
@@ -200,4 +212,81 @@ export function newestFirst(
   return [...entries]
     .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
     .slice(0, ACTIVITY_LIMIT)
+}
+
+/** ESPN's waiver claims (mTransactions2), the losing ones too. */
+export interface WireWaiver {
+  status?: string
+  scoringPeriodId?: number
+  bidAmount?: number
+  teamId?: number
+  items?: Array<{ playerId?: number; type?: string }>
+}
+
+/** ESPN's statuses for the claim that won. */
+const EXECUTED = new Set(['EXECUTED', 'SUCCESS', 'SUCCESSFUL'])
+
+/**
+ * Each waiver run's claims on a Player, by Player: grouped by Player and
+ * scoring period, the executed claim winning (or the first, should none
+ * say so), highest bid first.
+ */
+export function espnClaims(
+  waivers: ReadonlyArray<WireWaiver>,
+): Map<number, Array<Array<WaiverClaim>>> {
+  const groups = new Map<string, Array<WireWaiver>>()
+  for (const w of waivers) {
+    const pid = w.items?.find(
+      (i) => i.type === 'ADD' || i.type === 'WAIVER',
+    )?.playerId
+    if (pid === undefined || w.teamId === undefined) continue
+    const key = `${pid}:${w.scoringPeriodId ?? 0}`
+    groups.set(key, [...(groups.get(key) ?? []), w])
+  }
+  const out = new Map<number, Array<Array<WaiverClaim>>>()
+  for (const [key, group] of groups) {
+    const pid = Number(key.split(':')[0])
+    const winner = group.find((w) => EXECUTED.has(w.status ?? '')) ?? group[0]
+    const claims = group.map((w) => ({
+      teamId: w.teamId!,
+      bid: w.bidAmount ?? null,
+      won: w === winner,
+    }))
+    out.set(pid, [...(out.get(pid) ?? []), byBid(claims)])
+  }
+  return out
+}
+
+/** Highest bid first, the winner first among equals. */
+export function byBid(claims: ReadonlyArray<WaiverClaim>): Array<WaiverClaim> {
+  return [...claims].sort(
+    (a, b) => (b.bid ?? 0) - (a.bid ?? 0) || Number(b.won) - Number(a.won),
+  )
+}
+
+/**
+ * Give each waiver claim its competing claims, when there were any: the
+ * run whose winner is the claim's team (and bid), else the Player's only
+ * run.
+ */
+export function attachClaims(
+  entries: Array<ActivityEntry>,
+  claimsOf: ReadonlyMap<number, ReadonlyArray<ReadonlyArray<WaiverClaim>>>,
+): void {
+  for (const e of entries) {
+    if (e.kind !== 'waiver') continue
+    const added = e.items.find((i) => i.action === 'add')
+    if (!added) continue
+    const runs = claimsOf.get(added.player.espnId) ?? []
+    const run =
+      runs.find((r) =>
+        r.some(
+          (c) =>
+            c.won &&
+            c.teamId === e.teamIds[0] &&
+            (e.bid === null || c.bid === e.bid),
+        ),
+      ) ?? (runs.length === 1 ? runs[0] : undefined)
+    if (run && run.length > 1) e.claims = [...run]
+  }
 }

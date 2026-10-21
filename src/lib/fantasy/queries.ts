@@ -12,6 +12,7 @@ import {
   getMatchupDay,
   getMatchupRace,
   getSleeperConnection,
+  getWhatIf,
   getWhoHas,
 } from './server'
 import { getMatchupGames } from './schedule'
@@ -132,5 +133,14 @@ export function leagueActivityQuery(leagueId: string) {
     queryFn: () => getLeagueActivity({ data: { leagueId } }),
     refetchInterval: 5 * 60_000,
     staleTime: 2 * 60_000,
+  })
+}
+
+/** A football points league's What-if standings: past weeks change rarely. */
+export function whatIfQuery(leagueId: string) {
+  return queryOptions({
+    queryKey: ['what-if', leagueId] as const,
+    queryFn: () => getWhatIf({ data: { leagueId } }),
+    staleTime: 30 * 60_000,
   })
 }
