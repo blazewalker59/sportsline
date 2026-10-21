@@ -8,6 +8,15 @@
 
 import { NFL_PRO_TEAMS } from '../sports'
 import { asLeagueMatchup } from '../matchup'
+import { kindOf, newestFirst } from '../activity'
+import { ranked } from '../standings'
+import type {
+  ActivityEntry,
+  ActivityItem,
+  ActivityPlayer,
+  LeagueActivity,
+} from '../activity'
+import type { Standings } from '../standings'
 import type {
   LeagueMatchup,
   LineupPlayer,
@@ -19,6 +28,7 @@ import type {
   SleeperMatchup,
   SleeperPlayerInfo,
   SleeperRoster,
+  SleeperTransaction,
   SleeperUser,
 } from './client'
 
@@ -263,22 +273,10 @@ function sideOf(
   }
   const order = [0, 2, 3, 4, 5, 6, 23, 7, 16, 17]
   lineup.sort((a, b) => sortKey(a, order) - sortKey(b, order))
-  const owner = users.find((u) => u.user_id === roster.owner_id)
-  const name =
-    owner?.metadata?.team_name ||
-    owner?.display_name ||
-    `Team ${roster.roster_id}`
   const s = roster.settings
   const startersNow = lineup.filter((p) => p.starter)
   return {
-    teamId: roster.roster_id,
-    name,
-    abbrev: abbrevOf(name),
-    logo: owner?.metadata?.avatar?.startsWith('http')
-      ? owner.metadata.avatar
-      : owner?.avatar
-        ? `https://sleepercdn.com/avatars/thumbs/${owner.avatar}`
-        : null,
+    ...teamOf(roster, users),
     record: s
       ? `${s.wins ?? 0}-${s.losses ?? 0}${s.ties ? `-${s.ties}` : ''}`
       : null,
@@ -299,6 +297,28 @@ function sideOf(
   }
 }
 
+/** A roster as a team: its manager's team name (or theirs) and avatar. */
+function teamOf(
+  roster: SleeperRoster,
+  users: ReadonlyArray<SleeperUser>,
+): { teamId: number; name: string; abbrev: string; logo: string | null } {
+  const owner = users.find((u) => u.user_id === roster.owner_id)
+  const name =
+    owner?.metadata?.team_name ||
+    owner?.display_name ||
+    `Team ${roster.roster_id}`
+  return {
+    teamId: roster.roster_id,
+    name,
+    abbrev: abbrevOf(name),
+    logo: owner?.metadata?.avatar?.startsWith('http')
+      ? owner.metadata.avatar
+      : owner?.avatar
+        ? `https://sleepercdn.com/avatars/thumbs/${owner.avatar}`
+        : null,
+  }
+}
+
 /** "Bronx Bombers" → "BB"; one word → its first four letters. */
 function abbrevOf(name: string): string {
   const words = name.split(/\s+/).filter((w) => /\w/.test(w))
@@ -310,6 +330,136 @@ function abbrevOf(name: string): string {
           .slice(0, 4)
       : name.slice(0, 4)
   ).toUpperCase()
+}
+
+/**
+ * A Sleeper league's Standings: Sleeper doesn't rank, so they're placed
+ * by record, then points for (fantasy/standings.ts).
+ */
+export function readSleeperStandings(input: {
+  league: SleeperLeague
+  rosters: ReadonlyArray<SleeperRoster>
+  users: ReadonlyArray<SleeperUser>
+  mine: number | null
+}): Standings | null {
+  const { league, rosters: rs, users, mine } = input
+  if (rs.length === 0) return null
+  const points = (whole?: number, hundredths?: number) =>
+    whole === undefined ? null : round(whole + (hundredths ?? 0) / 100)
+  return {
+    rows: ranked(
+      rs.map((r) => {
+        const s = r.settings
+        // "3W" reads "W3", like ESPN's.
+        const streak = /^(\d+)([WLT])$/.exec(r.metadata?.streak ?? '')
+        return {
+          ...teamOf(r, users),
+          wins: s?.wins ?? 0,
+          losses: s?.losses ?? 0,
+          ties: s?.ties ?? 0,
+          pointsFor: points(s?.fpts, s?.fpts_decimal),
+          pointsAgainst: points(s?.fpts_against, s?.fpts_against_decimal),
+          streak: streak ? `${streak[2]}${streak[1]}` : null,
+          mine: r.roster_id === mine,
+        }
+      }),
+    ),
+    playoffTeams: league.settings?.playoff_teams ?? null,
+  }
+}
+
+/**
+ * A Sleeper player as a move names them: the same stand-in id a Lineup
+ * gives them (lineupPlayer), so they match ours the same way.
+ */
+function activityPlayer(
+  id: string,
+  info: ReadonlyMap<string, SleeperPlayerInfo>,
+): ActivityPlayer {
+  const p = info.get(id)
+  const defense = p?.position === 'DEF' || /^[A-Z]{2,3}$/.test(id)
+  const team = p?.team ?? (defense ? id : null)
+  const pro = proTeamId(team)
+  return {
+    espnId: defense ? -(pro ?? 0) || -1 : Number(id) || 0,
+    sourcePlayerId: id,
+    name: defense
+      ? `${p?.last_name ?? team ?? id} D/ST`
+      : [p?.first_name, p?.last_name].filter(Boolean).join(' ') || `#${id}`,
+    positionId: POSITION_IDS[p?.position ?? (defense ? 'DEF' : '')] ?? null,
+    proTeamId: pro,
+  }
+}
+
+/**
+ * A Sleeper league's Activity, newest first: each completed move, its
+ * adds and drops by roster, a trade between every roster in it.
+ * Commissioner moves read as adds and drops too.
+ */
+export function readSleeperActivity(input: {
+  transactions: ReadonlyArray<SleeperTransaction>
+  rosters: ReadonlyArray<SleeperRoster>
+  users: ReadonlyArray<SleeperUser>
+  info: ReadonlyMap<string, SleeperPlayerInfo>
+}): LeagueActivity {
+  const { transactions: txs, rosters: rs, users, info } = input
+  const entries = txs.flatMap((t): Array<ActivityEntry> => {
+    if (t.status !== 'complete') return []
+    const adds = Object.entries(t.adds ?? {})
+    const drops = Object.entries(t.drops ?? {})
+    const trade = t.type === 'trade'
+    const items: Array<ActivityItem> = trade
+      ? adds.map(([id, to]) => ({
+          action: 'add',
+          player: activityPlayer(id, info),
+          fromTeamId: t.drops?.[id] ?? null,
+          toTeamId: to,
+        }))
+      : [
+          ...adds.map(([id, to]) => ({
+            action: 'add' as const,
+            player: activityPlayer(id, info),
+            fromTeamId: null,
+            toTeamId: to,
+          })),
+          ...drops.map(([id, from]) => ({
+            action: 'drop' as const,
+            player: activityPlayer(id, info),
+            fromTeamId: from,
+            toTeamId: null,
+          })),
+        ]
+    if (items.length === 0) return []
+    const waiver = t.type === 'waiver'
+    return [
+      {
+        id: t.transaction_id,
+        kind: trade ? 'trade' : kindOf(items, waiver),
+        at: new Date(t.status_updated ?? t.created ?? 0).toISOString(),
+        teamIds: trade
+          ? [...(t.roster_ids ?? [])].sort((a, b) => a - b)
+          : (t.roster_ids ?? []).slice(0, 1),
+        items,
+        bid: waiver ? (t.settings?.waiver_bid ?? null) : null,
+      },
+    ]
+  })
+  return {
+    teams: rs.map((r) => {
+      const { teamId, name, abbrev } = teamOf(r, users)
+      return { teamId, name, abbrev }
+    }),
+    entries: newestFirst(entries),
+  }
+}
+
+/** Every roster in the league as a Matchup side this week. */
+export function readSleeperTeamSides(
+  input: Omit<Parameters<typeof readSleeperMatchup>[0], 'mine'>,
+): Array<MatchupSide> {
+  return input.rosters.map(
+    (r) => readSleeperMatchup({ ...input, mine: r }).mine,
+  )
 }
 
 /** The Viewer's roster in a league: theirs, or one they co-own. */

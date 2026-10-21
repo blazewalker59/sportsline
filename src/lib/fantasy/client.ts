@@ -5,7 +5,9 @@
  */
 
 import { SPORTS } from './sports'
+import { ACTIVITY_LIMIT, ESPN_ACTIVITY_TYPES } from './activity'
 import type { FantasySport } from './sports'
+import type { WireTopic } from './activity'
 import type { WireLeague } from './matchup'
 import { BROWSER_USER_AGENT, fetchWithRetry } from '@/lib/sources/pool'
 
@@ -28,11 +30,17 @@ export function bracedSwid(swid: string): string {
   return `{${swid.trim().replace(/[{}]/g, '').toUpperCase()}}`
 }
 
-async function get<T>(url: string, session: EspnSession | null): Promise<T> {
+async function get<T>(
+  url: string,
+  session: EspnSession | null,
+  /** ESPN's x-fantasy-filter: which of a view's records to send. */
+  filter?: unknown,
+): Promise<T> {
   const headers: Record<string, string> = {
     accept: 'application/json',
     'user-agent': BROWSER_USER_AGENT,
   }
+  if (filter !== undefined) headers['x-fantasy-filter'] = JSON.stringify(filter)
   if (session) {
     headers.cookie = `espn_s2=${session.espnS2}; SWID=${bracedSwid(session.swid)}`
   }
@@ -63,6 +71,73 @@ export async function fanProfile(session: EspnSession): Promise<unknown> {
   return null
 }
 
+function leagueUrl(
+  sport: FantasySport,
+  season: number,
+  leagueId: string,
+): string {
+  return `https://lm-api-reads.fantasy.espn.com/apis/v3/games/${SPORTS[sport].code}/seasons/${season}/segments/0/leagues/${encodeURIComponent(leagueId)}`
+}
+
+/** A league's recent adds, drops and trades, newest first. */
+export async function leagueActivity(
+  session: EspnSession | null,
+  sport: FantasySport,
+  season: number,
+  leagueId: string,
+): Promise<Array<WireTopic>> {
+  const res = await get<{ topics?: Array<WireTopic> }>(
+    `${leagueUrl(sport, season, leagueId)}/communication/?view=kona_league_communication`,
+    session,
+    {
+      topics: {
+        filterType: { value: ['ACTIVITY_TRANSACTIONS'] },
+        limit: ACTIVITY_LIMIT,
+        limitPerMessageSet: { value: ACTIVITY_LIMIT },
+        offset: 0,
+        sortMessageDate: { sortPriority: 1, sortAsc: false },
+        filterIncludeMessageTypeIds: { value: ESPN_ACTIVITY_TYPES },
+      },
+    },
+  )
+  return res.topics ?? []
+}
+
+/** Who some Players are (name, pro team, position), by ESPN id. */
+export async function playerCards(
+  session: EspnSession | null,
+  sport: FantasySport,
+  season: number,
+  leagueId: string,
+  ids: ReadonlyArray<number>,
+): Promise<
+  Array<{
+    id: number
+    fullName?: string
+    proTeamId?: number
+    defaultPositionId?: number
+  }>
+> {
+  if (ids.length === 0) return []
+  const res = await get<{
+    players?: Array<{
+      id?: number
+      player?: {
+        id?: number
+        fullName?: string
+        proTeamId?: number
+        defaultPositionId?: number
+      }
+    }>
+  }>(`${leagueUrl(sport, season, leagueId)}?view=kona_playercard`, session, {
+    players: { filterIds: { value: ids }, limit: ids.length },
+  })
+  return (res.players ?? []).flatMap((e) => {
+    const id = e.player?.id ?? e.id
+    return id === undefined ? [] : [{ ...e.player, id }]
+  })
+}
+
 /**
  * A league's teams, Lineups, this period's Matchups and settings; with a
  * scoring period, the Lineups and stat lines are that day's.
@@ -81,8 +156,5 @@ export function leagueViews(
       ? []
       : [`scoringPeriodId=${scoringPeriod}`]),
   ].join('&')
-  return get(
-    `https://lm-api-reads.fantasy.espn.com/apis/v3/games/${SPORTS[sport].code}/seasons/${season}/segments/0/leagues/${encodeURIComponent(leagueId)}?${query}`,
-    session,
-  )
+  return get(`${leagueUrl(sport, season, leagueId)}?${query}`, session)
 }

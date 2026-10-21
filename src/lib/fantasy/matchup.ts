@@ -46,6 +46,8 @@ interface WireEntry {
       defaultPositionId?: number
       injuryStatus?: string
       stats?: Array<WireStat>
+      /** Share of ESPN's leagues that roster the Player. */
+      ownership?: { percentOwned?: number }
     }
   }
 }
@@ -77,7 +79,10 @@ export interface WireLeague {
   settings?: {
     name?: string
     /** Each matchup period's scoring periods (days), by period id. */
-    scheduleSettings?: { matchupPeriods?: Record<string, Array<number>> }
+    scheduleSettings?: {
+      matchupPeriods?: Record<string, Array<number>>
+      playoffTeamCount?: number
+    }
     scoringSettings?: {
       scoringType?: string
       scoringItems?: Array<{ statId?: number; isReverseItem?: boolean }>
@@ -95,7 +100,21 @@ export interface WireLeague {
     primaryOwner?: string
     logo?: string
     roster?: { entries?: Array<WireEntry> }
-    record?: { overall?: { wins?: number; losses?: number; ties?: number } }
+    record?: {
+      overall?: {
+        wins?: number
+        losses?: number
+        ties?: number
+        pointsFor?: number
+        pointsAgainst?: number
+        streakLength?: number
+        streakType?: string
+      }
+    }
+    /** The current standings' place. */
+    playoffSeed?: number
+    /** The final place. */
+    rankCalculatedFinal?: number
   }>
   schedule?: Array<{
     matchupPeriodId?: number
@@ -130,6 +149,8 @@ export interface LineupPlayer {
   projected: number | null
   proTeamId: number | null
   injury: string | null
+  /** ESPN: the share of its leagues that roster the Player (0–100). */
+  owned?: number
   /** Where this period's points came from: each stat's value and points. */
   breakdown: Array<{
     statId: number
@@ -246,7 +267,7 @@ export interface MatchupDay {
 
 const round = (n: number) => Math.round(n * 100) / 100
 
-function teamName(t: NonNullable<WireLeague['teams']>[number]): string {
+export function teamName(t: NonNullable<WireLeague['teams']>[number]): string {
   return (
     t.name ??
     ([t.location, t.nickname].filter(Boolean).join(' ') || `Team ${t.id}`)
@@ -307,6 +328,9 @@ function lineupOf(
           p?.injuryStatus && p.injuryStatus !== 'ACTIVE'
             ? p.injuryStatus
             : null,
+        ...(p?.ownership?.percentOwned === undefined
+          ? {}
+          : { owned: round(p.ownership.percentOwned) }),
         breakdown: Object.entries(actualLine?.appliedStats ?? {})
           .filter(([, points]) => Math.abs(points) > 0.001)
           .map(([statId, points]) => ({
@@ -593,6 +617,20 @@ export function readMatchup(
     }
   }
   return view
+}
+
+/**
+ * Every team in the league as a Matchup side this period: its whole
+ * Lineup, read the way the Viewer's is (for leaders and rosters).
+ */
+export function readTeamSides(
+  sport: FantasySport,
+  league: WireLeague,
+): Array<MatchupSide> {
+  return (league.teams ?? []).flatMap((t) => {
+    const view = readMatchup(sport, league, t.id)
+    return view ? [view.mine] : []
+  })
 }
 
 /**

@@ -19,6 +19,13 @@ import {
 } from 'drizzle-orm/sqlite-core'
 import type { FantasySport } from '@/lib/fantasy/sports'
 import type { MatchupView } from '@/lib/fantasy/matchup'
+import type { ScoringLeaders } from '@/lib/fantasy/leaders'
+import type { Standings } from '@/lib/fantasy/standings'
+import type {
+  LeagueRosters,
+  WhoHasOption,
+  WhoHasPlayer,
+} from '@/lib/fantasy/whoHas'
 import type { Conference, RowItem } from '@/lib/model/leagues'
 import type {
   GameBox,
@@ -547,6 +554,12 @@ export const fantasyLeagues = sqliteTable(
     /** The Viewer's order for their leagues (null: after the ordered ones). */
     position: integer('position'),
     matchup: text('matchup', { mode: 'json' }).$type<MatchupView | null>(),
+    /** Every team's place and record, read with the Matchup. */
+    standings: text('standings', { mode: 'json' }).$type<Standings | null>(),
+    /** The league's top Players and teams this scoring period. */
+    leaders: text('leaders', { mode: 'json' }).$type<ScoringLeaders | null>(),
+    /** Every team's Players, kept about hourly (fantasy/whoHas.ts). */
+    rosters: text('rosters', { mode: 'json' }).$type<LeagueRosters | null>(),
     lastError: text('last_error'),
     updatedAt: text('updated_at').notNull(),
   },
@@ -569,6 +582,36 @@ export const fantasyPlayers = sqliteTable(
     primaryKey({ columns: [table.leagueRowId, table.espnId, table.side] }),
     index('fantasy_players_player_idx').on(table.playerId),
   ],
+)
+
+/**
+ * A Who Has? encounter (fantasy/whoHas.ts): an Injury Event in one of a
+ * Viewer's leagues, offered once as a guess at which team has the Player.
+ * One per Player and status, so an ongoing injury never comes back.
+ */
+export const whoHas = sqliteTable(
+  'who_has',
+  {
+    /** League row, Player and status. */
+    id: text('id').primaryKey(),
+    viewerId: text('viewer_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    leagueRowId: text('league_row_id')
+      .notNull()
+      .references(() => fantasyLeagues.id, { onDelete: 'cascade' }),
+    player: text('player', { mode: 'json' }).$type<WhoHasPlayer>().notNull(),
+    status: text('status').notNull(),
+    ownerTeamId: integer('owner_team_id').notNull(),
+    options: text('options', { mode: 'json' })
+      .$type<Array<WhoHasOption>>()
+      .notNull(),
+    createdAt: text('created_at').notNull(),
+    /** Answered, or passed on (no guess). */
+    answeredAt: text('answered_at'),
+    guessTeamId: integer('guess_team_id'),
+  },
+  (table) => [index('who_has_viewer_idx').on(table.viewerId, table.createdAt)],
 )
 
 /**

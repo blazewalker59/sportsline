@@ -17,7 +17,14 @@ import {
   sql,
 } from 'drizzle-orm'
 import { shouldRecord } from './race'
-import { EspnError, fanProfile, leagueViews } from './client'
+import {
+  EspnError,
+  fanProfile,
+  leagueActivity,
+  leagueViews,
+  playerCards,
+} from './client'
+import { espnActivityPlayerIds, readEspnActivity } from './activity'
 import { discoverLeagues } from './discovery'
 import { liveProjected } from './liveProjection'
 import { countsInMatchupWindow, matchupWindow } from './schedule'
@@ -26,10 +33,24 @@ import {
   readLeagueMatchups,
   readMatchup,
   readMatchupDay,
+  readTeamSides,
 } from './matchup'
 import { MLB_PRO_TEAMS, NFL_PRO_TEAMS, SPORTS, seasonOf } from './sports'
+import { readStandings } from './standings'
+import { scoringLeaders } from './leaders'
+import { injuryEvents, rostersDue, rostersOf, whoHasOptions } from './whoHas'
+import type { ActivityPlayer, LeagueActivity } from './activity'
 import type { EspnSession } from './client'
-import type { LineupPlayer, MatchupDay, MatchupView } from './matchup'
+import type { LeagueCategory } from './categories'
+import type { ScoringLeaders } from './leaders'
+import type { Standings } from './standings'
+import type { LeagueRosters } from './whoHas'
+import type {
+  LineupPlayer,
+  MatchupDay,
+  MatchupSide,
+  MatchupView,
+} from './matchup'
 import type { FantasySport } from './sports'
 import type { CloudflareEnv, Database } from '@/lib/db'
 import { dbFromD1 } from '@/lib/db'
@@ -42,6 +63,7 @@ import {
   players,
   sourceIds,
   teams,
+  whoHas,
 } from '@/lib/db/schema'
 import { isLegacy, seal, unseal } from '@/lib/kalshi/vault'
 import { normalizePlayerName } from '@/lib/kalshi/match'
@@ -138,6 +160,20 @@ export async function discover(
   return found.length
 }
 
+/** A Player as provider data has them, to be matched to ours. */
+type Attachable = Pick<
+  LineupPlayer,
+  | 'espnId'
+  | 'sourcePlayerId'
+  | 'name'
+  | 'proTeamId'
+  | 'playerId'
+  | 'headshot'
+  | 'teamId'
+  | 'teamLogo'
+  | 'teamAbbrev'
+>
+
 /**
  * Our Players for a Lineup's: by ESPN id where our Source is ESPN, else by
  * name (baseball, and providers without ESPN ids): an exact match first,
@@ -147,7 +183,7 @@ export async function discover(
 async function ourPlayers(
   db: Database,
   sport: FantasySport,
-  lineup: ReadonlyArray<LineupPlayer>,
+  lineup: ReadonlyArray<Attachable>,
   rowId: string,
 ): Promise<Map<number, { id: string; headshotUrl: string | null }>> {
   const out = new Map<number, { id: string; headshotUrl: string | null }>()
@@ -327,7 +363,7 @@ async function ourTeams(
 export async function attachOurs(
   db: Database,
   row: Pick<typeof fantasyLeagues.$inferSelect, 'id' | 'sport'>,
-  everyone: ReadonlyArray<LineupPlayer>,
+  everyone: ReadonlyArray<Attachable>,
 ): Promise<void> {
   const ids = await ourPlayers(db, row.sport, everyone, row.id)
   const teamsBy = await ourTeams(db, row.sport, everyone)
@@ -376,7 +412,15 @@ export async function storeMatchup(
   db: Database,
   row: typeof fantasyLeagues.$inferSelect,
   view: MatchupView | null,
-  set: { season: number; teamId: number | null; lastError: string | null },
+  set: {
+    season: number
+    teamId: number | null
+    lastError: string | null
+    standings: Standings | null
+    leaders: ScoringLeaders | null
+    /** Kept only when due (keepLeague); the last ones stay otherwise. */
+    rosters?: LeagueRosters
+  },
 ): Promise<void> {
   if (view) {
     await attachMatchup(db, row, view)
@@ -412,6 +456,9 @@ export async function storeMatchup(
       name: view?.leagueName ?? row.name,
       teamName: view?.mine.name ?? row.teamName,
       matchup: view && { ...view, asOf: new Date().toISOString() },
+      standings: set.standings,
+      leaders: set.leaders,
+      ...(set.rosters ? { rosters: set.rosters } : {}),
       lastError: set.lastError,
       updatedAt: new Date().toISOString(),
     })
@@ -519,6 +566,69 @@ async function projectLive(db: Database, view: MatchupView): Promise<void> {
     )
 }
 
+/**
+ * The league-wide reads each sync keeps (any provider's), from every
+ * team's side: its Scoring leaders, and about hourly its rosters, any
+ * Injury Events between the last ones and these becoming Who Has?
+ * encounters. Only the leaders' and events' Players are matched to ours.
+ */
+export async function keepLeague(
+  db: Database,
+  row: typeof fantasyLeagues.$inferSelect,
+  input: {
+    scoringPeriod: number
+    sides: ReadonlyArray<MatchupSide>
+    mine: number | null
+    categories: ReadonlyArray<LeagueCategory> | null
+  },
+  now = new Date(),
+): Promise<{ leaders: ScoringLeaders; rosters?: LeagueRosters }> {
+  const leaders = scoringLeaders({ sport: row.sport, ...input })
+  const due = rostersDue(row.rosters, now)
+  const events = due ? injuryEvents(row.rosters, input.sides, input.mine) : []
+  await attachOurs(db, row, [
+    ...leaders.players,
+    ...leaders.categories.map((c) => c.player),
+    ...events.map((e) => e.player),
+  ])
+  const teamsIn = input.sides.map((s) => ({ teamId: s.teamId, name: s.name }))
+  for (const e of events) {
+    const p = e.player
+    await db
+      .insert(whoHas)
+      .values({
+        id: `${row.id}~${p.espnId}~${e.status}`,
+        viewerId: row.viewerId,
+        leagueRowId: row.id,
+        player: {
+          espnId: p.espnId,
+          ...(p.sourcePlayerId === undefined
+            ? {}
+            : { sourcePlayerId: p.sourcePlayerId }),
+          headshot: p.headshot ?? null,
+          playerId: p.playerId ?? null,
+          name: p.name,
+          positionId: p.positionId,
+          proTeamId: p.proTeamId,
+          teamId: p.teamId ?? null,
+          teamAbbrev: p.teamAbbrev ?? null,
+          teamLogo: p.teamLogo ?? null,
+        },
+        status: e.status,
+        ownerTeamId: e.ownerTeamId,
+        options: whoHasOptions(p.espnId, e.ownerTeamId, teamsIn),
+        createdAt: now.toISOString(),
+      })
+      .onConflictDoNothing()
+  }
+  return {
+    leaders,
+    ...(due && input.sides.length > 0
+      ? { rosters: rostersOf(input.sides, now) }
+      : {}),
+  }
+}
+
 /** Read one league's Matchup now and store it, with its Players mapped. */
 export async function syncLeague(
   db: Database,
@@ -544,11 +654,23 @@ export async function syncLeague(
   const view = teamId === null ? null : readMatchup(row.sport, league, teamId)
   if (view && teamId !== null)
     view.others = readLeagueMatchups(row.sport, league, teamId)
+  const kept = await keepLeague(db, row, {
+    scoringPeriod:
+      view?.scoringPeriod ??
+      league.scoringPeriodId ??
+      league.status?.latestScoringPeriod ??
+      1,
+    sides: readTeamSides(row.sport, league),
+    mine: teamId,
+    categories: view?.categories ?? null,
+  })
   await storeMatchup(db, row, view, {
     season,
     teamId,
     lastError:
       teamId === null ? 'Couldn’t find your team in this league.' : null,
+    standings: readStandings(league, teamId),
+    ...kept,
   })
   return view
 }
@@ -621,6 +743,72 @@ export async function readLeagueMatchup(
   const view = readMatchup(row.sport, league, teamId)
   if (view) await attachMatchup(dbFromD1(env.DB), row, view)
   return view
+}
+
+/**
+ * A Viewer's ESPN league's Activity, read now and not stored (docs/adr/0004):
+ * its feed, then who each Player is in one more read (their names from
+ * the rosters kept, should that fail), matched to ours. The teams are the
+ * Standings' (or the rosters').
+ */
+export async function readActivity(
+  env: Pick<CloudflareEnv, 'DB' | 'ESPN_ENCRYPTION_KEY'>,
+  viewerId: string,
+  row: typeof fantasyLeagues.$inferSelect,
+): Promise<LeagueActivity | null> {
+  if (row.viewerId !== viewerId || row.provider !== 'espn') return null
+  // A public league reads without cookies.
+  const session = await loadSession(env, viewerId)
+  const topics = await leagueActivity(
+    session,
+    row.sport,
+    row.season,
+    row.leagueId,
+  )
+  const ids = espnActivityPlayerIds(topics)
+  const cards = await playerCards(
+    session,
+    row.sport,
+    row.season,
+    row.leagueId,
+    ids,
+  ).catch(() => [])
+  const known = new Map(cards.map((c) => [c.id, c]))
+  const rostered = new Map(
+    (row.rosters?.teams ?? []).flatMap((t) =>
+      t.players.map((p) => [p.espnId, p.name] as const),
+    ),
+  )
+  const named = new Map<number, ActivityPlayer>()
+  const playerOf = (espnId: number): ActivityPlayer => {
+    let p = named.get(espnId)
+    if (!p) {
+      const card = known.get(espnId)
+      p = {
+        espnId,
+        name: card?.fullName ?? rostered.get(espnId) ?? `Player ${espnId}`,
+        positionId: card?.defaultPositionId ?? null,
+        proTeamId: card?.proTeamId ?? null,
+      }
+      named.set(espnId, p)
+    }
+    return p
+  }
+  const entries = readEspnActivity(topics, playerOf)
+  await attachOurs(dbFromD1(env.DB), row, [...named.values()])
+  const leagueTeams =
+    row.standings?.rows.map(({ teamId, name, abbrev }) => ({
+      teamId,
+      name,
+      abbrev,
+    })) ??
+    row.rosters?.teams.map(({ teamId, name, abbrev }) => ({
+      teamId,
+      name,
+      abbrev,
+    })) ??
+    []
+  return { teams: leagueTeams, entries }
 }
 
 /** Bring one Viewer's Fantasy leagues up to date. */

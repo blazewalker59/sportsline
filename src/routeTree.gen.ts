@@ -17,6 +17,7 @@ import { Route as FantasyRouteImport } from './routes/fantasy'
 import { Route as FollowsRouteImport } from './routes/follows'
 import { Route as PredictionsRouteImport } from './routes/predictions'
 import { Route as ReactionsRouteImport } from './routes/reactions'
+import { Route as FantasyLeagueIdRouteImport } from './routes/fantasy_.$leagueId'
 import { Route as GamesGameIdRouteImport } from './routes/games.$gameId'
 import { Route as PlayersPlayerIdRouteImport } from './routes/players.$playerId'
 import { Route as PlaysPlayIdRouteImport } from './routes/plays.$playId'
@@ -62,6 +63,11 @@ const ReactionsRoute = ReactionsRouteImport.update({
   path: '/reactions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FantasyLeagueIdRoute = FantasyLeagueIdRouteImport.update({
+  id: '/fantasy_/$leagueId',
+  path: '/fantasy/$leagueId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GamesGameIdRoute = GamesGameIdRouteImport.update({
   id: '/games/$gameId',
   path: '/games/$gameId',
@@ -92,6 +98,7 @@ export interface FileRoutesByFullPath {
   '/follows': typeof FollowsRoute
   '/predictions': typeof PredictionsRoute
   '/reactions': typeof ReactionsRoute
+  '/fantasy/$leagueId': typeof FantasyLeagueIdRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/players/$playerId': typeof PlayersPlayerIdRoute
   '/plays/$playId': typeof PlaysPlayIdRoute
@@ -106,6 +113,7 @@ export interface FileRoutesByTo {
   '/follows': typeof FollowsRoute
   '/predictions': typeof PredictionsRoute
   '/reactions': typeof ReactionsRoute
+  '/fantasy/$leagueId': typeof FantasyLeagueIdRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/players/$playerId': typeof PlayersPlayerIdRoute
   '/plays/$playId': typeof PlaysPlayIdRoute
@@ -121,6 +129,7 @@ export interface FileRoutesById {
   '/follows': typeof FollowsRoute
   '/predictions': typeof PredictionsRoute
   '/reactions': typeof ReactionsRoute
+  '/fantasy_/$leagueId': typeof FantasyLeagueIdRoute
   '/games/$gameId': typeof GamesGameIdRoute
   '/players/$playerId': typeof PlayersPlayerIdRoute
   '/plays/$playId': typeof PlaysPlayIdRoute
@@ -137,6 +146,7 @@ export interface FileRouteTypes {
     | '/follows'
     | '/predictions'
     | '/reactions'
+    | '/fantasy/$leagueId'
     | '/games/$gameId'
     | '/players/$playerId'
     | '/plays/$playId'
@@ -151,6 +161,7 @@ export interface FileRouteTypes {
     | '/follows'
     | '/predictions'
     | '/reactions'
+    | '/fantasy/$leagueId'
     | '/games/$gameId'
     | '/players/$playerId'
     | '/plays/$playId'
@@ -165,6 +176,7 @@ export interface FileRouteTypes {
     | '/follows'
     | '/predictions'
     | '/reactions'
+    | '/fantasy_/$leagueId'
     | '/games/$gameId'
     | '/players/$playerId'
     | '/plays/$playId'
@@ -180,6 +192,7 @@ export interface RootRouteChildren {
   FollowsRoute: typeof FollowsRoute
   PredictionsRoute: typeof PredictionsRoute
   ReactionsRoute: typeof ReactionsRoute
+  FantasyLeagueIdRoute: typeof FantasyLeagueIdRoute
   GamesGameIdRoute: typeof GamesGameIdRoute
   PlayersPlayerIdRoute: typeof PlayersPlayerIdRoute
   PlaysPlayIdRoute: typeof PlaysPlayIdRoute
@@ -244,6 +257,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReactionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/fantasy_/$leagueId': {
+      id: '/fantasy_/$leagueId'
+      path: '/fantasy/$leagueId'
+      fullPath: '/fantasy/$leagueId'
+      preLoaderRoute: typeof FantasyLeagueIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/games/$gameId': {
       id: '/games/$gameId'
       path: '/games/$gameId'
@@ -284,6 +304,7 @@ const rootRouteChildren: RootRouteChildren = {
   FollowsRoute: FollowsRoute,
   PredictionsRoute: PredictionsRoute,
   ReactionsRoute: ReactionsRoute,
+  FantasyLeagueIdRoute: FantasyLeagueIdRoute,
   GamesGameIdRoute: GamesGameIdRoute,
   PlayersPlayerIdRoute: PlayersPlayerIdRoute,
   PlaysPlayIdRoute: PlaysPlayIdRoute,

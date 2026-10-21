@@ -5,12 +5,19 @@
  */
 
 import { and, eq } from 'drizzle-orm'
-import { attachMatchup, isOtherMatchup, storeMatchup } from '../sync'
+import {
+  attachMatchup,
+  attachOurs,
+  isOtherMatchup,
+  keepLeague,
+  storeMatchup,
+} from '../sync'
 import {
   SleeperError,
   league as fetchLeague,
   matchups as fetchMatchups,
   rosters as fetchRosters,
+  transactions as fetchTransactions,
   leagueUsers,
   sleeperPlayer,
   sleeperState,
@@ -18,13 +25,21 @@ import {
   weekProjections,
   weekStats,
 } from './client'
-import { myRoster, readSleeperLeagueMatchups, readSleeperMatchup } from './read'
+import {
+  myRoster,
+  readSleeperActivity,
+  readSleeperLeagueMatchups,
+  readSleeperMatchup,
+  readSleeperStandings,
+  readSleeperTeamSides,
+} from './read'
 import type {
   SleeperPlayerInfo,
   SleeperState,
   SleeperWeekEntry,
 } from './client'
 import type { WeekData } from './read'
+import type { LeagueActivity } from '../activity'
 import type { MatchupView } from '../matchup'
 import type { CloudflareEnv, Database } from '@/lib/db'
 import { dbFromD1 } from '@/lib/db'
@@ -138,11 +153,23 @@ async function syncLeague(
 ): Promise<void> {
   const week = await readWeek(row.leagueId, state, data)
   const mine = myRoster(week.rosters, userId)
+  const standings = readSleeperStandings({
+    ...week,
+    mine: mine?.roster_id ?? null,
+  })
+  const kept = await keepLeague(db, row, {
+    scoringPeriod: week.week,
+    sides: readSleeperTeamSides(week),
+    mine: mine?.roster_id ?? null,
+    categories: null,
+  })
   if (!mine) {
     await storeMatchup(db, row, null, {
       season: Number(state.season),
       teamId: null,
       lastError: 'Couldn’t find your team in this league.',
+      standings,
+      ...kept,
     })
     return
   }
@@ -152,6 +179,8 @@ async function syncLeague(
     season: Number(state.season),
     teamId: mine.roster_id,
     lastError: null,
+    standings,
+    ...kept,
   })
 }
 
@@ -174,6 +203,60 @@ export async function readLeagueMatchup(
   const view = readSleeperMatchup({ ...week, mine: roster })
   await attachMatchup(db, row, view)
   return view
+}
+
+/**
+ * A Sleeper league's Activity, read now and not stored: this week's and
+ * last week's moves, each Player named from Sleeper's weekly feed (or
+ * looked up), matched to ours.
+ */
+export async function readActivity(
+  db: Database,
+  row: typeof fantasyLeagues.$inferSelect,
+): Promise<LeagueActivity | null> {
+  if (row.provider !== 'sleeper') return null
+  const state = await sleeperState()
+  const weeks = [
+    ...new Set([state.week, state.week - 1].map((w) => Math.max(w, 1))),
+  ]
+  const [txs, rosterList, users, projections] = await Promise.all([
+    Promise.all(
+      weeks.map((w) => fetchTransactions(row.leagueId, w).catch(() => [])),
+    ).then((all) => all.flat()),
+    fetchRosters(row.leagueId),
+    leagueUsers(row.leagueId),
+    weekProjections(state.season, state.week).catch(
+      (): Array<SleeperWeekEntry> => [],
+    ),
+  ])
+  const info = new Map<string, SleeperPlayerInfo>()
+  for (const e of projections)
+    if (e.player)
+      info.set(e.player_id, { ...e.player, team: e.team ?? e.player.team })
+  const unknown = [
+    ...new Set(
+      txs.flatMap((t) => [
+        ...Object.keys(t.adds ?? {}),
+        ...Object.keys(t.drops ?? {}),
+      ]),
+    ),
+  ].filter((id) => !/^[A-Z]{2,3}$/.test(id) && !info.has(id))
+  for (const id of unknown.slice(0, LOOKUPS_PER_SYNC)) {
+    const p = await sleeperPlayer(id).catch(() => null)
+    if (p) info.set(id, p)
+  }
+  const activity = readSleeperActivity({
+    transactions: txs,
+    rosters: rosterList,
+    users,
+    info,
+  })
+  await attachOurs(
+    db,
+    row,
+    activity.entries.flatMap((e) => e.items.map((i) => i.player)),
+  )
+  return activity
 }
 
 /** Bring one Viewer's Sleeper leagues up to date. */

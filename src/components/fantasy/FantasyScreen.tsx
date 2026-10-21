@@ -5,6 +5,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 import { MatchupSheet } from './FantasyParts'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
@@ -429,7 +430,8 @@ function Leagues() {
 /**
  * The Viewer's leagues, one compact row each, in their order (the
  * Timeline's Fantasy cards follow it): drag the grip to reorder, tap the
- * score for the Matchup, Show or Hide in the Timeline.
+ * name for the league's page or the score for the Matchup, Show or Hide in
+ * the Timeline.
  */
 function LeagueList({
   leagues,
@@ -481,9 +483,11 @@ function LeagueList({
               ))}
             </svg>
           </button>
-          <span
+          <Link
+            to="/fantasy/$leagueId"
+            params={{ leagueId: l.id }}
             className={cn(
-              'flex min-w-0 flex-1 items-center gap-2.5',
+              'flex min-w-0 flex-1 items-center gap-2.5 rounded-lg hover:bg-notice',
               !l.enabled && 'opacity-45',
             )}
           >
@@ -508,7 +512,7 @@ function LeagueList({
                     .join(' · ')}
               </span>
             </span>
-          </span>
+          </Link>
           {l.enabled && l.matchup && (
             <button
               type="button"

@@ -9,6 +9,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 import { CategoryBars } from './CategoryBars'
 import { CategoryLineup } from './CategoryLineup'
@@ -60,6 +61,7 @@ export function MatchupSheet({
   league,
   other,
   games = [],
+  leagueLink = true,
   onClose,
 }: {
   league: FantasyLeagueView
@@ -67,6 +69,8 @@ export function MatchupSheet({
   other?: LeagueMatchup
   /** Today's Games, for each Player's game state. */
   games?: ReadonlyArray<GameSummary>
+  /** Link to the league's page (not when it's open there). */
+  leagueLink?: boolean
   onClose: () => void
 }) {
   const otherTeam = other?.left.teamId
@@ -236,6 +240,15 @@ export function MatchupSheet({
             />
           </section>
         </>
+      )}
+      {leagueLink && (
+        <Link
+          to="/fantasy/$leagueId"
+          params={{ leagueId: league.id }}
+          className="self-start text-sm font-semibold text-accent"
+        >
+          League standings &amp; leaders →
+        </Link>
       )}
       <p className="text-[11px] text-muted">
         {m.categories
