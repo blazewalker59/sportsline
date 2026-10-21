@@ -138,7 +138,10 @@ function BoxTables({ box, game }: { box: GameBox | null; game: GameSummary }) {
                   </span>
                 </th>
                 {t.columns.map((c) => (
-                  <th key={c} className="px-2 py-2 text-right font-normal">
+                  <th
+                    key={c}
+                    className="px-2 py-2 text-right font-normal whitespace-nowrap"
+                  >
                     {c}
                   </th>
                 ))}
@@ -162,7 +165,7 @@ function BoxTables({ box, game }: { box: GameBox | null; game: GameSummary }) {
                     )}
                   </td>
                   {r.values.map((v, j) => (
-                    <td key={j} className="px-2 text-right">
+                    <td key={j} className="px-2 text-right whitespace-nowrap">
                       {v}
                     </td>
                   ))}

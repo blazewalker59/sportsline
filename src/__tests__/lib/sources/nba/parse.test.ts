@@ -91,6 +91,21 @@ describe('NBA parseGame — 2026 Finals Game 2 (NY @ SA)', () => {
     expect(
       Object.fromEntries(sub.involved.map((i) => [i.name, i.role])),
     ).toMatchObject({ 'Dylan Harper': 'sub in' })
+    const rebound = plays.find((p) => /offensive rebound$/.test(p.description))!
+    expect(rebound.involved[0].role).toBe('rebounder')
+  })
+
+  it('credits Fantasy milestones on the play where each threshold is crossed', () => {
+    const credits = plays.flatMap((p) => p.credits.map((c) => c.credit))
+    expect(credits).toEqual(
+      expect.arrayContaining([
+        'fantasy:points-20',
+        'fantasy:rebounds-10',
+        'fantasy:double-double',
+        'fantasy:blocks-4',
+        'fantasy:steals-5',
+      ]),
+    )
   })
 
   it('orders every item uniquely and builds a box score', () => {

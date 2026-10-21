@@ -121,7 +121,7 @@ const CHOICES: { [K in keyof AlertLevels]: ReadonlyArray<Choice<K>> } = {
     {
       value: 'scores',
       label: 'Scores & finals',
-      hint: 'Every score, overturned score and final in your Teams’ and Players’ games.',
+      hint: 'Every score, overturned score and final in your Teams’ and Players’ games; NBA lead changes only in close fourth quarters and overtime.',
     },
     {
       value: 'finals',
@@ -139,7 +139,7 @@ const CHOICES: { [K in keyof AlertLevels]: ReadonlyArray<Choice<K>> } = {
     {
       value: 'scores',
       label: 'Key moments + every score',
-      hint: 'Also every scoring play in your Predictions’ games.',
+      hint: 'Also every scoring play in your Predictions’ games; NBA lead changes only in close fourth quarters and overtime.',
     },
     { value: 'off', label: 'Off', hint: '' },
   ],
@@ -147,12 +147,12 @@ const CHOICES: { [K in keyof AlertLevels]: ReadonlyArray<Choice<K>> } = {
     {
       value: 'key',
       label: 'Key events, both teams',
-      hint: 'Touchdowns and other scores by any starter in your matchups, and your starters’ big plays.',
+      hint: 'Scores by any starter; NBA point thresholds, double-doubles and standout stat lines; plus your starters’ big plays.',
     },
     {
       value: 'mine',
       label: 'Key events, my starters',
-      hint: 'Only your own starters’ scores and big plays.',
+      hint: 'Only your own starters’ scores, milestones and big plays.',
     },
     { value: 'off', label: 'Off', hint: '' },
   ],

@@ -1,10 +1,17 @@
+// @vitest-environment happy-dom
+import { cleanup, fireEvent, render } from '@testing-library/react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import basketball from '../../fixtures/fantasy/basketball-category-matchup.json'
 import type { CategoryResult } from '@/lib/fantasy/categories'
 import type { MatchupView, WireLeague } from '@/lib/fantasy/matchup'
 import { CategoryBars } from '@/components/fantasy/CategoryBars'
-import { dayLabel, dayRecord, daySportsDay } from '@/components/fantasy/format'
+import {
+  categoryRecord,
+  dayLabel,
+  dayRecord,
+  daySportsDay,
+} from '@/components/fantasy/format'
 import { readMatchup } from '@/lib/fantasy/matchup'
 
 const view = (): MatchupView => {
@@ -20,6 +27,8 @@ const rows = (html: string) =>
       r[0],
     ]),
   )
+
+afterEach(cleanup)
 
 describe('CategoryBars', () => {
   it('edges a lead on the leader’s side, and leaves a tie unmarked', () => {
@@ -50,34 +59,44 @@ describe('CategoryBars', () => {
     expect(byLabel[theirs.label]).not.toContain('border-left-color')
   })
 
-  it('shows the matchup score and the day’s figures under each total', () => {
+  it('toggles between the matchup’s totals and the day’s', () => {
     const m = view()
-    const html = renderToStaticMarkup(
+    const { getByRole, container } = render(
       <CategoryBars
         m={m}
         categories={m.categories!}
         day={{ label: 'Today', categories: m.today! }}
       />,
     )
-    expect(html).toContain(
-      `Today <span class="font-semibold text-foreground">${dayRecord(m.today!)}`,
-    )
-    const fg = rows(html)['FG%']
+    const matchup = getByRole('radio', { name: /^Matchup/ })
+    const today = getByRole('radio', { name: /^Today/ })
+    expect(matchup.textContent).toBe(`Matchup ${categoryRecord(m)}`)
+    expect(today.textContent).toBe(`Today ${dayRecord(m.today!)}`)
+    expect(matchup.getAttribute('aria-checked')).toBe('true')
+    const fgTotal = m.categories!.find((c) => c.label === 'FG%')!
+    expect(rows(container.innerHTML)['FG%']).toContain(fgTotal.mine)
+
+    fireEvent.click(today)
+    expect(today.getAttribute('aria-checked')).toBe('true')
+    const fg = rows(container.innerHTML)['FG%']
     expect(fg).toContain('.525')
     expect(fg).toContain('.360')
   })
 
   it('holds the day’s place while it loads', () => {
     const m = view()
-    const html = renderToStaticMarkup(
+    const { getByRole, container } = render(
       <CategoryBars
         m={m}
         categories={m.categories!}
         day={{ label: 'Sat, Oct 11', categories: null }}
       />,
     )
-    expect(html).toContain('Sat, Oct 11')
-    expect(html).toContain('…')
+    const day = getByRole('radio', { name: /^Sat, Oct 11/ })
+    expect(day.textContent).toContain('…')
+    fireEvent.click(day)
+    expect(container.innerHTML).not.toContain('border-left-color')
+    expect(rows(container.innerHTML)['FG%']).toContain('…')
   })
 })
 

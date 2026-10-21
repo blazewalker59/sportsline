@@ -76,6 +76,27 @@ describe('Following Alerts', () => {
       ),
     ).toBe(false)
   })
+
+  it('limits NBA lead-change alerts to close fourth quarters and overtime', () => {
+    const nba = (segmentLabel: string, away: number, home: number) =>
+      item({
+        league: 'nba',
+        segmentLabel,
+        score: { away, home },
+      })
+    expect(isFollowingAlertable(nba('Q3 0:04', 80, 79), 'scores', now)).toBe(
+      false,
+    )
+    expect(isFollowingAlertable(nba('Q4 8:12', 92, 90), 'scores', now)).toBe(
+      true,
+    )
+    expect(isFollowingAlertable(nba('OT 1:04', 111, 110), 'scores', now)).toBe(
+      true,
+    )
+    expect(isFollowingAlertable(nba('Q4 8:12', 99, 90), 'scores', now)).toBe(
+      false,
+    )
+  })
 })
 
 describe('Prediction play Alerts', () => {
@@ -89,6 +110,17 @@ describe('Prediction play Alerts', () => {
         now,
       ),
     ).toBe(false)
+  })
+
+  it('uses the close late-game gate for NBA Prediction scores too', () => {
+    const nba = (segmentLabel: string) =>
+      item({
+        league: 'nba',
+        segmentLabel,
+        score: { away: 101, home: 100 },
+      })
+    expect(isPredictionPlayAlertable(nba('Q3 0:05'), 'scores', now)).toBe(false)
+    expect(isPredictionPlayAlertable(nba('Q4 0:05'), 'scores', now)).toBe(true)
   })
 
   it('swing titles show the chance now and the move since last heard', () => {
@@ -111,8 +143,8 @@ describe('Fantasy key events', () => {
   })
 
   it('credit the players who made a score, on either side', () => {
-    expect(fantasyEvent(td, 'qb', 'mine', 'key', now)).toBe('score')
-    expect(fantasyEvent(td, 'te', 'opponent', 'key', now)).toBe('score')
+    expect(fantasyEvent(td, 'qb', 'mine', 'key', now)?.kind).toBe('score')
+    expect(fantasyEvent(td, 'te', 'opponent', 'key', now)?.kind).toBe('score')
     expect(fantasyEvent(td, 'ls', 'mine', 'key', now)).toBeNull()
     expect(fantasyEvent(td, 'te', 'opponent', 'mine', now)).toBeNull()
     expect(fantasyEvent(td, 'qb', 'mine', 'off', now)).toBeNull()
@@ -124,9 +156,9 @@ describe('Fantasy key events', () => {
         playType,
         players: [{ id: 'k', name: 'Chris Boswell', role: 'kicker' }],
       })
-    expect(fantasyEvent(kick('Field Goal Good'), 'k', 'mine', 'key', now)).toBe(
-      'score',
-    )
+    expect(
+      fantasyEvent(kick('Field Goal Good'), 'k', 'mine', 'key', now)?.kind,
+    ).toBe('score')
     expect(
       fantasyEvent(kick('Extra Point Good'), 'k', 'mine', 'key', now),
     ).toBeNull()
@@ -139,7 +171,7 @@ describe('Fantasy key events', () => {
       detail: { yards: 38 },
       players: [{ id: 'wr', name: 'George Pickens', role: 'receiver' }],
     })
-    expect(fantasyEvent(long, 'wr', 'mine', 'key', now)).toBe('big')
+    expect(fantasyEvent(long, 'wr', 'mine', 'key', now)?.kind).toBe('big')
     expect(fantasyEvent(long, 'wr', 'opponent', 'key', now)).toBeNull()
     const sack = item({
       significance: 'notable',
@@ -147,6 +179,23 @@ describe('Fantasy key events', () => {
       players: [{ id: 'qb', name: 'Aaron Rodgers', role: 'passer' }],
     })
     expect(fantasyEvent(sack, 'qb', 'mine', 'key', now)).toBeNull()
+  })
+
+  it('sends NBA milestones instead of every go-ahead basket', () => {
+    const nba = item({
+      league: 'nba',
+      segmentLabel: 'Q3 6:29',
+      players: [{ id: 'kat', name: 'Karl-Anthony Towns', role: 'shooter' }],
+      detail: { credits: [{ id: 'kat', credit: 'fantasy:points-20' }] },
+    })
+    expect(fantasyEvent(nba, 'kat', 'mine', 'key', now)).toEqual({
+      kind: 'milestone',
+      headline: '20 points',
+    })
+    expect(
+      fantasyEvent({ ...nba, detail: null }, 'kat', 'mine', 'key', now),
+    ).toBeNull()
+    expect(fantasyEvent(nba, 'kat', 'opponent', 'mine', now)).toBeNull()
   })
 })
 
@@ -166,6 +215,35 @@ describe('Alert candidates', () => {
         now,
       ),
     ).toBe(true)
+  })
+
+  it('keeps NBA Fantasy milestones alertable before the fourth quarter', () => {
+    expect(
+      isAlertCandidate(
+        item({
+          league: 'nba',
+          significance: 'routine',
+          segmentLabel: 'Q2 4:00',
+          detail: {
+            credits: [{ id: 'p', credit: 'fantasy:double-double' }],
+          },
+        }),
+        now,
+      ),
+    ).toBe(true)
+  })
+
+  it('drops ordinary early NBA lead changes before delivery work', () => {
+    expect(
+      isAlertCandidate(
+        item({
+          league: 'nba',
+          segmentLabel: 'Q2 4:00',
+          score: { away: 51, home: 50 },
+        }),
+        now,
+      ),
+    ).toBe(false)
   })
 })
 
@@ -206,6 +284,22 @@ describe('alertMessage', () => {
         matchup: null,
       }).title,
     ).toBe('FANTASY · Opp. Rodgers · Touchdown')
+  })
+
+  it('names an NBA Fantasy milestone', () => {
+    const m = alertMessage(item({ league: 'nba' }), {
+      source: 'fantasy',
+      side: 'mine',
+      player: 'Wembanyama',
+      matchup: null,
+      event: {
+        kind: 'milestone',
+        headline: 'Double-double · Block monster (4 BLK)',
+      },
+    })
+    expect(m.title).toBe(
+      'FANTASY · Your Wembanyama · Double-double · Block monster (4 BLK)',
+    )
   })
 
   it('opens each source’s own view, the Play over it', () => {

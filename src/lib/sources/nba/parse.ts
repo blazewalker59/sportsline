@@ -21,6 +21,7 @@ import {
 import { gameMilestones, takesLead } from '../common'
 import type { NbaRoster, NbaSummary } from './feed'
 import type { EspnTeams } from '../espn/common'
+import type { BasketballStats } from '@/lib/fantasy/basketballMilestones'
 import type {
   GameSnapshot,
   InvolvedPlayer,
@@ -33,6 +34,11 @@ import type {
   SourcePlay,
   SourceRoster,
 } from '@/lib/model/types'
+import {
+  BASKETBALL_MILESTONE_CREDIT,
+  basketballMilestones,
+  emptyBasketballStats,
+} from '@/lib/fantasy/basketballMilestones'
 import { sportsDayOf } from '@/lib/model/sportsDay'
 
 /** Momentum and officiating moments worth surfacing even when nothing scores. */
@@ -68,6 +74,8 @@ export function roleOf(
   if (new RegExp(`\\(${n} assists\\)`).test(text)) return 'assist'
   if (new RegExp(`\\(${n} steals\\)`).test(text)) return 'steal'
   if (new RegExp(`^${n} blocks\\b`).test(text)) return 'blocker'
+  if (new RegExp(`^${n} (?:offensive |defensive )?rebound\\b`, 'i').test(text))
+    return 'rebounder'
   if (new RegExp(`enters the game for ${n}\\b`).test(text)) return 'sub out'
   if (new RegExp(`^${n} enters the game`).test(text)) return 'sub in'
   if (new RegExp(`blocks ${n}\\b`).test(text)) return 'shooter'
@@ -100,6 +108,7 @@ export function parseGame(summary: NbaSummary): GameSnapshot {
   )
   const plays: Array<SourcePlay> = []
   const milestones: Array<SourceMilestone> = []
+  const playerStats = new Map<string, BasketballStats>()
   let previous: Score = { away: 0, home: 0 }
   let sawGameEnd = false
 
@@ -146,6 +155,25 @@ export function parseGame(summary: NbaSummary): GameSnapshot {
       })
     })
 
+    const credits: SourcePlay['credits'] = []
+    for (const player of involved) {
+      const before = playerStats.get(player.sourceId) ?? emptyBasketballStats()
+      const after = { ...before }
+      if (player.role === 'shooter') after.points += row.scoreValue ?? 0
+      if (player.role === 'rebounder') after.rebounds++
+      if (player.role === 'assist') after.assists++
+      if (player.role === 'steal') after.steals++
+      if (player.role === 'blocker') after.blocks++
+      for (const milestone of basketballMilestones(before, after)) {
+        credits.push({
+          sourceId: player.sourceId,
+          name: player.name,
+          credit: BASKETBALL_MILESTONE_CREDIT + milestone,
+        })
+      }
+      playerStats.set(player.sourceId, after)
+    }
+
     const scored = score.away > previous.away || score.home > previous.home
     // Baskets come ~100 a game, so in the NBA only a go-ahead one (giving a
     // team the lead, from behind or from a tie) is Scoring (CONTEXT.md).
@@ -164,7 +192,7 @@ export function parseGame(summary: NbaSummary): GameSnapshot {
       significance: significance(goAhead, type, text),
       side: sideOf(row.team?.id),
       involved,
-      credits: [],
+      credits,
       detail: {
         type,
         points: row.scoreValue ?? 0,

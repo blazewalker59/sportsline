@@ -212,7 +212,7 @@ A Viewer's link to their own Kalshi account, through a read-only API key they pr
 _Avoid_: login, integration
 
 **Alert**:
-A push notification to a Viewer's device, its title naming its source (Following, Prediction or Fantasy) and why it matters. Following: a Scoring Play, an Overturn of a score, or a Final in a Game their Team or Player Follows cover. Prediction: its key moments, meaning the odds on their side swinging sharply, a Combo's Leg hitting or missing, and its result. Fantasy: a Starter's key events, meaning their scores and, for the Viewer's own Starters, big plays. Each source sends at the Viewer's Alert level for it. League Follows never Alert. Never sent for history a LiveGame backfills.
+A push notification to a Viewer's device, its title naming its source (Following, Prediction or Fantasy) and why it matters. Following: a Scoring Play, an Overturn of a score, or a Final in a Game their Team or Player Follows cover; NBA lead changes interrupt only in the fourth quarter or overtime while the margin is five points or less. Prediction: its key moments, meaning the odds on their side swinging sharply, a Combo's Leg hitting or missing, and its result; the same NBA limit applies when its Alert level adds scores. Fantasy: a Starter's key events, meaning their scores and, for the Viewer's own Starters, big plays; NBA Starters Alert on 20, 30 and 40 points, 10 rebounds, 10 assists, 5 steals, 4 blocks, and their first double-double or triple-double rather than every go-ahead basket. Each source sends at the Viewer's Alert level for it. League Follows never Alert. Never sent for history a LiveGame backfills.
 _Avoid_: notification, push, ping
 
 **Alert level**:
