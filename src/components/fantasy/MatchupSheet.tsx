@@ -134,10 +134,12 @@ export function MatchupSheet({
   const starters = (l: Array<LineupPlayer>) => l.filter((p) => p.starter)
   const bench = (l: Array<LineupPlayer>) => l.filter((p) => !p.starter)
   // Each Player's Game that day: today's and the days ahead are loaded.
+  // Football's is the week's; elsewhere only that day's, so a Player off
+  // today shows no Game rather than their next one.
   const sportsDay = daySportsDay(m, day)
   const dayGames = summary
     ? []
-    : today
+    : m.sport === 'football' && today
       ? allGames
       : allGames.filter((g) => g.sportsDay === sportsDay)
   const side = (s: MatchupSide, align: 'left' | 'right') => (
