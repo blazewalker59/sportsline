@@ -207,7 +207,7 @@ export async function syncLeague(
       const stub = env.LIVE_GAME.get(env.LIVE_GAME.idFromName(gameId))
       const delayMs =
         g.status === 'final' ? backfills++ * BACKFILL_SPACING_MS : 0
-      return stub.track(
+      const wake = stub.track(
         {
           gameId,
           league,
@@ -228,8 +228,22 @@ export async function syncLeague(
         },
         delayMs,
       )
+      return { gameId, sourceGameId: g.sourceGameId, wake }
     })
-  await Promise.all(wakes)
+  // One LiveGame that can't be woken (its storage timed out and it was
+  // reset) is reported on its own; the rest still are, and the next
+  // minute's sync tries it again.
+  const results = await Promise.allSettled(wakes.map((w) => w.wake))
+  for (const [i, r] of results.entries()) {
+    if (r.status === 'fulfilled') continue
+    const { gameId, sourceGameId } = wakes[i]
+    await reportError(env, 'live-game-track', r.reason, {
+      league,
+      sportsDay,
+      gameId,
+      sourceGameId,
+    })
+  }
 }
 
 /** The schedule fields of the Games already stored, by id. */
