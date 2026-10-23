@@ -237,14 +237,22 @@ export const getMatchupGames = createServerFn({ method: 'GET' })
       }
     }
     const all = [...stored, ...ahead]
+    // Football: one Game a Team for the week. Elsewhere one a Team each
+    // day, so a day ahead shows its own Games, not the Team's next one.
+    const byDay = new Map<string, Array<GameSummary>>()
+    for (const g of all)
+      byDay.set(g.sportsDay, [...(byDay.get(g.sportsDay) ?? []), g])
+    const groups = football ? [all] : [...byDay.values()]
     const picked = new Map<string, GameSummary>()
-    for (const id of ids) {
-      const g = pickGame(all.filter((game) => hasId(game, id)))
-      if (g) picked.set(g.id, g)
-    }
-    for (const abbr of abbrevs) {
-      const g = pickGame(all.filter((game) => hasAbbrev(game, abbr)))
-      if (g) picked.set(g.id, g)
+    for (const group of groups) {
+      for (const id of ids) {
+        const g = pickGame(group.filter((game) => hasId(game, id)))
+        if (g) picked.set(g.id, g)
+      }
+      for (const abbr of abbrevs) {
+        const g = pickGame(group.filter((game) => hasAbbrev(game, abbr)))
+        if (g) picked.set(g.id, g)
+      }
     }
     return [...picked.values()]
   })
