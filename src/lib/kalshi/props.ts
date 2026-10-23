@@ -142,6 +142,9 @@ export function progressOf(input: {
           : null
     return current === null ? null : { current, target, label: stat.label }
   }
+  // A player's stat with no Player matched: their team's total would be
+  // wrong, so there's no progress to show.
+  if (!stat.team && !input.playerId) return null
   if (!input.box) return { current: 0, target, label: stat.label }
   const tables = input.box.tables.filter((t) =>
     t.title.endsWith(` ${stat.table}`),
@@ -160,7 +163,7 @@ export function progressOf(input: {
       .map((c) => t.columns.indexOf(c))
       .filter((i) => i >= 0)
     if (columns.length === 0) continue
-    if (stat.team || !input.playerId) {
+    if (stat.team) {
       if (side && t.side === side) current += sum(t.rows, columns)
     } else {
       current += sum(
