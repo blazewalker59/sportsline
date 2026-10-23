@@ -89,6 +89,21 @@ describe('stat props', () => {
     ).toBe(72)
   })
 
+  it("show nothing for a player prop whose Player isn't matched", () => {
+    expect(
+      progressOf({
+        league: 'cfb',
+        eventTicker: 'KXNCAAFRECYDS-26OCT03MIACLEM',
+        title: 'Cooper Barkate: 100+ receiving yards',
+        floorStrike: 99.5,
+        game,
+        box,
+        teamId: 'tm_mia',
+        playerId: null,
+      }),
+    ).toBeNull()
+  })
+
   it('use the score for totals', () => {
     expect(
       progressOf({

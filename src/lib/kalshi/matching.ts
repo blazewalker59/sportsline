@@ -174,10 +174,17 @@ export async function subjectFor(
     if (t) {
       const want = normalizePlayerName(t.name)
       const last = t.name.trim().split(/\s+/).at(-1) ?? ''
+      // Kalshi's "Jokić" is ESPN's "Jokic": look for the name both ways.
+      const plain = last.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       const rows = await db
         .select({ id: players.id, name: players.name })
         .from(players)
-        .where(and(eq(players.league, league), endsWithWord(last)))
+        .where(
+          and(
+            eq(players.league, league),
+            or(endsWithWord(last), endsWithWord(plain)),
+          ),
+        )
       playerId =
         rows.find((p) => normalizePlayerName(p.name) === want)?.id ?? null
     }
