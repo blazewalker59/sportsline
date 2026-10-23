@@ -15,6 +15,19 @@ const state = vi.hoisted(() => ({
   scheduled: [] as Array<ScheduledGame>,
   /** Statements in each batch syncLeague sends. */
   batches: [] as Array<number>,
+  reported: [] as Array<{ scope: string; context: unknown }>,
+}))
+
+vi.mock('@/lib/ops/errors', () => ({
+  reportError: (
+    _env: unknown,
+    scope: string,
+    _e: unknown,
+    context: unknown,
+  ) => {
+    state.reported.push({ scope, context })
+    return Promise.resolve()
+  },
 }))
 
 vi.mock('@/lib/db', async (original) => ({
@@ -103,6 +116,8 @@ describe.skipIf(!isBun)('syncLeague', () => {
   let tracked: Array<{ gameId: string; delayMs: number | undefined }>
   let env: CloudflareEnv
   let db: Awaited<ReturnType<typeof sqliteDb>>['db']
+  /** Games whose LiveGame fails to wake. */
+  let failing: Set<string>
 
   beforeEach(async () => {
     db = (await sqliteDb()).db
@@ -113,7 +128,9 @@ describe.skipIf(!isBun)('syncLeague', () => {
     }
     state.db = db
     state.batches = []
+    state.reported = []
     tracked = []
+    failing = new Set()
     env = {
       DB: {},
       LIVE_GAME: {
@@ -121,7 +138,9 @@ describe.skipIf(!isBun)('syncLeague', () => {
         get: (gameId: string) => ({
           track: (_game: unknown, delayMs?: number) => {
             tracked.push({ gameId, delayMs })
-            return Promise.resolve()
+            return failing.has(gameId)
+              ? Promise.reject(new Error('storage operation exceeded timeout'))
+              : Promise.resolve()
           },
         }),
       },
@@ -201,6 +220,22 @@ describe.skipIf(!isBun)('syncLeague', () => {
     expect(rows.every((r) => r.startsAt === '2026-10-02T18:00:00.000Z')).toBe(
       true,
     )
+  })
+
+  it('reports a LiveGame that fails to wake by its Game, and wakes the rest', async () => {
+    state.scheduled = [game(1, { status: 'live' }), game(2, { status: 'live' })]
+    await sync()
+    const [first] = await db.select().from(games).orderBy(games.startsAt)
+    failing.add(first.id)
+    tracked = []
+    await sync()
+    expect(tracked).toHaveLength(2)
+    expect(state.reported).toEqual([
+      {
+        scope: 'live-game-track',
+        context: expect.objectContaining({ league: 'nfl', gameId: first.id }),
+      },
+    ])
   })
 
   it('spaces out the first polls of a past day of Finals', async () => {
