@@ -51,6 +51,26 @@ export function isRateLimited(error: unknown): boolean {
 }
 
 /**
+ * A failure the next try usually gets past: a timeout, a Source's 5xx, or
+ * Cloudflare resetting a Durable Object or dropping its connection (their
+ * errors say `retryable`).
+ */
+export function isTransient(error: unknown): boolean {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { retryable?: unknown }).retryable === true
+  )
+    return true
+  return /timed out after|\b5\d\d for |network connection lost|internal error|object to be reset/i.test(
+    String(error),
+  )
+}
+
+/** Failed polls in a row before a transient failure is reported. */
+export const TRANSIENT_REPORT_AFTER = 3
+
+/**
  * After a failed poll: when to try again, and whether the failure is worth
  * reporting. `rateLimitedSince` is when the current run of 429s began, or
  * null when this failure isn't one.

@@ -16,7 +16,13 @@ import {
   keepInvolved,
 } from './diff'
 import { chunk, resolve } from './identity'
-import { isRateLimited, nextPollDelay, retryAfterFailure } from './pacing'
+import {
+  TRANSIENT_REPORT_AFTER,
+  isRateLimited,
+  isTransient,
+  nextPollDelay,
+  retryAfterFailure,
+} from './pacing'
 import { itemRow, toTimelineItem } from './rows'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { SeenItem } from './diff'
@@ -177,7 +183,12 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
         await this.ctx.storage.delete(RATE_LIMITED_KEY)
       }
       const retry = retryAfterFailure(rateLimitedSince, Date.now())
-      if (retry.report) {
+      // A blip (a timeout, a 5xx) is retried quietly; one that lasts is
+      // reported.
+      if (
+        retry.report &&
+        (!isTransient(error) || errors >= TRANSIENT_REPORT_AFTER)
+      ) {
         await reportError(this.env, 'live-game', error, {
           gameId: game.gameId,
           errors,
