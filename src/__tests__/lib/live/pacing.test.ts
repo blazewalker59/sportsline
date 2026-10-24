@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   isRateLimited,
+  isTransient,
   nextPollDelay,
   retryAfterFailure,
 } from '@/lib/live/pacing'
@@ -51,5 +52,23 @@ describe('isRateLimited', () => {
   it('spots a 429 in a Source error', () => {
     expect(isRateLimited(new Error('NHL 429 for https://x/1'))).toBe(true)
     expect(isRateLimited(new Error('NHL 500 for https://x/4290'))).toBe(false)
+  })
+})
+
+describe('isTransient', () => {
+  it('spots timeouts, 5xx and Cloudflare resets, not a refusal', () => {
+    const transient = [
+      'ESPN timed out after 8000ms for https://x/1',
+      'ESPN 525 for https://x/2',
+      'Network connection lost.',
+      'internal error; reference = c4j8ollpcq8v44nc58kkq2dq',
+      'Durable Object storage operation exceeded timeout which caused object to be reset.',
+    ]
+    for (const m of transient) expect(isTransient(new Error(m))).toBe(true)
+    expect(
+      isTransient(Object.assign(new Error('Overloaded'), { retryable: true })),
+    ).toBe(true)
+    expect(isTransient(new Error('ESPN 403 for https://x/500'))).toBe(false)
+    expect(isTransient(new Error('Cannot read properties of null'))).toBe(false)
   })
 })

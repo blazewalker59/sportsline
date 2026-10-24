@@ -6,7 +6,12 @@
 
 import { and, eq, inArray, notInArray, sql } from 'drizzle-orm'
 import { chunk, resolve } from './identity'
-import { RATE_LIMIT_GRACE_MS, WARMUP_MINUTES, isRateLimited } from './pacing'
+import {
+  RATE_LIMIT_GRACE_MS,
+  WARMUP_MINUTES,
+  isRateLimited,
+  isTransient,
+} from './pacing'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { CloudflareEnv, Database } from '@/lib/db'
 import type { Conference } from '@/lib/model/leagues'
@@ -62,14 +67,14 @@ export async function syncDay(
   for (const [i, r] of results.entries()) {
     const league = ACTIVE_LEAGUES[i]
     if (r.status === 'fulfilled') {
-      rateLimitedSince.delete(league)
+      failingSince.delete(league)
       continue
     }
-    // A rate limit clears itself (the next minute tries again): only one
-    // that lasts is worth reporting.
-    if (isRateLimited(r.reason)) {
-      const since = rateLimitedSince.get(league) ?? now.getTime()
-      rateLimitedSince.set(league, since)
+    // A rate limit or a blip (a timeout, a 5xx) clears itself (the next
+    // minute tries again): only one that lasts is worth reporting.
+    if (isRateLimited(r.reason) || isTransient(r.reason)) {
+      const since = failingSince.get(league) ?? now.getTime()
+      failingSince.set(league, since)
       if (now.getTime() - since < RATE_LIMIT_GRACE_MS) continue
     }
     await reportError(env, 'schedule', r.reason, { sportsDay })
@@ -82,8 +87,11 @@ const OWNED_BY_LIVE_GAME = ['live', 'delayed', 'final']
 /** Between the first polls of Finals woken together to be backfilled. */
 export const BACKFILL_SPACING_MS = 3_000
 
-/** When each League's schedule source started answering 429 (this isolate). */
-const rateLimitedSince = new Map<League, number>()
+/**
+ * When each League's schedule sync started failing with a rate limit or
+ * a blip (this isolate).
+ */
+const failingSince = new Map<League, number>()
 
 /** One League's schedule for one Sports Day (a Team page opening an old Game). */
 export async function syncLeague(
@@ -231,18 +239,21 @@ export async function syncLeague(
       return { gameId, sourceGameId: g.sourceGameId, wake }
     })
   // One LiveGame that can't be woken (its storage timed out and it was
-  // reset) is reported on its own; the rest still are, and the next
+  // reset) is logged on its own; the rest still are, and the next
   // minute's sync tries it again.
   const results = await Promise.allSettled(wakes.map((w) => w.wake))
   for (const [i, r] of results.entries()) {
     if (r.status === 'fulfilled') continue
     const { gameId, sourceGameId } = wakes[i]
-    await reportError(env, 'live-game-track', r.reason, {
-      league,
-      sportsDay,
-      gameId,
-      sourceGameId,
-    })
+    // Cloudflare resetting a LiveGame is logged, not pushed: the next
+    // minute wakes it again.
+    await reportError(
+      env,
+      'live-game-track',
+      r.reason,
+      { league, sportsDay, gameId, sourceGameId },
+      { notify: !isTransient(r.reason) },
+    )
   }
 }
 
