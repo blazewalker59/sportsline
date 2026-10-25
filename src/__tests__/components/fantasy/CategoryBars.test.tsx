@@ -31,7 +31,7 @@ const rows = (html: string) =>
 afterEach(cleanup)
 
 describe('CategoryBars', () => {
-  it('edges a lead on the leader’s side, and leaves a tie unmarked', () => {
+  it('colors the leader’s figure, and leaves a tie unmarked', () => {
     const m = view()
     const tie = { ...m.categories![4], mine: '9', opponent: '9' }
     tie.leader = 'tie'
@@ -44,19 +44,15 @@ describe('CategoryBars', () => {
     expect(html).not.toMatch(/·\s*tied/)
     expect(html).not.toContain('yellow')
     const byLabel = rows(html)
-    expect(byLabel[tie.label]).not.toContain('border-left-color')
-    expect(byLabel[tie.label]).not.toContain('border-right-color')
+    expect(byLabel[tie.label]).not.toContain('color:var(')
     expect(byLabel[tie.label]).toContain('(tied)') // for screen readers only
     const mine = categories.find((c) => c.leader === 'mine')!
-    expect(byLabel[mine.label]).toContain(
-      'border-left-color:var(--color-accent)',
-    )
-    expect(byLabel[mine.label]).not.toContain('border-right-color')
+    expect(byLabel[mine.label]).toContain('color:var(--color-accent)')
+    expect(byLabel[mine.label]).not.toContain('color:var(--color-live)')
+    expect(byLabel[mine.label]).not.toMatch(/border-(x|left|right)/)
     const theirs = categories.find((c) => c.leader === 'opponent')!
-    expect(byLabel[theirs.label]).toContain(
-      'border-right-color:var(--color-live)',
-    )
-    expect(byLabel[theirs.label]).not.toContain('border-left-color')
+    expect(byLabel[theirs.label]).toContain('color:var(--color-live)')
+    expect(byLabel[theirs.label]).not.toContain('color:var(--color-accent)')
   })
 
   it('toggles between the matchup’s totals and the day’s', () => {
@@ -95,7 +91,7 @@ describe('CategoryBars', () => {
     const day = getByRole('radio', { name: /^Sat, Oct 11/ })
     expect(day.textContent).toContain('…')
     fireEvent.click(day)
-    expect(container.innerHTML).not.toContain('border-left-color')
+    expect(rows(container.innerHTML)['FG%']).not.toContain('color:var(')
     expect(rows(container.innerHTML)['FG%']).toContain('…')
   })
 })

@@ -3,9 +3,8 @@
  * Viewer's total and their opponent's either side of its name in the
  * middle (close enough to compare at a glance), and under them a bar from
  * the middle that leans toward whoever leads, as far as the lead is
- * decisive (categoryLean). A category someone leads carries an edge in
- * their color on their side (left for the Viewer, right for the opponent;
- * none while tied). A toggle in the caption swaps the whole Matchup's
+ * decisive (categoryLean); the leader's figure is bold in their color.
+ * A toggle in the caption swaps the whole Matchup's
  * totals for the day being looked at, so each row shows one figure a
  * side. HTML rather than a chart: it reads as a table, framed like the
  * app's charts (ChartCard, CHART_COLORS).
@@ -23,16 +22,6 @@ import { cn } from '@/lib/utils'
 export interface CategoryDay {
   label: string
   categories: ReadonlyArray<CategoryResult> | null
-}
-
-/**
- * A row's edge: the leader's color on the leader's side. Both sides keep
- * a transparent edge, so every row's columns line up.
- */
-function edge(leader: CategoryResult['leader']): React.CSSProperties {
-  if (leader === 'mine') return { borderLeftColor: CHART_COLORS.mine }
-  if (leader === 'opponent') return { borderRightColor: CHART_COLORS.opponent }
-  return {}
 }
 
 export function CategoryBars({
@@ -117,8 +106,7 @@ export function CategoryBars({
             return (
               <li
                 key={c.statId}
-                className="flex flex-col gap-1.5 border-x-[3px] border-transparent px-1.5 py-1.5"
-                style={edge(leader)}
+                className="flex flex-col gap-1.5 px-1.5 py-1.5"
               >
                 <span className="grid grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)] items-baseline gap-2">
                   <span
