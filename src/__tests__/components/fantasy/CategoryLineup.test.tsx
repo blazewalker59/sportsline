@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import basketball from '../../fixtures/fantasy/basketball-category-matchup.json'
 import type { MatchupView, WireLeague } from '@/lib/fantasy/matchup'
+import type { GameSummary } from '@/lib/model/timeline'
 import { CategoryLineup } from '@/components/fantasy/CategoryLineup'
 import { readMatchup } from '@/lib/fantasy/matchup'
 
@@ -84,6 +85,37 @@ describe('CategoryLineup', () => {
           : '',
     )
     expect(order.indexOf('bench')).toBeGreaterThan(order.indexOf('totals'))
+  })
+
+  it('marks a Starter on the court amber', () => {
+    const m = view()
+    const starter = m.mine.lineup.find((p) => p.starter)!
+    starter.playerId = 'pl_star'
+    starter.teamId = 'tm_star'
+    const live = {
+      id: 'gm_1',
+      league: 'nba',
+      sportsDay: '2026-10-24',
+      status: 'live',
+      startsAt: '2026-10-25T00:00:00Z',
+      awayTeam: { id: 'tm_star', abbreviation: 'AAA', logoUrl: null },
+      homeTeam: { id: 'tm_other', abbreviation: 'BBB', logoUrl: null },
+      score: { away: 50, home: 48 },
+      situation: { segmentLabel: 'Q3 5:12', detail: { onCourt: ['pl_star'] } },
+    } as unknown as GameSummary
+    const html = renderToStaticMarkup(
+      <CategoryLineup
+        sport="basketball"
+        categories={m.categories!}
+        mine={m.mine}
+        opponent={m.opponent}
+        lineups={{ mine: m.mine.lineup, theirs: m.opponent!.lineup }}
+        games={[live]}
+        knowsGames
+      />,
+    )
+    expect(html).toContain(`aria-label="${starter.name}: on the court"`)
+    expect(html.match(/field-state/g)).toHaveLength(1)
   })
 
   it('sums the whole matchup in summary, without slot tags', () => {

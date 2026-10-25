@@ -224,6 +224,7 @@ export function parseGame(summary: NbaSummary): GameSnapshot {
   const items: Array<SourceItem> = [...plays, ...milestones]
   const live = status === 'live' || status === 'delayed'
   const period = competition.status.period ?? 1
+  const halftime = competition.status.type?.name === 'STATUS_HALFTIME'
   return {
     league: 'nba',
     sourceGameId: summary.header.id,
@@ -235,11 +236,10 @@ export function parseGame(summary: NbaSummary): GameSnapshot {
     score: finalScore,
     situation: live
       ? {
-          segmentLabel:
-            competition.status.type?.name === 'STATUS_HALFTIME'
-              ? 'Halftime'
-              : `${quarterLabel(period)} ${competition.status.displayClock ?? ''}`.trim(),
-          detail: {},
+          segmentLabel: halftime
+            ? 'Halftime'
+            : `${quarterLabel(period)} ${competition.status.displayClock ?? ''}`.trim(),
+          detail: halftime ? {} : { onCourt: onCourt(summary) },
         }
       : null,
     items,
@@ -255,6 +255,19 @@ function significance(
   if (goAhead) return 'scoring'
   if (NOTABLE.test(type) || NOTABLE.test(text)) return 'notable'
   return 'routine'
+}
+
+/**
+ * The Players on the court, by Source id: ESPN marks each team's five
+ * `active`. A team with more marked (a glitch) is left out.
+ */
+export function onCourt(summary: NbaSummary): Array<string> {
+  return (summary.boxscore?.players ?? []).flatMap((t) => {
+    const active = (t.statistics?.[0]?.athletes ?? []).filter(
+      (a) => a.active && !a.didNotPlay,
+    )
+    return active.length <= 5 ? active.map((a) => a.athlete.id) : []
+  })
 }
 
 function box(

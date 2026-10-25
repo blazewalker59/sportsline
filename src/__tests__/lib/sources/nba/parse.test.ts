@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import fixture from '../../../fixtures/nba/final-401859964.json'
 import type { NbaSummary } from '@/lib/sources/nba/feed'
 import type { SourceMilestone, SourcePlay } from '@/lib/model/types'
-import { parseGame, roleOf } from '@/lib/sources/nba/parse'
+import { onCourt, parseGame, roleOf } from '@/lib/sources/nba/parse'
 import { takesLead } from '@/lib/sources/common'
 
 const game = parseGame(fixture as unknown as NbaSummary)
@@ -143,5 +143,28 @@ describe('takesLead', () => {
     expect(takesLead({ away: 49, home: 51 }, { away: 51, home: 51 })).toBe(
       false,
     )
+  })
+})
+
+describe('NBA onCourt', () => {
+  const summary = fixture as unknown as NbaSummary
+
+  it('names the five each team has on the court', () => {
+    const ids = onCourt(summary)
+    expect(ids).toHaveLength(10)
+    const names = summary.boxscore!.players!.flatMap((t) =>
+      (t.statistics?.[0]?.athletes ?? [])
+        .filter((a) => ids.includes(a.athlete.id))
+        .map((a) => a.athlete.displayName),
+    )
+    expect(names).toContain('Victor Wembanyama')
+    expect(names).toContain('OG Anunoby')
+  })
+
+  it('leaves out a team with more than five marked', () => {
+    const glitch = structuredClone(summary)
+    for (const a of glitch.boxscore!.players![0].statistics![0].athletes!)
+      a.active = true
+    expect(onCourt(glitch)).toHaveLength(5)
   })
 })

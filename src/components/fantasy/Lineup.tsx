@@ -91,7 +91,7 @@ function PlayerCell({
       )}
       aria-label={
         state?.onField
-          ? `${player.name}: ${state.redZone ? 'in the red zone' : 'on the field'}`
+          ? `${player.name}: ${state.redZone ? 'in the red zone' : sport === 'basketball' ? 'on the court' : 'on the field'}`
           : undefined
       }
     >

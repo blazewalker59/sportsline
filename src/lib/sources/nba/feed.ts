@@ -31,6 +31,8 @@ interface NbaBoxAthlete {
     position?: { abbreviation?: string }
   }
   starter?: boolean
+  /** On the court now (at the end, once it's over). */
+  active?: boolean
   didNotPlay?: boolean
   stats?: Array<string>
 }

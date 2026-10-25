@@ -107,7 +107,11 @@ export function CategoryLineup({
       <tr key={p.espnId} className={cn(idle && 'opacity-50')}>
         <th
           scope="row"
-          className="sticky left-0 z-10 border-r border-b border-border bg-surface px-2 py-1.5 text-left font-normal"
+          className={cn(
+            'sticky left-0 z-10 border-r border-b border-border bg-surface px-2 py-1.5 text-left font-normal',
+            state?.onField && 'field-state',
+          )}
+          aria-label={state?.onField ? `${p.name}: on the court` : undefined}
         >
           <PlayerLabel sport={sport} player={p} games={games} slot={!summary} />
         </th>
