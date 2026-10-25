@@ -94,13 +94,17 @@ export function MatchupSheet({
   const abbrevs = [
     ...new Set(lineup.flatMap((p) => (p.teamAbbrev ? [p.teamAbbrev] : []))),
   ]
+  // Only the Matchup's sport: today's Games span every League, and a
+  // Celtic off tonight would otherwise match the Bruins' "BOS".
+  const sportLeague = SPORTS[m.sport].league
   const week = useQuery({
-    ...matchupGamesQuery(league.id, SPORTS[m.sport].league, teamIds, abbrevs),
+    ...matchupGamesQuery(league.id, sportLeague, teamIds, abbrevs),
     enabled: !reading,
   })
   const allGames = useMemo(
-    () => [...games, ...(week.data ?? [])],
-    [games, week.data],
+    () =>
+      [...games, ...(week.data ?? [])].filter((g) => g.league === sportLeague),
+    [games, week.data, sportLeague],
   )
   const byeWeeks = m.sport === 'football' && week.isSuccess
   // Every day of the Matchup (a category league), first to last: today
