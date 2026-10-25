@@ -1,7 +1,8 @@
 /**
  * A category league's Matchup at a glance: one row per category, the
- * Viewer's total on the left and their opponent's on the right, and a bar
- * from the middle that leans toward whoever leads, as far as the lead is
+ * Viewer's total and their opponent's either side of its name in the
+ * middle (close enough to compare at a glance), and under them a bar from
+ * the middle that leans toward whoever leads, as far as the lead is
  * decisive (categoryLean). A category someone leads carries an edge in
  * their color on their side (left for the Viewer, right for the opponent;
  * none while tied). A toggle in the caption swaps the whole Matchup's
@@ -116,14 +117,20 @@ export function CategoryBars({
             return (
               <li
                 key={c.statId}
-                className="grid grid-cols-[3.75rem_minmax(0,1fr)_3.75rem] items-center gap-2 border-x-[3px] border-transparent px-1.5 py-1.5"
+                className="flex flex-col gap-1.5 border-x-[3px] border-transparent px-1.5 py-1.5"
                 style={edge(leader)}
               >
-                <span {...value(mine, theirs, CHART_COLORS.mine)}>
-                  {figure('mine')}
-                </span>
-                <span className="flex flex-col items-center gap-1">
-                  <span className="text-[11px] leading-none font-semibold text-muted">
+                <span className="grid grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)] items-baseline gap-2">
+                  <span
+                    {...value(mine, theirs, CHART_COLORS.mine)}
+                    className={cn(
+                      value(mine, theirs, CHART_COLORS.mine).className,
+                      'text-right',
+                    )}
+                  >
+                    {figure('mine')}
+                  </span>
+                  <span className="text-center text-[11px] leading-none font-semibold text-muted">
                     {c.label}
                     {c.reverse && (
                       <span className="sr-only"> (lower is better)</span>
@@ -132,34 +139,26 @@ export function CategoryBars({
                       <span className="sr-only"> (tied)</span>
                     )}
                   </span>
-                  <span
-                    aria-hidden="true"
-                    className="relative h-1.5 w-full rounded-full bg-notice"
-                  >
-                    <span className="absolute top-[-2px] left-1/2 h-[10px] w-px -translate-x-1/2 bg-border" />
-                    {lean !== 0 && (
-                      <span
-                        className="absolute top-0 h-full rounded-full"
-                        style={{
-                          width: `${Math.abs(lean) * 50}%`,
-                          background:
-                            lean > 0
-                              ? CHART_COLORS.mine
-                              : CHART_COLORS.opponent,
-                          ...(lean > 0 ? { right: '50%' } : { left: '50%' }),
-                        }}
-                      />
-                    )}
+                  <span {...value(theirs, mine, CHART_COLORS.opponent)}>
+                    {figure('opponent')}
                   </span>
                 </span>
                 <span
-                  {...value(theirs, mine, CHART_COLORS.opponent)}
-                  className={cn(
-                    value(theirs, mine, CHART_COLORS.opponent).className,
-                    'text-right',
-                  )}
+                  aria-hidden="true"
+                  className="relative h-1.5 w-full rounded-full bg-notice"
                 >
-                  {figure('opponent')}
+                  <span className="absolute top-[-2px] left-1/2 h-[10px] w-px -translate-x-1/2 bg-border" />
+                  {lean !== 0 && (
+                    <span
+                      className="absolute top-0 h-full rounded-full"
+                      style={{
+                        width: `${Math.abs(lean) * 50}%`,
+                        background:
+                          lean > 0 ? CHART_COLORS.mine : CHART_COLORS.opponent,
+                        ...(lean > 0 ? { right: '50%' } : { left: '50%' }),
+                      }}
+                    />
+                  )}
                 </span>
               </li>
             )
