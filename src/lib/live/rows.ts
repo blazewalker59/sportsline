@@ -10,7 +10,13 @@ import type {
   TimelineItem,
   TimelinePlayer,
 } from '@/lib/model/timeline'
-import type { Json, League, SourceItem, SourcePlay } from '@/lib/model/types'
+import type {
+  Json,
+  League,
+  Situation,
+  SourceItem,
+  SourcePlay,
+} from '@/lib/model/types'
 import { teamColors } from '@/lib/brand/teamColors'
 
 export type ItemRow = typeof timelineItems.$inferSelect
@@ -149,5 +155,24 @@ function teamRef(t: TeamRow): TeamRef & { name: string } {
     logoUrl: t.logoUrl ?? null,
     name: t.name,
     colors: teamColors(t.league, t.name),
+  }
+}
+
+/**
+ * The Situation as stored: Players on the court (basketball) by our ids,
+ * as Fantasy Lineups know them, not the Source's.
+ */
+export function storedSituation(
+  situation: Situation | null,
+  ids: ReadonlyMap<string, string>,
+): Situation | null {
+  const detail = situation?.detail as { onCourt?: unknown } | null | undefined
+  if (!situation || !Array.isArray(detail?.onCourt)) return situation
+  const onCourt = (detail.onCourt as Array<string>).flatMap(
+    (id) => ids.get(id) ?? [],
+  )
+  return {
+    ...situation,
+    detail: { ...detail, onCourt } as Situation['detail'],
   }
 }

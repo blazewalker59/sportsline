@@ -23,7 +23,7 @@ import {
   nextPollDelay,
   retryAfterFailure,
 } from './pacing'
-import { itemRow, toTimelineItem } from './rows'
+import { itemRow, storedSituation, toTimelineItem } from './rows'
 import type { BatchItem } from 'drizzle-orm/batch'
 import type { SeenItem } from './diff'
 import type { ItemRow, TrackedGame } from './rows'
@@ -390,11 +390,12 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
     const keepBox =
       snapshot.boxPartial &&
       Boolean(await this.ctx.storage.get<boolean>(FULL_BOX_KEY))
+    const situation = storedSituation(snapshot.situation, this.knownPlayers)
     const gameFields = {
       status: snapshot.status,
       awayScore: snapshot.score.away,
       homeScore: snapshot.score.home,
-      situation: snapshot.situation,
+      situation,
       ...(keepBox ? {} : { box }),
       // Only a Source that ranks teams (college football) sets these.
       ...(snapshot.away.rank !== undefined
@@ -523,7 +524,7 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
                 awayTeam: away,
                 homeTeam: home,
                 score: snapshot.score,
-                situation: snapshot.situation,
+                situation,
               },
             },
           ]

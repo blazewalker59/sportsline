@@ -1,6 +1,7 @@
 /**
- * A Lineup Player's Game, from the Games we have: when it is, and in
- * football whether their unit is on the field. Pure.
+ * A Lineup Player's Game, from the Games we have: when it is, and whether
+ * they're in the action (football: their unit on the field; basketball:
+ * on the court). Pure.
  */
 
 import type { LineupPlayer } from '@/lib/fantasy/matchup'
@@ -14,14 +15,16 @@ export interface GameState {
   status: string
   live: boolean
   upcoming: boolean
+  /** Their unit on the field (football), or on the court (basketball). */
   onField: boolean
   redZone: boolean
 }
 
 /**
- * A Player's Game from the Games we have: its state, and in football
- * whether their unit is on the field (their team has the ball, or for a
- * defense, doesn't) and in the red zone (inside the 20).
+ * A Player's Game from the Games we have: its state; in football whether
+ * their unit is on the field (their team has the ball, or for a defense,
+ * doesn't) and in the red zone (inside the 20); in basketball whether
+ * they're one of the five on the court.
  */
 export function gameState(
   p: LineupPlayer,
@@ -54,6 +57,11 @@ export function gameState(
   const detail = (g.situation?.detail ?? {}) as {
     possession?: string | null
     downDistance?: string | null
+    onCourt?: Array<string>
+  }
+  if (live && g.league === 'nba') {
+    const onCourt = Boolean(p.playerId && detail.onCourt?.includes(p.playerId))
+    return { ...base, onField: onCourt, redZone: false }
   }
   if (!live || g.league !== 'nfl' || !detail.possession)
     return { ...base, onField: false, redZone: false }
