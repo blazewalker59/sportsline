@@ -199,6 +199,10 @@ _Avoid_: table, rankings
 A Viewer’s Fantasy league’s best this scoring period, read with each sync from every team’s Lineup: in a points league its top Players by Fantasy points, overall or at each position (a bench Player counts, marked), and every team’s score this Matchup; in a category league each Category’s top ten, today or over the whole Matchup: a rate (FG%, ERA) ranks only Players with the volume behind it, lowest first where lower wins, and a count where lower wins (turnovers) ranks most first, as who’s costing their side. Shown on the league’s page.
 _Avoid_: leaderboard, top performers
 
+**Available players**:
+The Players no Fantasy team in a Viewer’s Fantasy league has, searched by name or Team and narrowed by position: on ESPN its 300 most rostered free agents and waiver Players, each with the share of ESPN’s leagues that roster them and how that moved this week; on Sleeper everyone projected this week, most projected first (Sleeper doesn’t say who’s on waivers). Read from the provider while the Viewer looks at the league’s page, never stored. Only to look at: Sportsline doesn’t add, drop or claim (docs/adr/0004).
+_Avoid_: free agents (ESPN’s word, and it leaves out waivers), waiver wire
+
 **Injury Event**:
 A notable Player on another team in a Viewer’s Fantasy league turning doubtful, out or injured, seen between two of the league’s rosters (kept about hourly). Notable: rostered in 80% of ESPN’s leagues, or a Starter where ownership isn’t known (Sleeper).
 _Avoid_: injury alert (an Alert is a push)

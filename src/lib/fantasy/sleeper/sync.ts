@@ -28,11 +28,13 @@ import {
 import {
   myRoster,
   readSleeperActivity,
+  readSleeperAvailable,
   readSleeperLeagueMatchups,
   readSleeperMatchup,
   readSleeperStandings,
   readSleeperTeamSides,
 } from './read'
+import type { AvailablePlayers } from '../freeAgents'
 import type {
   SleeperPlayerInfo,
   SleeperState,
@@ -340,4 +342,28 @@ export async function syncAccount(
       .where(eq(sleeperAccounts.viewerId, viewerId))
     throw error
   }
+}
+
+/**
+ * A Sleeper league's Available players, read now (never stored), matched
+ * to ours for their Teams and headshots.
+ */
+export async function readAvailable(
+  db: Database,
+  row: typeof fantasyLeagues.$inferSelect,
+): Promise<AvailablePlayers | null> {
+  if (row.provider !== 'sleeper') return null
+  const state = await sleeperState()
+  const [league, rosterList, projections] = await Promise.all([
+    fetchLeague(row.leagueId),
+    fetchRosters(row.leagueId),
+    weekProjections(state.season, Math.max(state.week, 1)),
+  ])
+  const available = readSleeperAvailable({
+    league,
+    rosters: rosterList,
+    projections,
+  })
+  await attachOurs(db, row, available.players)
+  return available
 }

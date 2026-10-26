@@ -9,6 +9,7 @@ import { ACTIVITY_LIMIT, ESPN_ACTIVITY_TYPES } from './activity'
 import type { FantasySport } from './sports'
 import type { WireTopic, WireWaiver } from './activity'
 import type { WireLeague } from './matchup'
+import type { WireAvailable } from './freeAgents'
 import { BROWSER_USER_AGENT, fetchWithRetry } from '@/lib/sources/pool'
 
 export interface EspnSession {
@@ -153,6 +154,33 @@ export async function playerPool(
     },
   })
   return cardsOf(res.players)
+}
+
+/**
+ * The league's free agents and waiver Players, most rostered first: the
+ * first `limit` of them.
+ */
+export async function availablePlayers(
+  session: EspnSession | null,
+  sport: FantasySport,
+  season: number,
+  leagueId: string,
+  limit: number,
+): Promise<Array<WireAvailable>> {
+  const res = await get<{ players?: Array<WireAvailable> }>(
+    `${leagueUrl(sport, season, leagueId)}?view=kona_player_info`,
+    session,
+    {
+      players: {
+        filterStatus: { value: ['FREEAGENT', 'WAIVERS'] },
+        filterSlotIds: { value: Array.from({ length: 26 }, (_, i) => i) },
+        sortPercOwned: { sortPriority: 1, sortAsc: false },
+        limit,
+        offset: 0,
+      },
+    },
+  )
+  return res.players ?? []
 }
 
 export interface PlayerCard {

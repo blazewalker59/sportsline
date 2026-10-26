@@ -1,10 +1,12 @@
 /**
  * The Viewer's Fantasy queries (connections, leagues, a Matchup's race,
- * Games and past days): each key with its fetch and timing.
+ * Games and past days, a league's Activity and Available players): each
+ * key with its fetch and timing.
  */
 
 import { queryOptions } from '@tanstack/react-query'
 import {
+  getAvailablePlayers,
   getEspnConnection,
   getFantasy,
   getLeagueActivity,
@@ -142,5 +144,18 @@ export function whatIfQuery(leagueId: string) {
     queryKey: ['what-if', leagueId] as const,
     queryFn: () => getWhatIf({ data: { leagueId } }),
     staleTime: 30 * 60_000,
+  })
+}
+
+/**
+ * A league's Available players, read from its provider while its tab is
+ * open; a search runs over them in the page.
+ */
+export function availablePlayersQuery(leagueId: string) {
+  return queryOptions({
+    queryKey: ['available-players', leagueId] as const,
+    queryFn: () => getAvailablePlayers({ data: { leagueId } }),
+    refetchInterval: 10 * 60_000,
+    staleTime: 5 * 60_000,
   })
 }
