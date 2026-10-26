@@ -17,6 +17,7 @@ import { useLiveGame } from '@/lib/games/useLiveGame'
 import { typingFor } from '@/lib/timeline/chat'
 import { gameSearch } from '@/lib/timeline/gameLink'
 import { cn } from '@/lib/utils'
+import { PlayerButton } from '@/components/players/playerSheet'
 import { weekdayTime } from '@/lib/time/format'
 import { useTimeZone } from '@/lib/time/useTimeZone'
 
@@ -118,12 +119,13 @@ export function PredictionGames({
 function playerLines(
   box: GameBox | null,
   playerId: string,
-): Array<{ name: string; line: string }> {
+): Array<{ id: string; name: string; line: string }> {
   if (!box) return []
   return box.tables.flatMap((t) =>
     t.rows
       .filter((r) => r.player.id === playerId)
       .map((r) => ({
+        id: playerId,
         name: r.player.name,
         line: `${t.title.replace(/^\S+\s/, '')}: ${t.columns
           .map((c, i) => `${r.values[i]} ${c}`)
@@ -167,7 +169,9 @@ function GamePanel({
           <ul className="flex flex-col gap-1 text-xs">
             {players.map((p, i) => (
               <li key={i}>
-                <span className="font-semibold">{p.name}</span>{' '}
+                <PlayerButton playerId={p.id} className="font-semibold">
+                  {p.name}
+                </PlayerButton>{' '}
                 <span className="text-muted tabular-nums">{p.line}</span>
               </li>
             ))}

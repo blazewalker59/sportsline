@@ -149,6 +149,11 @@ export const weekProjections = (season: string, week: number) =>
   get<Array<SleeperWeekEntry>>(
     `${APP}/projections/nfl/${season}/${week}?season_type=regular&${POSITIONS}`,
   )
+/** Every fantasy-relevant player's season so far (games played as `gp`). */
+export const seasonStats = (season: string) =>
+  get<Array<SleeperWeekEntry>>(
+    `${APP}/stats/nfl/${season}?season_type=regular&${POSITIONS}`,
+  )
 /** One player, for one the weekly feeds don't carry. */
 export const sleeperPlayer = (id: string) =>
   get<SleeperPlayerInfo | null>(`${APP}/players/nfl/${encodeURIComponent(id)}`)

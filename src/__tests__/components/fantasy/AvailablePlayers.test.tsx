@@ -71,6 +71,40 @@ describe('AvailablePlayers', () => {
     expect(html).toContain('2 most rostered')
   })
 
+  it('shows each Player’s stats, and opens their page', () => {
+    const html = renderToStaticMarkup(
+      <AvailablePlayers
+        sport="basketball"
+        provider="espn"
+        available={{
+          order: 'owned',
+          recentLabel: 'Last 15',
+          players: [
+            player({
+              playerId: 'pl_1',
+              stats: {
+                season: [{ label: 'PTS', value: '18.2' }],
+                recent: [{ label: 'PTS', value: '21.0' }],
+              },
+            }),
+            // Not matched to ours yet: no page to open.
+            player({ espnId: 2, name: 'Unmatched Guy' }),
+          ],
+        }}
+      />,
+    )
+    expect(html).toContain('>18.2</span>')
+    expect(html).not.toContain('21.0')
+    expect(html).toContain('>Season<')
+    expect(html).toContain('>Last 15<')
+    expect(
+      html.match(/<button[^>]*>(?:(?!<\/button>).)*Keegan Murray/),
+    ).not.toBeNull()
+    expect(
+      html.match(/<button[^>]*>(?:(?!<\/button>).)*Unmatched Guy/),
+    ).toBeNull()
+  })
+
   it('lists Sleeper’s by projection', () => {
     const html = renderToStaticMarkup(
       <AvailablePlayers

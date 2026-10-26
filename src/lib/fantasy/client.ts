@@ -7,6 +7,7 @@
 
 import { SPORTS } from './sports'
 import { ACTIVITY_LIMIT, ESPN_ACTIVITY_TYPES } from './activity'
+import { statIds } from './freeAgents'
 import type { FantasySport } from './sports'
 import type { WireTopic, WireWaiver } from './activity'
 import type { WireLeague } from './matchup'
@@ -177,6 +178,11 @@ export async function availablePlayers(
         filterStatus: { value: ['FREEAGENT', 'WAIVERS'] },
         filterSlotIds: { value: Array.from({ length: 26 }, (_, i) => i) },
         sortPercOwned: { sortPriority: 1, sortAsc: false },
+        // Each Player's lines this season and lately, not every period's.
+        filterStatsForTopScoringPeriodIds: {
+          value: 2,
+          additionalValue: statIds(season),
+        },
         limit,
         offset: 0,
       },

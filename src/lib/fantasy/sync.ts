@@ -821,6 +821,11 @@ export async function readAvailable(
       row.leagueId,
       AVAILABLE_LIMIT,
     ),
+    {
+      sport: row.sport,
+      season: row.season,
+      categories: row.matchup?.categories ?? null,
+    },
   )
   await attachOurs(dbFromD1(env.DB), row, available.players)
   return available

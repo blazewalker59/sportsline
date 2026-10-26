@@ -1,8 +1,9 @@
 /**
  * A Fantasy league's Available players (CONTEXT.md, "Available players"):
- * searched by name or Team, narrowed to a position, each with what says
- * they're worth a look (ESPN: how rostered, and the week's move; Sleeper:
- * this week's projection), waiver Players marked; with roster moves on,
+ * searched by name or Team, narrowed to a position, each with their stats
+ * (this season, or ESPN's last 15 days) and what says they're worth a
+ * look (ESPN: how rostered, and the week's move; Sleeper: this week's
+ * projection), waiver Players marked; with roster moves on,
  * each one Add or Claim.
  */
 
@@ -12,10 +13,12 @@ import { Segmented } from './Segmented'
 import type {
   AvailablePlayers as Available,
   AvailablePlayer,
+  StatLine,
 } from '@/lib/fantasy/freeAgents'
 import type { FantasySport } from '@/lib/fantasy/sports'
 import { searchAvailable } from '@/lib/fantasy/freeAgents'
 import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
+import { PlayerButton } from '@/components/players/playerSheet'
 import { cn } from '@/lib/utils'
 
 /** How many rows show at a time; the rest one tap away. */
@@ -56,6 +59,7 @@ export function AvailablePlayers({
   const [query, setQuery] = useState('')
   const [position, setPosition] = useState('All')
   const [shown, setShown] = useState(SHOWN)
+  const [span, setSpan] = useState<'season' | 'recent'>('season')
   const groups = availablePositions(sport, available.players)
   const chosen = groups.find((g) => g.label === position)
   const found = searchAvailable(available.players, query, chosen?.ids ?? null)
@@ -87,6 +91,17 @@ export function AvailablePlayers({
           }}
         />
       )}
+      {available.recentLabel && (
+        <Segmented
+          label="Stats over"
+          options={[
+            { key: 'season', label: 'Season' },
+            { key: 'recent', label: available.recentLabel },
+          ]}
+          value={span}
+          onChange={setSpan}
+        />
+      )}
       {found.length === 0 ? (
         <p className="text-sm text-muted">
           {available.players.length === 0
@@ -100,6 +115,7 @@ export function AvailablePlayers({
               key={p.sourcePlayerId ?? p.espnId}
               sport={sport}
               p={p}
+              line={p.stats?.[span] ?? null}
               onMove={onMove}
             />
           ))}
@@ -116,8 +132,8 @@ export function AvailablePlayers({
       )}
       <p className="text-[11px] text-muted">
         {available.order === 'owned'
-          ? `Read from ${source} now: the ${available.players.length} most rostered free agents and waiver players, with the share of ${source} leagues that roster each and how it moved this week.`
-          : `Read from ${source} now: the ${available.players.length} players no team has, most projected this week first under the league’s scoring.`}
+          ? `Read from ${source} now: the ${available.players.length} most rostered free agents and waiver players, with their stats in the league’s categories or points, the share of ${source} leagues that roster each and how it moved this week. Tap a player for their page.`
+          : `Read from ${source} now: the ${available.players.length} players no team has, most projected this week first, with their season’s points under the league’s scoring. Tap a player for their page.`}
       </p>
     </section>
   )
@@ -126,10 +142,13 @@ export function AvailablePlayers({
 function Row({
   sport,
   p,
+  line,
   onMove,
 }: {
   sport: FantasySport
   p: AvailablePlayer
+  /** Their stats over the span chosen. */
+  line: StatLine | null
   onMove?: (p: AvailablePlayer) => void
 }) {
   const tone = injuryTone(p.injury)
@@ -137,33 +156,48 @@ function Row({
     p.positionId === null ? null : (POSITIONS[sport][p.positionId] ?? null)
   return (
     <li className="flex items-center gap-2.5 px-3 py-2">
-      <PlayerAvatar
-        name={p.name}
-        headshotUrl={headshotOf(sport, p)}
-        size={28}
-      />
-      <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-1.5">
-          <span className="truncate text-sm font-semibold">{p.name}</span>
-          {p.injury && (
-            <span
-              className={cn(
-                'shrink-0 text-[11px] font-semibold',
-                tone === 'yellow'
-                  ? 'text-amber-600 dark:text-amber-400'
-                  : 'text-live',
-              )}
-            >
-              {injuryLabel(p.injury)}
+      <PlayerButton
+        playerId={p.playerId}
+        className="flex min-w-0 flex-1 items-center gap-2.5"
+      >
+        <PlayerAvatar
+          name={p.name}
+          headshotUrl={headshotOf(sport, p)}
+          size={28}
+        />
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5">
+            <span className="truncate text-sm font-semibold">{p.name}</span>
+            {p.injury && (
+              <span
+                className={cn(
+                  'shrink-0 text-[11px] font-semibold',
+                  tone === 'yellow'
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-live',
+                )}
+              >
+                {injuryLabel(p.injury)}
+              </span>
+            )}
+          </span>
+          <span className="block truncate text-[11px] text-muted">
+            {[p.teamAbbrev, position, p.waivers ? 'Waivers' : null]
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
+          {line && (
+            <span className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] leading-tight tabular-nums">
+              {line.map((s) => (
+                <span key={s.label} className="whitespace-nowrap">
+                  <span className="font-semibold">{s.value}</span>{' '}
+                  <span className="text-muted">{s.label}</span>
+                </span>
+              ))}
             </span>
           )}
         </span>
-        <span className="block truncate text-[11px] text-muted">
-          {[p.teamAbbrev, position, p.waivers ? 'Waivers' : null]
-            .filter(Boolean)
-            .join(' · ')}
-        </span>
-      </span>
+      </PlayerButton>
       {p.owned !== null ? (
         <span className="shrink-0 text-right tabular-nums">
           <span className="block text-sm font-bold">{p.owned.toFixed(1)}%</span>

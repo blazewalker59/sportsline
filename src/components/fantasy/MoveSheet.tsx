@@ -14,6 +14,7 @@ import type { MoveOptions } from '@/lib/fantasy/rosterMoves'
 import type { FantasySport } from '@/lib/fantasy/sports'
 import { Sheet } from '@/components/chat/Sheet'
 import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
+import { PlayerButton } from '@/components/players/playerSheet'
 import { moveSummary } from '@/lib/fantasy/moves'
 import { useMakeMove } from '@/lib/fantasy/useFantasy'
 import { cn } from '@/lib/utils'
@@ -85,7 +86,10 @@ export function MoveSheet({
   return (
     <Sheet title={TITLE[intent.kind]} onClose={onClose}>
       {intent.kind !== 'drop' && (
-        <div className="flex items-center gap-2.5 rounded-xl border border-border bg-surface px-3 py-2">
+        <PlayerButton
+          playerId={intent.player.playerId}
+          className="flex items-center gap-2.5 rounded-xl border border-border bg-surface px-3 py-2"
+        >
           <PlayerAvatar
             name={intent.player.name}
             headshotUrl={headshotOf(sport, intent.player)}
@@ -108,7 +112,7 @@ export function MoveSheet({
                 .join(' · ')}
             </span>
           </span>
-        </div>
+        </PlayerButton>
       )}
       {result ? (
         <p
