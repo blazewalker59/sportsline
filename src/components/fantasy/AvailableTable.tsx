@@ -303,8 +303,8 @@ export function AvailableTable({
 
 /**
  * The Player column: avatar and name (opening their page), injury and
- * waivers marked, position and Team under it, and Add (solid) or Claim
- * (outlined, waiting on waivers).
+ * waivers marked, position and Team under it, and Add or Claim (a shade
+ * deeper).
  */
 function PlayerCell({
   sport,
@@ -351,12 +351,10 @@ function PlayerCell({
             )}
           </span>
           <span className="block truncate text-[10px] leading-tight text-muted">
-            {[position, p.teamAbbrev].filter(Boolean).join(' · ')}
-            {p.waivers && (
-              <span className="text-amber-700 dark:text-amber-400">
-                {position || p.teamAbbrev ? ' · ' : ''}Waivers
-              </span>
-            )}
+            {/* With moves on, the Claim button says it. */}
+            {[position, p.teamAbbrev, p.waivers && !onMove ? 'Waivers' : null]
+              .filter(Boolean)
+              .join(' · ')}
           </span>
         </span>
       </PlayerButton>
@@ -366,34 +364,12 @@ function PlayerCell({
           onClick={() => onMove(p)}
           aria-label={`${p.waivers ? 'Claim' : 'Add'} ${p.name}`}
           className={cn(
-            'inline-flex min-h-7 shrink-0 items-center gap-0.5 rounded-full px-2 text-[11px] font-semibold',
-            // A free agent is one tap from the roster; a claim waits on
-            // waivers: solid for one, an outline with a clock for the other.
-            p.waivers
-              ? 'border border-amber-500/60 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400'
-              : 'bg-scoring/15 text-scoring hover:bg-scoring/25',
+            'min-h-7 shrink-0 rounded-full px-2 text-[11px] font-semibold hover:bg-accent hover:text-background',
+            // A claim a shade deeper than an add.
+            p.waivers ? 'bg-foreground/15' : 'bg-notice',
           )}
         >
-          {p.waivers ? (
-            <>
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 12 12"
-                className="size-2.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              >
-                <circle cx="6" cy="6" r="4.5" />
-                <path d="M6 3.5V6l1.75 1" />
-              </svg>
-              Claim
-            </>
-          ) : (
-            <>
-              <span aria-hidden="true">+</span>Add
-            </>
-          )}
+          {p.waivers ? 'Claim' : 'Add'}
         </button>
       )}
     </span>
