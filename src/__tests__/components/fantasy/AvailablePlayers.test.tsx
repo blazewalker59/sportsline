@@ -97,9 +97,8 @@ describe('AvailablePlayers', () => {
 
   it('marks waivers and injuries, and opens a matched Player’s page', () => {
     expect(html).toContain('SF · SAC')
-    expect(html).toContain(
-      'PG · SAC<span class="text-amber-700 dark:text-amber-400"> · Waivers',
-    )
+    // No moves here: waivers said in the row.
+    expect(html).toContain('PG · SAC · Waivers')
     expect(html).toContain('>DTD<')
     expect(
       html.match(/<button[^>]*>(?:(?!<\/button>).)*K\. Murray/),
