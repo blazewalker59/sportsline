@@ -19,6 +19,7 @@ import {
 import { shouldRecord } from './race'
 import {
   EspnError,
+  availablePlayers,
   fanProfile,
   leagueActivity,
   leagueViews,
@@ -45,11 +46,13 @@ import {
 import { MLB_PRO_TEAMS, NFL_PRO_TEAMS, SPORTS, seasonOf } from './sports'
 import { readStandings } from './standings'
 import { scoringLeaders } from './leaders'
+import { AVAILABLE_LIMIT, readEspnAvailable } from './freeAgents'
 import { injuryEvents, rostersDue, rostersOf, whoHasOptions } from './whoHas'
 import type { ActivityPlayer, LeagueActivity } from './activity'
 import type { EspnSession, PlayerCard } from './client'
 import type { LeagueCategory } from './categories'
 import type { ScoringLeaders } from './leaders'
+import type { AvailablePlayers } from './freeAgents'
 import type { Standings } from './standings'
 import type { LeagueRosters } from './whoHas'
 import type {
@@ -752,6 +755,31 @@ export async function readLeagueMatchup(
   const view = readMatchup(row.sport, league, teamId)
   if (view) await attachMatchup(dbFromD1(env.DB), row, view)
   return view
+}
+
+/**
+ * A league's Available players, read from ESPN now (never stored),
+ * matched to ours for their Teams and headshots.
+ */
+export async function readAvailable(
+  env: Pick<CloudflareEnv, 'DB' | 'ESPN_ENCRYPTION_KEY'>,
+  viewerId: string,
+  row: typeof fantasyLeagues.$inferSelect,
+): Promise<AvailablePlayers | null> {
+  if (row.viewerId !== viewerId || row.provider !== 'espn') return null
+  // A public league reads without cookies.
+  const session = await loadSession(env, viewerId)
+  const available = readEspnAvailable(
+    await availablePlayers(
+      session,
+      row.sport,
+      row.season,
+      row.leagueId,
+      AVAILABLE_LIMIT,
+    ),
+  )
+  await attachOurs(dbFromD1(env.DB), row, available.players)
+  return available
 }
 
 /**

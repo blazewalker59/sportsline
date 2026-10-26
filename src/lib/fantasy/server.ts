@@ -14,6 +14,7 @@ import {
   leagueRowId,
   loadSession,
   readActivity,
+  readAvailable,
   readDay,
   readLeagueMatchup,
   syncAccount,
@@ -22,6 +23,7 @@ import {
 import { sleeperUser } from './sleeper/client'
 import {
   readActivity as readSleeperActivity,
+  readAvailable as readSleeperAvailable,
   readLeagueMatchup as readSleeperLeagueMatchup,
   sleeperLeagueRowId,
   syncAccount as syncSleeper,
@@ -33,6 +35,7 @@ import type { MatchupDay, MatchupView } from './matchup'
 import type { RacePoint } from './race'
 import type { FantasySport } from './sports'
 import type { LeagueActivity } from './activity'
+import type { AvailablePlayers } from './freeAgents'
 import type { LeagueWhatIf } from './whatIfRead'
 import type { ScoringLeaders } from './leaders'
 import type { Standings } from './standings'
@@ -755,6 +758,49 @@ export const getLeagueActivity = createServerFn({ method: 'GET' })
         })
         throw new UserError(
           `Couldn’t read the league’s activity from ${provider}.`,
+        )
+      }
+    },
+  )
+
+/**
+ * A Viewer's league's Available players, read from its provider while
+ * they look (never stored).
+ */
+export const getAvailablePlayers = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
+  .validator((data: { leagueId: string }) =>
+    z.object({ leagueId: z.string().max(300) }).parse(data),
+  )
+  .handler(
+    async ({
+      data,
+      context: { db, viewerId },
+    }): Promise<AvailablePlayers | null> => {
+      const env = getCloudflareEnv()
+      const row = await db
+        .select()
+        .from(fantasyLeagues)
+        .where(
+          and(
+            eq(fantasyLeagues.id, data.leagueId),
+            eq(fantasyLeagues.viewerId, viewerId),
+          ),
+        )
+        .get()
+      if (!row) return null
+      const provider = row.provider === 'sleeper' ? 'Sleeper' : 'ESPN'
+      try {
+        return row.provider === 'sleeper'
+          ? await readSleeperAvailable(db, row)
+          : await readAvailable(env, viewerId, row)
+      } catch (error) {
+        await reportError(env, row.provider, error, {
+          viewerId,
+          step: 'available-players',
+        })
+        throw new UserError(
+          `Couldn’t read the league’s available players from ${provider}.`,
         )
       }
     },

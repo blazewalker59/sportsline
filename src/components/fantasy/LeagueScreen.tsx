@@ -2,14 +2,15 @@
  * A Fantasy league's page (CONTEXT.md, "Fantasy league"), in tabs: its
  * Overview (every Matchup this scoring period, the Viewer's first, each
  * opening in full, and the league's Scoring leaders) and its Standings,
- * kept with each sync, and its Activity, read from its provider while
- * that tab is open.
+ * kept with each sync, and its Players (who's available) and Activity,
+ * read from its provider while that tab is open.
  */
 
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { ActivityFeed } from './ActivityFeed'
+import { AvailablePlayers } from './AvailablePlayers'
 import { MatchupSheet } from './FantasyParts'
 import { LeadersView } from './LeadersView'
 import { Segmented } from './Segmented'
@@ -20,7 +21,11 @@ import type { LeagueMatchup, LeagueMatchupSide } from '@/lib/fantasy/matchup'
 import type { Standings } from '@/lib/fantasy/standings'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
-import { leagueActivityQuery, whatIfQuery } from '@/lib/fantasy/queries'
+import {
+  availablePlayersQuery,
+  leagueActivityQuery,
+  whatIfQuery,
+} from '@/lib/fantasy/queries'
 import { SPORTS } from '@/lib/fantasy/sports'
 import { useFantasyLeague } from '@/lib/fantasy/useFantasy'
 import { gamesQuery } from '@/lib/timeline/queries'
@@ -29,11 +34,12 @@ import { useTimeZone } from '@/lib/time/useTimeZone'
 import { useViewer } from '@/lib/viewer/useViewer'
 import { cn } from '@/lib/utils'
 
-type Tab = 'overview' | 'standings' | 'activity'
+type Tab = 'overview' | 'standings' | 'players' | 'activity'
 
 const TABS: ReadonlyArray<{ key: Tab; label: string }> = [
   { key: 'overview', label: 'Overview' },
   { key: 'standings', label: 'Standings' },
+  { key: 'players', label: 'Players' },
   { key: 'activity', label: 'Activity' },
 ]
 
@@ -130,6 +136,8 @@ export function LeagueScreen({ leagueId }: { leagueId: string }) {
             </>
           ) : tab === 'activity' ? (
             <ActivityTab league={league} />
+          ) : tab === 'players' ? (
+            <PlayersTab league={league} />
           ) : (
             <StandingsTab
               league={league}
@@ -204,6 +212,24 @@ function StandingsTab({
         </p>
       )}
     </div>
+  )
+}
+
+/** Who's available, read from the league's provider while the tab is open. */
+function PlayersTab({ league }: { league: FantasyLeagueView }) {
+  const available = useQuery(availablePlayersQuery(league.id))
+  if (available.isPending)
+    return <p className="text-sm text-muted">Loading available players…</p>
+  if (available.isError)
+    return <p className="text-sm text-live">{available.error.message}</p>
+  if (!available.data)
+    return <p className="text-sm text-muted">League not found.</p>
+  return (
+    <AvailablePlayers
+      sport={league.sport}
+      available={available.data}
+      provider={league.provider}
+    />
   )
 }
 

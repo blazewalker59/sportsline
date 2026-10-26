@@ -10,6 +10,8 @@ import { NFL_PRO_TEAMS } from '../sports'
 import { asLeagueMatchup } from '../matchup'
 import { byBid, kindOf, newestFirst } from '../activity'
 import { ranked } from '../standings'
+import { AVAILABLE_LIMIT } from '../freeAgents'
+import type { AvailablePlayer, AvailablePlayers } from '../freeAgents'
 import type {
   ActivityEntry,
   ActivityItem,
@@ -36,6 +38,7 @@ import type {
   SleeperRoster,
   SleeperTransaction,
   SleeperUser,
+  SleeperWeekEntry,
 } from './client'
 
 /** Sleeper's slots as ESPN's slot ids, so Lineups sort and pair alike. */
@@ -395,6 +398,45 @@ function activityPlayer(
     positionId: POSITION_IDS[p?.position ?? (defense ? 'DEF' : '')] ?? null,
     proTeamId: pro,
   }
+}
+
+/**
+ * A Sleeper league's Available players: everyone projected this week
+ * whom no roster has, the most projected first under the league's
+ * scoring. Sleeper doesn't say who's on waivers.
+ */
+export function readSleeperAvailable(input: {
+  league: SleeperLeague
+  rosters: ReadonlyArray<SleeperRoster>
+  projections: ReadonlyArray<SleeperWeekEntry>
+}): AvailablePlayers {
+  const rostered = new Set(
+    input.rosters.flatMap((r) => [
+      ...(r.players ?? []),
+      ...(r.reserve ?? []),
+      ...(r.taxi ?? []),
+    ]),
+  )
+  const scoring = input.league.scoring_settings ?? {}
+  const info = new Map<string, SleeperPlayerInfo>()
+  for (const e of input.projections)
+    if (e.player)
+      info.set(e.player_id, { ...e.player, team: e.team ?? e.player.team })
+  const players = input.projections
+    .filter((e) => e.player && !rostered.has(e.player_id))
+    .map((e): AvailablePlayer => {
+      const status = info.get(e.player_id)?.injury_status
+      return {
+        ...activityPlayer(e.player_id, info),
+        injury: status ? (INJURY[status] ?? status.toUpperCase()) : null,
+        owned: null,
+        ownedChange: null,
+        waivers: false,
+        projected: projectedPoints(e.stats, scoring),
+      }
+    })
+    .sort((a, b) => (b.projected ?? -1) - (a.projected ?? -1))
+  return { players: players.slice(0, AVAILABLE_LIMIT), order: 'projected' }
 }
 
 /**
