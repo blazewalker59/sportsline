@@ -111,8 +111,8 @@ describe('AvailablePlayers', () => {
   it('keeps its filters to one line of dropdowns, no chips', () => {
     expect(html).toContain('Search players or teams')
     expect(html).toContain('2 players')
-    expect(html).toContain('>All positions</option>')
-    expect(html).toContain('>Last 15</option>')
+    expect(html).toContain('aria-label="Position: All positions"')
+    expect(html).toContain('aria-label="Stats over: Season"')
     expect(html).not.toContain('role="tablist"')
   })
 

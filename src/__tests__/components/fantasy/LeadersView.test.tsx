@@ -83,8 +83,7 @@ describe('LeadersView', () => {
         }}
       />,
     )
-    expect(html).toContain('>Players<')
-    expect(html).toContain('>Teams<')
+    expect(html).toContain('aria-label="Leaders among: Players"')
   })
 
   it('offers each position in a points league', () => {
@@ -106,11 +105,9 @@ describe('LeadersView', () => {
         }}
       />,
     )
-    // A dropdown, not a row of chips.
-    expect(html).toContain('<select')
-    expect(html).toContain('>All positions</option>')
-    expect(html).toContain('>QB</option>')
-    expect(html).toContain('>RB</option>')
+    // A dropdown, not a row of chips (its options: Picker's tests).
+    expect(html).toContain('aria-label="Position: All positions"')
+    expect(html).toContain('aria-haspopup="listbox"')
   })
 
   it('offers today or the whole matchup in a category league', () => {
@@ -133,8 +130,7 @@ describe('LeadersView', () => {
         }}
       />,
     )
-    expect(html).toContain('>Today<')
-    expect(html).toContain('>Matchup<')
+    expect(html).toContain('aria-label="Leaders over: Today"')
     expect(html).toContain('No stats yet today.')
   })
 
@@ -163,8 +159,8 @@ describe('LeadersView', () => {
     expect(html).toContain('31.2')
     expect(html).toContain('BUF · BB')
     expect(html).toContain('bench')
-    // Players first; Teams one tap away.
-    expect(html).toContain('>Teams<')
+    // Players first; Teams one pick away.
+    expect(html).toContain('aria-label="Scoring leaders: Players"')
     expect(html).not.toContain('120.7')
   })
 
