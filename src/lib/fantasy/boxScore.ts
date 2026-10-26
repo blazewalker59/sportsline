@@ -52,7 +52,7 @@ export function played(stats: Stats | null | undefined): stats is Stats {
 }
 
 /** A column's number for a line, to compare (null: nothing to compare). */
-function measure(
+export function boxValue(
   sport: FantasySport,
   col: BoxColumn,
   stats: Stats,
@@ -75,7 +75,7 @@ export function boxCell(
   if (!played(stats)) return '–'
   if (col.made !== undefined && col.attempts !== undefined)
     return `${stats[col.made] ?? 0}/${stats[col.attempts] ?? 0}`
-  const value = measure(sport, col, stats)
+  const value = boxValue(sport, col, stats)
   return formatCategory(sport, col.statId, value)
 }
 
@@ -91,7 +91,7 @@ export function boxLeaders<TKey>(
 ): Set<TKey> {
   const values = rows.flatMap((r) => {
     if (!played(r.stats)) return []
-    const n = measure(sport, col, r.stats)
+    const n = boxValue(sport, col, r.stats)
     return n === null || !Number.isFinite(n) ? [] : [{ key: r.key, n }]
   })
   if (values.length < 2) return new Set()

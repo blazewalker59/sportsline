@@ -11,7 +11,11 @@ import { asLeagueMatchup } from '../matchup'
 import { byBid, kindOf, newestFirst } from '../activity'
 import { ranked } from '../standings'
 import { AVAILABLE_LIMIT } from '../freeAgents'
-import type { AvailablePlayer, AvailablePlayers, StatLine } from '../freeAgents'
+import type {
+  AvailablePlayer,
+  AvailablePlayers,
+  SpanStats,
+} from '../freeAgents'
 import type {
   ActivityEntry,
   ActivityItem,
@@ -428,17 +432,16 @@ export function readSleeperAvailable(input: {
     (input.season ?? []).map((e) => [e.player_id, e.stats ?? {}]),
   )
   /** Their season's Fantasy points under the league's scoring, and per game. */
-  const seasonLine = (id: string): StatLine | null => {
+  const seasonLine = (id: string): SpanStats | null => {
     const stats = season.get(id)
     const points = projectedPoints(stats, scoring)
     if (!stats || !points) return null
     const games = stats.gp ?? 0
-    return [
-      { label: 'FPTS', value: points.toFixed(1) },
-      ...(games > 0
-        ? [{ label: 'AVG', value: (points / games).toFixed(1) }]
-        : []),
-    ]
+    return {
+      stats: null,
+      points,
+      average: games > 0 ? round(points / games) : null,
+    }
   }
   const players = input.projections
     .filter((e) => e.player && !rostered.has(e.player_id))
