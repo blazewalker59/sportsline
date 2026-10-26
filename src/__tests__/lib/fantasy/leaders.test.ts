@@ -5,7 +5,12 @@ import type {
   MatchupSide,
   WireLeague,
 } from '@/lib/fantasy/matchup'
-import { TOP_PLAYERS, scoringLeaders } from '@/lib/fantasy/leaders'
+import type { ScoringLeaders } from '@/lib/fantasy/leaders'
+import {
+  TOP_PLAYERS,
+  currentLeaders,
+  scoringLeaders,
+} from '@/lib/fantasy/leaders'
 import { readMatchup, readTeamSides } from '@/lib/fantasy/matchup'
 
 const player = (
@@ -139,40 +144,125 @@ describe('scoringLeaders in a category league', () => {
     categories: view.categories ?? null,
   })
 
-  it('names a leader for counting Categories only', () => {
+  it('ranks every Category, rates and turnovers among them', () => {
     const labels = leaders.categories.map((c) => c.label)
-    expect(labels.length).toBeGreaterThan(0)
-    // Rates need volume; turnovers lead nothing.
-    expect(labels).not.toContain('FG%')
-    expect(labels).not.toContain('FT%')
-    expect(labels).not.toContain('TO')
+    expect(labels).toEqual(
+      expect.arrayContaining(['PTS', 'REB', 'FG%', 'FT%', 'TO']),
+    )
     expect(leaders.players).toEqual([])
     expect(leaders.teams).toEqual([])
-  })
-
-  it('names the matchup’s leaders from each side’s whole-matchup lines', () => {
-    const sides = readTeamSides('basketball', league)
-    expect(leaders.matchupCategories?.length).toBeGreaterThan(0)
-    for (const c of leaders.matchupCategories ?? []) {
-      const best = Math.max(
-        ...sides.flatMap((s) =>
-          (s.summary ?? []).map((p) => p.dayStats?.[c.statId] ?? 0),
-        ),
-      )
-      expect(c.player.points).toBe(best)
+    for (const c of [
+      ...leaders.categories,
+      ...(leaders.matchupCategories ?? []),
+    ]) {
+      expect(c.players.length).toBeGreaterThan(0)
+      expect(c.players.length).toBeLessThanOrEqual(TOP_PLAYERS)
     }
   })
 
-  it('picks the most of each among every team’s Players today', () => {
+  it('ranks the matchup from each side’s whole-matchup lines', () => {
     const sides = readTeamSides('basketball', league)
-    for (const c of leaders.categories) {
-      const best = Math.max(
-        ...sides.flatMap((s) =>
-          s.lineup.map((p) => p.dayStats?.[c.statId] ?? 0),
-        ),
-      )
-      expect(c.player.points).toBe(best)
+    const pts = leaders.matchupCategories?.find((c) => c.label === 'PTS')
+    const best = Math.max(
+      ...sides.flatMap((s) =>
+        (s.summary ?? []).map((p) => p.dayStats?.[0] ?? 0),
+      ),
+    )
+    expect(pts?.players[0].points).toBe(best)
+  })
+
+  it('ranks a count most first among every team’s Players today', () => {
+    const sides = readTeamSides('basketball', league)
+    for (const c of leaders.categories.filter((d) => !d.minimum)) {
+      const counts = sides
+        .flatMap((s) => s.lineup.map((p) => p.dayStats?.[c.statId] ?? 0))
+        .filter((n) => n > 0)
+        .sort((a, b) => b - a)
+        .slice(0, TOP_PLAYERS)
+      expect(c.players.map((p) => p.points)).toEqual(counts)
     }
+  })
+})
+
+describe('scoringLeaders’ rates and reverse counts', () => {
+  const line = (espnId: number, dayStats: Record<string, number>) => ({
+    ...player(espnId, null),
+    dayStats,
+  })
+  const read = (lineup: Array<LineupPlayer>, reverse = true) =>
+    scoringLeaders({
+      sport: 'basketball',
+      scoringPeriod: 1,
+      sides: [side(1, 0, lineup)],
+      mine: null,
+      categories: [
+        { statId: 19, label: 'FG%', reverse: false },
+        { statId: 11, label: 'TO', reverse },
+      ],
+    })
+
+  it('ranks a rate only with the volume behind it, its parts shown', () => {
+    const leaders = read([
+      // 2-2: too few shots to rank.
+      line(1, { 13: 2, 14: 2 }),
+      line(2, { 13: 6, 14: 10 }),
+      line(3, { 13: 9, 14: 12 }),
+    ])
+    const fg = leaders.categories.find((c) => c.label === 'FG%')!
+    expect(fg.minimum).toBe('5+ FGA')
+    expect(fg.players.map((p) => [p.espnId, p.value, p.parts])).toEqual([
+      [3, '.750', '9-12'],
+      [2, '.600', '6-10'],
+    ])
+  })
+
+  it('ranks a count where lower wins most first', () => {
+    const leaders = read([
+      line(1, { 11: 2 }),
+      line(2, { 11: 5 }),
+      line(3, { 11: 0 }),
+    ])
+    const to = leaders.categories.find((c) => c.label === 'TO')!
+    expect(to.reverse).toBe(true)
+    expect(to.players.map((p) => p.espnId)).toEqual([2, 1])
+  })
+
+  it('ranks a rate where lower wins lowest first', () => {
+    const leaders = scoringLeaders({
+      sport: 'baseball',
+      scoringPeriod: 1,
+      sides: [
+        side(1, 0, [
+          line(1, { 34: 18, 45: 1 }),
+          line(2, { 34: 15, 45: 4 }),
+          // One inning: not enough to rank.
+          line(3, { 34: 3, 45: 0 }),
+        ]),
+      ],
+      mine: null,
+      categories: [{ statId: 47, label: 'ERA', reverse: true }],
+    })
+    expect(
+      leaders.categories[0].players.map((p) => [p.espnId, p.value, p.parts]),
+    ).toEqual([
+      [1, '1.50', '6.0 IP'],
+      [2, '7.20', '5.0 IP'],
+    ])
+  })
+})
+
+describe('currentLeaders', () => {
+  it('drops leaders kept before Categories ranked their top Players', () => {
+    const old = {
+      scoringPeriod: 1,
+      players: [],
+      teams: [],
+      categories: [{ statId: 0, label: 'PTS', value: '40', player: {} }],
+    } as unknown as ScoringLeaders
+    expect(currentLeaders(old)).toBeNull()
+    const kept: ScoringLeaders = { ...old, categories: [] }
+    expect(currentLeaders(kept)).toBe(kept)
+    expect(currentLeaders(null)).toBeNull()
   })
 })
 

@@ -596,8 +596,8 @@ export async function keepLeague(
   await attachOurs(db, row, [
     ...leaders.players,
     ...(leaders.positions ?? []).flatMap((p) => p.players),
-    ...leaders.categories.map((c) => c.player),
-    ...(leaders.matchupCategories ?? []).map((c) => c.player),
+    ...leaders.categories.flatMap((c) => c.players),
+    ...(leaders.matchupCategories ?? []).flatMap((c) => c.players),
     ...events.map((e) => e.player),
   ])
   const teamsIn = input.sides.map((s) => ({ teamId: s.teamId, name: s.name }))

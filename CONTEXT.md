@@ -188,7 +188,7 @@ The Viewer's Fantasy team against its opponent this scoring period, decided by f
 _Avoid_: game (a Game is real), fixture
 
 **League Matchups**:
-The other Matchups in a Viewer’s Fantasy league this scoring period, between teams that aren’t the Viewer’s: their scores kept with each sync and shown under the Timeline’s Fantasy cards while the Viewer’s Matchup in that league is selected, each opening in full (both Lineups) when tapped. Read only to look at: they add nothing to the Fantasy feed or Alerts.
+The other Matchups in a Viewer’s Fantasy league this scoring period, between teams that aren’t the Viewer’s: their scores kept with each sync and shown under the Timeline’s Fantasy cards while the Viewer’s Matchup in that league is selected, and with it on the league’s page, each opening in full (both Lineups) when tapped. Read only to look at: they add nothing to the Fantasy feed or Alerts.
 _Avoid_: scoreboard, other games
 
 **Standings**:
@@ -196,7 +196,7 @@ Every Fantasy team in a Viewer’s Fantasy league first to last: its record, Fan
 _Avoid_: table, rankings
 
 **Scoring leaders**:
-A Viewer’s Fantasy league’s best this scoring period, read with each sync from every team’s Lineup: in a points league its top Players by Fantasy points, overall or at each position (a bench Player counts, marked), and every team’s score this Matchup; in a category league each counting Category’s leader, today or over the whole Matchup. Shown on the league’s page.
+A Viewer’s Fantasy league’s best this scoring period, read with each sync from every team’s Lineup: in a points league its top Players by Fantasy points, overall or at each position (a bench Player counts, marked), and every team’s score this Matchup; in a category league each Category’s top ten, today or over the whole Matchup: a rate (FG%, ERA) ranks only Players with the volume behind it, lowest first where lower wins, and a count where lower wins (turnovers) ranks most first, as who’s costing their side. Shown on the league’s page.
 _Avoid_: leaderboard, top performers
 
 **Injury Event**:

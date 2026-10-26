@@ -77,7 +77,12 @@ describe('LeadersView', () => {
           teams: [],
           categories: [],
           matchupCategories: [
-            { statId: 0, label: 'PTS', value: '160', player: leader() },
+            {
+              statId: 0,
+              label: 'PTS',
+              reverse: false,
+              players: [{ ...leader(), value: '160' }],
+            },
           ],
         }}
       />,
@@ -126,12 +131,36 @@ describe('LeadersView', () => {
         {
           statId: 0,
           label: 'PTS',
-          value: '41',
-          player: leader({
-            name: 'Luka Dončić',
-            teamAbbrev: 'LAL',
-            points: 41,
-          }),
+          reverse: false,
+          players: [
+            {
+              ...leader({
+                name: 'Luka Dončić',
+                teamAbbrev: 'LAL',
+                points: 41,
+              }),
+              value: '41',
+            },
+          ],
+        },
+        {
+          statId: 19,
+          label: 'FG%',
+          reverse: false,
+          minimum: '5+ FGA',
+          players: [
+            {
+              ...leader({ name: 'Jalen Duren' }),
+              value: '.900',
+              parts: '9-10',
+            },
+          ],
+        },
+        {
+          statId: 11,
+          label: 'TO',
+          reverse: true,
+          players: [{ ...leader({ name: 'Trae Young' }), value: '7' }],
         },
       ],
     }
@@ -142,5 +171,12 @@ describe('LeadersView', () => {
     expect(html).toContain('PTS')
     expect(html).toContain('Luka Dončić')
     expect(html).toContain('41')
+    // A rate with its parts; turnovers as the most.
+    expect(html).toContain('9-10')
+    expect(html).toContain('Trae Young')
+    expect(html).toContain('>most<')
+    // Each Category one tap from its top Players.
+    expect(html).toContain('>FG%<')
+    expect(html).toContain('>All<')
   })
 })

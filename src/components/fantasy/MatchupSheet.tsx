@@ -168,7 +168,21 @@ export function MatchupSheet({
     </span>
   )
   return (
-    <Sheet title={m.leagueName} onClose={onClose}>
+    <Sheet
+      title={m.leagueName}
+      action={
+        leagueLink && (
+          <Link
+            to="/fantasy/$leagueId"
+            params={{ leagueId: league.id }}
+            className="shrink-0 text-[13px] font-semibold text-muted hover:text-foreground"
+          >
+            League ›
+          </Link>
+        )
+      }
+      onClose={onClose}
+    >
       <header className="flex items-start gap-3">
         {side(m.mine, 'left')}
         <span className="pt-6 text-sm text-muted">vs</span>
@@ -246,15 +260,6 @@ export function MatchupSheet({
             />
           </section>
         </>
-      )}
-      {leagueLink && (
-        <Link
-          to="/fantasy/$leagueId"
-          params={{ leagueId: league.id }}
-          className="self-start text-sm font-semibold text-accent"
-        >
-          League standings &amp; leaders →
-        </Link>
       )}
       <p className="text-[11px] text-muted">
         {m.categories

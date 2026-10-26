@@ -28,6 +28,7 @@ import {
 } from './sleeper/sync'
 import { WHO_HAS_FOR_MS } from './whoHas'
 import { readWhatIf } from './whatIfRead'
+import { currentLeaders } from './leaders'
 import type { MatchupDay, MatchupView } from './matchup'
 import type { RacePoint } from './race'
 import type { FantasySport } from './sports'
@@ -568,7 +569,7 @@ export const getFantasyLeague = createServerFn({ method: 'GET' })
         ? {
             league: leagueView(row),
             standings: row.standings ?? null,
-            leaders: row.leaders ?? null,
+            leaders: currentLeaders(row.leaders ?? null),
           }
         : null
     },
