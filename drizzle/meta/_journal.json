@@ -225,6 +225,13 @@
       "when": 1792554267592,
       "tag": "0031_fantasy_what_if",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1792977411508,
+      "tag": "0032_fantasy_moves",
+      "breakpoints": true
     }
   ]
 }

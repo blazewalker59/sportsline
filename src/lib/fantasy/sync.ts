@@ -47,6 +47,7 @@ import { MLB_PRO_TEAMS, NFL_PRO_TEAMS, SPORTS, seasonOf } from './sports'
 import { readStandings } from './standings'
 import { scoringLeaders } from './leaders'
 import { AVAILABLE_LIMIT, readEspnAvailable } from './freeAgents'
+import { rosteredBy, settleMove } from './moves'
 import { injuryEvents, rostersDue, rostersOf, whoHasOptions } from './whoHas'
 import type { ActivityPlayer, LeagueActivity } from './activity'
 import type { EspnSession, PlayerCard } from './client'
@@ -60,6 +61,7 @@ import type {
   MatchupDay,
   MatchupSide,
   MatchupView,
+  WireLeague,
 } from './matchup'
 import type { FantasySport } from './sports'
 import type { CloudflareEnv, Database } from '@/lib/db'
@@ -67,6 +69,7 @@ import { dbFromD1 } from '@/lib/db'
 import {
   espnAccounts,
   fantasyLeagues,
+  fantasyMoves,
   fantasyPlayers,
   fantasyScorePoints,
   games,
@@ -663,6 +666,7 @@ export async function syncLeague(
     league = await leagueViews(session, row.sport, season, row.leagueId)
   }
   const teamId = myTeamId(league, session.swid, row.teamId)
+  if (teamId !== null) await settleMoves(db, row, league, teamId)
   const view = teamId === null ? null : readMatchup(row.sport, league, teamId)
   if (view && teamId !== null)
     view.others = readLeagueMatchups(row.sport, league, teamId)
@@ -685,6 +689,46 @@ export async function syncLeague(
     ...kept,
   })
   return view
+}
+
+/**
+ * The Viewer's roster moves in a league still waiting on an outcome (no
+ * answer from ESPN, a claim before waivers run, or stuck sending),
+ * settled from the rosters this sync read (docs/adr/0010).
+ */
+export async function settleMoves(
+  db: Database,
+  row: Pick<typeof fantasyLeagues.$inferSelect, 'id'>,
+  league: WireLeague,
+  teamId: number,
+  now = new Date(),
+): Promise<void> {
+  const waiting = await db
+    .select()
+    .from(fantasyMoves)
+    .where(
+      and(
+        eq(fantasyMoves.leagueRowId, row.id),
+        inArray(fantasyMoves.status, ['sending', 'unknown', 'pending']),
+      ),
+    )
+  if (waiting.length === 0) return
+  const rosters = rosteredBy(league)
+  for (const m of waiting) {
+    const settled = settleMove(
+      { ...m, add: m.add ?? null, drop: m.drop ?? null },
+      rosters,
+      teamId,
+      now,
+    )
+    if (!settled) continue
+    await db
+      .update(fantasyMoves)
+      .set({ ...settled, updatedAt: now.toISOString() })
+      // Only while it's as read: a move the Viewer's request just
+      // settled keeps that outcome.
+      .where(and(eq(fantasyMoves.id, m.id), eq(fantasyMoves.status, m.status)))
+  }
 }
 
 /**

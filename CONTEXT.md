@@ -200,8 +200,12 @@ A Viewer’s Fantasy league’s best this scoring period, read with each sync fr
 _Avoid_: leaderboard, top performers
 
 **Available players**:
-The Players no Fantasy team in a Viewer’s Fantasy league has, searched by name or Team and narrowed by position: on ESPN its 300 most rostered free agents and waiver Players, each with the share of ESPN’s leagues that roster them and how that moved this week; on Sleeper everyone projected this week, most projected first (Sleeper doesn’t say who’s on waivers). Read from the provider while the Viewer looks at the league’s page, never stored. Only to look at: Sportsline doesn’t add, drop or claim (docs/adr/0004).
+The Players no Fantasy team in a Viewer’s Fantasy league has, searched by name or Team and narrowed by position: on ESPN its 300 most rostered free agents and waiver Players, each with the share of ESPN’s leagues that roster them and how that moved this week; on Sleeper everyone projected this week, most projected first (Sleeper doesn’t say who’s on waivers). Read from the provider while the Viewer looks at the league’s page, never stored. In an ESPN league with Roster moves on, each is a Roster move away.
 _Avoid_: free agents (ESPN’s word, and it leaves out waivers), waiver wire
+
+**Roster move**:
+A change a Viewer makes to their own Fantasy team in an ESPN league from Sportsline: adding a free agent, claiming a Player on waivers (with a bid where the league has a budget) or dropping a Player, any of them with a drop. Off until the Viewer turns roster moves on for their ESPN connection, and made only when they confirm one; sent to ESPN once, then done, pending (a claim before waivers run), lost, refused with ESPN’s reason, or unknown until the league’s next syncs settle it (docs/adr/0010). Not on Sleeper, which has no way to make one.
+_Avoid_: transaction (ESPN’s word, which takes in trades), pickup
 
 **Injury Event**:
 A notable Player on another team in a Viewer’s Fantasy league turning doubtful, out or injured, seen between two of the league’s rosters (kept about hourly). Notable: rostered in 80% of ESPN’s leagues, or a Starter where ownership isn’t known (Sleeper).
@@ -228,7 +232,7 @@ One stat a head-to-head category league plays (runs, ERA, FG%, turnovers): each 
 _Avoid_: cat, stat category
 
 **ESPN connection**:
-A Viewer's link to their ESPN fantasy leagues, through their ESPN session cookies (docs/adr/0004). Read-only by Sportsline's choice, not ESPN's.
+A Viewer's link to their ESPN fantasy leagues, through their ESPN session cookies (docs/adr/0004). Read-only by Sportsline's choice, not ESPN's, except for the Roster moves a Viewer turns on and confirms (docs/adr/0010).
 _Avoid_: login, integration
 
 **Sleeper connection**:

@@ -6,7 +6,7 @@ We considered public leagues only (no cookies stored), which is safest but leave
 
 ## Consequences
 
-- Sportsline only ever reads (league, roster and matchup views); nothing it does changes a lineup or roster.
+- Sportsline only ever reads (league, roster and matchup views); nothing it does changes a lineup or roster. Superseded for roster moves a Viewer opts into and confirms: docs/adr/0010.
 - A leak of the database and the Worker secret together would expose ESPN sessions that can act as the Viewer on ESPN. The cookies expire when the Viewer signs out of ESPN, which also ends Sportsline's access until they reconnect.
 - League reads are never shared or cached across Viewers: holding a league id isn't membership.
 - Fantasy players are ESPN athletes: in Leagues our Source is ESPN (NFL, college football, NBA) they map by id; elsewhere (MLB) by name.

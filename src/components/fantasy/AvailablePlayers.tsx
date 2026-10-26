@@ -2,7 +2,8 @@
  * A Fantasy league's Available players (CONTEXT.md, "Available players"):
  * searched by name or Team, narrowed to a position, each with what says
  * they're worth a look (ESPN: how rostered, and the week's move; Sleeper:
- * this week's projection), waiver Players marked.
+ * this week's projection), waiver Players marked; with roster moves on,
+ * each one Add or Claim.
  */
 
 import { useState } from 'react'
@@ -44,10 +45,13 @@ export function AvailablePlayers({
   sport,
   available,
   provider,
+  onMove,
 }: {
   sport: FantasySport
   available: Available
   provider: 'espn' | 'sleeper'
+  /** Add or claim a Player, when roster moves are on (docs/adr/0010). */
+  onMove?: (p: AvailablePlayer) => void
 }) {
   const [query, setQuery] = useState('')
   const [position, setPosition] = useState('All')
@@ -92,7 +96,12 @@ export function AvailablePlayers({
       ) : (
         <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
           {found.slice(0, shown).map((p) => (
-            <Row key={p.sourcePlayerId ?? p.espnId} sport={sport} p={p} />
+            <Row
+              key={p.sourcePlayerId ?? p.espnId}
+              sport={sport}
+              p={p}
+              onMove={onMove}
+            />
           ))}
         </ul>
       )}
@@ -114,7 +123,15 @@ export function AvailablePlayers({
   )
 }
 
-function Row({ sport, p }: { sport: FantasySport; p: AvailablePlayer }) {
+function Row({
+  sport,
+  p,
+  onMove,
+}: {
+  sport: FantasySport
+  p: AvailablePlayer
+  onMove?: (p: AvailablePlayer) => void
+}) {
   const tone = injuryTone(p.injury)
   const position =
     p.positionId === null ? null : (POSITIONS[sport][p.positionId] ?? null)
@@ -169,6 +186,16 @@ function Row({ sport, p }: { sport: FantasySport; p: AvailablePlayer }) {
             <span className="block text-[11px] text-muted">proj</span>
           </span>
         )
+      )}
+      {onMove && (
+        <button
+          type="button"
+          onClick={() => onMove(p)}
+          aria-label={`${p.waivers ? 'Claim' : 'Add'} ${p.name}`}
+          className="min-h-8 shrink-0 rounded-full bg-notice px-3 text-xs font-semibold hover:bg-accent hover:text-background"
+        >
+          {p.waivers ? 'Claim' : 'Add'}
+        </button>
       )}
     </li>
   )

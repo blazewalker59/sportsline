@@ -22,6 +22,7 @@ import type { MatchupView } from '@/lib/fantasy/matchup'
 import type { ScoringLeaders } from '@/lib/fantasy/leaders'
 import type { WhatIfMatchup } from '@/lib/fantasy/whatIf'
 import type { Standings } from '@/lib/fantasy/standings'
+import type { MoveKind, MovePlayer, MoveStatus } from '@/lib/fantasy/moves'
 import type {
   LeagueRosters,
   WhoHasOption,
@@ -516,6 +517,10 @@ export const espnAccounts = sqliteTable('espn_accounts', {
   connectedAt: text('connected_at').notNull(),
   syncedAt: text('synced_at'),
   discoveredAt: text('discovered_at'),
+  /** Roster moves turned on (docs/adr/0010); off until the Viewer opts in. */
+  movesEnabled: integer('moves_enabled', { mode: 'boolean' })
+    .notNull()
+    .default(false),
 })
 
 /** A Viewer's Sleeper connection: just who they are (Sleeper is public). */
@@ -638,6 +643,35 @@ export const whoHas = sqliteTable(
     guessTeamId: integer('guess_team_id'),
   },
   (table) => [index('who_has_viewer_idx').on(table.viewerId, table.createdAt)],
+)
+
+/**
+ * A roster move a Viewer made in an ESPN league (docs/adr/0010), kept with
+ * its outcome. Its id is the page's, so a move is only ever sent once.
+ */
+export const fantasyMoves = sqliteTable(
+  'fantasy_moves',
+  {
+    id: text('id').primaryKey(),
+    viewerId: text('viewer_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    leagueRowId: text('league_row_id')
+      .notNull()
+      .references(() => fantasyLeagues.id, { onDelete: 'cascade' }),
+    kind: text('kind').$type<MoveKind>().notNull(),
+    add: text('add', { mode: 'json' }).$type<MovePlayer | null>(),
+    drop: text('drop', { mode: 'json' }).$type<MovePlayer | null>(),
+    bid: integer('bid'),
+    status: text('status').$type<MoveStatus>().notNull(),
+    reason: text('reason'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    index('fantasy_moves_viewer_idx').on(table.viewerId, table.createdAt),
+    index('fantasy_moves_league_idx').on(table.leagueRowId, table.status),
+  ],
 )
 
 /**

@@ -31,11 +31,14 @@ import {
 import { WHO_HAS_FOR_MS } from './whoHas'
 import { readWhatIf } from './whatIfRead'
 import { currentLeaders } from './leaders'
+import { moveOptions, sendMove } from './rosterMoves'
 import type { MatchupDay, MatchupView } from './matchup'
 import type { RacePoint } from './race'
 import type { FantasySport } from './sports'
 import type { LeagueActivity } from './activity'
 import type { AvailablePlayers } from './freeAgents'
+import type { FantasyMove } from './moves'
+import type { MoveOptions } from './rosterMoves'
 import type { LeagueWhatIf } from './whatIfRead'
 import type { ScoringLeaders } from './leaders'
 import type { Standings } from './standings'
@@ -59,6 +62,8 @@ export interface EspnConnection {
   status: 'ok' | 'error'
   lastError: string | null
   syncedAt: string | null
+  /** Roster moves turned on (docs/adr/0010). */
+  movesEnabled: boolean
 }
 
 export interface FantasyLeagueView {
@@ -87,6 +92,7 @@ export const getEspnConnection = createServerFn({ method: 'GET' })
             status: row.status,
             lastError: row.lastError,
             syncedAt: row.syncedAt,
+            movesEnabled: row.movesEnabled,
           }
         : null
     },
@@ -153,15 +159,22 @@ export const connectEspn = createServerFn({ method: 'POST' })
         syncedAt: null,
         discoveredAt: null,
       }
-      await db
+      // Reconnecting keeps the Viewer's choice about roster moves.
+      const [kept] = await db
         .insert(espnAccounts)
         .values(row)
         .onConflictDoUpdate({ target: espnAccounts.viewerId, set: row })
+        .returning({ movesEnabled: espnAccounts.movesEnabled })
       await syncAccount(env, viewerId).catch((error: unknown) =>
         reportError(env, 'espn', error, { viewerId, step: 'connect' }),
       )
       await startViewerSync(env, viewerId)
-      return { status: 'ok', lastError: null, syncedAt: now }
+      return {
+        status: 'ok',
+        lastError: null,
+        syncedAt: now,
+        movesEnabled: kept?.movesEnabled ?? false,
+      }
     },
   )
 
@@ -192,6 +205,22 @@ export const disconnectEspn = createServerFn({ method: 'POST' })
         ),
       db.delete(espnAccounts).where(eq(espnAccounts.viewerId, viewerId)),
     ])
+  })
+
+/**
+ * Turn roster moves on or off for the Viewer's ESPN connection: off until
+ * they opt in (docs/adr/0010).
+ */
+export const setEspnMoves = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
+  .validator((data: { enabled: boolean }) =>
+    z.object({ enabled: z.boolean() }).parse(data),
+  )
+  .handler(async ({ data, context: { db, viewerId } }) => {
+    await db
+      .update(espnAccounts)
+      .set({ movesEnabled: data.enabled })
+      .where(eq(espnAccounts.viewerId, viewerId))
   })
 
 export const syncFantasyNow = createServerFn({ method: 'POST' })
@@ -803,6 +832,68 @@ export const getAvailablePlayers = createServerFn({ method: 'GET' })
           `Couldn’t read the league’s available players from ${provider}.`,
         )
       }
+    },
+  )
+
+/** One of the Viewer's leagues, by its row id. */
+async function viewerLeague(db: Database, viewerId: string, leagueId: string) {
+  return db
+    .select()
+    .from(fantasyLeagues)
+    .where(
+      and(
+        eq(fantasyLeagues.id, leagueId),
+        eq(fantasyLeagues.viewerId, viewerId),
+      ),
+    )
+    .get()
+}
+
+/**
+ * What a league's move sheet offers: whether moves are on, the Viewer's
+ * roster, a budget league's bidding, and their latest moves there. Null
+ * outside ESPN.
+ */
+export const getMoveOptions = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
+  .validator((data: { leagueId: string }) =>
+    z.object({ leagueId: z.string().max(300) }).parse(data),
+  )
+  .handler(
+    async ({
+      data,
+      context: { db, viewerId },
+    }): Promise<MoveOptions | null> => {
+      const row = await viewerLeague(db, viewerId, data.leagueId)
+      return row ? moveOptions(getCloudflareEnv(), viewerId, row) : null
+    },
+  )
+
+const MOVE = z.object({
+  leagueId: z.string().max(300),
+  moveId: z.string().uuid(),
+  kind: z.enum(['add', 'claim', 'drop']),
+  add: z
+    .object({ espnId: z.number().int(), name: z.string().min(1).max(120) })
+    .nullable(),
+  dropId: z.number().int().nullable(),
+  bid: z.number().int().min(0).max(100_000).nullable(),
+})
+
+/**
+ * Make a roster move the Viewer confirmed (docs/adr/0010): checked, kept,
+ * and sent to ESPN once. The same move id never sends twice.
+ */
+export const makeMove = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
+  .validator((data: z.input<typeof MOVE>) => MOVE.parse(data))
+  .handler(
+    async ({ data, context: { db, viewerId } }): Promise<FantasyMove> => {
+      const env = getCloudflareEnv()
+      const row = await viewerLeague(db, viewerId, data.leagueId)
+      if (!row) throw new UserError('League not found.')
+      const { leagueId: _, ...request } = data
+      return sendMove(env, viewerId, row, request)
     },
   )
 
