@@ -1,7 +1,7 @@
 /**
  * The Viewer's Fantasy queries (connections, leagues, a Matchup's race,
- * Games and past days, a league's Activity and Available players): each
- * key with its fetch and timing.
+ * Games and past days, a league's Activity, Available players and move
+ * options): each key with its fetch and timing.
  */
 
 import { queryOptions } from '@tanstack/react-query'
@@ -13,6 +13,7 @@ import {
   getLeagueMatchup,
   getMatchupDay,
   getMatchupRace,
+  getMoveOptions,
   getSleeperConnection,
   getWhatIf,
   getWhoHas,
@@ -157,5 +158,19 @@ export function availablePlayersQuery(leagueId: string) {
     queryFn: () => getAvailablePlayers({ data: { leagueId } }),
     refetchInterval: 10 * 60_000,
     staleTime: 5 * 60_000,
+  })
+}
+
+/**
+ * A league's move options: whether moves are on, the Viewer's roster, a
+ * budget's bidding, and their latest moves (pending claims settle at the
+ * league's syncs).
+ */
+export function moveOptionsQuery(leagueId: string) {
+  return queryOptions({
+    queryKey: ['move-options', leagueId] as const,
+    queryFn: () => getMoveOptions({ data: { leagueId } }),
+    refetchInterval: 2 * 60_000,
+    staleTime: 60_000,
   })
 }

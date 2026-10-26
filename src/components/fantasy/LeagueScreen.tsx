@@ -11,21 +11,27 @@ import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { ActivityFeed } from './ActivityFeed'
 import { AvailablePlayers } from './AvailablePlayers'
+import { MoveSheet } from './MoveSheet'
 import { MatchupSheet } from './FantasyParts'
 import { LeadersView } from './LeadersView'
 import { Segmented } from './Segmented'
 import { WhatIfTable } from './WhatIfTable'
 import { scoreText } from './format'
+import type { MoveIntent } from './MoveSheet'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { LeagueMatchup, LeagueMatchupSide } from '@/lib/fantasy/matchup'
+import type { FantasyMove } from '@/lib/fantasy/moves'
 import type { Standings } from '@/lib/fantasy/standings'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import {
   availablePlayersQuery,
   leagueActivityQuery,
+  moveOptionsQuery,
   whatIfQuery,
 } from '@/lib/fantasy/queries'
+import { MOVE_STATUS, moveSummary } from '@/lib/fantasy/moves'
+import { timeAgo, useNow } from '@/components/timeline/format'
 import { SPORTS } from '@/lib/fantasy/sports'
 import { useFantasyLeague } from '@/lib/fantasy/useFantasy'
 import { gamesQuery } from '@/lib/timeline/queries'
@@ -215,21 +221,135 @@ function StandingsTab({
   )
 }
 
-/** Who's available, read from the league's provider while the tab is open. */
+/**
+ * Who's available, read from the league's provider while the tab is
+ * open; in an ESPN league with roster moves on, each one a move away.
+ */
 function PlayersTab({ league }: { league: FantasyLeagueView }) {
   const available = useQuery(availablePlayersQuery(league.id))
-  if (available.isPending)
-    return <p className="text-sm text-muted">Loading available players…</p>
-  if (available.isError)
-    return <p className="text-sm text-live">{available.error.message}</p>
-  if (!available.data)
-    return <p className="text-sm text-muted">League not found.</p>
+  const espn = league.provider === 'espn'
+  const options = useQuery({ ...moveOptionsQuery(league.id), enabled: espn })
+  const [intent, setIntent] = useState<MoveIntent | null>(null)
+  const moves = options.data?.enabled ? options.data : null
   return (
-    <AvailablePlayers
-      sport={league.sport}
-      available={available.data}
-      provider={league.provider}
-    />
+    <div className="flex flex-col gap-4">
+      {espn && options.data && !options.data.enabled && (
+        <p className="text-xs text-muted">
+          Turn on roster moves for ESPN on the{' '}
+          <Link to="/fantasy" className="font-semibold text-accent">
+            Fantasy page
+          </Link>{' '}
+          to add, drop and claim players here.
+        </p>
+      )}
+      {moves && (
+        <YourMoves
+          moves={moves.moves}
+          canDrop={moves.roster.length > 0}
+          onDrop={() => setIntent({ kind: 'drop' })}
+        />
+      )}
+      {available.isPending ? (
+        <p className="text-sm text-muted">Loading available players…</p>
+      ) : available.isError ? (
+        <p className="text-sm text-live">{available.error.message}</p>
+      ) : !available.data ? (
+        <p className="text-sm text-muted">League not found.</p>
+      ) : (
+        <AvailablePlayers
+          sport={league.sport}
+          available={available.data}
+          provider={league.provider}
+          onMove={
+            moves
+              ? (p) =>
+                  setIntent({ kind: p.waivers ? 'claim' : 'add', player: p })
+              : undefined
+          }
+        />
+      )}
+      {intent && moves && (
+        <MoveSheet
+          leagueId={league.id}
+          sport={league.sport}
+          options={moves}
+          intent={intent}
+          onClose={() => setIntent(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+/** The Viewer's latest moves in the league with how each came out, and Drop. */
+function YourMoves({
+  moves,
+  canDrop,
+  onDrop,
+}: {
+  moves: ReadonlyArray<FantasyMove>
+  canDrop: boolean
+  onDrop: () => void
+}) {
+  const now = useNow()
+  return (
+    <section className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-xs font-bold tracking-wide text-muted uppercase">
+          Your moves
+        </h2>
+        {canDrop && (
+          <button
+            type="button"
+            onClick={onDrop}
+            className="min-h-8 rounded-full bg-notice px-3 text-xs font-semibold"
+          >
+            Drop a player
+          </button>
+        )}
+      </div>
+      {moves.length === 0 ? (
+        <p className="text-xs text-muted">
+          None yet. Tap Add or Claim on a player below.
+        </p>
+      ) : (
+        <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+          {moves.map((m) => (
+            <li key={m.id} className="flex items-start gap-2 px-3 py-2">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold">
+                  {moveSummary(m)}
+                </span>
+                {m.reason && (
+                  <span className="block text-[11px] text-muted">
+                    {m.reason}
+                  </span>
+                )}
+              </span>
+              <span className="shrink-0 text-right text-[11px]">
+                <span
+                  className={cn(
+                    'block font-semibold',
+                    m.status === 'done'
+                      ? 'text-scoring'
+                      : m.status === 'refused' || m.status === 'lost'
+                        ? 'text-live'
+                        : 'text-muted',
+                  )}
+                >
+                  {MOVE_STATUS[m.status]}
+                </span>
+                {now !== null && (
+                  <span className="block text-muted">
+                    {timeAgo(m.createdAt, now)}
+                  </span>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }
 

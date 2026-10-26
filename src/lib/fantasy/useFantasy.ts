@@ -8,18 +8,23 @@ import {
   connectSleeper,
   disconnectEspn,
   disconnectSleeper,
+  makeMove,
   reorderFantasyLeagues,
+  setEspnMoves,
   setFantasyLeagueEnabled,
   syncFantasyNow,
 } from './server'
 import {
+  availablePlayersQuery,
   espnConnectionQuery,
   fantasyQuery,
+  moveOptionsQuery,
   sleeperConnectionQuery,
   whoHasQuery,
 } from './queries'
 import { fantasyLeagueQuery } from './leagueQuery'
 import type { FantasyLeagueView } from './server'
+import type { MoveKind, MovePlayer } from './moves'
 import { useViewer } from '@/lib/viewer/useViewer'
 
 const ESPN_KEY = espnConnectionQuery().queryKey
@@ -95,6 +100,43 @@ export function useDisconnectEspn() {
       queryClient.setQueryData(ESPN_KEY, null)
       // Sleeper's leagues stay: read the list again.
       void queryClient.invalidateQueries({ queryKey: FANTASY_KEY })
+    },
+  })
+}
+
+/** Turn roster moves on or off for ESPN (docs/adr/0010). */
+export function useSetEspnMoves() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (enabled: boolean) => setEspnMoves({ data: { enabled } }),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ESPN_KEY })
+      void queryClient.invalidateQueries({ queryKey: ['move-options'] })
+    },
+  })
+}
+
+/**
+ * Make a confirmed roster move in a league; its Available players and
+ * moves are read again afterwards, whatever came of it.
+ */
+export function useMakeMove(leagueId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (move: {
+      moveId: string
+      kind: MoveKind
+      add: MovePlayer | null
+      dropId: number | null
+      bid: number | null
+    }) => makeMove({ data: { leagueId, ...move } }),
+    onSettled: () => {
+      for (const { queryKey } of [
+        moveOptionsQuery(leagueId),
+        availablePlayersQuery(leagueId),
+        fantasyLeagueQuery(leagueId),
+      ])
+        void queryClient.invalidateQueries({ queryKey })
     },
   })
 }

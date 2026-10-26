@@ -94,6 +94,12 @@ export interface WireLeague {
       /** Category leagues' innings minimum: { statId: 34, limitValue: outs }. */
       statQualificationMinimum?: { statId?: number; limitValue?: number }
     }
+    /** Waivers: whether claims bid from a season's budget (FAAB). */
+    acquisitionSettings?: {
+      isUsingAcquisitionBudget?: boolean
+      acquisitionBudget?: number
+      minimumBid?: number
+    }
   }
   teams?: Array<{
     id: number
@@ -105,6 +111,8 @@ export interface WireLeague {
     primaryOwner?: string
     logo?: string
     roster?: { entries?: Array<WireEntry> }
+    /** The season's moves so far: in a budget league, what's been bid. */
+    transactionCounter?: { acquisitionBudgetSpent?: number }
     record?: {
       overall?: {
         wins?: number

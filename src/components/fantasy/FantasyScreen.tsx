@@ -26,6 +26,7 @@ import {
   useFantasy,
   useFantasyConnected,
   useReorderFantasyLeagues,
+  useSetEspnMoves,
   useSetFantasyLeagueEnabled,
   useSleeperConnection,
   useSyncFantasy,
@@ -178,10 +179,59 @@ function Connections() {
                 {r.key === 'espn' ? <ConnectForm /> : <SleeperForm />}
               </div>
             )}
+            {r.key === 'espn' && espn.data && (
+              <MovesSwitch on={espn.data.movesEnabled} />
+            )}
           </li>
         ))}
       </ul>
     </section>
+  )
+}
+
+/**
+ * Roster moves for ESPN, off until the Viewer opts in (docs/adr/0010):
+ * then a league's Players tab can add, drop and claim, each confirmed.
+ */
+function MovesSwitch({ on }: { on: boolean }) {
+  const set = useSetEspnMoves()
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      disabled={set.isPending}
+      onClick={() => set.mutate(!on)}
+      className="flex w-full items-center gap-3 border-t border-border px-3 py-2.5 text-left disabled:opacity-60"
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">Roster moves</span>
+        <span className="block text-xs text-muted">
+          {on
+            ? 'On. Add, drop and claim players from a league’s Players tab; nothing goes to ESPN until you confirm it.'
+            : 'Off. Turn on to add, drop and claim players from Sportsline with your ESPN session, each one confirmed first.'}
+        </span>
+        {set.error && (
+          <span role="alert" className="block text-xs text-live">
+            {set.error.message}
+          </span>
+        )}
+      </span>
+      <span
+        aria-hidden="true"
+        className={cn(
+          'relative h-7 w-12 shrink-0 rounded-full transition-colors',
+          on ? 'bg-accent' : 'bg-notice',
+        )}
+      >
+        <span
+          className={cn(
+            'absolute top-0.5 size-6 rounded-full bg-white shadow transition-transform',
+            on ? 'translate-x-[22px]' : 'translate-x-0.5',
+          )}
+        />
+      </span>
+    </button>
   )
 }
 
@@ -336,7 +386,8 @@ function ConnectForm() {
         </button>
         <p className="text-[11px] text-muted">
           These cookies are your ESPN session, so they’re encrypted before
-          they’re stored and only used to read your leagues. Disconnect any time
+          they’re stored and used to read your leagues (and, only if you turn
+          roster moves on, to make the moves you confirm). Disconnect any time
           to delete them; signing out of ESPN also ends access.
         </p>
       </form>

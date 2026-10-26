@@ -1,7 +1,8 @@
 /**
  * ESPN Fantasy reads (docs/adr/0004), always with the Viewer's own session
- * cookies and never cached across Viewers. Server only. ESPN rejects
- * requests without a browser User-Agent, which Workers don't send.
+ * cookies and never cached across Viewers, and the roster moves a Viewer
+ * confirms (docs/adr/0010). Server only. ESPN rejects requests without a
+ * browser User-Agent, which Workers don't send.
  */
 
 import { SPORTS } from './sports'
@@ -10,6 +11,7 @@ import type { FantasySport } from './sports'
 import type { WireTopic, WireWaiver } from './activity'
 import type { WireLeague } from './matchup'
 import type { WireAvailable } from './freeAgents'
+import type { WireMove } from './moves'
 import { BROWSER_USER_AGENT, fetchWithRetry } from '@/lib/sources/pool'
 
 export interface EspnSession {
@@ -240,4 +242,57 @@ export function leagueViews(
       : [`scoringPeriodId=${scoringPeriod}`]),
   ].join('&')
   return get(`${leagueUrl(sport, season, leagueId)}?${query}`, session)
+}
+
+/**
+ * A league's teams, rosters and settings (waiver budgets) as they are now:
+ * the check before a move, lighter than the whole of leagueViews.
+ */
+export function leagueRosters(
+  session: EspnSession,
+  sport: FantasySport,
+  season: number,
+  leagueId: string,
+): Promise<WireLeague> {
+  return get(
+    `${leagueUrl(sport, season, leagueId)}?view=mTeam&view=mRoster&view=mSettings`,
+    session,
+  )
+}
+
+/** How long a move waits for ESPN before it's recorded as unknown. */
+const MOVE_TIMEOUT_MS = 20_000
+
+/**
+ * Send a roster move to ESPN, once: never retried, since a lost answer
+ * might mean it went through. A status of null means none came back.
+ */
+export async function postMove(
+  session: EspnSession,
+  sport: FantasySport,
+  season: number,
+  leagueId: string,
+  move: WireMove,
+): Promise<{ status: number | null; body: unknown }> {
+  const url = `https://lm-api-writes.fantasy.espn.com/apis/v3/games/${SPORTS[sport].code}/seasons/${season}/segments/0/leagues/${encodeURIComponent(leagueId)}/transactions/`
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        'user-agent': BROWSER_USER_AGENT,
+        origin: 'https://fantasy.espn.com',
+        referer: 'https://fantasy.espn.com/',
+        cookie: `espn_s2=${session.espnS2}; SWID=${bracedSwid(session.swid)}`,
+      },
+      body: JSON.stringify(move),
+      signal: AbortSignal.timeout(MOVE_TIMEOUT_MS),
+    })
+  } catch {
+    return { status: null, body: null }
+  }
+  const body: unknown = await res.json().catch(() => null)
+  return { status: res.status, body }
 }
