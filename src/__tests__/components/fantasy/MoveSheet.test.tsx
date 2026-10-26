@@ -69,6 +69,9 @@ describe('AvailablePlayers with roster moves on', () => {
     )
     expect(html).toContain('aria-label="Claim Bub Carrington"')
     expect(html).toContain('aria-label="Add Free Guy"')
+    // Told apart at a glance: a solid Add, an outlined Claim with a clock.
+    expect(html).toMatch(/aria-label="Claim Bub Carrington"[^>]*border-amber/)
+    expect(html).toMatch(/aria-label="Add Free Guy"[^>]*bg-scoring/)
   })
 })
 
