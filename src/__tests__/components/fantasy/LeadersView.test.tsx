@@ -106,9 +106,11 @@ describe('LeadersView', () => {
         }}
       />,
     )
-    expect(html).toContain('>All<')
-    expect(html).toContain('>QB<')
-    expect(html).toContain('>RB<')
+    // A dropdown, not a row of chips.
+    expect(html).toContain('<select')
+    expect(html).toContain('>All positions</option>')
+    expect(html).toContain('>QB</option>')
+    expect(html).toContain('>RB</option>')
   })
 
   it('offers today or the whole matchup in a category league', () => {
@@ -219,9 +221,9 @@ describe('LeadersView', () => {
     expect(html).toContain('9-10')
     expect(html).toContain('Trae Young')
     expect(html).toContain('>most<')
-    // Each Category one tap from its top Players.
+    // Each Category opens in place to its top Players: no chips.
     expect(html).toContain('>FG%<')
-    expect(html).toContain('>All<')
+    expect(html).not.toContain('role="tablist"')
   })
 })
 
@@ -252,21 +254,16 @@ describe('TeamBoard', () => {
 
   it('names each Category’s leading team', () => {
     const html = renderToStaticMarkup(
-      <TeamBoard
-        lists={lists}
-        chosen={null}
-        onChoose={() => {}}
-        when="today"
-      />,
+      <TeamBoard lists={lists} open={null} onToggle={() => {}} when="today" />,
     )
     expect(html).toContain('Careful Club')
     expect(html).not.toContain('Bronx Bombers')
-    expect(html).toContain('TO: every team')
+    expect(html).toContain('TO: top 2')
   })
 
   it('ranks every team in one, lowest first where lower wins', () => {
     const html = renderToStaticMarkup(
-      <TeamBoard lists={lists} chosen="11" onChoose={() => {}} when="today" />,
+      <TeamBoard lists={lists} open={11} onToggle={() => {}} when="today" />,
     )
     expect(html).toContain('Lowest first: fewer wins TO.')
     expect(html.indexOf('Careful Club')).toBeLessThan(

@@ -5,9 +5,9 @@
  * a free agent or on waivers; Sleeper's by this week's projection. Pure.
  */
 
-import { categoryValue, formatCategory, isRate, toStats } from './categories'
+import { toStats } from './categories'
 import type { ActivityPlayer } from './activity'
-import type { LeagueCategory } from './categories'
+import type { LeagueCategory, Stats } from './categories'
 import type { FantasySport } from './sports'
 
 /** How many Players a read lists: enough for any league's real options. */
@@ -24,15 +24,20 @@ export type AvailablePlayer = ActivityPlayer & {
   /** Sleeper: Fantasy points projected this week, under the league's scoring. */
   projected: number | null
   /** What they've done: this season, and lately (ESPN: the last 15 days). */
-  stats?: { season: StatLine | null; recent: StatLine | null }
+  stats?: { season: SpanStats | null; recent: SpanStats | null }
 }
 
-/**
- * A Player's figures in a line: in a category league the league's
- * Categories (per game in basketball, totals in baseball); in a points
- * league their Fantasy points and per game.
- */
-export type StatLine = Array<{ label: string; value: string }>
+/** A Player's figures over a span, for the table's columns. */
+export interface SpanStats {
+  /**
+   * Their line by ESPN stat id, as the league's Categories need it: per
+   * game in basketball, totals in baseball. Null in a points league.
+   */
+  stats: Stats | null
+  /** Fantasy points over the span, and per game (points leagues). */
+  points: number | null
+  average: number | null
+}
 
 export interface AvailablePlayers {
   players: Array<AvailablePlayer>
@@ -40,6 +45,10 @@ export interface AvailablePlayers {
   order: 'owned' | 'projected'
   /** What `recent` stats cover ("Last 15"), when any Player has them. */
   recentLabel?: string
+  /** A category league's Categories: the stat table's columns. */
+  categories?: Array<LeagueCategory>
+  /** The stats are per game (basketball), not totals. */
+  perGame?: boolean
 }
 
 /** One of ESPN's `kona_player_info` entries. */
@@ -86,45 +95,54 @@ export const statIds = (season: number) => [
   `0${LAST_15}${season}`,
 ]
 
-/** Baseball's pitchers: their pitching Categories, not their batting. */
+/** Baseball's pitchers (SP, RP): their pitching Categories, not batting. */
 const PITCHERS = new Set([1, 11])
 /** Baseball's pitching stat ids start here (innings are 34). */
 const FIRST_PITCHING_STAT = 32
 
-/** A season line's figures, for the league's Categories or its points. */
-export function statLine(
+export const isPitcher = (sport: FantasySport, positionId: number | null) =>
+  sport === 'baseball' && positionId !== null && PITCHERS.has(positionId)
+
+/** A baseball Category a pitcher plays (K, ERA), not a batter (HR, AVG). */
+export const isPitching = (statId: number) => statId >= FIRST_PITCHING_STAT
+
+/**
+ * The stats a rate's columns are made from (attempts, at-bats, innings),
+ * kept beside the Categories themselves; the rest of a line isn't sent.
+ */
+const PARTS: Record<FantasySport, ReadonlyArray<number>> = {
+  football: [],
+  basketball: [3, 11, 13, 14, 15, 16, 17, 18],
+  baseball: [0, 1, 8, 10, 12, 13, 23, 24, 34, 37, 39, 45, 48, 57, 60],
+}
+
+const two = (n: number) => Math.round(n * 100) / 100
+
+/** A season line as the table shows it: the stats it needs, and its points. */
+export function spanStats(
   sport: FantasySport,
   line: WireSeasonStat | undefined,
   categories: ReadonlyArray<LeagueCategory> | null,
-  positionId: number | null,
-): StatLine | null {
+): SpanStats | null {
   if (!line) return null
-  if (!categories) {
-    if (!line.appliedTotal) return null
-    return [
-      { label: 'FPTS', value: line.appliedTotal.toFixed(1) },
-      ...(line.appliedAverage === undefined
-        ? []
-        : [{ label: 'AVG', value: line.appliedAverage.toFixed(1) }]),
-    ]
-  }
+  if (!categories)
+    return line.appliedTotal
+      ? {
+          stats: null,
+          points: two(line.appliedTotal),
+          average:
+            line.appliedAverage === undefined ? null : two(line.appliedAverage),
+        }
+      : null
   // Basketball's per game; baseball's totals, as each sport reads them.
-  const perGame = sport === 'basketball' && line.averageStats !== undefined
-  const stats = toStats(perGame ? line.averageStats : line.stats)
-  if (Object.keys(stats).length === 0) return null
-  const pitcher = positionId !== null && PITCHERS.has(positionId)
-  const out = categories.flatMap((c) => {
-    if (sport === 'baseball' && pitcher !== c.statId >= FIRST_PITCHING_STAT)
-      return []
-    const n = categoryValue(sport, c.statId, stats)
-    if (n === null || !Number.isFinite(n)) return []
-    const value =
-      perGame && !isRate(sport, c.statId)
-        ? n.toFixed(1)
-        : formatCategory(sport, c.statId, n)
-    return [{ label: c.label, value }]
-  })
-  return out.length > 0 ? out : null
+  const raw = toStats(sport === 'basketball' ? line.averageStats : line.stats)
+  const keep = new Set([...categories.map((c) => c.statId), ...PARTS[sport]])
+  const stats: Record<string, number> = {}
+  for (const [id, n] of Object.entries(raw))
+    if (keep.has(Number(id)) && Number.isFinite(n)) stats[id] = two(n)
+  return Object.keys(stats).length > 0
+    ? { stats, points: null, average: null }
+    : null
 }
 
 const round = (n: number) => Math.round(n * 10) / 10
@@ -174,8 +192,8 @@ export function readEspnAvailable(
         waivers: e.status === 'WAIVERS',
         projected: null,
         stats: {
-          season: statLine(sport, lineOf(e, 0), categories, position),
-          recent: statLine(sport, lineOf(e, LAST_15), categories, position),
+          season: spanStats(sport, lineOf(e, 0), categories),
+          recent: spanStats(sport, lineOf(e, LAST_15), categories),
         },
       },
     ]
@@ -184,6 +202,16 @@ export function readEspnAvailable(
     players: players.slice(0, AVAILABLE_LIMIT),
     order: 'owned',
     ...(players.some((p) => p.stats?.recent) ? { recentLabel: 'Last 15' } : {}),
+    ...(categories
+      ? {
+          categories: categories.map((c) => ({
+            statId: c.statId,
+            label: c.label,
+            reverse: c.reverse,
+          })),
+          perGame: sport === 'basketball',
+        }
+      : {}),
   }
 }
 

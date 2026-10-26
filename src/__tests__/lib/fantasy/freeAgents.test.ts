@@ -4,7 +4,7 @@ import {
   AVAILABLE_LIMIT,
   readEspnAvailable,
   searchAvailable,
-  statLine,
+  spanStats,
 } from '@/lib/fantasy/freeAgents'
 import { readSleeperAvailable } from '@/lib/fantasy/sleeper/read'
 
@@ -77,8 +77,12 @@ describe('Available players’ stats', () => {
     stats,
     ...over,
   })
+  const categories = [
+    { statId: 19, label: 'FG%', reverse: false },
+    { statId: 0, label: 'PTS', reverse: false },
+  ]
 
-  it('reads a category league’s Categories, per game in basketball', () => {
+  it('keeps basketball’s per-game line, only what the Categories need', () => {
     const read = readEspnAvailable(
       [
         {
@@ -89,96 +93,63 @@ describe('Available players’ stats', () => {
               line(
                 0,
                 {},
-                { averageStats: { 0: 18.24, 6: 6.1, 13: 7, 14: 15 } },
+                {
+                  averageStats: { 0: 18.237, 13: 7, 14: 15, 40: 31.2, 99: 1 },
+                },
               ),
-              line(2, {}, { averageStats: { 0: 21, 6: 4, 13: 8, 14: 16 } }),
-              // Last season's: not this one's.
+              line(2, {}, { averageStats: { 0: 21 } }),
+              // Last season's, and a projection: neither is what they've done.
               line(0, { 0: 99 }, { seasonId: 2026 }),
-              // A projection: not what they've done.
               line(0, { 0: 30 }, { statSourceId: 1 }),
             ],
           },
         },
       ],
-      {
-        sport: 'basketball',
-        season: 2027,
-        categories: [
-          { statId: 19, label: 'FG%', reverse: false },
-          { statId: 6, label: 'REB', reverse: false },
-          { statId: 0, label: 'PTS', reverse: false },
-          { statId: 11, label: 'TO', reverse: true },
-        ],
-      },
+      { sport: 'basketball', season: 2027, categories },
     )
-    expect(read.recentLabel).toBe('Last 15')
+    expect(read).toMatchObject({
+      recentLabel: 'Last 15',
+      perGame: true,
+      categories,
+    })
     expect(read.players[0].stats).toEqual({
-      season: [
-        { label: 'FG%', value: '.467' },
-        { label: 'REB', value: '6.1' },
-        { label: 'PTS', value: '18.2' },
-      ],
-      recent: [
-        { label: 'FG%', value: '.500' },
-        { label: 'REB', value: '4.0' },
-        { label: 'PTS', value: '21.0' },
-      ],
+      season: {
+        stats: { 0: 18.24, 13: 7, 14: 15 },
+        points: null,
+        average: null,
+      },
+      recent: { stats: { 0: 21 }, points: null, average: null },
     })
   })
 
-  it('gives a baseball pitcher his pitching and a hitter his batting', () => {
-    const categories = [
-      { statId: 5, label: 'HR', reverse: false },
-      { statId: 2, label: 'AVG', reverse: false },
-      { statId: 48, label: 'K', reverse: false },
-      { statId: 47, label: 'ERA', reverse: true },
-    ]
+  it('keeps baseball’s totals', () => {
     const read = readEspnAvailable(
-      [
-        {
-          id: 1,
-          player: {
-            defaultPositionId: 1,
-            stats: [line(0, { 34: 90, 45: 10, 48: 33 })],
-          },
-        },
-        {
-          id: 2,
-          player: {
-            defaultPositionId: 7,
-            stats: [line(0, { 0: 100, 1: 27, 5: 6 })],
-          },
-        },
-      ],
-      { sport: 'baseball', season: 2027, categories },
+      [{ id: 1, player: { stats: [line(0, { 0: 100, 1: 27, 5: 6 })] } }],
+      {
+        sport: 'baseball',
+        season: 2027,
+        categories: [{ statId: 5, label: 'HR', reverse: false }],
+      },
     )
-    expect(read.players.map((p) => p.stats?.season)).toEqual([
-      [
-        { label: 'K', value: '33' },
-        { label: 'ERA', value: '3.00' },
-      ],
-      [
-        { label: 'HR', value: '6' },
-        { label: 'AVG', value: '.270' },
-      ],
-    ])
+    expect(read.perGame).toBe(false)
+    expect(read.players[0].stats?.season?.stats).toEqual({
+      0: 100,
+      1: 27,
+      5: 6,
+    })
     expect(read.recentLabel).toBeUndefined()
   })
 
   it('reads a points league’s Fantasy points and per game', () => {
     expect(
-      statLine(
+      spanStats(
         'football',
-        line(0, {}, { appliedTotal: 84.25, appliedAverage: 12.04 }),
+        line(0, {}, { appliedTotal: 84.254, appliedAverage: 12.04 }),
         null,
-        2,
       ),
-    ).toEqual([
-      { label: 'FPTS', value: '84.3' },
-      { label: 'AVG', value: '12.0' },
-    ])
-    expect(statLine('football', line(0, {}), null, 2)).toBeNull()
-    expect(statLine('football', undefined, null, 2)).toBeNull()
+    ).toEqual({ stats: null, points: 84.25, average: 12.04 })
+    expect(spanStats('football', line(0, {}), null)).toBeNull()
+    expect(spanStats('football', undefined, null)).toBeNull()
   })
 })
 
@@ -221,10 +192,7 @@ describe('reading Sleeper’s Available players', () => {
       ['Patriots D/ST', null],
     ])
     expect(read.players[0].stats).toEqual({
-      season: [
-        { label: 'FPTS', value: '61.5' },
-        { label: 'AVG', value: '10.3' },
-      ],
+      season: { stats: null, points: 61.5, average: 10.25 },
       recent: null,
     })
     expect(read.players[1].stats?.season).toBeNull()

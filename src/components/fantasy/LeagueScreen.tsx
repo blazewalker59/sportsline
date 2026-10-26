@@ -14,7 +14,7 @@ import { AvailablePlayers } from './AvailablePlayers'
 import { MoveSheet } from './MoveSheet'
 import { MatchupSheet } from './FantasyParts'
 import { LeadersView } from './LeadersView'
-import { Segmented } from './Segmented'
+import { Picker, SectionHead } from './Picker'
 import { WhatIfTable } from './WhatIfTable'
 import { scoreText } from './format'
 import type { MoveIntent } from './MoveSheet'
@@ -109,7 +109,7 @@ export function LeagueScreen({ leagueId }: { leagueId: string }) {
           <div
             role="tablist"
             aria-label="League"
-            className="flex gap-1 rounded-full bg-notice p-1"
+            className="-mt-2 flex gap-5 overflow-x-auto border-b border-border [scrollbar-width:none]"
           >
             {TABS.map((t) => (
               <button
@@ -119,10 +119,10 @@ export function LeagueScreen({ leagueId }: { leagueId: string }) {
                 aria-selected={tab === t.key}
                 onClick={() => setTab(t.key)}
                 className={cn(
-                  'min-h-9 flex-1 rounded-full text-sm font-semibold transition-colors',
+                  '-mb-px min-h-10 shrink-0 border-b-2 text-sm font-semibold transition-colors',
                   tab === t.key
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted',
+                    ? 'border-foreground text-foreground'
+                    : 'border-transparent text-muted hover:text-foreground',
                 )}
               >
                 {t.label}
@@ -185,18 +185,22 @@ function StandingsTab({
     enabled: whatIfs && view === 'whatIf',
   })
   return (
-    <div className="flex flex-col gap-3">
-      {whatIfs && (
-        <Segmented
-          label="Standings"
-          options={[
-            { key: 'real', label: 'Standings' },
-            { key: 'whatIf', label: 'What if' },
-          ]}
-          value={view}
-          onChange={setView}
-        />
-      )}
+    <section>
+      <SectionHead
+        title={view === 'whatIf' ? 'What-if standings' : 'Standings'}
+      >
+        {whatIfs && (
+          <Picker
+            label="Standings"
+            options={[
+              { key: 'real', label: 'Actual' },
+              { key: 'whatIf', label: 'What if' },
+            ]}
+            value={view}
+            onChange={setView}
+          />
+        )}
+      </SectionHead>
       {view === 'whatIf' ? (
         whatIf.isPending ? (
           <p className="text-sm text-muted">Reading past weeks…</p>
@@ -217,7 +221,7 @@ function StandingsTab({
           Standings show after the league’s next sync.
         </p>
       )}
-    </div>
+    </section>
   )
 }
 
@@ -293,21 +297,18 @@ function YourMoves({
 }) {
   const now = useNow()
   return (
-    <section className="flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-xs font-bold tracking-wide text-muted uppercase">
-          Your moves
-        </h2>
+    <section>
+      <SectionHead title="Your moves">
         {canDrop && (
           <button
             type="button"
             onClick={onDrop}
-            className="min-h-8 rounded-full bg-notice px-3 text-xs font-semibold"
+            className="min-h-8 px-1.5 text-xs font-semibold text-accent"
           >
             Drop a player
           </button>
         )}
-      </div>
+      </SectionHead>
       {moves.length === 0 ? (
         <p className="text-xs text-muted">
           None yet. Tap Add or Claim on a player below.
@@ -393,9 +394,7 @@ function Slate({
   const all = [own, ...(m.others ?? [])]
   return (
     <section>
-      <h2 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-        {all.length > 1 ? 'Matchups' : 'This matchup'}
-      </h2>
+      <SectionHead title={all.length > 1 ? 'Matchups' : 'This matchup'} />
       <ul className="grid grid-cols-2 gap-2">
         {all.map((o, i) => {
           const mine = i === 0
