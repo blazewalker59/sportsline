@@ -14,6 +14,7 @@ import type {
 } from '@/lib/fantasy/activity'
 import type { FantasySport } from '@/lib/fantasy/sports'
 import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
+import { PlayerButton } from '@/components/players/playerSheet'
 import { clockTime, dateLabel } from '@/lib/time/format'
 import { cn } from '@/lib/utils'
 
@@ -89,17 +90,22 @@ function ItemRow({
           {i.action === 'add' ? '+' : '−'}
         </span>
       )}
-      <PlayerAvatar
-        name={i.player.name}
-        headshotUrl={headshotOf(sport, i.player)}
-        size={24}
-      />
-      <span className="min-w-0 flex-1 truncate">
-        {i.player.name}
-        {i.player.teamAbbrev && (
-          <span className="text-xs text-muted"> {i.player.teamAbbrev}</span>
-        )}
-      </span>
+      <PlayerButton
+        playerId={i.player.playerId}
+        className="flex min-w-0 flex-1 items-center gap-2"
+      >
+        <PlayerAvatar
+          name={i.player.name}
+          headshotUrl={headshotOf(sport, i.player)}
+          size={24}
+        />
+        <span className="min-w-0 flex-1 truncate">
+          {i.player.name}
+          {i.player.teamAbbrev && (
+            <span className="text-xs text-muted"> {i.player.teamAbbrev}</span>
+          )}
+        </span>
+      </PlayerButton>
     </li>
   )
 }

@@ -11,6 +11,7 @@ import { Sheet } from '@/components/chat/Sheet'
 import { TeamLogo, TeamMark } from '@/components/brand/TeamMark'
 import { FollowButton } from '@/components/follows/FollowButton'
 import { cn } from '@/lib/utils'
+import { PlayerButton } from '@/components/players/playerSheet'
 
 /** The box score over the feed, so closing it lands exactly where you were. */
 export function BoxSheet({
@@ -159,7 +160,12 @@ function BoxTables({ box, game }: { box: GameBox | null; game: GameSummary }) {
                       r.sub ? 'pl-6 text-foreground/80' : 'pl-3',
                     )}
                   >
-                    {r.player.name}
+                    <PlayerButton
+                      playerId={r.player.id}
+                      className="hover:underline"
+                    >
+                      {r.player.name}
+                    </PlayerButton>
                     {r.note && (
                       <span className="ml-1.5 text-muted">{r.note}</span>
                     )}

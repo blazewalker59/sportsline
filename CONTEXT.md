@@ -200,7 +200,7 @@ A Viewer’s Fantasy league’s best this scoring period, read with each sync fr
 _Avoid_: leaderboard, top performers
 
 **Available players**:
-The Players no Fantasy team in a Viewer’s Fantasy league has, searched by name or Team and narrowed by position: on ESPN its 300 most rostered free agents and waiver Players, each with the share of ESPN’s leagues that roster them and how that moved this week; on Sleeper everyone projected this week, most projected first (Sleeper doesn’t say who’s on waivers). Read from the provider while the Viewer looks at the league’s page, never stored. In an ESPN league with Roster moves on, each is a Roster move away.
+The Players no Fantasy team in a Viewer’s Fantasy league has, searched by name or Team and narrowed by position, each with their stats and opening their Player page: on ESPN its 300 most rostered free agents and waiver Players, with their season or last 15 days in the league’s Categories (per game in basketball) or Fantasy points, the share of ESPN’s leagues that roster them and how that moved this week; on Sleeper everyone projected this week, most projected first, with their season’s Fantasy points (Sleeper doesn’t say who’s on waivers). Read from the provider while the Viewer looks at the league’s page, never stored. In an ESPN league with Roster moves on, each is a Roster move away.
 _Avoid_: free agents (ESPN’s word, and it leaves out waivers), waiver wire
 
 **Roster move**:

@@ -19,6 +19,7 @@ import {
   rosters as fetchRosters,
   transactions as fetchTransactions,
   leagueUsers,
+  seasonStats,
   sleeperPlayer,
   sleeperState,
   userLeagues,
@@ -354,15 +355,18 @@ export async function readAvailable(
 ): Promise<AvailablePlayers | null> {
   if (row.provider !== 'sleeper') return null
   const state = await sleeperState()
-  const [league, rosterList, projections] = await Promise.all([
+  const [league, rosterList, projections, season] = await Promise.all([
     fetchLeague(row.leagueId),
     fetchRosters(row.leagueId),
     weekProjections(state.season, Math.max(state.week, 1)),
+    // Without the season, the list still reads by projection.
+    seasonStats(state.season).catch((): Array<SleeperWeekEntry> => []),
   ])
   const available = readSleeperAvailable({
     league,
     rosters: rosterList,
     projections,
+    season,
   })
   await attachOurs(db, row, available.players)
   return available

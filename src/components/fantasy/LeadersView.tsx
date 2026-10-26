@@ -17,6 +17,7 @@ import type {
 } from '@/lib/fantasy/leaders'
 import type { FantasySport } from '@/lib/fantasy/sports'
 import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
+import { PlayerButton } from '@/components/players/playerSheet'
 import { cn } from '@/lib/utils'
 
 const HEADING = 'mb-2 text-xs font-bold tracking-wide text-muted uppercase'
@@ -136,31 +137,39 @@ function CategoryBoard({
         <p className="text-sm text-muted">No stats yet {when}.</p>
       ) : (
         <ul className={LIST}>
-          {lists.map((c) => (
-            <li key={c.statId}>
-              <button
-                type="button"
-                onClick={() => setChosen(String(c.statId))}
-                aria-label={`${c.label}: top ${c.players.length}`}
+          {lists.map((c) => {
+            const top = () => setChosen(String(c.statId))
+            return (
+              <li
+                key={c.statId}
                 className={cn(
-                  'flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-notice',
+                  'flex items-center gap-2.5 px-3 py-2',
                   c.players[0].mine && 'bg-notice',
                 )}
               >
-                <span className="w-10 shrink-0 text-xs font-bold text-muted">
+                <button
+                  type="button"
+                  onClick={top}
+                  className="w-10 shrink-0 self-stretch text-left text-xs font-bold text-muted"
+                >
                   {c.label}
                   {c.reverse && !c.minimum && (
                     <span className="block text-[10px] font-normal">most</span>
                   )}
-                </span>
+                </button>
                 <LeaderName sport={sport} p={c.players[0]} />
                 <CategoryFigure p={c.players[0]} />
-                <span aria-hidden="true" className="shrink-0 text-muted">
+                <button
+                  type="button"
+                  onClick={top}
+                  aria-label={`${c.label}: top ${c.players.length}`}
+                  className="-mr-1 min-h-8 shrink-0 px-1 text-muted hover:text-foreground"
+                >
                   ›
-                </span>
-              </button>
-            </li>
-          ))}
+                </button>
+              </li>
+            )
+          })}
         </ul>
       )}
     </section>
@@ -279,7 +288,10 @@ function PointsLeaders({
 /** A leader's headshot and name, with their Team and Fantasy team. */
 function LeaderName({ sport, p }: { sport: FantasySport; p: LeaderPlayer }) {
   return (
-    <>
+    <PlayerButton
+      playerId={p.playerId}
+      className="flex min-w-0 flex-1 items-center gap-2.5"
+    >
       <PlayerAvatar
         name={p.name}
         headshotUrl={headshotOf(sport, p)}
@@ -293,6 +305,6 @@ function LeaderName({ sport, p }: { sport: FantasySport; p: LeaderPlayer }) {
             .join(' · ')}
         </span>
       </span>
-    </>
+    </PlayerButton>
   )
 }
