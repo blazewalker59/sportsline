@@ -303,7 +303,8 @@ export function AvailableTable({
 
 /**
  * The Player column: avatar and name (opening their page), injury and
- * waivers marked, position and Team under it, and Add or Claim.
+ * waivers marked, position and Team under it, and Add (solid) or Claim
+ * (outlined, waiting on waivers).
  */
 function PlayerCell({
   sport,
@@ -350,9 +351,12 @@ function PlayerCell({
             )}
           </span>
           <span className="block truncate text-[10px] leading-tight text-muted">
-            {[position, p.teamAbbrev, p.waivers ? 'Waivers' : null]
-              .filter(Boolean)
-              .join(' · ')}
+            {[position, p.teamAbbrev].filter(Boolean).join(' · ')}
+            {p.waivers && (
+              <span className="text-amber-700 dark:text-amber-400">
+                {position || p.teamAbbrev ? ' · ' : ''}Waivers
+              </span>
+            )}
           </span>
         </span>
       </PlayerButton>
@@ -361,9 +365,35 @@ function PlayerCell({
           type="button"
           onClick={() => onMove(p)}
           aria-label={`${p.waivers ? 'Claim' : 'Add'} ${p.name}`}
-          className="min-h-7 shrink-0 rounded-full bg-notice px-2 text-[11px] font-semibold hover:bg-accent hover:text-background"
+          className={cn(
+            'inline-flex min-h-7 shrink-0 items-center gap-0.5 rounded-full px-2 text-[11px] font-semibold',
+            // A free agent is one tap from the roster; a claim waits on
+            // waivers: solid for one, an outline with a clock for the other.
+            p.waivers
+              ? 'border border-amber-500/60 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400'
+              : 'bg-scoring/15 text-scoring hover:bg-scoring/25',
+          )}
         >
-          {p.waivers ? 'Claim' : 'Add'}
+          {p.waivers ? (
+            <>
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 12 12"
+                className="size-2.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              >
+                <circle cx="6" cy="6" r="4.5" />
+                <path d="M6 3.5V6l1.75 1" />
+              </svg>
+              Claim
+            </>
+          ) : (
+            <>
+              <span aria-hidden="true">+</span>Add
+            </>
+          )}
         </button>
       )}
     </span>
