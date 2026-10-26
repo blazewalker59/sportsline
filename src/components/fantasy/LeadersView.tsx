@@ -14,6 +14,7 @@ import type {
   CategoryPlace,
   LeaderPlayer,
   ScoringLeaders,
+  TeamCategoryLeaders,
 } from '@/lib/fantasy/leaders'
 import type { FantasySport } from '@/lib/fantasy/sports'
 import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
@@ -64,31 +65,60 @@ function CategoryBoard({
 }) {
   const [span, setSpan] = useState<'today' | 'matchup'>('today')
   const [chosen, setChosen] = useState('All')
+  const [who, setWho] = useState<'players' | 'teams'>('players')
+  const ranksTeams = leaders.teamCategories !== undefined
   const lists: Array<CategoryLeaders> =
     span === 'today' ? leaders.categories : (leaders.matchupCategories ?? [])
-  // Every Category either span ranks, in the league's order.
-  const offered = [...leaders.categories, ...(leaders.matchupCategories ?? [])]
-    .filter((c, i, all) => all.findIndex((d) => d.statId === c.statId) === i)
-    .sort((a, b) => order(leaders, a.statId) - order(leaders, b.statId))
+  const playerCategories = [
+    ...leaders.categories,
+    ...(leaders.matchupCategories ?? []),
+  ]
+  // Every Category either span ranks, in the league's order (the teams'
+  // come in it: every team's matchup has a total in nearly all of them).
+  const offered = (
+    who === 'teams'
+      ? [
+          ...(leaders.matchupTeamCategories ?? []),
+          ...(leaders.teamCategories ?? []),
+        ]
+      : [...playerCategories].sort(
+          (a, b) => order(leaders, a.statId) - order(leaders, b.statId),
+        )
+  ).filter((c, i, all) => all.findIndex((d) => d.statId === c.statId) === i)
   const one = lists.find((c) => String(c.statId) === chosen)
-  const picked = offered.find((c) => String(c.statId) === chosen)
+  const picked = offered.some((c) => String(c.statId) === chosen)
+  // The Category's note (its minimum, or most first) from either span.
+  const pickedPlayers = playerCategories.find(
+    (c) => String(c.statId) === chosen,
+  )
   const when = span === 'today' ? 'today' : 'this matchup'
   return (
     <section className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
         <h2 className={cn(HEADING, 'mb-0')}>Category leaders</h2>
-        {leaders.matchupCategories && (
+        {ranksTeams && (
           <Segmented
-            label="Category leaders over"
+            label="Category leaders among"
             options={[
-              { key: 'today', label: 'Today' },
-              { key: 'matchup', label: 'Matchup' },
+              { key: 'players', label: 'Players' },
+              { key: 'teams', label: 'Teams' },
             ]}
-            value={span}
-            onChange={setSpan}
+            value={who}
+            onChange={setWho}
           />
         )}
       </div>
+      {leaders.matchupCategories && (
+        <Segmented
+          label="Category leaders over"
+          options={[
+            { key: 'today', label: 'Today' },
+            { key: 'matchup', label: 'Matchup' },
+          ]}
+          value={span}
+          onChange={setSpan}
+        />
+      )}
       {offered.length > 1 && (
         <Segmented
           label="Category"
@@ -100,13 +130,24 @@ function CategoryBoard({
           onChange={setChosen}
         />
       )}
-      {picked ? (
+      {who === 'teams' ? (
+        <TeamBoard
+          lists={
+            (span === 'today'
+              ? leaders.teamCategories
+              : leaders.matchupTeamCategories) ?? []
+          }
+          chosen={picked ? chosen : null}
+          onChoose={setChosen}
+          when={when}
+        />
+      ) : picked && pickedPlayers ? (
         <>
-          {(picked.minimum || picked.reverse) && (
+          {(pickedPlayers.minimum || pickedPlayers.reverse) && (
             <p className="text-[11px] text-muted">
-              {picked.minimum
-                ? `${picked.minimum} to rank${picked.reverse ? ', lowest first' : ''}.`
-                : `Most first: fewer wins ${picked.label}.`}
+              {pickedPlayers.minimum
+                ? `${pickedPlayers.minimum} to rank${pickedPlayers.reverse ? ', lowest first' : ''}.`
+                : `Most first: fewer wins ${pickedPlayers.label}.`}
             </p>
           )}
           {one ? (
@@ -129,7 +170,7 @@ function CategoryBoard({
             </ol>
           ) : (
             <p className="text-sm text-muted">
-              No {picked.label} yet {when}.
+              No {pickedPlayers.label} yet {when}.
             </p>
           )}
         </>
@@ -173,6 +214,86 @@ function CategoryBoard({
         </ul>
       )}
     </section>
+  )
+}
+
+/** The teams' side of Category leaders: each Category's leading team, or every team in one. */
+export function TeamBoard({
+  lists,
+  chosen,
+  onChoose,
+  when,
+}: {
+  lists: ReadonlyArray<TeamCategoryLeaders>
+  chosen: string | null
+  onChoose: (statId: string) => void
+  when: string
+}) {
+  const one =
+    chosen === null ? null : lists.find((c) => String(c.statId) === chosen)
+  if (chosen !== null)
+    return one ? (
+      <>
+        {one.reverse && (
+          <p className="text-[11px] text-muted">
+            Lowest first: fewer wins {one.label}.
+          </p>
+        )}
+        <ol className={LIST}>
+          {one.teams.map((t, i) => (
+            <li
+              key={t.teamId}
+              className={cn(
+                'flex items-center gap-2.5 px-3 py-2 text-sm',
+                t.mine && 'bg-notice font-semibold',
+              )}
+            >
+              <span className="w-5 shrink-0 text-xs text-muted tabular-nums">
+                {i + 1}
+              </span>
+              <span className="min-w-0 flex-1 truncate">{t.name}</span>
+              <span className="shrink-0 font-bold tabular-nums">{t.value}</span>
+            </li>
+          ))}
+        </ol>
+      </>
+    ) : (
+      <p className="text-sm text-muted">No team has any yet {when}.</p>
+    )
+  if (lists.length === 0)
+    return <p className="text-sm text-muted">No stats yet {when}.</p>
+  return (
+    <ul className={LIST}>
+      {lists.map((c) => {
+        const top = c.teams[0]
+        return (
+          <li key={c.statId}>
+            <button
+              type="button"
+              onClick={() => onChoose(String(c.statId))}
+              aria-label={`${c.label}: every team`}
+              className={cn(
+                'flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-notice',
+                top.mine && 'bg-notice',
+              )}
+            >
+              <span className="w-10 shrink-0 text-xs font-bold text-muted">
+                {c.label}
+              </span>
+              <span className="min-w-0 flex-1 truncate font-semibold">
+                {top.name}
+              </span>
+              <span className="shrink-0 font-bold tabular-nums">
+                {top.value}
+              </span>
+              <span aria-hidden="true" className="shrink-0 text-muted">
+                ›
+              </span>
+            </button>
+          </li>
+        )
+      })}
+    </ul>
   )
 }
 

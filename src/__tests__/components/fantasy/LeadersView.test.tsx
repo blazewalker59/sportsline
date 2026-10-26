@@ -1,7 +1,11 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { LeaderPlayer, ScoringLeaders } from '@/lib/fantasy/leaders'
-import { LeadersView, positionGroups } from '@/components/fantasy/LeadersView'
+import {
+  LeadersView,
+  TeamBoard,
+  positionGroups,
+} from '@/components/fantasy/LeadersView'
 
 const leader = (over: Partial<LeaderPlayer> = {}): LeaderPlayer => ({
   espnId: 1,
@@ -43,6 +47,46 @@ describe('positionGroups', () => {
 })
 
 describe('LeadersView', () => {
+  it('offers Teams beside Players where teams are ranked', () => {
+    const html = renderToStaticMarkup(
+      <LeadersView
+        sport="basketball"
+        leaders={{
+          scoringPeriod: 85,
+          players: [],
+          teams: [],
+          categories: [
+            {
+              statId: 0,
+              label: 'PTS',
+              reverse: false,
+              players: [{ ...leader(), value: '41' }],
+            },
+          ],
+          teamCategories: [],
+          matchupTeamCategories: [
+            {
+              statId: 0,
+              label: 'PTS',
+              reverse: false,
+              teams: [
+                {
+                  teamId: 3,
+                  name: 'Bronx Bombers',
+                  abbrev: 'BB',
+                  value: '612',
+                  mine: true,
+                },
+              ],
+            },
+          ],
+        }}
+      />,
+    )
+    expect(html).toContain('>Players<')
+    expect(html).toContain('>Teams<')
+  })
+
   it('offers each position in a points league', () => {
     const html = renderToStaticMarkup(
       <LeadersView
@@ -178,5 +222,55 @@ describe('LeadersView', () => {
     // Each Category one tap from its top Players.
     expect(html).toContain('>FG%<')
     expect(html).toContain('>All<')
+  })
+})
+
+describe('TeamBoard', () => {
+  const lists = [
+    {
+      statId: 11,
+      label: 'TO',
+      reverse: true,
+      teams: [
+        {
+          teamId: 4,
+          name: 'Careful Club',
+          abbrev: 'CC',
+          value: '41',
+          mine: false,
+        },
+        {
+          teamId: 3,
+          name: 'Bronx Bombers',
+          abbrev: 'BB',
+          value: '58',
+          mine: true,
+        },
+      ],
+    },
+  ]
+
+  it('names each Category’s leading team', () => {
+    const html = renderToStaticMarkup(
+      <TeamBoard
+        lists={lists}
+        chosen={null}
+        onChoose={() => {}}
+        when="today"
+      />,
+    )
+    expect(html).toContain('Careful Club')
+    expect(html).not.toContain('Bronx Bombers')
+    expect(html).toContain('TO: every team')
+  })
+
+  it('ranks every team in one, lowest first where lower wins', () => {
+    const html = renderToStaticMarkup(
+      <TeamBoard lists={lists} chosen="11" onChoose={() => {}} when="today" />,
+    )
+    expect(html).toContain('Lowest first: fewer wins TO.')
+    expect(html.indexOf('Careful Club')).toBeLessThan(
+      html.indexOf('Bronx Bombers'),
+    )
   })
 })

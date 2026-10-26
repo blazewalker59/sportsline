@@ -640,9 +640,21 @@ export function readTeamSides(
   sport: FantasySport,
   league: WireLeague,
 ): Array<MatchupSide> {
+  return readTeamViews(sport, league).map((v) => v.mine)
+}
+
+/**
+ * Every team's Matchup this period read as if it were the Viewer's: in a
+ * category league, `categories` and `today` hold that team's totals
+ * (`mineValue`), for the leaders' team ranks.
+ */
+export function readTeamViews(
+  sport: FantasySport,
+  league: WireLeague,
+): Array<MatchupView> {
   return (league.teams ?? []).flatMap((t) => {
     const view = readMatchup(sport, league, t.id)
-    return view ? [view.mine] : []
+    return view ? [view] : []
   })
 }
 

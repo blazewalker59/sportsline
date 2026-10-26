@@ -41,7 +41,7 @@ import {
   readLeagueMatchups,
   readMatchup,
   readMatchupDay,
-  readTeamSides,
+  readTeamViews,
 } from './matchup'
 import { MLB_PRO_TEAMS, NFL_PRO_TEAMS, SPORTS, seasonOf } from './sports'
 import { readStandings } from './standings'
@@ -593,6 +593,8 @@ export async function keepLeague(
     sides: ReadonlyArray<MatchupSide>
     mine: number | null
     categories: ReadonlyArray<LeagueCategory> | null
+    /** ESPN: every team's Matchup, ranking the teams in each Category. */
+    teamViews?: ReadonlyArray<MatchupView>
   },
   now = new Date(),
 ): Promise<{ leaders: ScoringLeaders; rosters?: LeagueRosters }> {
@@ -670,15 +672,17 @@ export async function syncLeague(
   const view = teamId === null ? null : readMatchup(row.sport, league, teamId)
   if (view && teamId !== null)
     view.others = readLeagueMatchups(row.sport, league, teamId)
+  const teamViews = readTeamViews(row.sport, league)
   const kept = await keepLeague(db, row, {
     scoringPeriod:
       view?.scoringPeriod ??
       league.scoringPeriodId ??
       league.status?.latestScoringPeriod ??
       1,
-    sides: readTeamSides(row.sport, league),
+    sides: teamViews.map((v) => v.mine),
     mine: teamId,
     categories: view?.categories ?? null,
+    teamViews,
   })
   await storeMatchup(db, row, view, {
     season,

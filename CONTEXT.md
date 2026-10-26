@@ -196,7 +196,7 @@ Every Fantasy team in a Viewer’s Fantasy league first to last: its record, Fan
 _Avoid_: table, rankings
 
 **Scoring leaders**:
-A Viewer’s Fantasy league’s best this scoring period, read with each sync from every team’s Lineup: in a points league its top Players by Fantasy points, overall or at each position (a bench Player counts, marked), and every team’s score this Matchup; in a category league each Category’s top ten, today or over the whole Matchup: a rate (FG%, ERA) ranks only Players with the volume behind it, lowest first where lower wins, and a count where lower wins (turnovers) ranks most first, as who’s costing their side. Shown on the league’s page.
+A Viewer’s Fantasy league’s best this scoring period, read with each sync from every team’s Lineup: in a points league its top Players by Fantasy points, overall or at each position (a bench Player counts, marked), and every team’s score this Matchup; in a category league each Category’s top ten, today or over the whole Matchup, and on ESPN every Fantasy team ranked in it by its own total: a rate (FG%, ERA) ranks only Players with the volume behind it, lowest first where lower wins, and a count where lower wins (turnovers) ranks most first, as who’s costing their side. Shown on the league’s page.
 _Avoid_: leaderboard, top performers
 
 **Available players**:
