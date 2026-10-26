@@ -1,8 +1,9 @@
 /**
  * A Fantasy league's page (CONTEXT.md, "Fantasy league"), in tabs: its
- * Overview (the Viewer's Matchup this scoring period, opening in full, and
- * the league's Scoring leaders) and its Standings, kept with each sync,
- * and its Activity, read from its provider while that tab is open.
+ * Overview (every Matchup this scoring period, the Viewer's first, each
+ * opening in full, and the league's Scoring leaders) and its Standings,
+ * kept with each sync, and its Activity, read from its provider while
+ * that tab is open.
  */
 
 import { useQuery } from '@tanstack/react-query'
@@ -13,8 +14,9 @@ import { MatchupSheet } from './FantasyParts'
 import { LeadersView } from './LeadersView'
 import { Segmented } from './Segmented'
 import { WhatIfTable } from './WhatIfTable'
-import { scoreText, sideRecord } from './format'
+import { scoreText } from './format'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
+import type { LeagueMatchup, LeagueMatchupSide } from '@/lib/fantasy/matchup'
 import type { Standings } from '@/lib/fantasy/standings'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
@@ -38,14 +40,15 @@ const TABS: ReadonlyArray<{ key: Tab; label: string }> = [
 export function LeagueScreen({ leagueId }: { leagueId: string }) {
   const { data: viewerState, isPending } = useViewer()
   const page = useFantasyLeague(leagueId)
-  const [open, setOpen] = useState(false)
+  // The Matchup open in full: the Viewer's, or another in the league.
+  const [open, setOpen] = useState<'mine' | LeagueMatchup | null>(null)
   const [tab, setTab] = useState<Tab>('overview')
   const league = page.data?.league
   // Today's Games, for each Player's game state in the Matchup sheet.
   const today = useToday()
   const games = useQuery({
     ...gamesQuery(today),
-    enabled: open,
+    enabled: open !== null,
     refetchInterval: 30_000,
   })
   return (
@@ -116,9 +119,7 @@ export function LeagueScreen({ leagueId }: { leagueId: string }) {
           </div>
           {tab === 'overview' ? (
             <>
-              {league.matchup && (
-                <ThisMatchup league={league} onOpen={() => setOpen(true)} />
-              )}
+              {league.matchup && <Slate league={league} onOpen={setOpen} />}
               {page.data?.leaders ? (
                 <LeadersView sport={league.sport} leaders={page.data.leaders} />
               ) : (
@@ -135,12 +136,15 @@ export function LeagueScreen({ leagueId }: { leagueId: string }) {
               standings={page.data?.standings ?? null}
             />
           )}
-          {open && league.matchup && (
+          {open !== null && league.matchup && (
             <MatchupSheet
+              // A fresh sheet per Matchup, so each opens on its own today.
+              key={open === 'mine' ? 'mine' : open.left.teamId}
               league={league}
+              {...(open === 'mine' ? {} : { other: open })}
               games={games.data ?? []}
               leagueLink={false}
-              onClose={() => setOpen(false)}
+              onClose={() => setOpen(null)}
             />
           )}
         </div>
@@ -223,44 +227,91 @@ function ActivityTab({ league }: { league: FantasyLeagueView }) {
   )
 }
 
-/** The Viewer's Matchup as a scoreboard row that opens it in full. */
-function ThisMatchup({
+/**
+ * Every Matchup in the league this scoring period, the Viewer's first:
+ * each a two-row scoreboard, the leader bold, opening in full.
+ */
+function Slate({
   league,
   onOpen,
 }: {
   league: FantasyLeagueView
-  onOpen: () => void
+  onOpen: (matchup: 'mine' | LeagueMatchup) => void
 }) {
   const m = league.matchup!
-  const score = (side: 'mine' | 'opponent') =>
-    m.categories
-      ? sideRecord(m, side)
-      : scoreText(m, (side === 'mine' ? m.mine : m.opponent)?.score ?? null)
+  const own: LeagueMatchup = {
+    left: m.mine,
+    right: m.opponent,
+    ...(m.ties ? { ties: m.ties } : {}),
+  }
+  const all = [own, ...(m.others ?? [])]
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 text-left hover:bg-notice"
-    >
-      <span className="min-w-0 flex-1">
-        <span className="block text-xs text-muted">This matchup</span>
-        <span className="block truncate text-sm font-semibold">
-          {m.mine.name}
-          <span className="font-normal text-muted">
-            {m.opponent ? ` vs ${m.opponent.name}` : ' · Bye week'}
-          </span>
-        </span>
-      </span>
-      <span className="shrink-0 text-sm font-bold tabular-nums">
-        {score('mine')}
-        {m.opponent && (
-          <>
-            <span className="font-normal text-muted"> – </span>
-            {score('opponent')}
-          </>
-        )}
-      </span>
-    </button>
+    <section>
+      <h2 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
+        {all.length > 1 ? 'Matchups' : 'This matchup'}
+      </h2>
+      <ul className="grid grid-cols-2 gap-2">
+        {all.map((o, i) => {
+          const mine = i === 0
+          const { left, right } = o
+          const lead =
+            !right || left.score === right.score
+              ? null
+              : left.score > right.score
+                ? 'left'
+                : 'right'
+          const row = (s: LeagueMatchupSide, leading: boolean) => (
+            <span
+              className={cn(
+                'flex items-baseline justify-between gap-2 tabular-nums',
+                leading ? 'font-bold' : 'text-foreground/75',
+              )}
+            >
+              <span className="min-w-0 truncate text-[13px] font-semibold">
+                {s.name}
+              </span>
+              <span className="shrink-0 text-[15px]">
+                {scoreText(m, s.score)}
+              </span>
+            </span>
+          )
+          return (
+            <li key={left.teamId} className="flex">
+              <button
+                type="button"
+                onClick={() => onOpen(mine ? 'mine' : o)}
+                aria-current={mine || undefined}
+                aria-label={
+                  right
+                    ? `${left.name} ${scoreText(m, left.score)}, ${right.name} ${scoreText(m, right.score)}`
+                    : `${left.name}, bye week`
+                }
+                className={cn(
+                  'flex min-w-0 flex-1 flex-col gap-0.5 rounded-xl border px-2.5 py-2 text-left hover:bg-notice',
+                  mine
+                    ? 'border-accent bg-accent-soft'
+                    : 'border-border bg-surface',
+                )}
+              >
+                {row(left, lead === 'left')}
+                {right ? (
+                  row(right, lead === 'right')
+                ) : (
+                  <span className="text-[13px] text-muted">Bye week</span>
+                )}
+                {(mine || (o.ties ?? 0) > 0) && (
+                  <span className="text-[11px] text-muted">
+                    {[mine && 'Your matchup', o.ties && `${o.ties} tied`]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                )}
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
   )
 }
 

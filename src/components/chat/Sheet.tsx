@@ -60,10 +60,13 @@ function trapTab(e: KeyboardEvent, node: HTMLElement) {
  */
 export function Sheet({
   title,
+  action,
   onClose,
   children,
 }: {
   title: string
+  /** A quiet link or button beside the title, before Done. */
+  action?: React.ReactNode
   onClose: () => void
   children: React.ReactNode
 }) {
@@ -207,7 +210,10 @@ export function Sheet({
             <span className="h-1.5 w-10 rounded-full bg-muted/40" />
           </div>
           <div className="flex items-center gap-3 border-b border-border px-4 pb-3">
-            <span className="flex-1 text-base font-bold">{title}</span>
+            <span className="min-w-0 flex-1 truncate text-base font-bold">
+              {title}
+            </span>
+            {action}
             <button
               ref={close}
               type="button"

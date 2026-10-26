@@ -23,6 +23,18 @@ interface CategoryDef {
   format: (v: number) => string
   /** A pitching rate held to the league's innings minimum. */
   innings?: boolean
+  /**
+   * A rate's volume, which a Player needs this much of to rank in its
+   * Scoring leaders: a day's worth, or a matchup's.
+   */
+  volume?: {
+    of: (s: Stats) => number
+    unit: string
+    day: number
+    matchup: number
+  }
+  /** A rate's parts, shown beside it in the leaders: "8-15", "5.1 IP". */
+  parts?: (s: Stats) => string
 }
 
 const v = (s: Stats, id: number) => s[id] ?? 0
@@ -37,12 +49,28 @@ const two = (n: number) => n.toFixed(2)
 export const innings = (outs: number) =>
   `${Math.floor(outs / 3)}.${Math.round(outs % 3)}`
 
+const made = (m: number, a: number) => (s: Stats) => `${v(s, m)}-${v(s, a)}`
+const ip = (s: Stats) => `${innings(v(s, 34))} IP`
+/** Plate appearances: at-bats, walks, hit by pitch, sacrifice flies. */
+const pa = (s: Stats) => v(s, 0) + v(s, 10) + v(s, 12) + v(s, 13)
+const AT_BATS = { of: (s: Stats) => v(s, 0), unit: 'AB', day: 3, matchup: 10 }
+const PLATE = { of: pa, unit: 'PA', day: 3, matchup: 10 }
+/** Innings (from outs), the volume behind a pitching rate. */
+const INNINGS = {
+  of: (s: Stats) => v(s, 34) / 3,
+  unit: 'IP',
+  day: 3,
+  matchup: 5,
+}
+
 const BASEBALL: Record<number, CategoryDef> = {
   0: { label: 'AB', format: whole },
   1: { label: 'H', format: whole },
   2: {
     label: 'AVG',
     compute: (s) => (has(s, 0) ? ratio(v(s, 1), v(s, 0)) : null),
+    volume: AT_BATS,
+    parts: made(1, 0),
     format: avg,
   },
   3: { label: '2B', format: whole },
@@ -52,10 +80,18 @@ const BASEBALL: Record<number, CategoryDef> = {
   9: {
     label: 'SLG',
     compute: (s) => (has(s, 0) ? ratio(v(s, 8), v(s, 0)) : null),
+    volume: AT_BATS,
+    parts: made(1, 0),
     format: avg,
   },
   10: { label: 'BB', format: whole },
-  17: { label: 'OBP', compute: obp, format: avg },
+  17: {
+    label: 'OBP',
+    compute: obp,
+    volume: PLATE,
+    parts: made(1, 0),
+    format: avg,
+  },
   18: {
     label: 'OPS',
     compute: (s) => {
@@ -63,6 +99,8 @@ const BASEBALL: Record<number, CategoryDef> = {
       const slg = has(s, 0) ? ratio(v(s, 8), v(s, 0)) : null
       return o === null || slg === null ? null : o + slg
     },
+    volume: PLATE,
+    parts: made(1, 0),
     format: avg,
   },
   20: { label: 'R', format: whole },
@@ -84,6 +122,8 @@ const BASEBALL: Record<number, CategoryDef> = {
     reverse: true,
     innings: true,
     compute: (s) => ratio(3 * (v(s, 37) + v(s, 39)), v(s, 34)),
+    volume: INNINGS,
+    parts: ip,
     format: two,
   },
   45: { label: 'ER', reverse: true, format: whole },
@@ -92,6 +132,8 @@ const BASEBALL: Record<number, CategoryDef> = {
     reverse: true,
     innings: true,
     compute: (s) => ratio(27 * v(s, 45), v(s, 34)),
+    volume: INNINGS,
+    parts: ip,
     format: two,
   },
   48: { label: 'K', format: whole },
@@ -99,6 +141,8 @@ const BASEBALL: Record<number, CategoryDef> = {
     label: 'K/9',
     innings: true,
     compute: (s) => ratio(27 * v(s, 48), v(s, 34)),
+    volume: INNINGS,
+    parts: ip,
     format: two,
   },
   53: { label: 'W', format: whole },
@@ -141,21 +185,29 @@ const BASKETBALL: Record<number, CategoryDef> = {
   19: {
     label: 'FG%',
     compute: (s) => (has(s, 14) ? ratio(v(s, 13), v(s, 14)) : null),
+    volume: { of: (s) => v(s, 14), unit: 'FGA', day: 5, matchup: 20 },
+    parts: made(13, 14),
     format: avg,
   },
   20: {
     label: 'FT%',
     compute: (s) => (has(s, 16) ? ratio(v(s, 15), v(s, 16)) : null),
+    volume: { of: (s) => v(s, 16), unit: 'FTA', day: 3, matchup: 10 },
+    parts: made(15, 16),
     format: avg,
   },
   21: {
     label: '3P%',
     compute: (s) => (has(s, 18) ? ratio(v(s, 17), v(s, 18)) : null),
+    volume: { of: (s) => v(s, 18), unit: '3PA', day: 3, matchup: 10 },
+    parts: made(17, 18),
     format: avg,
   },
   36: {
     label: 'A/TO',
     compute: (s) => (has(s, 3) ? ratio(v(s, 3), v(s, 11)) : null),
+    volume: { of: (s) => v(s, 3), unit: 'AST', day: 4, matchup: 15 },
+    parts: made(3, 11),
     format: two,
   },
   37: { label: 'DD', format: whole },
@@ -268,6 +320,32 @@ export function categoryValue(
 /** A category computed from others (AVG, ERA, FG%), not counted. */
 export const isRate = (sport: FantasySport, statId: number): boolean =>
   DEFS[sport][statId]?.compute !== undefined
+
+/**
+ * What a Player needs to rank in a rate's Scoring leaders over a day or a
+ * matchup ("5+ FGA"), and the rate's parts on their line. Null for a
+ * count, which anyone with one ranks in.
+ */
+export function rateVolume(
+  sport: FantasySport,
+  statId: number,
+  span: 'day' | 'matchup',
+): {
+  of: (s: Stats) => number
+  minimum: number
+  label: string
+  parts: (s: Stats) => string | null
+} | null {
+  const def = DEFS[sport][statId]
+  if (!def?.volume) return null
+  const minimum = def.volume[span]
+  return {
+    of: def.volume.of,
+    minimum,
+    label: `${minimum}+ ${def.volume.unit}`,
+    parts: (s) => def.parts?.(s) ?? null,
+  }
+}
 
 export function formatCategory(
   sport: FantasySport,

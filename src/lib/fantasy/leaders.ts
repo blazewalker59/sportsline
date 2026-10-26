@@ -3,11 +3,11 @@
  * top Players and teams this scoring period, read from every team's
  * Lineup in the same league data as the Matchup, so they cost no extra
  * read. Points leagues rank Fantasy points, overall and by position;
- * category leagues name each counting Category's leader, today and over
- * the whole matchup. Pure.
+ * category leagues rank each Category's top Players, today and over the
+ * whole matchup. Pure.
  */
 
-import { formatCategory, isRate } from './categories'
+import { categoryValue, formatCategory, rateVolume } from './categories'
 import type { LeagueCategory } from './categories'
 import type { LineupPlayer, MatchupSide } from './matchup'
 import type { FantasySport } from './sports'
@@ -34,12 +34,27 @@ export type LeaderPlayer = Pick<
   mine: boolean
 }
 
-export interface CategoryLeader {
+/** A Player's place in a Category: `points` holds their value. */
+export type CategoryPlace = LeaderPlayer & {
+  /** Their value, as the Category shows it. */
+  value: string
+  /** A rate's parts: "8-15", "5.1 IP". */
+  parts?: string
+}
+
+/** One Category's top Players, its leader first. */
+export interface CategoryLeaders {
   statId: number
   label: string
-  /** The leader's count, as the Category shows it. */
-  value: string
-  player: LeaderPlayer
+  /**
+   * Lower wins (ERA, turnovers): a rate then ranks lowest first, and a
+   * count most first, as who's costing their side the Category.
+   */
+  reverse: boolean
+  /** A rate's volume to rank: "5+ FGA". */
+  minimum?: string
+  /** At most TOP_PLAYERS. */
+  players: Array<CategoryPlace>
 }
 
 export interface TeamLeader {
@@ -63,10 +78,10 @@ export interface ScoringLeaders {
   players: Array<LeaderPlayer>
   /** Points leagues: each position's top Players this scoring period. */
   positions?: Array<PositionLeaders>
-  /** Category leagues: each counting Category's leader today. */
-  categories: Array<CategoryLeader>
-  /** Category leagues: each counting Category's leader over the matchup. */
-  matchupCategories?: Array<CategoryLeader>
+  /** Category leagues: each Category's top Players today. */
+  categories: Array<CategoryLeaders>
+  /** Category leagues: each Category's top Players over the matchup. */
+  matchupCategories?: Array<CategoryLeaders>
   /** Points leagues: every team's score this matchup, best first. */
   teams: Array<TeamLeader>
 }
@@ -122,42 +137,59 @@ export function scoringLeaders(input: {
     side.lineup.map((p) => ({ p, side })),
   )
   if (categories) {
-    // Counts only: a rate needs volume, and a lowest count (turnovers)
-    // isn't leading anything.
-    const counted = categories.filter(
-      (c) => !c.reverse && !isRate(sport, c.statId),
-    )
     // The matchup's lines: each side's summary (who counted, and how much).
     const matchup = sides.flatMap((side) =>
       (side.summary ?? []).map((p) => ({ p, side })),
     )
     const leadersOf = (
       lines: ReadonlyArray<{ p: LineupPlayer; side: MatchupSide }>,
-    ): Array<CategoryLeader> =>
-      counted.flatMap((c) => {
-        let best: { p: LineupPlayer; side: MatchupSide; n: number } | null =
-          null
-        for (const { p, side } of lines) {
-          const n = p.dayStats?.[c.statId] ?? 0
-          if (n > 0 && (!best || n > best.n)) best = { p, side, n }
-        }
-        return best
-          ? [
-              {
-                statId: c.statId,
-                label: c.label,
-                value: formatCategory(sport, c.statId, best.n),
-                player: leaderOf(best.p, best.side, mine, best.n),
-              },
-            ]
-          : []
+      span: 'day' | 'matchup',
+    ): Array<CategoryLeaders> =>
+      categories.flatMap((c) => {
+        // A rate ranks only those with the volume behind it; a count,
+        // anyone with one.
+        const rate = rateVolume(sport, c.statId, span)
+        const ranked = lines
+          .flatMap(({ p, side }) => {
+            const s = p.dayStats ?? {}
+            const volume = rate ? rate.of(s) : 0
+            if (rate && volume < rate.minimum) return []
+            const n = categoryValue(sport, c.statId, s)
+            if (n === null || !Number.isFinite(n) || (!rate && n <= 0))
+              return []
+            return [{ p, side, n, volume }]
+          })
+          .sort(
+            (a, b) =>
+              (rate && c.reverse ? a.n - b.n : b.n - a.n) ||
+              b.volume - a.volume ||
+              Number(b.p.starter) - Number(a.p.starter),
+          )
+          .slice(0, TOP_PLAYERS)
+        if (ranked.length === 0) return []
+        return [
+          {
+            statId: c.statId,
+            label: c.label,
+            reverse: c.reverse,
+            ...(rate ? { minimum: rate.label } : {}),
+            players: ranked.map(({ p, side, n }) => {
+              const parts = rate?.parts(p.dayStats ?? {})
+              return {
+                ...leaderOf(p, side, mine, n),
+                value: formatCategory(sport, c.statId, n),
+                ...(parts ? { parts } : {}),
+              }
+            }),
+          },
+        ]
       })
     return {
       scoringPeriod: input.scoringPeriod,
       players: [],
       teams: [],
-      categories: leadersOf(everyone),
-      matchupCategories: leadersOf(matchup),
+      categories: leadersOf(everyone, 'day'),
+      matchupCategories: leadersOf(matchup, 'matchup'),
     }
   }
   const scored = everyone
@@ -194,4 +226,16 @@ export function scoringLeaders(input: {
         mine: s.teamId === mine,
       })),
   }
+}
+
+/**
+ * Leaders as kept, or null when they were kept before each Category
+ * ranked its top Players (they're rewritten at the league's next sync).
+ */
+export function currentLeaders(
+  leaders: ScoringLeaders | null,
+): ScoringLeaders | null {
+  if (!leaders) return null
+  const kept = [...leaders.categories, ...(leaders.matchupCategories ?? [])]
+  return kept.every((c) => Array.isArray(c.players)) ? leaders : null
 }
