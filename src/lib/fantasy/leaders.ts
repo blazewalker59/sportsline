@@ -8,8 +8,8 @@
  */
 
 import { categoryValue, formatCategory, rateVolume } from './categories'
-import type { LeagueCategory } from './categories'
-import type { LineupPlayer, MatchupSide } from './matchup'
+import type { CategoryResult, LeagueCategory } from './categories'
+import type { LineupPlayer, MatchupSide, MatchupView } from './matchup'
 import type { FantasySport } from './sports'
 
 /** A Player as the leaders show them, with the Fantasy team that has them. */
@@ -57,6 +57,25 @@ export interface CategoryLeaders {
   players: Array<CategoryPlace>
 }
 
+/** A Fantasy team's place in a Category: its total, as the Category shows it. */
+export interface TeamPlace {
+  teamId: number
+  name: string
+  abbrev: string
+  value: string
+  mine: boolean
+}
+
+/** One Category's every team, its leader first. */
+export interface TeamCategoryLeaders {
+  statId: number
+  label: string
+  /** Lower wins (ERA, turnovers): ranked lowest first. */
+  reverse: boolean
+  /** Every team with a total, best first. */
+  teams: Array<TeamPlace>
+}
+
 export interface TeamLeader {
   teamId: number
   name: string
@@ -82,6 +101,10 @@ export interface ScoringLeaders {
   categories: Array<CategoryLeaders>
   /** Category leagues: each Category's top Players over the matchup. */
   matchupCategories?: Array<CategoryLeaders>
+  /** Category leagues: each Category's teams ranked on today's Starters. */
+  teamCategories?: Array<TeamCategoryLeaders>
+  /** Category leagues: each Category's teams ranked over the matchup. */
+  matchupTeamCategories?: Array<TeamCategoryLeaders>
   /** Points leagues: every team's score this matchup, best first. */
   teams: Array<TeamLeader>
 }
@@ -131,8 +154,13 @@ export function scoringLeaders(input: {
   mine: number | null
   /** Category leagues' Categories (null in a points league). */
   categories: ReadonlyArray<LeagueCategory> | null
+  /**
+   * Category leagues: every team's Matchup read as its own (ESPN), whose
+   * totals rank the teams in each Category.
+   */
+  teamViews?: ReadonlyArray<Pick<MatchupView, 'mine' | 'categories' | 'today'>>
 }): ScoringLeaders {
-  const { sport, sides, mine, categories } = input
+  const { sport, sides, mine, categories, teamViews } = input
   const everyone = sides.flatMap((side) =>
     side.lineup.map((p) => ({ p, side })),
   )
@@ -190,6 +218,17 @@ export function scoringLeaders(input: {
       teams: [],
       categories: leadersOf(everyone, 'day'),
       matchupCategories: leadersOf(matchup, 'matchup'),
+      ...(teamViews && teamViews.length > 0
+        ? {
+            teamCategories: teamRanks(categories, teamViews, mine, 'today'),
+            matchupTeamCategories: teamRanks(
+              categories,
+              teamViews,
+              mine,
+              'categories',
+            ),
+          }
+        : {}),
     }
   }
   const scored = everyone
@@ -226,6 +265,57 @@ export function scoringLeaders(input: {
         mine: s.teamId === mine,
       })),
   }
+}
+
+/**
+ * Each Category's teams, best first (lowest where lower wins), from each
+ * team's own totals: today's Starters, or the matchup so far. A team
+ * with no total yet (no attempts, no innings) is left out.
+ */
+function teamRanks(
+  categories: ReadonlyArray<LeagueCategory>,
+  views: ReadonlyArray<Pick<MatchupView, 'mine' | 'categories' | 'today'>>,
+  mine: number | null,
+  span: 'today' | 'categories',
+): Array<TeamCategoryLeaders> {
+  return categories.flatMap((c) => {
+    const ranked = views
+      .flatMap((v) => {
+        const r = (v[span] ?? []).find(
+          (x: CategoryResult) => x.statId === c.statId,
+        )
+        const n = r?.mineValue
+        return r && n != null
+          ? [
+              {
+                n,
+                place: {
+                  teamId: v.mine.teamId,
+                  name: v.mine.name,
+                  abbrev: v.mine.abbrev,
+                  value: r.mine,
+                  mine: v.mine.teamId === mine,
+                },
+              },
+            ]
+          : []
+      })
+      .sort(
+        (a, b) =>
+          (c.reverse ? a.n - b.n : b.n - a.n) ||
+          a.place.teamId - b.place.teamId,
+      )
+    return ranked.length === 0
+      ? []
+      : [
+          {
+            statId: c.statId,
+            label: c.label,
+            reverse: c.reverse,
+            teams: ranked.map((t) => t.place),
+          },
+        ]
+  })
 }
 
 /**

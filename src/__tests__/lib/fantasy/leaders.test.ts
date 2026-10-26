@@ -11,7 +11,11 @@ import {
   currentLeaders,
   scoringLeaders,
 } from '@/lib/fantasy/leaders'
-import { readMatchup, readTeamSides } from '@/lib/fantasy/matchup'
+import {
+  readMatchup,
+  readTeamSides,
+  readTeamViews,
+} from '@/lib/fantasy/matchup'
 
 const player = (
   espnId: number,
@@ -181,6 +185,46 @@ describe('scoringLeaders in a category league', () => {
         .slice(0, TOP_PLAYERS)
       expect(c.players.map((p) => p.points)).toEqual(counts)
     }
+  })
+})
+
+describe('scoringLeaders’ team ranks in a category league', () => {
+  const league = basketball as unknown as WireLeague
+  const views = readTeamViews('basketball', league)
+  const read = (teamViews?: typeof views) =>
+    scoringLeaders({
+      sport: 'basketball',
+      scoringPeriod: views[0].scoringPeriod,
+      sides: views.map((v) => v.mine),
+      mine: 1,
+      categories: views[0].categories ?? null,
+      teamViews,
+    })
+
+  it('ranks every team in each Category from its own totals', () => {
+    const leaders = read(views)
+    expect(leaders.matchupTeamCategories?.length).toBeGreaterThan(0)
+    for (const c of leaders.matchupTeamCategories ?? []) {
+      const totals = views.flatMap((v) => {
+        const n = v.categories?.find((r) => r.statId === c.statId)?.mineValue
+        return n == null ? [] : [n]
+      })
+      const best = c.reverse ? Math.min(...totals) : Math.max(...totals)
+      const leader = views.find((v) => v.mine.teamId === c.teams[0].teamId)
+      expect(
+        leader?.categories?.find((r) => r.statId === c.statId)?.mineValue,
+      ).toBe(best)
+      expect(c.teams.length).toBe(totals.length)
+    }
+    expect(
+      leaders.matchupTeamCategories?.[0].teams.find((t) => t.teamId === 1)
+        ?.mine,
+    ).toBe(true)
+    expect(leaders.teamCategories).toBeDefined()
+  })
+
+  it('ranks no teams without every team’s Matchup (Sleeper)', () => {
+    expect(read().matchupTeamCategories).toBeUndefined()
   })
 })
 
