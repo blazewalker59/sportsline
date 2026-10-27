@@ -13,7 +13,7 @@ import {
   scoreCategories,
   toStats,
 } from '@/lib/fantasy/categories'
-import { readMatchup, readMatchupDay } from '@/lib/fantasy/matchup'
+import { matchupDays, readMatchup, readMatchupDay } from '@/lib/fantasy/matchup'
 
 const homeOf = (league: WireLeague) =>
   league.schedule!.find(
@@ -67,8 +67,15 @@ describe('category Matchups (from ESPN payloads dreamteam reads)', () => {
 
   it('scores today on its own, and knows the matchup’s days', () => {
     const league = basketball as unknown as WireLeague
-    const view = readMatchup('basketball', league, homeOf(league))!
-    expect(view.days).toEqual([78, 79, 80, 81, 82, 83, 84, 85])
+    // Day 85 is Tuesday, Jan 12: the season began Tuesday, Oct 20, so
+    // week 13 runs Monday to Sunday, days 84 to 90.
+    const view = readMatchup(
+      'basketball',
+      league,
+      homeOf(league),
+      '2027-01-12',
+    )!
+    expect(view.days).toEqual([84, 85, 86, 87, 88, 89, 90])
     const today = Object.fromEntries(view.today!.map((c) => [c.label, c]))
     // Today's Starters alone: 21-40 and 9-25 from the floor.
     expect(today['FG%']).toMatchObject({
@@ -83,6 +90,38 @@ describe('category Matchups (from ESPN payloads dreamteam reads)', () => {
     expect(today.TO.leader).toBe('opponent')
     // The matchup's totals are untouched.
     expect(view.categories!.find((c) => c.label === 'PTS')!.mine).not.toBe('60')
+  })
+
+  it('counts a matchup’s days from the weeks ESPN lists for it', () => {
+    // ESPN's real shape: matchup 2 is week 2, not day 2. The season began
+    // Tuesday, Oct 20, so week 1 is days 1–6 and week 2 Monday, Oct 26
+    // (day 7) to Sunday, Nov 1.
+    const league: WireLeague = {
+      scoringPeriodId: 8,
+      status: { currentMatchupPeriod: 2, finalScoringPeriod: 174 },
+      settings: {
+        scheduleSettings: { matchupPeriods: { '1': [1], '2': [2] } },
+      },
+    }
+    expect(matchupDays(league, 2, '2026-10-27')).toEqual([
+      7, 8, 9, 10, 11, 12, 13,
+    ])
+    expect(matchupDays(league, 1, '2026-10-27')).toEqual([1, 2, 3, 4, 5, 6])
+    // A two-week round, cut off at the season's last day.
+    const end = {
+      ...league,
+      status: { currentMatchupPeriod: 2, finalScoringPeriod: 10 },
+      settings: {
+        scheduleSettings: { matchupPeriods: { '2': [2, 3] } },
+      },
+    }
+    expect(matchupDays(end, 2, '2026-10-27')).toEqual([7, 8, 9, 10])
+    // Should the count miss today, the current matchup is today's week.
+    const off = {
+      ...league,
+      settings: { scheduleSettings: { matchupPeriods: { '2': [5] } } },
+    }
+    expect(matchupDays(off, 2, '2026-10-27')).toEqual([7, 8, 9, 10, 11, 12, 13])
   })
 
   it('reads one day of a matchup: that day’s Lineups and categories', () => {
