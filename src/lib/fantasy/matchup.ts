@@ -21,6 +21,7 @@ import { SPORTS, slotName } from './sports'
 import type { CategoryResult, LeagueCategory, Stats } from './categories'
 import type { WhatIfMatchupInput, WhatIfPlayer } from './whatIf'
 import type { FantasySport } from './sports'
+import { shiftSportsDay, sportsDayOf } from '@/lib/model/sportsDay'
 
 // ─── ESPN's shapes (loose) ─────────────────────────────────────────────────
 
@@ -78,10 +79,18 @@ interface WireSide {
 export interface WireLeague {
   id?: number
   scoringPeriodId?: number
-  status?: { currentMatchupPeriod?: number; latestScoringPeriod?: number }
+  status?: {
+    currentMatchupPeriod?: number
+    latestScoringPeriod?: number
+    finalScoringPeriod?: number
+  }
   settings?: {
     name?: string
-    /** Each matchup period's scoring periods (days), by period id. */
+    /**
+     * Each matchup period's weeks, by period id: [4] one week, [4, 5] a
+     * two-week round. In football a week is a scoring period; in
+     * basketball and baseball it holds several (matchupDays).
+     */
     scheduleSettings?: {
       matchupPeriods?: Record<string, Array<number>>
       playoffTeamCount?: number
@@ -562,6 +571,44 @@ function categoriesOf(
     : null
 }
 
+/**
+ * A daily league's matchup period as scoring periods (days). ESPN lists a
+ * matchup's weeks, not its days: its weeks run Monday to Sunday, the first
+ * from the season's first day to its first Sunday, and scoring periods
+ * are consecutive days, so each is counted out from today's (`today` is
+ * today's Sports Day). The current matchup always holds today: should the
+ * count miss it, it's today's week.
+ */
+export function matchupDays(
+  league: WireLeague,
+  period: number,
+  today: string = sportsDayOf(new Date()),
+): Array<number> {
+  const current =
+    league.scoringPeriodId ?? league.status?.latestScoringPeriod ?? 1
+  const first = shiftSportsDay(today, 1 - current)
+  const monday = (new Date(`${first}T12:00:00Z`).getUTCDay() + 6) % 7
+  const firstWeek = 7 - monday
+  const weekOf = (day: number) =>
+    day <= firstWeek ? 1 : 2 + Math.floor((day - firstWeek - 1) / 7)
+  const final = league.status?.finalScoringPeriod ?? Infinity
+  const weekDays = (week: number) => {
+    const from = week === 1 ? 1 : firstWeek + 1 + 7 * (week - 2)
+    const to = week === 1 ? firstWeek : from + 6
+    const days: Array<number> = []
+    for (let d = from; d <= Math.min(to, final); d++) days.push(d)
+    return days
+  }
+  const weeks = league.settings?.scheduleSettings?.matchupPeriods?.[
+    String(period)
+  ] ?? [period]
+  const days = [...new Set(weeks.flatMap(weekDays))].sort((a, b) => a - b)
+  const isCurrent = period === league.status?.currentMatchupPeriod
+  return isCurrent && current >= 1 && !days.includes(current)
+    ? weekDays(weekOf(current))
+    : days
+}
+
 /** The matchup period a scoring period falls in, from the league's schedule. */
 function periodOf(league: WireLeague, scoringPeriod: number): number | null {
   const periods = league.settings?.scheduleSettings?.matchupPeriods ?? {}
@@ -575,6 +622,8 @@ export function readMatchup(
   sport: FantasySport,
   league: WireLeague,
   teamId: number,
+  /** Today's Sports Day, to place the matchup's days (matchupDays). */
+  today?: string,
 ): MatchupView | null {
   const period = league.status?.currentMatchupPeriod ?? 1
   const scoringPeriod =
@@ -618,9 +667,13 @@ export function readMatchup(
       theirsWire && opponent ? theirsWire : undefined,
       scoringPeriod,
     )
-    const days =
-      league.settings?.scheduleSettings?.matchupPeriods?.[String(period)]
-    view.days = days?.length ? [...days].sort((a, b) => a - b) : [scoringPeriod]
+    // Football's weeks are its scoring periods; the rest count days.
+    view.days =
+      sport === 'football'
+        ? (league.settings?.scheduleSettings?.matchupPeriods?.[
+            String(period)
+          ] ?? [scoringPeriod])
+        : matchupDays(league, period, today)
     // A side's score is the categories it leads; points mean nothing here.
     mine.score = t.wins
     mine.projected = null
@@ -689,11 +742,12 @@ export function readMatchupDay(
   league: WireLeague,
   teamId: number,
   scoringPeriod: number,
+  /** The matchup period the day is in (the stored Matchup's); else now's. */
+  matchupPeriod?: number,
 ): MatchupDay | null {
   const categories = categoriesOf(sport, league)
   if (!categories) return null
-  const period =
-    periodOf(league, scoringPeriod) ?? league.status?.currentMatchupPeriod ?? 1
+  const period = matchupPeriod ?? league.status?.currentMatchupPeriod ?? 1
   const { mineWire, theirsWire } = sidesOf(league, period, teamId)
   const mine = sideOf(sport, league, mineWire, scoringPeriod, categories)
   if (!mine) return null

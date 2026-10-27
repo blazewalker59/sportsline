@@ -774,7 +774,13 @@ export async function readDay(
     row.leagueId,
     scoringPeriod,
   )
-  const day = readMatchupDay(row.sport, league, team, scoringPeriod)
+  const day = readMatchupDay(
+    row.sport,
+    league,
+    team,
+    scoringPeriod,
+    m.matchupPeriod,
+  )
   if (day) await attachOurs(db, row, [...day.mine, ...(day.opponent ?? [])])
   return day
 }

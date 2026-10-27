@@ -731,7 +731,8 @@ describe.skipIf(!isBun)('ESPN fantasy sync', () => {
     const { fantasyLeagues } = await import('@/lib/db/schema')
     const { readMatchup } = await import('@/lib/fantasy/matchup')
     const league = basketball as unknown as WireLeague
-    const view = readMatchup('basketball', league, 1)!
+    // Day 85 is Tuesday, Jan 12: the Matchup is days 84 to 90.
+    const view = readMatchup('basketball', league, 1, '2027-01-12')!
     sqlite.run(
       "INSERT INTO fantasy_leagues (id,viewer_id,sport,league_id,season,team_id,name,updated_at) VALUES ('u1~basketball~5','u1','basketball','5',2027,1,'Hoops','x')",
     )
@@ -771,9 +772,9 @@ describe.skipIf(!isBun)('ESPN fantasy sync', () => {
       .set({ matchup: { ...view, scoringPeriod: 80 } })
       .where(eq(fantasyLeagues.id, 'u1~basketball~5'))
     expect(
-      (await sync.readDay(env, 'u1', 'u1~basketball~5', 83))?.scoringPeriod,
-    ).toBe(83)
-    expect(asked).toEqual([84, 83])
+      (await sync.readDay(env, 'u1', 'u1~basketball~5', 86))?.scoringPeriod,
+    ).toBe(86)
+    expect(asked).toEqual([84, 86])
   })
 })
 
