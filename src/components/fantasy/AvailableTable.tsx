@@ -15,9 +15,11 @@ import {
   headshotOf,
   injuryLabel,
   injuryTone,
+  nextGameLabel,
   pts,
   shortName,
 } from './format'
+import type { NextGame } from '@/lib/fantasy/proSchedule'
 import type { BoxColumn } from '@/lib/fantasy/boxScore'
 import type { LeagueCategory } from '@/lib/fantasy/categories'
 import type {
@@ -26,6 +28,7 @@ import type {
   SpanStats,
 } from '@/lib/fantasy/freeAgents'
 import type { FantasySport } from '@/lib/fantasy/sports'
+import { useTimeZone } from '@/lib/time/useTimeZone'
 import { boxCell, boxColumns, boxValue } from '@/lib/fantasy/boxScore'
 import { categoryValue, formatCategory, isRate } from '@/lib/fantasy/categories'
 import { isPitcher, isPitching } from '@/lib/fantasy/freeAgents'
@@ -220,7 +223,7 @@ export function AvailableTable({
       <table className="w-max min-w-full border-separate border-spacing-0 text-xs tabular-nums">
         <thead>
           <tr>
-            <th className="sticky left-0 z-20 min-w-[10.5rem] border-r border-b border-border bg-surface px-2 py-1.5 text-left text-[10px] font-semibold tracking-wide text-muted uppercase">
+            <th className="sticky left-0 z-20 min-w-[12rem] border-r border-b border-border bg-surface px-2 py-1.5 text-left text-[10px] font-semibold tracking-wide text-muted uppercase">
               {title ?? 'Player'}
             </th>
             {columns.map((c) => {
@@ -264,13 +267,19 @@ export function AvailableTable({
           </tr>
         </thead>
         <tbody>
-          {rows.map((p) => {
+          {rows.map((p, i) => {
             const s = p.stats?.[span] ?? null
+            // Every other row a shade off the table's, so a row reads
+            // straight across; opaque, as the Player column is sticky.
+            const shade = i % 2 === 1 ? 'bg-background' : 'bg-surface'
             return (
               <tr key={p.sourcePlayerId ?? p.espnId}>
                 <th
                   scope="row"
-                  className="sticky left-0 z-10 border-r border-b border-border bg-surface px-2 py-1.5 text-left font-normal"
+                  className={cn(
+                    'sticky left-0 z-10 border-r border-b border-border px-2 py-2.5 text-left font-normal',
+                    shade,
+                  )}
                 >
                   <PlayerCell sport={sport} p={p} onMove={onMove} />
                 </th>
@@ -280,7 +289,8 @@ export function AvailableTable({
                     <td
                       key={c.key}
                       className={cn(
-                        'border-b border-border px-1 py-1.5 text-center',
+                        'border-b border-border px-1 py-2.5 text-center',
+                        shade,
                         cell === DASH
                           ? 'text-muted/50'
                           : sort?.key === c.key
@@ -298,6 +308,32 @@ export function AvailableTable({
         </tbody>
       </table>
     </div>
+  )
+}
+
+/**
+ * When a Player's Team plays next, a pill under their name: live in the
+ * live color, today in the accent, later quieter.
+ */
+function NextGamePill({ game }: { game: NextGame }) {
+  const label = nextGameLabel(game, useTimeZone())
+  if (!label) return null
+  return (
+    <span
+      className={cn(
+        'inline-flex max-w-full items-center gap-1 self-start truncate rounded-full px-1.5 py-px text-[10px] leading-tight font-semibold',
+        label.soon === 'now'
+          ? 'bg-live/15 text-live'
+          : label.soon === 'today'
+            ? 'bg-accent-soft text-accent'
+            : 'bg-notice text-foreground/80',
+      )}
+    >
+      <span>{label.when}</span>
+      {label.versus && (
+        <span className="font-normal opacity-80">{label.versus}</span>
+      )}
+    </span>
   )
 }
 
@@ -321,19 +357,24 @@ function PlayerCell({
     ? (INJURY_ABBREV[p.injury] ?? p.injury.slice(0, 4))
     : null
   return (
-    <span className="flex max-w-[12rem] items-center gap-1.5">
+    <span className="flex max-w-[14rem] items-center gap-2">
       <PlayerButton
         playerId={p.playerId}
-        className="flex min-w-0 flex-1 items-center gap-1.5"
+        className="flex min-w-0 flex-1 items-center gap-2.5"
       >
         <PlayerAvatar
           name={p.name}
           headshotUrl={headshotOf(sport, p)}
-          size={24}
+          team={
+            p.teamLogo
+              ? { abbreviation: p.teamAbbrev ?? '', logoUrl: p.teamLogo }
+              : null
+          }
+          size={40}
         />
-        <span className="min-w-0 flex-1">
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex items-center gap-1">
-            <span className="truncate text-[12px] leading-tight font-semibold">
+            <span className="truncate text-[13px] leading-tight font-semibold">
               {shortName(p)}
             </span>
             {injury && (
@@ -356,6 +397,7 @@ function PlayerCell({
               .filter(Boolean)
               .join(' · ')}
           </span>
+          {p.nextGame && <NextGamePill game={p.nextGame} />}
         </span>
       </PlayerButton>
       {onMove && (

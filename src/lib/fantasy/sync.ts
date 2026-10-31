@@ -25,8 +25,10 @@ import {
   leagueViews,
   playerCards,
   playerPool,
+  proSchedule,
   waiverClaims,
 } from './client'
+import { nextGames } from './proSchedule'
 import {
   attachClaims,
   espnActivityPlayerIds,
@@ -49,11 +51,12 @@ import { scoringLeaders } from './leaders'
 import { AVAILABLE_LIMIT, readEspnAvailable } from './freeAgents'
 import { rosteredBy, settleMove } from './moves'
 import { injuryEvents, rostersDue, rostersOf, whoHasOptions } from './whoHas'
+import type { NextGame } from './proSchedule'
 import type { ActivityPlayer, LeagueActivity } from './activity'
 import type { EspnSession, PlayerCard } from './client'
 import type { LeagueCategory } from './categories'
 import type { ScoringLeaders } from './leaders'
-import type { AvailablePlayers } from './freeAgents'
+import type { AvailablePlayer, AvailablePlayers } from './freeAgents'
 import type { Standings } from './standings'
 import type { LeagueRosters } from './whoHas'
 import type {
@@ -397,6 +400,25 @@ export async function attachOurs(
       : (t?.logoUrl ?? null)
     p.teamAbbrev = nfl ?? t?.abbreviation ?? null
   }
+}
+
+/**
+ * Each Available player's Team's next Game, from ESPN's pro schedule. The
+ * list reads fine without it, so a failed read leaves them unset.
+ */
+export async function attachNextGames(
+  row: Pick<typeof fantasyLeagues.$inferSelect, 'sport' | 'season'>,
+  available: ReadonlyArray<AvailablePlayer>,
+  now: number = Date.now(),
+): Promise<void> {
+  let next: Map<number, NextGame>
+  try {
+    next = nextGames(await proSchedule(row.sport, row.season, now), now)
+  } catch {
+    return
+  }
+  for (const p of available)
+    p.nextGame = p.proTeamId === null ? null : (next.get(p.proTeamId) ?? null)
 }
 
 /**
@@ -837,7 +859,10 @@ export async function readAvailable(
       categories: row.matchup?.categories ?? null,
     },
   )
-  await attachOurs(dbFromD1(env.DB), row, available.players)
+  await Promise.all([
+    attachOurs(dbFromD1(env.DB), row, available.players),
+    attachNextGames(row, available.players),
+  ])
   return available
 }
 
