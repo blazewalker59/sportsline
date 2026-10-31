@@ -223,7 +223,7 @@ export function AvailableTable({
       <table className="w-max min-w-full border-separate border-spacing-0 text-xs tabular-nums">
         <thead>
           <tr>
-            <th className="sticky left-0 z-20 min-w-[12rem] border-r border-b border-border bg-surface px-2 py-1.5 text-left text-[10px] font-semibold tracking-wide text-muted uppercase">
+            <th className="sticky left-0 z-20 min-w-[9rem] border-r sm:min-w-[12rem] border-b border-border bg-surface px-2 py-1.5 text-left text-[10px] font-semibold tracking-wide text-muted uppercase">
               {title ?? 'Player'}
             </th>
             {columns.map((c) => {
@@ -277,7 +277,7 @@ export function AvailableTable({
                 <th
                   scope="row"
                   className={cn(
-                    'sticky left-0 z-10 border-r border-b border-border px-2 py-2.5 text-left font-normal',
+                    'sticky left-0 z-10 border-r border-b border-border px-1.5 py-2 text-left font-normal sm:px-2 sm:py-2.5',
                     shade,
                   )}
                 >
@@ -289,7 +289,7 @@ export function AvailableTable({
                     <td
                       key={c.key}
                       className={cn(
-                        'border-b border-border px-1 py-2.5 text-center',
+                        'border-b border-border px-1 py-2 text-center sm:py-2.5',
                         shade,
                         cell === DASH
                           ? 'text-muted/50'
@@ -321,7 +321,7 @@ function NextGamePill({ game }: { game: NextGame }) {
   return (
     <span
       className={cn(
-        'inline-flex max-w-full items-center gap-1 self-start truncate rounded-full px-1.5 py-px text-[10px] leading-tight font-semibold',
+        'inline-flex max-w-full items-center gap-1 self-start truncate rounded-full px-1.5 py-px text-[10px] leading-tight font-semibold whitespace-nowrap',
         label.soon === 'now'
           ? 'bg-live/15 text-live'
           : label.soon === 'today'
@@ -329,7 +329,9 @@ function NextGamePill({ game }: { game: NextGame }) {
             : 'bg-notice text-foreground/80',
       )}
     >
-      <span>{label.when}</span>
+      {/* Short on a phone ("7:30p"), in full from sm up ("Today 7:30 PM"). */}
+      <span className="sm:hidden">{label.short}</span>
+      <span className="hidden sm:inline">{label.when}</span>
       {label.versus && (
         <span className="font-normal opacity-80">{label.versus}</span>
       )}
@@ -357,10 +359,10 @@ function PlayerCell({
     ? (INJURY_ABBREV[p.injury] ?? p.injury.slice(0, 4))
     : null
   return (
-    <span className="flex max-w-[14rem] items-center gap-2">
+    <span className="flex max-w-[10rem] items-center gap-1.5 sm:max-w-[14rem] sm:gap-2">
       <PlayerButton
         playerId={p.playerId}
-        className="flex min-w-0 flex-1 items-center gap-2.5"
+        className="flex min-w-0 flex-1 items-center gap-2 sm:gap-2.5"
       >
         <PlayerAvatar
           name={p.name}
@@ -371,10 +373,13 @@ function PlayerCell({
               : null
           }
           size={40}
+          // Smaller on a phone, where the stats need the width; the logo
+          // badge keeps its size, so the Team still reads.
+          className="size-8! sm:size-10!"
         />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex items-center gap-1">
-            <span className="truncate text-[13px] leading-tight font-semibold">
+            <span className="truncate text-[12px] leading-tight font-semibold sm:text-[13px]">
               {shortName(p)}
             </span>
             {injury && (
@@ -406,7 +411,7 @@ function PlayerCell({
           onClick={() => onMove(p)}
           aria-label={`${p.waivers ? 'Claim' : 'Add'} ${p.name}`}
           className={cn(
-            'min-h-7 shrink-0 rounded-full px-2 text-[11px] font-semibold hover:bg-accent hover:text-background',
+            'min-h-6 shrink-0 rounded-full px-1.5 text-[10px] font-semibold hover:bg-accent hover:text-background sm:min-h-7 sm:px-2 sm:text-[11px]',
             // A claim a shade deeper than an add.
             p.waivers ? 'bg-foreground/15' : 'bg-notice',
           )}

@@ -53,12 +53,13 @@ describe('nextGameLabel', () => {
   it('reads a started Game as on now', () => {
     expect(
       nextGameLabel(game('2026-10-31T15:00:00Z', { home: false }), tz, now),
-    ).toEqual({ when: 'Now', versus: '@ LAL', soon: 'now' })
+    ).toEqual({ when: 'Now', short: 'Now', versus: '@ LAL', soon: 'now' })
   })
 
   it('names today and tomorrow, with the time unless it’s unset', () => {
     expect(nextGameLabel(game('2026-10-31T23:30:00Z'), tz, now)).toEqual({
       when: 'Today 7:30 PM',
+      short: '7:30p',
       versus: 'vs LAL',
       soon: 'today',
     })
@@ -67,12 +68,25 @@ describe('nextGameLabel', () => {
     ).toBe('Tmrw')
   })
 
+  it('shortens the time for a phone', () => {
+    expect(nextGameLabel(game('2026-11-01T18:00:00Z'), tz, now)?.short).toBe(
+      'Tmrw 1p',
+    )
+    expect(nextGameLabel(game('2026-11-04T00:30:00Z'), tz, now)?.short).toBe(
+      'Tue 7:30p',
+    )
+    expect(
+      nextGameLabel(game('2026-10-31T23:00:00Z', { tbd: true }), tz, now)
+        ?.short,
+    ).toBe('Today')
+  })
+
   it('names the weekday this week, else the date', () => {
     expect(nextGameLabel(game('2026-11-04T00:00:00Z'), tz, now)?.when).toBe(
       'Tue 7:00 PM',
     )
     expect(
       nextGameLabel(game('2026-11-12T00:00:00Z', { opponent: null }), tz, now),
-    ).toEqual({ when: 'Nov 11', versus: '', soon: 'later' })
+    ).toEqual({ when: 'Nov 11', short: 'Nov 11', versus: '', soon: 'later' })
   })
 })

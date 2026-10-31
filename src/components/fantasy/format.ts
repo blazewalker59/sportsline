@@ -29,21 +29,54 @@ export function nextGameLabel(
   g: NextGame,
   timeZone: string | null,
   now: number = Date.now(),
-): { when: string; versus: string; soon: 'now' | 'today' | 'later' } | null {
+): {
+  when: string
+  /** `when` for a narrow screen: "7:30p" today (its color says so), "Tue 7p". */
+  short: string
+  versus: string
+  soon: 'now' | 'today' | 'later'
+} | null {
   if (timeZone === null) return null
   const versus = g.opponent ? `${g.home ? 'vs' : '@'} ${g.opponent}` : ''
-  if (g.startsAt <= now) return { when: 'Now', versus, soon: 'now' }
+  if (g.startsAt <= now)
+    return { when: 'Now', short: 'Now', versus, soon: 'now' }
   const today = dayOf(now, timeZone)
   const day = dayOf(g.startsAt, timeZone)
-  const time = g.tbd ? '' : ` ${clockTime(g.startsAt, timeZone)}`
-  if (day === today) return { when: `Today${time}`, versus, soon: 'today' }
+  const clock = g.tbd ? '' : clockTime(g.startsAt, timeZone)
+  const time = clock ? ` ${clock}` : ''
+  // "7:30 PM" → "7:30p", "1:00 PM" → "1p".
+  const brief = clock
+    .replace(':00', '')
+    .replace(/ ([AP])M$/, (_, m: string) => m.toLowerCase())
+  const join = (a: string, b: string) => (b ? `${a} ${b}` : a)
+  if (day === today)
+    return {
+      when: `Today${time}`,
+      short: brief || 'Today',
+      versus,
+      soon: 'today',
+    }
   if (day === shiftDay(today, 1))
-    return { when: `Tmrw${time}`, versus, soon: 'later' }
-  const within = day <= shiftDay(today, 6)
-  const when = within
-    ? `${formatInstant(g.startsAt, timeZone, { weekday: 'short' })}${time}`
-    : formatInstant(g.startsAt, timeZone, { month: 'short', day: 'numeric' })
-  return { when, versus, soon: 'later' }
+    return {
+      when: `Tmrw${time}`,
+      short: join('Tmrw', brief),
+      versus,
+      soon: 'later',
+    }
+  if (day <= shiftDay(today, 6)) {
+    const weekday = formatInstant(g.startsAt, timeZone, { weekday: 'short' })
+    return {
+      when: `${weekday}${time}`,
+      short: join(weekday, brief),
+      versus,
+      soon: 'later',
+    }
+  }
+  const date = formatInstant(g.startsAt, timeZone, {
+    month: 'short',
+    day: 'numeric',
+  })
+  return { when: date, short: date, versus, soon: 'later' }
 }
 
 /** A Matchup side's score: points, or categories led (a whole number). */
