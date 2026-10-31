@@ -9,6 +9,7 @@ import { toStats } from './categories'
 import type { ActivityPlayer } from './activity'
 import type { LeagueCategory, Stats } from './categories'
 import type { FantasySport } from './sports'
+import type { NextGame } from './proSchedule'
 
 /** How many Players a read lists: enough for any league's real options. */
 export const AVAILABLE_LIMIT = 300
@@ -25,6 +26,8 @@ export type AvailablePlayer = ActivityPlayer & {
   projected: number | null
   /** What they've done: this season, and lately (ESPN: the last 15 days). */
   stats?: { season: SpanStats | null; recent: SpanStats | null }
+  /** Their Team's next Game (ESPN's pro schedule), when it's known. */
+  nextGame?: NextGame | null
 }
 
 /** A Player's figures over a span, for the table's columns. */

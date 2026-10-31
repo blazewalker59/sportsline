@@ -7,6 +7,7 @@
 import { and, eq } from 'drizzle-orm'
 import {
   attachMatchup,
+  attachNextGames,
   attachOurs,
   isOtherMatchup,
   keepLeague,
@@ -368,6 +369,9 @@ export async function readAvailable(
     projections,
     season,
   })
-  await attachOurs(db, row, available.players)
+  await Promise.all([
+    attachOurs(db, row, available.players),
+    attachNextGames(row, available.players),
+  ])
   return available
 }

@@ -6,12 +6,45 @@
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { CategoryResult } from '@/lib/fantasy/categories'
 import type { LineupPlayer, MatchupView } from '@/lib/fantasy/matchup'
+import type { NextGame } from '@/lib/fantasy/proSchedule'
 import { tally } from '@/lib/fantasy/categories'
 import { shiftSportsDay, sportsDayOf } from '@/lib/model/sportsDay'
-import { weekdayDay } from '@/lib/time/format'
+import {
+  clockTime,
+  dayOf,
+  formatInstant,
+  shiftDay,
+  weekdayDay,
+} from '@/lib/time/format'
 import { timeAgo } from '@/components/timeline/format'
 
 export const pts = (n: number | null) => (n === null ? '—' : n.toFixed(1))
+
+/**
+ * A Player's next Game as their row shows it: when ("Now", "Today 7:30
+ * PM", "Tmrw 1:00 PM", "Sat 7:00 PM", "Oct 14"), against whom ("vs LAL",
+ * "@ LAL"), and how soon, for its color. Null until the zone is known.
+ */
+export function nextGameLabel(
+  g: NextGame,
+  timeZone: string | null,
+  now: number = Date.now(),
+): { when: string; versus: string; soon: 'now' | 'today' | 'later' } | null {
+  if (timeZone === null) return null
+  const versus = g.opponent ? `${g.home ? 'vs' : '@'} ${g.opponent}` : ''
+  if (g.startsAt <= now) return { when: 'Now', versus, soon: 'now' }
+  const today = dayOf(now, timeZone)
+  const day = dayOf(g.startsAt, timeZone)
+  const time = g.tbd ? '' : ` ${clockTime(g.startsAt, timeZone)}`
+  if (day === today) return { when: `Today${time}`, versus, soon: 'today' }
+  if (day === shiftDay(today, 1))
+    return { when: `Tmrw${time}`, versus, soon: 'later' }
+  const within = day <= shiftDay(today, 6)
+  const when = within
+    ? `${formatInstant(g.startsAt, timeZone, { weekday: 'short' })}${time}`
+    : formatInstant(g.startsAt, timeZone, { month: 'short', day: 'numeric' })
+  return { when, versus, soon: 'later' }
+}
 
 /** A Matchup side's score: points, or categories led (a whole number). */
 export const scoreText = (m: MatchupView, n: number | null) =>

@@ -13,6 +13,7 @@ import type { WireTopic, WireWaiver } from './activity'
 import type { WireLeague } from './matchup'
 import type { WireAvailable } from './freeAgents'
 import type { WireMove } from './moves'
+import type { WireProSchedule } from './proSchedule'
 import { BROWSER_USER_AGENT, fetchWithRetry } from '@/lib/sources/pool'
 
 export interface EspnSession {
@@ -189,6 +190,30 @@ export async function availablePlayers(
     },
   )
   return res.players ?? []
+}
+
+/** The pro schedule changes rarely: read it once an hour per sport. */
+const SCHEDULE_TTL_MS = 60 * 60_000
+const schedules = new Map<string, { at: number; wire: WireProSchedule }>()
+
+/**
+ * Every pro Team's Games this season (public: no session), kept in this
+ * isolate for an hour since it's the same for every Viewer.
+ */
+export async function proSchedule(
+  sport: FantasySport,
+  season: number,
+  now: number = Date.now(),
+): Promise<WireProSchedule> {
+  const key = `${sport}:${season}`
+  const kept = schedules.get(key)
+  if (kept && now - kept.at < SCHEDULE_TTL_MS) return kept.wire
+  const wire = await get<WireProSchedule>(
+    `https://lm-api-reads.fantasy.espn.com/apis/v3/games/${SPORTS[sport].code}/seasons/${season}?view=proTeamSchedules_wl`,
+    null,
+  )
+  schedules.set(key, { at: now, wire })
+  return wire
 }
 
 export interface PlayerCard {
