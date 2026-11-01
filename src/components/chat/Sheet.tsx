@@ -59,7 +59,9 @@ function trapTab(e: KeyboardEvent, node: HTMLElement) {
  * A bottom sheet over the Timeline (box score, Play Detail), so drilling
  * in never leaves the conversation: closing lands exactly where you were.
  * Swipe it down (from the handle or header, or from the content when it is
- * scrolled to the top) to dismiss, like a native sheet.
+ * scrolled to the top) to dismiss, like a native sheet. Its content
+ * scrolls under the header (and anything pinned there), fading out rather
+ * than cut off at an edge.
  *
  * A sheet about a team (or two) wears its Subject's color, as the feed
  * does: a crown fading in from the top, split for two teams, and with
@@ -70,6 +72,7 @@ export function Sheet({
   title,
   action,
   subject = null,
+  pinned,
   onClose,
   children,
 }: {
@@ -78,12 +81,19 @@ export function Sheet({
   action?: React.ReactNode
   /** The team (or two) the sheet is about. */
   subject?: Subject | null
+  /**
+   * What stays in view under the title while the rest scrolls (a
+   * Matchup's score), on the crown rather than in the content.
+   */
+  pinned?: React.ReactNode
   onClose: () => void
   children: React.ReactNode
 }) {
   const root = useRef<HTMLDivElement>(null)
   const close = useRef<HTMLButtonElement>(null)
   const body = useRef<HTMLDivElement>(null)
+  // Scrolled down: the content fades out under the header, not cut off.
+  const [scrolled, setScrolled] = useState(false)
   const [drag, setDrag] = useState(0)
   const [leaving, setLeaving] = useState(false)
   const gesture = useRef<{
@@ -227,8 +237,10 @@ export function Sheet({
           </div>
           <div
             className={cn(
-              'flex items-center gap-3 border-b px-4 pb-3',
-              // The crown runs on under the title: no rule across it.
+              'flex items-center gap-3 px-4 pb-3',
+              // The crown runs on under the title (and anything pinned):
+              // no rule across it. A pinned header draws its own.
+              !pinned && 'border-b',
               subject ? 'border-transparent' : 'border-border',
             )}
           >
@@ -248,11 +260,16 @@ export function Sheet({
               Done
             </button>
           </div>
+          {pinned && <div className="px-4 pb-1">{pinned}</div>}
         </div>
         <div
           ref={body}
+          onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 0)}
           className={cn(
             'flex flex-col gap-4 overflow-y-auto overscroll-contain px-4 py-4 [&>*]:shrink-0',
+            // Content scrolled under the header fades into it.
+            scrolled &&
+              '[mask-image:linear-gradient(to_bottom,transparent,black_24px)]',
             // One team tints every card. Two leave shared cards neutral:
             // a card about one side opts in (`subject-cards`, with
             // `subject-b` for the second).
