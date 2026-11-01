@@ -172,5 +172,7 @@ describe('Sheet with a Subject', () => {
     expect(panel().style.getPropertyValue('--s-light')).toBe('#0076b6')
     expect(panel().style.getPropertyValue('--s2-light')).toBe('#e31837')
     expect(panel().style.getPropertyValue('--s2-ink-dark')).toBe('#ffb612')
+    // Shared cards stay neutral: a card about one side opts in.
+    expect(body().className).not.toContain('subject-cards')
   })
 })

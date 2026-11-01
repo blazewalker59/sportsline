@@ -15,6 +15,8 @@ import {
 import type { ChangeDisplay } from '@/lib/kalshi/server'
 import type { PredictionView } from '@/lib/kalshi/predictionViews'
 import { Sheet } from '@/components/chat/Sheet'
+import { TeamPip } from '@/components/brand/TeamPip'
+import { predictionTeams } from '@/lib/kalshi/legTeam'
 import { cn } from '@/lib/utils'
 
 /**
@@ -163,8 +165,13 @@ function PortfolioSheet({
           const lost = p.legs.some((l) => l.status === 'lost')
           const progress =
             p.kind === 'single' ? (p.legs[0]?.progress ?? null) : null
+          // Whose it is, at a glance: its team's pip, when it has one.
+          const teams = predictionTeams(p.legs)
           const row = (
             <span className="flex w-full items-start gap-3 px-3 py-2.5 text-left">
+              {teams && 'team' in teams && (
+                <TeamPip colors={teams.team.colors} className="mt-1 h-4 w-1" />
+              )}
               <span className="flex min-w-0 flex-1 flex-col gap-1">
                 <span className="line-clamp-2 text-sm leading-snug font-semibold">
                   {p.side === 'no' && <span className="text-muted">Not: </span>}

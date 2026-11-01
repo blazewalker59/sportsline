@@ -313,6 +313,15 @@ body:has(.subject-page) {
   --s: var(--s2);
   --s-ink: var(--s2-ink);
 }
+/* The first team's part, inside something of the second's. */
+.subject .subject-a {
+  --s: var(--s-light);
+  --s-ink: var(--s-ink-light);
+}
+.dark .subject .subject-a {
+  --s: var(--s-dark);
+  --s-ink: var(--s-ink-dark);
+}
 .subject .subject-cards .subject-b,
 .subject .subject-cards.subject-b {
   --surface: color-mix(
@@ -352,6 +361,10 @@ body:has(.subject-page) {
     var(--subject-ink-base),
     var(--s-ink) var(--subject-ink-amount)
   );
+}
+/* Two teams: a shared chart isn't either's; it keeps its own color. */
+.subject.subject-crown--split {
+  --subject-line: initial;
 }
 .subject .subject-b {
   --subject-line: color-mix(

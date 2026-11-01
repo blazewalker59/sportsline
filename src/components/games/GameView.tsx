@@ -8,16 +8,16 @@ import type { GameSummary } from '@/lib/model/timeline'
 import type { GameBox } from '@/lib/model/types'
 import { GameFlow } from '@/components/charts/lazy'
 import { Sheet } from '@/components/chat/Sheet'
-import { TeamLogo, TeamMark } from '@/components/brand/TeamMark'
+import { TeamMark } from '@/components/brand/TeamMark'
+import { BoxScore } from '@/components/games/BoxScore'
 import { FollowButton } from '@/components/follows/FollowButton'
 import { pairSubject, teamSubject } from '@/lib/brand/subject'
 import { cn } from '@/lib/utils'
-import { PlayerButton } from '@/components/players/playerSheet'
 
 /**
  * The box score over the feed, so closing it lands exactly where you were.
- * It wears both teams' colors: away on the left, home on the right, down
- * through the linescore and each team's table.
+ * It wears both teams' colors, away on the left and home on the right;
+ * the stats card wears the team it shows.
  */
 export function BoxSheet({
   game,
@@ -50,7 +50,13 @@ export function BoxSheet({
       </div>
       {box && <Linescore box={box} game={game} />}
       <GameFlow game={game} />
-      <BoxTables box={box} game={game} />
+      {box && box.tables.length > 0 ? (
+        <BoxScore box={box} game={game} />
+      ) : (
+        <p className="mt-10 text-center text-sm text-muted">
+          No box score yet.
+        </p>
+      )}
     </Sheet>
   )
 }
@@ -64,15 +70,14 @@ export function Linescore({ box, game }: { box: GameBox; game: GameSummary }) {
   if (ls.segments.length === 0) return null
   const pinnedLeft = 'sticky left-0 z-[1] bg-surface'
   const pinnedRight = 'sticky right-0 z-[1] bg-surface'
-  // In a sheet with both teams' colors, the home row takes the home
-  // team's tint (the card is the away team's).
+  // Each team's mark in its own ink (no row tint: the rows read as one).
   const row = (
     team: GameSummary['awayTeam'],
     runs: Array<number | null>,
     totals: Array<number>,
     home = false,
   ) => (
-    <tr className={cn(home && 'subject-b bg-surface')}>
+    <tr className={cn(home && 'subject-b')}>
       <th
         className={cn(pinnedLeft, 'py-1.5 pr-2 pl-3 text-left font-semibold')}
       >
@@ -127,82 +132,6 @@ export function Linescore({ box, game }: { box: GameBox; game: GameSummary }) {
           {row(game.homeTeam, ls.home, ls.homeTotals, true)}
         </tbody>
       </table>
-    </div>
-  )
-}
-
-function BoxTables({ box, game }: { box: GameBox | null; game: GameSummary }) {
-  if (!box || box.tables.length === 0) {
-    return (
-      <p className="mt-10 text-center text-sm text-muted">No box score yet.</p>
-    )
-  }
-  return (
-    <div className="flex flex-col gap-4">
-      {box.tables.map((t) => (
-        <div
-          key={t.title}
-          className={cn(
-            'overflow-x-auto rounded-xl border border-border bg-surface',
-            // Each team's table in its own color.
-            t.side === 'home' && 'subject-b',
-          )}
-        >
-          <table className="w-full text-xs tabular-nums">
-            <thead>
-              <tr className="border-b border-border text-muted">
-                <th className="subject-ink px-3 py-2 text-left font-semibold text-foreground">
-                  <span className="inline-flex items-center gap-1.5">
-                    <TeamLogo
-                      team={t.side === 'away' ? game.awayTeam : game.homeTeam}
-                      size={16}
-                    />
-                    {t.title}
-                  </span>
-                </th>
-                {t.columns.map((c) => (
-                  <th
-                    key={c}
-                    className="px-2 py-2 text-right font-normal whitespace-nowrap"
-                  >
-                    {c}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {t.rows.map((r, i) => (
-                <tr
-                  key={`${r.player.name}-${i}`}
-                  className="border-b border-border/50 last:border-0"
-                >
-                  <td
-                    className={cn(
-                      'py-1.5 pr-2',
-                      r.sub ? 'pl-6 text-foreground/80' : 'pl-3',
-                    )}
-                  >
-                    <PlayerButton
-                      playerId={r.player.id}
-                      className="hover:underline"
-                    >
-                      {r.player.name}
-                    </PlayerButton>
-                    {r.note && (
-                      <span className="ml-1.5 text-muted">{r.note}</span>
-                    )}
-                  </td>
-                  {r.values.map((v, j) => (
-                    <td key={j} className="px-2 text-right whitespace-nowrap">
-                      {v}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
     </div>
   )
 }
