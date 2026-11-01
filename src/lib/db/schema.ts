@@ -557,6 +557,10 @@ export const fantasyLeagues = sqliteTable(
     name: text('name').notNull(),
     teamName: text('team_name'),
     enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+    /** Who Has? offered from this league: off until the Viewer opts in. */
+    whoHasEnabled: integer('who_has_enabled', { mode: 'boolean' })
+      .notNull()
+      .default(false),
     /** The Viewer's order for their leagues (null: after the ordered ones). */
     position: integer('position'),
     matchup: text('matchup', { mode: 'json' }).$type<MatchupView | null>(),

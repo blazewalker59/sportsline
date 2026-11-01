@@ -12,6 +12,7 @@ import {
   reorderFantasyLeagues,
   setEspnMoves,
   setFantasyLeagueEnabled,
+  setFantasyLeagueWhoHas,
   syncFantasyNow,
 } from './server'
 import {
@@ -197,6 +198,23 @@ export function useDisconnectSleeper() {
 export function useWhoHas() {
   const { connected } = useFantasyConnected()
   return useQuery({ ...whoHasQuery(), enabled: connected })
+}
+
+/** Opt a league into Who Has? (or out); its page and the list read again. */
+export function useSetFantasyLeagueWhoHas(leagueId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (enabled: boolean) =>
+      setFantasyLeagueWhoHas({ data: { id: leagueId, enabled } }),
+    onSettled: () => {
+      for (const queryKey of [
+        fantasyLeagueQuery(leagueId).queryKey,
+        FANTASY_KEY,
+        whoHasQuery().queryKey,
+      ])
+        void queryClient.invalidateQueries({ queryKey })
+    },
+  })
 }
 
 /** Answer (or pass on, with no team) a Who Has? encounter. */
