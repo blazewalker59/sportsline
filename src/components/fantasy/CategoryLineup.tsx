@@ -15,7 +15,7 @@ import {
   injuryTone,
   shortName,
 } from './format'
-import { gameState } from './gameState'
+import { gameState, stateTeam } from './gameState'
 import type { LeagueCategory } from '@/lib/fantasy/categories'
 import type { LineupPlayer, MatchupSide } from '@/lib/fantasy/matchup'
 import type { FantasySport } from '@/lib/fantasy/sports'
@@ -31,6 +31,7 @@ import {
   boxTotals,
   played,
 } from '@/lib/fantasy/boxScore'
+import { teamNameStyle } from '@/lib/brand/subject'
 import { cn } from '@/lib/utils'
 
 type Side = 'mine' | 'opponent'
@@ -232,8 +233,16 @@ function PlayerLabel({
   const injury = player.injury
     ? (INJURY_ABBREV[player.injury] ?? player.injury.slice(0, 4))
     : null
+  // Their own team's ink, from their Game.
+  const ink = teamNameStyle(state ? stateTeam(state).colors : null)
   const name = (
-    <span className="block truncate text-[12px] leading-tight font-semibold">
+    <span
+      style={ink}
+      className={cn(
+        'block truncate text-[12px] leading-tight font-semibold',
+        ink && 'team-name',
+      )}
+    >
       {shortName(player)}
     </span>
   )

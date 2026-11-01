@@ -20,6 +20,11 @@ export interface GameState {
   redZone: boolean
 }
 
+/** The Player's own team in their Game (for its colors). */
+export function stateTeam(state: GameState): GameSummary['awayTeam'] {
+  return state.home ? state.game.homeTeam : state.game.awayTeam
+}
+
 /**
  * A Player's Game from the Games we have: its state; in football whether
  * their unit is on the field (their team has the ball, or for a defense,

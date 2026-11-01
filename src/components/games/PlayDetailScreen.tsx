@@ -15,6 +15,7 @@ import { Rink } from '@/components/nhl/Rink'
 import { playDetailQuery } from '@/lib/games/queries'
 import { gameSearch, playSearch } from '@/lib/timeline/gameLink'
 import { PlayerButton } from '@/components/players/playerSheet'
+import { teamSubject } from '@/lib/brand/subject'
 import { cn } from '@/lib/utils'
 import { clockTime } from '@/lib/time/format'
 import { useTimeZone } from '@/lib/time/useTimeZone'
@@ -185,7 +186,10 @@ export function PlayDetailScreen({ playId }: { playId: string }) {
   )
 }
 
-/** A Play's detail in a sheet over the Timeline. */
+/**
+ * A Play's detail in a sheet over the Timeline, in the color of the team
+ * whose Play it is (as its bubble in the feed).
+ */
 export function PlaySheet({
   playId,
   onClose,
@@ -194,8 +198,14 @@ export function PlaySheet({
   onClose: () => void
 }) {
   const { data, isPending } = useQuery(playDetailQuery(playId))
+  const item = data?.item
+  const acting = item?.side
+    ? item.side === 'home'
+      ? item.homeTeam
+      : item.awayTeam
+    : null
   return (
-    <Sheet title="Play" onClose={onClose}>
+    <Sheet title="Play" subject={teamSubject(acting?.colors)} onClose={onClose}>
       {isPending ? (
         <p className="py-10 text-center text-sm text-muted">Loading…</p>
       ) : !data ? (
@@ -293,7 +303,9 @@ function Play({ detail }: { detail: PlayDetail }) {
 
       {detail.players.length > 0 && (
         <section>
-          <h2 className="mb-2 text-sm font-semibold text-muted">Players</h2>
+          <h2 className="subject-ink mb-2 text-sm font-semibold text-muted">
+            Players
+          </h2>
           <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
             {detail.players.map(({ player, lines, headshotUrl, team }) => (
               <li
@@ -390,7 +402,7 @@ function MlbContext({ detail }: { detail: MlbDetail }) {
 
       {pitches.length > 0 && (
         <section>
-          <h2 className="mb-2 text-sm font-semibold text-muted">
+          <h2 className="subject-ink mb-2 text-sm font-semibold text-muted">
             {pitches.length} {pitches.length === 1 ? 'pitch' : 'pitches'}
           </h2>
           <div className="flex flex-col items-center gap-4 rounded-xl border border-border bg-surface p-4 sm:flex-row sm:items-start">
@@ -467,7 +479,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-border bg-surface px-2 py-2.5">
       <p className="text-base font-semibold tabular-nums">{value}</p>
-      <p className="text-[11px] text-muted">{label}</p>
+      <p className="subject-ink text-[11px] text-muted">{label}</p>
     </div>
   )
 }

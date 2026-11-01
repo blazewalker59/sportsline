@@ -10,6 +10,8 @@ import { useState } from 'react'
 import type { RosterPlayer, TeamGame, TeamPage } from '@/lib/teams/server'
 import { TeamResults } from '@/components/charts/lazy'
 import { AppHeader } from '@/components/layout/AppHeader'
+import { SubjectPage } from '@/components/brand/SubjectPage'
+import { teamSubject } from '@/lib/brand/subject'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
 import { RowItemMark, rowItemLabel } from '@/components/brand/RowItemMark'
@@ -43,7 +45,7 @@ export function TeamScreen({ teamId }: { teamId: string }) {
       ) : !data ? (
         <p className="mt-16 text-center text-sm text-muted">Team not found.</p>
       ) : (
-        <>
+        <SubjectPage subject={teamSubject(data.team.colors)}>
           <TeamHeader page={data} canFollow={Boolean(viewerState?.viewer)} />
           <TeamResults page={data} />
           <div className="mb-5 empty:hidden">
@@ -82,7 +84,7 @@ export function TeamScreen({ teamId }: { teamId: string }) {
           ) : (
             <Roster roster={data.roster} league={data.team.league} />
           )}
-        </>
+        </SubjectPage>
       )}
     </div>
   )
@@ -222,7 +224,7 @@ function GameSection({
 }) {
   return (
     <section>
-      <h2 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
+      <h2 className="subject-ink mb-2 text-xs font-bold tracking-wide text-muted uppercase">
         {title}
       </h2>
       <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
@@ -436,7 +438,7 @@ function Roster({
     <div className="flex flex-col gap-5">
       {rosterGroups(league, roster).map(({ label, players }) => (
         <section key={label}>
-          <h2 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
+          <h2 className="subject-ink mb-2 text-xs font-bold tracking-wide text-muted uppercase">
             {label}
             <span className="ml-1 font-normal">{players.length}</span>
           </h2>
@@ -452,7 +454,7 @@ function Roster({
                     headshotUrl={p.headshotUrl}
                     size={40}
                   />
-                  <span className="min-w-0 flex-1 truncate font-medium">
+                  <span className="subject-ink min-w-0 flex-1 truncate font-medium">
                     {p.name}
                   </span>
                   {p.position && (

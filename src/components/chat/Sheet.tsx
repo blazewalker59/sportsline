@@ -6,6 +6,9 @@ import {
   useSyncExternalStore,
 } from 'react'
 import { createPortal } from 'react-dom'
+import type { Subject } from '@/lib/brand/subject'
+import { isPair, subjectStyle } from '@/lib/brand/subject'
+import { cn } from '@/lib/utils'
 
 /** Drag further than this (px), or flick faster than FLICK, to dismiss. */
 const DISMISS_PX = 110
@@ -57,16 +60,23 @@ function trapTab(e: KeyboardEvent, node: HTMLElement) {
  * in never leaves the conversation: closing lands exactly where you were.
  * Swipe it down (from the handle or header, or from the content when it is
  * scrolled to the top) to dismiss, like a native sheet.
+ *
+ * A sheet about a team (or two) wears its Subject's color, as the feed
+ * does: a crown fading in from the top, split for two teams, and its
+ * cards tinted (styles.css, "Subject"). Without one it stays neutral.
  */
 export function Sheet({
   title,
   action,
+  subject = null,
   onClose,
   children,
 }: {
   title: string
   /** A quiet link or button beside the title, before Done. */
   action?: React.ReactNode
+  /** The team (or two) the sheet is about. */
+  subject?: Subject | null
   onClose: () => void
   children: React.ReactNode
 }) {
@@ -191,8 +201,13 @@ export function Sheet({
         style={{ opacity: leaving ? 0 : Math.max(0.2, 1 - drag / 400) }}
       />
       <div
-        className="animate-in slide-in-from-bottom relative mx-auto flex max-h-[calc(100dvh-max(env(safe-area-inset-top),1.5rem))] w-full max-w-xl flex-col rounded-t-3xl bg-background pb-[env(safe-area-inset-bottom)] shadow-2xl duration-300"
+        className={cn(
+          'animate-in slide-in-from-bottom relative mx-auto flex max-h-[calc(100dvh-max(env(safe-area-inset-top),1.5rem))] w-full max-w-xl flex-col rounded-t-3xl bg-background pb-[env(safe-area-inset-bottom)] shadow-2xl duration-300',
+          subject && 'subject subject-crown',
+          subject && isPair(subject) && 'subject-crown--split',
+        )}
         style={{
+          ...subjectStyle(subject),
           transform: leaving ? 'translateY(100%)' : `translateY(${drag}px)`,
           transition: dragging
             ? 'none'
@@ -209,7 +224,13 @@ export function Sheet({
           <div className="flex justify-center pt-2 pb-1" aria-hidden="true">
             <span className="h-1.5 w-10 rounded-full bg-muted/40" />
           </div>
-          <div className="flex items-center gap-3 border-b border-border px-4 pb-3">
+          <div
+            className={cn(
+              'flex items-center gap-3 border-b px-4 pb-3',
+              // The crown runs on under the title: no rule across it.
+              subject ? 'border-transparent' : 'border-border',
+            )}
+          >
             <span className="min-w-0 flex-1 truncate text-base font-bold">
               {title}
             </span>
@@ -218,7 +239,10 @@ export function Sheet({
               ref={close}
               type="button"
               onClick={dismiss}
-              className="min-h-11 rounded-full bg-notice px-4 text-[13px] font-semibold"
+              className={cn(
+                'min-h-11 rounded-full px-4 text-[13px] font-semibold',
+                subject ? 'bg-foreground/10' : 'bg-notice',
+              )}
             >
               Done
             </button>
@@ -226,7 +250,10 @@ export function Sheet({
         </div>
         <div
           ref={body}
-          className="flex flex-col gap-4 overflow-y-auto overscroll-contain px-4 py-4 [&>*]:shrink-0"
+          className={cn(
+            'flex flex-col gap-4 overflow-y-auto overscroll-contain px-4 py-4 [&>*]:shrink-0',
+            subject && 'subject-cards',
+          )}
           onTouchStart={(e) => onTouchStart(e, true)}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}

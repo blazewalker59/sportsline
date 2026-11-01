@@ -63,7 +63,7 @@ export function CategoryBars({
   )
   return (
     <section>
-      <h3 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
+      <h3 className="subject-ink mb-2 text-xs font-bold tracking-wide text-muted uppercase">
         Categories
       </h3>
       <ChartCard

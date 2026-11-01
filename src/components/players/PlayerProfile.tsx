@@ -27,6 +27,7 @@ import {
 } from '@/components/fantasy/FantasyParts'
 import { FollowButton } from '@/components/follows/FollowButton'
 import { PlaySheet } from '@/components/games/PlayDetailScreen'
+import { teamSubject } from '@/lib/brand/subject'
 import { SPORTS } from '@/lib/fantasy/sports'
 import { useFantasy } from '@/lib/fantasy/useFantasy'
 import { usePlayerDetail, usePlayerFirstPage } from '@/lib/players/usePlayer'
@@ -50,7 +51,11 @@ export function PlayerSheet({
   const [playId, setPlayId] = useState<string | null>(null)
   const player = page.data?.player
   return (
-    <Sheet title="Player" onClose={onClose}>
+    <Sheet
+      title="Player"
+      subject={teamSubject(player?.team?.colors)}
+      onClose={onClose}
+    >
       {page.isPending ? (
         <p className="py-10 text-center text-sm text-muted">Loading…</p>
       ) : !player ? (
@@ -330,7 +335,9 @@ function GameSide({
 function LineTable({ line }: { line: PlayerLine }) {
   return (
     <div className="border-t border-border px-3 py-2">
-      <p className="mb-1 text-[11px] font-semibold text-muted">{line.title}</p>
+      <p className="subject-ink mb-1 text-[11px] font-semibold text-muted">
+        {line.title}
+      </p>
       <div className="overflow-x-auto [scrollbar-width:none]">
         <table className="w-full text-center text-xs whitespace-nowrap tabular-nums">
           <thead>
@@ -377,7 +384,7 @@ function SeasonSection({
         {groups.map((g, gi) => (
           <div key={gi}>
             {g.name && (
-              <p className="mb-1 text-[11px] font-semibold text-muted">
+              <p className="subject-ink mb-1 text-[11px] font-semibold text-muted">
                 {g.name}
               </p>
             )}
@@ -390,7 +397,7 @@ function SeasonSection({
                   <span className="text-base font-bold tabular-nums">
                     {s.value}
                   </span>
-                  <span className="text-[10px] font-semibold text-muted uppercase">
+                  <span className="subject-ink text-[10px] font-semibold text-muted uppercase">
                     {s.label}
                   </span>
                 </li>
