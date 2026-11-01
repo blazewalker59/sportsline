@@ -212,7 +212,7 @@ A notable Player on another team in a Viewer’s Fantasy league turning doubtful
 _Avoid_: injury alert (an Alert is a push)
 
 **Who Has?**:
-A guessing game made from an Injury Event: the next time the Viewer opens the app it pops up once, asking which of four teams in the league has the Player. Answered or passed on, it never comes back; offered for two days. The Viewer’s record of right guesses is kept.
+A guessing game made from an Injury Event, in the leagues the Viewer opts into (each off until they turn it on from the league’s page): the next time the Viewer opens the app it pops up once, asking which of four teams in the league has the Player. Answered or passed on, it never comes back; offered for two days. The Viewer’s record of right guesses is kept.
 _Avoid_: quiz, trivia
 
 **League activity**:

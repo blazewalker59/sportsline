@@ -1,7 +1,8 @@
 /**
  * A Fantasy league's page (CONTEXT.md, "Fantasy league"), in tabs: its
  * Overview (every Matchup this scoring period, the Viewer's first, each
- * opening in full, and the league's Scoring leaders) and its Standings,
+ * opening in full, the league's Scoring leaders, and its Who Has?
+ * switch) and its Standings,
  * kept with each sync, and its Players (who's available) and Activity,
  * read from its provider while that tab is open.
  */
@@ -16,6 +17,7 @@ import { MatchupSheet } from './FantasyParts'
 import { LeadersView } from './LeadersView'
 import { Picker, SectionHead } from './Picker'
 import { WhatIfTable } from './WhatIfTable'
+import { WhoHasSwitch } from './WhoHasSwitch'
 import { scoreText } from './format'
 import type { MoveIntent } from './MoveSheet'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
@@ -139,6 +141,7 @@ export function LeagueScreen({ leagueId }: { leagueId: string }) {
                   Scoring leaders show after the league’s next sync.
                 </p>
               )}
+              <WhoHasSwitch leagueId={league.id} on={league.whoHasEnabled} />
             </>
           ) : tab === 'activity' ? (
             <ActivityTab league={league} />

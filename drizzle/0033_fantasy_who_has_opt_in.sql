@@ -1,0 +1,1 @@
+ALTER TABLE `fantasy_leagues` ADD `who_has_enabled` integer DEFAULT false NOT NULL;

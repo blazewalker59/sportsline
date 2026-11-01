@@ -106,17 +106,38 @@ function opened(): Opened {
 const SWID = '{0D3C2B1A-1111-2222-3333-444455556666}'
 const S2 = `AE${'b'.repeat(60)}%2B%2F`
 
-async function league(id: string, kind: 'espn' | 'sleeper') {
-  await opened().db.insert(fantasyLeagues).values({
+async function league(
+  id: string,
+  kind: 'espn' | 'sleeper',
+  over: { whoHasEnabled?: boolean } = {},
+) {
+  await opened()
+    .db.insert(fantasyLeagues)
+    .values({
+      id,
+      viewerId: 'u1',
+      sport: 'football',
+      provider: kind,
+      leagueId: id,
+      season: 2026,
+      name: id,
+      updatedAt: '2026-10-08T00:00:00Z',
+      ...over,
+    })
+}
+
+/** An open Who Has? encounter in a league, made just now. */
+function openEncounter(id: string, leagueRowId: string) {
+  return {
     id,
     viewerId: 'u1',
-    sport: 'football',
-    provider: kind,
-    leagueId: id,
-    season: 2026,
-    name: id,
-    updatedAt: '2026-10-08T00:00:00Z',
-  })
+    leagueRowId,
+    player: { espnId: 1, name: 'Josh Allen', positionId: 1, proTeamId: 2 },
+    status: 'OUT',
+    ownerTeamId: 3,
+    options: [{ teamId: 3, name: 'Owner' }],
+    createdAt: new Date().toISOString(),
+  }
 }
 
 describe.skipIf(!isBun)('Fantasy server functions', () => {
@@ -296,7 +317,7 @@ describe.skipIf(!isBun)('Fantasy server functions', () => {
   })
 
   it('offers an open Who Has? once, then keeps the Viewer’s record', async () => {
-    await league('espn-1', 'espn')
+    await league('espn-1', 'espn', { whoHasEnabled: true })
     const encounter = (id: string, createdAt: string) => ({
       id,
       viewerId: 'u1',
@@ -350,24 +371,49 @@ describe.skipIf(!isBun)('Fantasy server functions', () => {
   })
 
   it('passes on a Who Has? with no guess, outside the record', async () => {
-    await league('espn-1', 'espn')
-    await opened()
-      .db.insert(whoHas)
-      .values({
-        id: 'pass',
-        viewerId: 'u1',
-        leagueRowId: 'espn-1',
-        player: { espnId: 1, name: 'Josh Allen', positionId: 1, proTeamId: 2 },
-        status: 'OUT',
-        ownerTeamId: 3,
-        options: [{ teamId: 3, name: 'Owner' }],
-        createdAt: new Date().toISOString(),
-      })
+    await league('espn-1', 'espn', { whoHasEnabled: true })
+    await opened().db.insert(whoHas).values(openEncounter('pass', 'espn-1'))
     await call('answerWhoHas', { id: 'pass', teamId: null })
     type Got = Awaited<ReturnType<typeof caller.getWhoHas>>
     expect((await call<Got>('getWhoHas')).result).toEqual({
       encounter: null,
       record: { right: 0, answered: 0 },
     })
+  })
+
+  it('offers Who Has? only from a league opted in, off until then', async () => {
+    await league('espn-1', 'espn')
+    await opened().db.insert(whoHas).values(openEncounter('e', 'espn-1'))
+    type Got = Awaited<ReturnType<typeof caller.getWhoHas>>
+    type Page = Awaited<ReturnType<typeof caller.getFantasyLeague>>
+    const page = () => call<Page>('getFantasyLeague', { leagueId: 'espn-1' })
+
+    expect((await page()).result?.league.whoHasEnabled).toBe(false)
+    expect((await call<Got>('getWhoHas')).result?.encounter).toBeNull()
+
+    await call('setFantasyLeagueWhoHas', { id: 'espn-1', enabled: true })
+    expect((await page()).result?.league.whoHasEnabled).toBe(true)
+    expect((await call<Got>('getWhoHas')).result?.encounter?.id).toBe('e')
+
+    await call('setFantasyLeagueWhoHas', { id: 'espn-1', enabled: false })
+    expect((await call<Got>('getWhoHas')).result?.encounter).toBeNull()
+  })
+
+  it('opts only the Viewer’s own league into Who Has?', async () => {
+    opened().sqlite.run(
+      "INSERT INTO user (id,name,email,email_verified,created_at,updated_at) VALUES ('u2','W','w@example.com',1,0,0)",
+    )
+    await opened().db.insert(fantasyLeagues).values({
+      id: 'theirs',
+      viewerId: 'u2',
+      sport: 'football',
+      leagueId: 'theirs',
+      season: 2026,
+      name: 'theirs',
+      updatedAt: '2026-10-08T00:00:00Z',
+    })
+    await call('setFantasyLeagueWhoHas', { id: 'theirs', enabled: true })
+    const row = await opened().db.select().from(fantasyLeagues).get()
+    expect(row?.whoHasEnabled).toBe(false)
   })
 })

@@ -73,6 +73,8 @@ export interface FantasyLeagueView {
   name: string
   teamName: string | null
   enabled: boolean
+  /** Who Has? offered from this league (opted into). */
+  whoHasEnabled: boolean
   lastError: string | null
   updatedAt: string
   matchup: MatchupView | null
@@ -426,6 +428,24 @@ export const setFantasyLeagueEnabled = createServerFn({ method: 'POST' })
       )
   })
 
+/** Opt a league into Who Has? (or out): off until the Viewer turns it on. */
+export const setFantasyLeagueWhoHas = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
+  .validator((data: { id: string; enabled: boolean }) =>
+    z.object({ id: z.string().max(300), enabled: z.boolean() }).parse(data),
+  )
+  .handler(async ({ data, context: { db, viewerId } }) => {
+    await db
+      .update(fantasyLeagues)
+      .set({ whoHasEnabled: data.enabled })
+      .where(
+        and(
+          eq(fantasyLeagues.id, data.id),
+          eq(fantasyLeagues.viewerId, viewerId),
+        ),
+      )
+  })
+
 /** Save the Viewer's order for their leagues (ids, first to last). */
 export const reorderFantasyLeagues = createServerFn({ method: 'POST' })
   .middleware([viewerMiddleware])
@@ -624,7 +644,8 @@ export interface WhoHasRecord {
 
 /**
  * A Who Has? encounter to offer now, if any: one of the Viewer's open
- * ones (fresh, unanswered, in a league they show), picked at random.
+ * ones (fresh, unanswered, in a league they show and opted into Who
+ * Has?), picked at random.
  */
 export const getWhoHas = createServerFn({ method: 'GET' })
   .middleware([viewerMiddleware])
@@ -651,6 +672,7 @@ export const getWhoHas = createServerFn({ method: 'GET' })
               isNull(whoHas.answeredAt),
               gte(whoHas.createdAt, since),
               eq(fantasyLeagues.enabled, true),
+              eq(fantasyLeagues.whoHasEnabled, true),
             ),
           )
           .limit(20),
@@ -728,6 +750,7 @@ const LEAGUE_VIEW = {
   name: fantasyLeagues.name,
   teamName: fantasyLeagues.teamName,
   enabled: fantasyLeagues.enabled,
+  whoHasEnabled: fantasyLeagues.whoHasEnabled,
   lastError: fantasyLeagues.lastError,
   updatedAt: fantasyLeagues.updatedAt,
   matchup: fantasyLeagues.matchup,
@@ -743,6 +766,7 @@ function leagueView(
     name: r.name,
     teamName: r.teamName,
     enabled: r.enabled,
+    whoHasEnabled: r.whoHasEnabled,
     lastError: r.lastError,
     updatedAt: r.updatedAt,
     matchup: r.matchup ?? null,
