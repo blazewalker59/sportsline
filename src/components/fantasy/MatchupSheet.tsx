@@ -192,6 +192,20 @@ export function MatchupSheet({
         )
       }
       subject={matchupSubject(colors)}
+      // The score stays in view however far down the Lineups go.
+      pinned={
+        <header className="flex items-start gap-3">
+          {side(m.mine, 'left')}
+          <span className="pt-6 text-sm text-muted">vs</span>
+          {m.opponent ? (
+            side(m.opponent, 'right')
+          ) : (
+            <span className="flex-1 pt-6 text-right text-sm text-muted">
+              Bye week
+            </span>
+          )}
+        </header>
+      }
       onClose={onClose}
     >
       <div
@@ -204,17 +218,6 @@ export function MatchupSheet({
           } as React.CSSProperties
         }
       >
-        <header className="flex items-start gap-3">
-          {side(m.mine, 'left')}
-          <span className="pt-6 text-sm text-muted">vs</span>
-          {m.opponent ? (
-            side(m.opponent, 'right')
-          ) : (
-            <span className="flex-1 pt-6 text-right text-sm text-muted">
-              Bye week
-            </span>
-          )}
-        </header>
         {m.categories && !reading && (
           <MatchupDays
             m={m}
