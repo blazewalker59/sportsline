@@ -62,8 +62,9 @@ function trapTab(e: KeyboardEvent, node: HTMLElement) {
  * scrolled to the top) to dismiss, like a native sheet.
  *
  * A sheet about a team (or two) wears its Subject's color, as the feed
- * does: a crown fading in from the top, split for two teams, and its
- * cards tinted (styles.css, "Subject"). Without one it stays neutral.
+ * does: a crown fading in from the top, split for two teams, and with
+ * one team its cards tinted (styles.css, "Subject"). Without one it
+ * stays neutral.
  */
 export function Sheet({
   title,
@@ -252,7 +253,10 @@ export function Sheet({
           ref={body}
           className={cn(
             'flex flex-col gap-4 overflow-y-auto overscroll-contain px-4 py-4 [&>*]:shrink-0',
-            subject && 'subject-cards',
+            // One team tints every card. Two leave shared cards neutral:
+            // a card about one side opts in (`subject-cards`, with
+            // `subject-b` for the second).
+            subject && !isPair(subject) && 'subject-cards',
           )}
           onTouchStart={(e) => onTouchStart(e, true)}
           onTouchMove={onTouchMove}

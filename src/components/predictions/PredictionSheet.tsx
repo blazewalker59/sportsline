@@ -17,8 +17,8 @@ import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { Sheet } from '@/components/chat/Sheet'
 import { TeamPip } from '@/components/brand/TeamPip'
-import { teamSubject } from '@/lib/brand/subject'
-import { legTeam } from '@/lib/kalshi/legTeam'
+import { isPair } from '@/lib/brand/subject'
+import { legTeam, predictionSubject } from '@/lib/kalshi/legTeam'
 import { gameSearch } from '@/lib/timeline/gameLink'
 import { PlayerButton } from '@/components/players/playerSheet'
 import { cn } from '@/lib/utils'
@@ -31,7 +31,7 @@ function LegRow({
   onNavigate,
 }: {
   leg: LegView
-  /** A combo's Leg: its own team's pip (the sheet has no one team). */
+  /** Its own team's pip (when the sheet isn't one team's). */
   pip: boolean
   onNavigate: () => void
 }) {
@@ -111,9 +111,10 @@ function LegRow({
 }
 
 /**
- * A Prediction in full: Odds, money, and every Leg with its Game. A single
- * one wears its team's color (the Player's, or the team picked); a combo
- * has no one team, so each Leg shows its own.
+ * A Prediction in full: Odds, money, and every Leg with its Game. It
+ * wears its team's color (the Player's, the team picked, or a combo's on
+ * one team), or both teams' when it's on one Game (a total, a same-game
+ * combo); otherwise each Leg shows its own team.
  */
 export function PredictionSheet({
   prediction: p,
@@ -125,14 +126,13 @@ export function PredictionSheet({
   const move = movement(p)
   const settled = p.status !== 'open'
   const combo = p.kind === 'combo'
+  const subject = predictionSubject(p.legs)
+  // Each Leg's own team, unless the whole sheet is one team's.
+  const pips = !subject || isPair(subject)
   return (
     <Sheet
       title={combo ? 'Combo' : 'Prediction'}
-      subject={
-        combo || p.legs.length === 0
-          ? null
-          : teamSubject(legTeam(p.legs[0])?.colors)
-      }
+      subject={subject}
       onClose={onClose}
     >
       <header className="flex flex-col gap-1">
@@ -232,7 +232,7 @@ export function PredictionSheet({
         </h3>
         <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
           {p.legs.map((leg, i) => (
-            <LegRow key={i} leg={leg} pip={combo} onNavigate={onClose} />
+            <LegRow key={i} leg={leg} pip={pips} onNavigate={onClose} />
           ))}
         </ul>
       </section>
