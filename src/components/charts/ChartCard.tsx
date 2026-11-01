@@ -25,10 +25,23 @@ export const CHART_COLORS = {
   bad: 'var(--color-live)',
   muted: 'var(--color-muted)',
   foreground: 'var(--color-foreground)',
-  /** The Viewer's side in a head-to-head (theirs is `opponent`). */
-  mine: 'var(--color-accent)',
-  opponent: 'var(--color-live)',
+  /**
+   * A head-to-head's sides: the Matchup sheet sets each manager's color
+   * as --matchup-left / --matchup-right (lib/brand/subject.ts
+   * matchupColors). Otherwise the Viewer's accent, and the first manager
+   * hue for theirs; never red, which means bad.
+   */
+  mine: 'var(--matchup-left, var(--color-accent))',
+  opponent: 'var(--matchup-right, var(--manager-1))',
 } as const
+
+/**
+ * A mark in the Subject's ink inside a team's sheet or page (styles.css,
+ * "Subject"), else `fallback`.
+ */
+export function subjectColor(fallback: string): string {
+  return `var(--subject-line, ${fallback})`
+}
 
 export interface LegendItem {
   label: string

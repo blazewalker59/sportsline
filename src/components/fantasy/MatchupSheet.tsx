@@ -34,6 +34,7 @@ import {
   matchupDayQuery,
   matchupGamesQuery,
 } from '@/lib/fantasy/queries'
+import { matchupColors, matchupSubject } from '@/lib/brand/subject'
 import { SPORTS } from '@/lib/fantasy/sports'
 import { cn } from '@/lib/utils'
 
@@ -146,14 +147,23 @@ export function MatchupSheet({
     : m.sport === 'football' && today
       ? allGames
       : allGames.filter((g) => g.sportsDay === sportsDay)
+  // The Viewer's side in the accent, every other manager in their hue:
+  // the crown, the names, the bars and the race all agree.
+  const colors = matchupColors(
+    m.mine.teamId,
+    m.opponent?.teamId ?? null,
+    other === undefined,
+  )
   const side = (s: MatchupSide, align: 'left' | 'right') => (
     <span
       className={cn(
         'flex min-w-0 flex-1 flex-col',
-        align === 'right' && 'items-end text-right',
+        align === 'right' && 'subject-b items-end text-right',
       )}
     >
-      <span className="truncate text-sm font-semibold">{s.name}</span>
+      <span className="subject-ink truncate text-sm font-semibold">
+        {s.name}
+      </span>
       {s.record && <span className="text-[11px] text-muted">{s.record}</span>}
       <span className="text-3xl leading-tight font-bold tabular-nums">
         {m.categories
@@ -181,91 +191,103 @@ export function MatchupSheet({
           </Link>
         )
       }
+      subject={matchupSubject(colors)}
       onClose={onClose}
     >
-      <header className="flex items-start gap-3">
-        {side(m.mine, 'left')}
-        <span className="pt-6 text-sm text-muted">vs</span>
-        {m.opponent ? (
-          side(m.opponent, 'right')
-        ) : (
-          <span className="flex-1 pt-6 text-right text-sm text-muted">
-            Bye week
-          </span>
+      <div
+        // The charts read each side's color from here (CHART_COLORS).
+        className="contents [&>*]:shrink-0"
+        style={
+          {
+            '--matchup-left': colors.left,
+            ...(colors.right && { '--matchup-right': colors.right }),
+          } as React.CSSProperties
+        }
+      >
+        <header className="flex items-start gap-3">
+          {side(m.mine, 'left')}
+          <span className="pt-6 text-sm text-muted">vs</span>
+          {m.opponent ? (
+            side(m.opponent, 'right')
+          ) : (
+            <span className="flex-1 pt-6 text-right text-sm text-muted">
+              Bye week
+            </span>
+          )}
+        </header>
+        {m.categories && !reading && (
+          <MatchupDays
+            m={m}
+            days={days}
+            part={part}
+            onPart={setPart}
+            summary={m.mine.summary != null}
+          />
         )}
-      </header>
-      {m.categories && !reading && (
-        <MatchupDays
-          m={m}
-          days={days}
-          part={part}
-          onPart={setPart}
-          summary={m.mine.summary != null}
-        />
-      )}
-      {m.categories && m.categories.length > 0 ? (
-        <CategoryBars m={m} categories={m.categories} day={categoryDay} />
-      ) : (
-        other === undefined && <MatchupRace leagueId={league.id} m={m} />
-      )}
-      {reading ? (
-        <p className="rounded-xl border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
-          {read.isError
-            ? read.error.message
-            : read.isSuccess
-              ? 'This matchup isn’t in the league’s schedule any more.'
-              : 'Loading lineups…'}
+        {m.categories && m.categories.length > 0 ? (
+          <CategoryBars m={m} categories={m.categories} day={categoryDay} />
+        ) : (
+          other === undefined && <MatchupRace leagueId={league.id} m={m} />
+        )}
+        {reading ? (
+          <p className="rounded-xl border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
+            {read.isError
+              ? read.error.message
+              : read.isSuccess
+                ? 'This matchup isn’t in the league’s schedule any more.'
+                : 'Loading lineups…'}
+          </p>
+        ) : !today && !summary && !past.data ? (
+          <p className="rounded-xl border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
+            {past.isError
+              ? 'Couldn’t read that day from ESPN.'
+              : `Loading ${label === 'Yesterday' || label === 'Tomorrow' ? label.toLowerCase() : label}’s lineups…`}
+          </p>
+        ) : m.categories ? (
+          <CategoryLineup
+            sport={m.sport}
+            categories={m.categories}
+            mine={m.mine}
+            opponent={m.opponent}
+            lineups={lineups}
+            games={dayGames}
+            knowsGames={!summary && day >= m.scoringPeriod && week.isSuccess}
+            summary={summary}
+          />
+        ) : (
+          <>
+            <section>
+              <h3 className="subject-ink mb-2 text-xs font-bold tracking-wide text-muted uppercase">
+                Starters
+              </h3>
+              <LineupRows
+                sport={m.sport}
+                mine={starters(lineups.mine)}
+                theirs={starters(lineups.theirs)}
+                games={dayGames}
+                byes={byeWeeks}
+              />
+            </section>
+            <section>
+              <h3 className="subject-ink mb-2 text-xs font-bold tracking-wide text-muted uppercase">
+                Bench
+              </h3>
+              <LineupRows
+                sport={m.sport}
+                mine={bench(lineups.mine)}
+                theirs={bench(lineups.theirs)}
+                games={dayGames}
+                byes={byeWeeks}
+              />
+            </section>
+          </>
+        )}
+        <p className="text-[11px] text-muted">
+          {m.categories
+            ? `Read from ${source}: categories through yesterday plus today’s starters, refreshed every couple of minutes; toggle above the categories between the whole matchup and the day. Step through the matchup’s days with ‹ ›, or tap the day for any day or the whole matchup’s summary; switch sides above the lineup, and scroll it sideways for every category.`
+            : `Read from ${source}. Points refresh every couple of minutes; tap a player’s points for the breakdown.`}
         </p>
-      ) : !today && !summary && !past.data ? (
-        <p className="rounded-xl border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
-          {past.isError
-            ? 'Couldn’t read that day from ESPN.'
-            : `Loading ${label === 'Yesterday' || label === 'Tomorrow' ? label.toLowerCase() : label}’s lineups…`}
-        </p>
-      ) : m.categories ? (
-        <CategoryLineup
-          sport={m.sport}
-          categories={m.categories}
-          mine={m.mine}
-          opponent={m.opponent}
-          lineups={lineups}
-          games={dayGames}
-          knowsGames={!summary && day >= m.scoringPeriod && week.isSuccess}
-          summary={summary}
-        />
-      ) : (
-        <>
-          <section>
-            <h3 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-              Starters
-            </h3>
-            <LineupRows
-              sport={m.sport}
-              mine={starters(lineups.mine)}
-              theirs={starters(lineups.theirs)}
-              games={dayGames}
-              byes={byeWeeks}
-            />
-          </section>
-          <section>
-            <h3 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-              Bench
-            </h3>
-            <LineupRows
-              sport={m.sport}
-              mine={bench(lineups.mine)}
-              theirs={bench(lineups.theirs)}
-              games={dayGames}
-              byes={byeWeeks}
-            />
-          </section>
-        </>
-      )}
-      <p className="text-[11px] text-muted">
-        {m.categories
-          ? `Read from ${source}: categories through yesterday plus today’s starters, refreshed every couple of minutes; toggle above the categories between the whole matchup and the day. Step through the matchup’s days with ‹ ›, or tap the day for any day or the whole matchup’s summary; switch sides above the lineup, and scroll it sideways for every category.`
-          : `Read from ${source}. Points refresh every couple of minutes; tap a player’s points for the breakdown.`}
-      </p>
+      </div>
     </Sheet>
   )
 }

@@ -10,10 +10,15 @@ import { GameFlow } from '@/components/charts/lazy'
 import { Sheet } from '@/components/chat/Sheet'
 import { TeamLogo, TeamMark } from '@/components/brand/TeamMark'
 import { FollowButton } from '@/components/follows/FollowButton'
+import { pairSubject, teamSubject } from '@/lib/brand/subject'
 import { cn } from '@/lib/utils'
 import { PlayerButton } from '@/components/players/playerSheet'
 
-/** The box score over the feed, so closing it lands exactly where you were. */
+/**
+ * The box score over the feed, so closing it lands exactly where you were.
+ * It wears both teams' colors: away on the left, home on the right, down
+ * through the linescore and each team's table.
+ */
 export function BoxSheet({
   game,
   box,
@@ -24,11 +29,21 @@ export function BoxSheet({
   onClose: () => void
 }) {
   return (
-    <Sheet title="Box score" onClose={onClose}>
+    <Sheet
+      title="Box score"
+      subject={pairSubject(
+        teamSubject(game.awayTeam.colors),
+        teamSubject(game.homeTeam.colors),
+      )}
+      onClose={onClose}
+    >
       <div className="flex justify-between gap-2">
-        {[game.awayTeam, game.homeTeam].map((team) => (
-          <div key={team.id} className="flex items-center gap-2">
-            <TeamMark team={team} size={20} bold />
+        {[game.awayTeam, game.homeTeam].map((team, i) => (
+          <div
+            key={team.id}
+            className={cn('flex items-center gap-2', i === 1 && 'subject-b')}
+          >
+            <TeamMark team={team} size={20} bold className="subject-ink" />
             <FollowButton follow={{ kind: 'team', teamId: team.id }} />
           </div>
         ))}
@@ -49,16 +64,19 @@ export function Linescore({ box, game }: { box: GameBox; game: GameSummary }) {
   if (ls.segments.length === 0) return null
   const pinnedLeft = 'sticky left-0 z-[1] bg-surface'
   const pinnedRight = 'sticky right-0 z-[1] bg-surface'
+  // In a sheet with both teams' colors, the home row takes the home
+  // team's tint (the card is the away team's).
   const row = (
     team: GameSummary['awayTeam'],
     runs: Array<number | null>,
     totals: Array<number>,
+    home = false,
   ) => (
-    <tr>
+    <tr className={cn(home && 'subject-b bg-surface')}>
       <th
         className={cn(pinnedLeft, 'py-1.5 pr-2 pl-3 text-left font-semibold')}
       >
-        <TeamMark team={team} size={18} />
+        <TeamMark team={team} size={18} className="subject-ink" />
       </th>
       {runs.map((r, i) => (
         <td key={i} className="min-w-6 px-1 text-center text-muted">
@@ -106,7 +124,7 @@ export function Linescore({ box, game }: { box: GameBox; game: GameSummary }) {
         </thead>
         <tbody>
           {row(game.awayTeam, ls.away, ls.awayTotals)}
-          {row(game.homeTeam, ls.home, ls.homeTotals)}
+          {row(game.homeTeam, ls.home, ls.homeTotals, true)}
         </tbody>
       </table>
     </div>
@@ -124,12 +142,16 @@ function BoxTables({ box, game }: { box: GameBox | null; game: GameSummary }) {
       {box.tables.map((t) => (
         <div
           key={t.title}
-          className="overflow-x-auto rounded-xl border border-border bg-surface"
+          className={cn(
+            'overflow-x-auto rounded-xl border border-border bg-surface',
+            // Each team's table in its own color.
+            t.side === 'home' && 'subject-b',
+          )}
         >
           <table className="w-full text-xs tabular-nums">
             <thead>
               <tr className="border-b border-border text-muted">
-                <th className="px-3 py-2 text-left font-semibold text-foreground">
+                <th className="subject-ink px-3 py-2 text-left font-semibold text-foreground">
                   <span className="inline-flex items-center gap-1.5">
                     <TeamLogo
                       team={t.side === 'away' ? game.awayTeam : game.homeTeam}

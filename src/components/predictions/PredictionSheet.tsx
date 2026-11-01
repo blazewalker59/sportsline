@@ -16,18 +16,33 @@ import { OddsChart } from '@/components/charts/lazy'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { Sheet } from '@/components/chat/Sheet'
+import { TeamPip } from '@/components/brand/TeamPip'
+import { teamSubject } from '@/lib/brand/subject'
+import { legTeam } from '@/lib/kalshi/legTeam'
 import { gameSearch } from '@/lib/timeline/gameLink'
 import { PlayerButton } from '@/components/players/playerSheet'
 import { cn } from '@/lib/utils'
 import { weekdayTime } from '@/lib/time/format'
 import { useTimeZone } from '@/lib/time/useTimeZone'
 
-function LegRow({ leg, onNavigate }: { leg: LegView; onNavigate: () => void }) {
+function LegRow({
+  leg,
+  pip,
+  onNavigate,
+}: {
+  leg: LegView
+  /** A combo's Leg: its own team's pip (the sheet has no one team). */
+  pip: boolean
+  onNavigate: () => void
+}) {
   const g = leg.game
   const timeZone = useTimeZone()
   return (
     <li className="flex flex-col gap-1 px-3 py-2.5">
       <span className="flex items-start gap-2">
+        {pip && (
+          <TeamPip colors={legTeam(leg)?.colors} className="mt-1 h-3.5 w-1" />
+        )}
         <span
           aria-label={leg.status}
           className={cn(
@@ -95,7 +110,11 @@ function LegRow({ leg, onNavigate }: { leg: LegView; onNavigate: () => void }) {
   )
 }
 
-/** A Prediction in full: Odds, money, and every Leg with its Game. */
+/**
+ * A Prediction in full: Odds, money, and every Leg with its Game. A single
+ * one wears its team's color (the Player's, or the team picked); a combo
+ * has no one team, so each Leg shows its own.
+ */
 export function PredictionSheet({
   prediction: p,
   onClose,
@@ -105,9 +124,15 @@ export function PredictionSheet({
 }) {
   const move = movement(p)
   const settled = p.status !== 'open'
+  const combo = p.kind === 'combo'
   return (
     <Sheet
-      title={p.kind === 'combo' ? 'Combo' : 'Prediction'}
+      title={combo ? 'Combo' : 'Prediction'}
+      subject={
+        combo || p.legs.length === 0
+          ? null
+          : teamSubject(legTeam(p.legs[0])?.colors)
+      }
       onClose={onClose}
     >
       <header className="flex flex-col gap-1">
@@ -159,7 +184,7 @@ export function PredictionSheet({
       <OddsChart predictionId={p.id} />
       <dl className="grid grid-cols-3 gap-2 rounded-xl border border-border bg-surface p-3 text-center text-xs text-muted">
         <div>
-          <dt>Contracts</dt>
+          <dt className="subject-ink">Contracts</dt>
           <dd className="text-base font-semibold text-foreground tabular-nums">
             {Number.isInteger(p.contracts)
               ? p.contracts
@@ -167,13 +192,13 @@ export function PredictionSheet({
           </dd>
         </div>
         <div>
-          <dt>Cost</dt>
+          <dt className="subject-ink">Cost</dt>
           <dd className="text-base font-semibold text-foreground tabular-nums">
             {money(p.cost)}
           </dd>
         </div>
         <div>
-          <dt>{settled ? 'Payout' : 'Cash out now'}</dt>
+          <dt className="subject-ink">{settled ? 'Payout' : 'Cash out now'}</dt>
           <dd className="text-base font-semibold text-foreground tabular-nums">
             {settled
               ? p.payout === null
@@ -202,12 +227,12 @@ export function PredictionSheet({
         </div>
       </dl>
       <section>
-        <h3 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-          {p.kind === 'combo' ? `${p.legs.length} legs` : 'Market'}
+        <h3 className="subject-ink mb-2 text-xs font-bold tracking-wide text-muted uppercase">
+          {combo ? `${p.legs.length} legs` : 'Market'}
         </h3>
         <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
           {p.legs.map((leg, i) => (
-            <LegRow key={i} leg={leg} onNavigate={onClose} />
+            <LegRow key={i} leg={leg} pip={combo} onNavigate={onClose} />
           ))}
         </ul>
       </section>

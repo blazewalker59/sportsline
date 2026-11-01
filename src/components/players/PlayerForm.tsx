@@ -11,11 +11,18 @@ import { scaleLinear } from '@tanstack/charts/scales/linear'
 import { tooltip } from '@tanstack/charts/tooltip'
 import { useMemo } from 'react'
 import type { PlayerOverview } from '@/lib/model/types'
-import { CHART_COLORS, ChartCard } from '@/components/charts/ChartCard'
+import {
+  CHART_COLORS,
+  ChartCard,
+  subjectColor,
+} from '@/components/charts/ChartCard'
 import { shortDate } from '@/lib/time/format'
 import { useTimeZone } from '@/lib/time/useTimeZone'
 
 type Game = PlayerOverview['recent'][number]
+
+/** A game under their average: their team's ink, else the accent. */
+const GAME = subjectColor(CHART_COLORS.accent)
 
 interface Bar {
   key: string
@@ -68,7 +75,7 @@ export function PlayerForm({
             x: 'key',
             y: 'value',
             key: 'key',
-            fill: (b) => (b.above ? CHART_COLORS.good : CHART_COLORS.accent),
+            fill: (b) => (b.above ? CHART_COLORS.good : GAME),
             fillOpacity: 0.75,
             radius: 3,
           }),
@@ -126,7 +133,7 @@ export function PlayerForm({
     <ChartCard
       className="mb-2"
       legend={[
-        { label: form.label, color: CHART_COLORS.accent },
+        { label: form.label, color: GAME },
         ...(form.average !== null
           ? [
               {

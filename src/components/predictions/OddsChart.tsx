@@ -18,7 +18,11 @@ import type {
   PredictionDetail,
   PredictionMove,
 } from '@/lib/kalshi/predictionDetail'
-import { CHART_COLORS, ChartCard } from '@/components/charts/ChartCard'
+import {
+  CHART_COLORS,
+  ChartCard,
+  subjectColor,
+} from '@/components/charts/ChartCard'
 import {
   KeyPlayPanel,
   keyPlaySelection,
@@ -191,7 +195,9 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
   const entry = detail.entryChance
   const move = entry === null ? null : Math.round((now - entry) * 100)
   const up = move === null ? now >= rows[0].chance : move >= 0
-  const lineColor = up ? CHART_COLORS.good : CHART_COLORS.bad
+  // In a team's sheet, the odds draw in its ink (the move above stays
+  // up or down); elsewhere the line says which way they went.
+  const lineColor = subjectColor(up ? CHART_COLORS.good : CHART_COLORS.bad)
   const axis = chanceAxis(Math.max(entry ?? 0, ...rows.map((r) => r.chance)))
   // Over a day and a half, label dates; within one, clock times.
   const timeZone = useTimeZone()

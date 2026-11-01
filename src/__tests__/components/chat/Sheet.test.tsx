@@ -115,3 +115,62 @@ describe('Sheet', () => {
     expect(document.body.style.overflow).toBe('')
   })
 })
+
+describe('Sheet with a Subject', () => {
+  afterEach(cleanup)
+
+  const lions = {
+    wash: { light: '#0076b6', dark: '#0076b6' },
+    ink: { light: '#0076b6', dark: '#b0b7bc' },
+  }
+  const chiefs = {
+    wash: { light: '#e31837', dark: '#e31837' },
+    ink: { light: '#e31837', dark: '#ffb612' },
+  }
+  const panel = () =>
+    document.querySelector<HTMLElement>('[role="dialog"] > div')!
+  const body = () =>
+    document.querySelector<HTMLElement>('[role="dialog"] .overflow-y-auto')!
+
+  it('stays neutral without one', () => {
+    render(
+      <Sheet title="Alerts" onClose={() => {}}>
+        <p>Body</p>
+      </Sheet>,
+    )
+    expect(panel().className).not.toContain('subject')
+    expect(panel().style.getPropertyValue('--s-light')).toBe('')
+    expect(body().className).not.toContain('subject-cards')
+  })
+
+  it('wears one team: a crown, its colors, tinted cards', () => {
+    render(
+      <Sheet title="Player" subject={lions} onClose={() => {}}>
+        <p>Body</p>
+      </Sheet>,
+    )
+    expect(panel().className).toContain('subject subject-crown')
+    expect(panel().className).not.toContain('subject-crown--split')
+    expect(panel().style.getPropertyValue('--s-light')).toBe('#0076b6')
+    expect(panel().style.getPropertyValue('--s-ink-dark')).toBe('#b0b7bc')
+    // One team: the second side is the same team.
+    expect(panel().style.getPropertyValue('--s2-light')).toBe('#0076b6')
+    expect(body().className).toContain('subject-cards')
+  })
+
+  it('splits the crown for two teams', () => {
+    render(
+      <Sheet
+        title="Box score"
+        subject={{ a: lions, b: chiefs }}
+        onClose={() => {}}
+      >
+        <p>Body</p>
+      </Sheet>,
+    )
+    expect(panel().className).toContain('subject-crown--split')
+    expect(panel().style.getPropertyValue('--s-light')).toBe('#0076b6')
+    expect(panel().style.getPropertyValue('--s2-light')).toBe('#e31837')
+    expect(panel().style.getPropertyValue('--s2-ink-dark')).toBe('#ffb612')
+  })
+})

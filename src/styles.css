@@ -25,6 +25,15 @@
   --live: #e5372a;
   --scoring: #c24a00;
   --notable: #2d3cff;
+  /* Fantasy managers' colors (lib/brand/subject.ts managerColor). */
+  --manager-1: #0f8f7e;
+  --manager-2: #c2410c;
+  --manager-3: #7c3aed;
+  --manager-4: #be185d;
+  --manager-5: #0369a1;
+  --manager-6: #a16207;
+  --manager-7: #15803d;
+  --manager-8: #4f46e5;
 }
 
 .dark {
@@ -41,6 +50,14 @@
   --live: #ff6b5e;
   --scoring: #ffb612;
   --notable: #8fa2ff;
+  --manager-1: #34d3bd;
+  --manager-2: #fb8a4c;
+  --manager-3: #b69cff;
+  --manager-4: #f472b6;
+  --manager-5: #5ab8f0;
+  --manager-6: #e8b53a;
+  --manager-7: #4ade80;
+  --manager-8: #8f94ff;
 }
 
 @theme inline {
@@ -168,6 +185,180 @@ textarea,
 
 .dark .team-name {
   color: color-mix(in srgb, var(--name-dark, var(--foreground)) 68%, #fff);
+}
+
+/*
+  A Subject: a sheet or page about a team (or two facing each other)
+  carries its color the way the feed does (lib/brand/subject.ts sets
+  --s-* and --s2-* for each theme). Everything here is scoped to
+  `.subject`, so a sheet or page without one looks as it always has.
+  Team color never means good or bad: that stays --scoring and --live.
+*/
+.subject {
+  --s: var(--s-light);
+  --s-ink: var(--s-ink-light);
+  --s2: var(--s2-light);
+  --s2-ink: var(--s2-ink-light);
+  /* How strongly the color enters each surface: gentler on light. */
+  --subject-crown: 30%;
+  --subject-tint: 7%;
+  --subject-edge: 28%;
+  --subject-ink-base: #000;
+  --subject-ink-amount: 72%;
+  /* The page's own surface and border, before cards take the tint. */
+  --subject-surface: var(--surface);
+  --subject-border: var(--border);
+  --subject-crown-a: color-mix(
+    in srgb,
+    transparent,
+    var(--s) var(--subject-crown)
+  );
+  --subject-crown-b: color-mix(
+    in srgb,
+    transparent,
+    var(--s2) var(--subject-crown)
+  );
+}
+.dark .subject {
+  --s: var(--s-dark);
+  --s-ink: var(--s-ink-dark);
+  --s2: var(--s2-dark);
+  --s2-ink: var(--s2-ink-dark);
+  --subject-crown: 46%;
+  --subject-tint: 16%;
+  --subject-edge: 40%;
+  --subject-ink-base: #fff;
+  --subject-ink-amount: 68%;
+}
+
+/*
+  The crown: the top of a sheet (behind its handle, title and header)
+  wears the Subject's color, fading into the page as the content begins.
+  Two teams split it, the first left, the second right.
+*/
+.subject.subject-crown {
+  background-image: linear-gradient(
+    to bottom,
+    var(--subject-crown-a) 0,
+    var(--subject-crown-a) 64px,
+    transparent 260px
+  );
+  background-repeat: no-repeat;
+}
+.subject.subject-crown--split {
+  background-image:
+    linear-gradient(to bottom, transparent 64px, var(--background) 260px),
+    linear-gradient(
+      90deg,
+      var(--subject-crown-a) 0,
+      var(--subject-crown-a) 38%,
+      var(--subject-crown-b) 62%,
+      var(--subject-crown-b) 100%
+    );
+  background-size: 100% 260px;
+  background-repeat: no-repeat;
+}
+/*
+  A page's crown: under its (plain) app header, so it fades in as well as
+  out, and runs the full width of the screen behind the content.
+*/
+.subject.subject-page {
+  position: relative;
+  isolation: isolate;
+}
+.subject.subject-page::before {
+  content: '';
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  z-index: -1;
+  width: 100vw;
+  height: 340px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    var(--subject-crown-a) 56px,
+    var(--subject-crown-a) 120px,
+    transparent 340px
+  );
+}
+
+/* 100vw counts a desktop scrollbar: never scroll sideways for the crown. */
+body:has(.subject-page) {
+  overflow-x: clip;
+}
+
+/*
+  Cards inside take a breath of the Subject's color: every bg-surface and
+  border-border within reads the tinted tokens (the feed's .team-tint at a
+  lower dose). On a child of `.subject`, never on it.
+*/
+.subject .subject-cards {
+  --surface: color-mix(
+    in srgb,
+    var(--subject-surface),
+    var(--s) var(--subject-tint)
+  );
+  --border: color-mix(
+    in srgb,
+    var(--subject-border),
+    var(--s) var(--subject-edge)
+  );
+}
+
+/* The second team's part of a pair: its color in place of the first's. */
+.subject .subject-b {
+  --s: var(--s2);
+  --s-ink: var(--s2-ink);
+}
+.subject .subject-cards .subject-b,
+.subject .subject-cards.subject-b {
+  --surface: color-mix(
+    in srgb,
+    var(--subject-surface),
+    var(--s2) var(--subject-tint)
+  );
+  --border: color-mix(
+    in srgb,
+    var(--subject-border),
+    var(--s2) var(--subject-edge)
+  );
+}
+
+/* Labels, headings and names in the Subject's ink (as .team-name). */
+.subject .subject-ink {
+  color: color-mix(
+    in srgb,
+    var(--subject-ink-base),
+    var(--s-ink) var(--subject-ink-amount)
+  );
+}
+
+/* Bars and marks in the Subject's color. */
+.subject .subject-fill,
+.subject.subject-pip {
+  background-color: var(--s);
+}
+
+/*
+  A chart's line in the Subject's ink, readable on the page (ChartCard
+  subjectColor falls back to the chart's own color outside a Subject).
+*/
+.subject {
+  --subject-line: color-mix(
+    in srgb,
+    var(--subject-ink-base),
+    var(--s-ink) var(--subject-ink-amount)
+  );
+}
+.subject .subject-b {
+  --subject-line: color-mix(
+    in srgb,
+    var(--subject-ink-base),
+    var(--s2-ink) var(--subject-ink-amount)
+  );
 }
 
 /*

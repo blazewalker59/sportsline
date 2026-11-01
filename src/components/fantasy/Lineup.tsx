@@ -18,7 +18,7 @@ import {
   pts,
   shortName,
 } from './format'
-import { gameState } from './gameState'
+import { gameState, stateTeam } from './gameState'
 import type { GameState } from './gameState'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { LineupPlayer } from '@/lib/fantasy/matchup'
@@ -26,6 +26,8 @@ import type { GameSummary } from '@/lib/model/timeline'
 import { useTimeZone } from '@/lib/time/useTimeZone'
 import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
 import { TeamLogo } from '@/components/brand/TeamMark'
+import { TeamPip } from '@/components/brand/TeamPip'
+import { teamNameStyle } from '@/lib/brand/subject'
 import { PlayerButton } from '@/components/players/playerSheet'
 import { cn } from '@/lib/utils'
 
@@ -63,14 +65,19 @@ function PlayerCell({
     ? (INJURY_ABBREV[player.injury] ?? player.injury.slice(0, 4))
     : null
   const tone = injuryTone(player.injury)
+  // Their own team's colors, from their Game: the name in its ink.
+  const team = state ? stateTeam(state) : null
+  const ink = teamNameStyle(team?.colors)
   // One line, never split inside a word: longer names step down a size
   // to fit, and only then trail off.
   const short = shortName(player)
   const name = (
     <span
       title={player.name}
+      style={ink}
       className={cn(
         'block truncate leading-tight font-semibold whitespace-nowrap',
+        ink && 'team-name',
         short.length > 14
           ? 'text-[11px] tracking-tight'
           : short.length > 11
@@ -132,7 +139,10 @@ function PlayerCell({
               </span>
             )}
             {player.teamAbbrev && (
-              <span className="text-muted">{player.teamAbbrev}</span>
+              <span className="flex items-center gap-0.5 text-muted">
+                <TeamPip colors={team?.colors} className="size-1.5" />
+                {player.teamAbbrev}
+              </span>
             )}
             {injury && (
               <span

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import basketball from '../../fixtures/fantasy/basketball-category-matchup.json'
 import type { CategoryResult } from '@/lib/fantasy/categories'
 import type { MatchupView, WireLeague } from '@/lib/fantasy/matchup'
+import { CHART_COLORS } from '@/components/charts/ChartCard'
 import { CategoryBars } from '@/components/fantasy/CategoryBars'
 import {
   categoryRecord,
@@ -46,13 +47,15 @@ describe('CategoryBars', () => {
     const byLabel = rows(html)
     expect(byLabel[tie.label]).not.toContain('color:var(')
     expect(byLabel[tie.label]).toContain('(tied)') // for screen readers only
+    // Each side in its manager's color (the sheet sets them), never red.
     const mine = categories.find((c) => c.leader === 'mine')!
-    expect(byLabel[mine.label]).toContain('color:var(--color-accent)')
-    expect(byLabel[mine.label]).not.toContain('color:var(--color-live)')
+    expect(byLabel[mine.label]).toContain(`color:${CHART_COLORS.mine}`)
+    expect(byLabel[mine.label]).not.toContain(`color:${CHART_COLORS.opponent}`)
     expect(byLabel[mine.label]).not.toMatch(/border-(x|left|right)/)
     const theirs = categories.find((c) => c.leader === 'opponent')!
-    expect(byLabel[theirs.label]).toContain('color:var(--color-live)')
-    expect(byLabel[theirs.label]).not.toContain('color:var(--color-accent)')
+    expect(byLabel[theirs.label]).toContain(`color:${CHART_COLORS.opponent}`)
+    expect(byLabel[theirs.label]).not.toContain(`color:${CHART_COLORS.mine}`)
+    expect(html).not.toContain('--color-live')
   })
 
   it('toggles between the matchup’s totals and the day’s', () => {

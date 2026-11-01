@@ -8,6 +8,8 @@ import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useCallback, useEffect } from 'react'
 import type { TimelineItem } from '@/lib/model/timeline'
 import { AppHeader } from '@/components/layout/AppHeader'
+import { SubjectPage } from '@/components/brand/SubjectPage'
+import { teamSubject } from '@/lib/brand/subject'
 import {
   PlayerDetailSections,
   PlayerHeader,
@@ -62,12 +64,12 @@ export function PlayerScreen({
           Player not found.
         </p>
       ) : (
-        <>
+        <SubjectPage subject={teamSubject(first.player.team?.colors)}>
           <PlayerHeader player={first.player} />
           <div className="mt-6 mb-6">
             <PlayerDetailSections player={first.player} />
           </div>
-          <h2 className="mb-3 text-xs font-bold tracking-wide text-muted uppercase">
+          <h2 className="subject-ink mb-3 text-xs font-bold tracking-wide text-muted uppercase">
             Plays
           </h2>
 
@@ -79,7 +81,7 @@ export function PlayerScreen({
             <div className="flex flex-col gap-6">
               {groupByDay(items).map(({ sportsDay, entries }) => (
                 <section key={sportsDay} className="flex flex-col gap-3">
-                  <h2 className="text-xs font-bold tracking-wide text-muted uppercase">
+                  <h2 className="subject-ink text-xs font-bold tracking-wide text-muted uppercase">
                     {dayLabel(sportsDay, today)}
                   </h2>
                   {entries.map((item) => (
@@ -99,7 +101,7 @@ export function PlayerScreen({
               )}
             </div>
           )}
-        </>
+        </SubjectPage>
       )}
       {playId && <PlaySheet playId={playId} onClose={closePlay} />}
     </div>

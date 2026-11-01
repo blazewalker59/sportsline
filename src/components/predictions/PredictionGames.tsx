@@ -54,7 +54,7 @@ export function PredictionGames({
   if (games.length === 0) return null
   return (
     <section>
-      <h3 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
+      <h3 className="subject-ink mb-2 text-xs font-bold tracking-wide text-muted uppercase">
         {games.length === 1 ? 'The game' : `${games.length} games`}
       </h3>
       <ul className="flex flex-col gap-2">
@@ -163,7 +163,7 @@ function GamePanel({
       {data.box && <Linescore box={data.box} game={data.game} />}
       {players.length > 0 && (
         <div>
-          <h4 className="mb-1 text-[11px] font-bold tracking-wide text-muted uppercase">
+          <h4 className="subject-ink mb-1 text-[11px] font-bold tracking-wide text-muted uppercase">
             Your players
           </h4>
           <ul className="flex flex-col gap-1 text-xs">
@@ -180,7 +180,7 @@ function GamePanel({
       )}
       {plays.length > 0 && (
         <div>
-          <h4 className="mb-1 text-[11px] font-bold tracking-wide text-muted uppercase">
+          <h4 className="subject-ink mb-1 text-[11px] font-bold tracking-wide text-muted uppercase">
             Latest
           </h4>
           <ul className="flex flex-col gap-1.5">
