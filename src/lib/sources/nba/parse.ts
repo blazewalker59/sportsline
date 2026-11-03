@@ -13,6 +13,7 @@
 import {
   competitorTeam,
   espnHeadshot,
+  espnPause,
   mapStatus,
   periodEndMilestone,
   quarterLabel,
@@ -244,6 +245,7 @@ export function parseGame(summary: NbaSummary): GameSnapshot {
       : null,
     items,
     box: box(summary, awayC, homeC),
+    pause: espnPause(competition.status),
   }
 }
 

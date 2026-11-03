@@ -570,6 +570,62 @@ describe.skipIf(!isBun)('LiveGame', () => {
     expect(finalRow?.status).toBe('final')
   })
 
+  it('polls slowly through a break in play, and once its Final is in', async () => {
+    const game = instance()
+    await game.track(tracked)
+    ctx.alarmSets.length = 0
+    state.snap = snap([play('a')], { pollHintSeconds: 10, pause: 'long' })
+    await game.alarm()
+    expect(ctx.alarmSets.at(-1)).toBe(NOW + 60_000)
+
+    state.snap = snap([play('a')], { pause: 'short' })
+    await game.alarm()
+    expect(ctx.alarmSets.at(-1)).toBe(NOW + 20_000)
+
+    // The Final arrived before the status turned: nothing more is coming.
+    const final: SourceItem = {
+      kind: 'milestone',
+      milestone: 'final',
+      key: 'final',
+      sequence: 99,
+      occurredAt: '2026-10-08T20:00:00.000Z',
+      segmentLabel: 'Bot 9th',
+      score: { away: 1, home: 0 },
+      description: 'Final: NYY 1, BOS 0',
+    }
+    state.snap = snap([play('a'), final], { pollHintSeconds: 10 })
+    await game.alarm()
+    expect(ctx.alarmSets.at(-1)).toBe(NOW + 60_000)
+  })
+
+  it('is not woken again once polled to its end', async () => {
+    const game = instance()
+    await game.track(tracked)
+    state.snap = snap([play('a')], { status: 'final' })
+    await game.alarm()
+    await ctx.storage.deleteAlarm() // the runtime clears an alarm that fired
+    ctx.alarmSets.length = 0
+    // The schedule sync's scoreboard still lists it live.
+    await game.track(tracked)
+    expect(ctx.alarmSets).toEqual([])
+    expect(await ctx.storage.getAlarm()).toBeNull()
+  })
+
+  it('can be woken while a final Game still waits on its full box score', async () => {
+    const game = instance()
+    await game.track(tracked)
+    state.snap = snap([play('a')], {
+      status: 'final',
+      box: boxOf([]),
+      boxPartial: true,
+    })
+    await game.alarm()
+    await ctx.storage.deleteAlarm()
+    ctx.alarmSets.length = 0
+    await game.track(tracked)
+    expect(ctx.alarmSets).toEqual([NOW])
+  })
+
   it("keeps a play's players on a fallback that no longer names them", async () => {
     const game = instance()
     await game.track(tracked)

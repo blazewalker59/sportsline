@@ -32,6 +32,7 @@ import type { TimelineEvent, TimelineItem } from '@/lib/model/timeline'
 import type {
   GameBox,
   GameSnapshot,
+  Pause,
   SourceBox,
   SourceItem,
 } from '@/lib/model/types'
@@ -65,6 +66,12 @@ const FULL_BOX_KEY = 'fullBox'
 const BOX_RETRIES_KEY = 'boxRetries'
 export const BOX_RETRY_MS = 5 * 60_000
 export const MAX_BOX_RETRIES = 12
+/**
+ * Set once a poll found the Game final and stopped polling it. The schedule
+ * sync can still list the Game as live for a while after (its scoreboard
+ * lags the Game's own feed); track() then leaves it be.
+ */
+const ENDED_KEY = 'ended'
 /** When refresh() last polled; page views of a Game ask at most this often. */
 const REFRESHED_KEY = 'refreshedAt'
 export const REFRESH_EVERY_MS = 5 * 60_000
@@ -108,10 +115,12 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
    * that gave up after MAX_CONSECUTIVE_ERRORS gets one try per wake, not
    * another full run of fast retries, until a poll succeeds and resets it.
    * `delayMs` puts off the first poll (staggering a past day's backfills);
-   * an alarm already set is never moved.
+   * an alarm already set is never moved. A Game already polled to its end
+   * isn't polled again (ENDED_KEY).
    */
   async track(game: TrackRequest, delayMs = 0): Promise<void> {
     await this.ctx.storage.put(GAME_KEY, game)
+    if (await this.ctx.storage.get<boolean>(ENDED_KEY)) return
     const alarm = await this.ctx.storage.getAlarm()
     if (alarm === null) await this.ctx.storage.setAlarm(Date.now() + delayMs)
   }
@@ -170,7 +179,11 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
           snapshot.startsAt,
           new Date(),
           snapshot.pollHintSeconds,
+          pauseOf(snapshot),
         ) ?? (await this.boxRetryDelay(snapshot))
+      if (delay === null && snapshot.status === 'final') {
+        await this.ctx.storage.put(ENDED_KEY, true)
+      }
     } catch (error) {
       const errors = ((await this.ctx.storage.get<number>(ERRORS_KEY)) ?? 0) + 1
       await this.ctx.storage.put(ERRORS_KEY, errors)
@@ -604,6 +617,20 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
     await this.ctx.storage.put(ALERT_LOG_KEY, log)
     if (result.sent > 0 || result.pruned > 0) console.log('Alerts sent', result)
   }
+}
+
+/**
+ * The break a snapshot is in, if any. A Game whose Final is already among
+ * its items is over even while its status hasn't caught up (ESPN marks a
+ * game "post" a little after its last play): nothing more is coming, so it
+ * waits as at halftime for the status to turn.
+ */
+export function pauseOf(snapshot: GameSnapshot): Pause | undefined {
+  if (snapshot.status !== 'live') return undefined
+  const ended = snapshot.items.some(
+    (i) => i.kind === 'milestone' && i.milestone === 'final',
+  )
+  return ended ? 'long' : snapshot.pause
 }
 
 function storedBox(

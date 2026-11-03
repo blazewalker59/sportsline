@@ -97,6 +97,16 @@ describe('NFL parseGame — live game (PIT @ CLE)', () => {
     expect(live.box!.linescore.homeTotals).toEqual([21])
     expect(live.box!.tables.map((t) => t.title)).toContain('PIT Passing')
   })
+
+  it('reports halftime as a break in play, and play on as none', () => {
+    expect(live.pause).toBeUndefined()
+    const summary = structuredClone(summaryFixture) as unknown as NflSummary
+    const status = summary.header.competitions[0].status
+    status.type = { ...status.type, name: 'STATUS_HALFTIME' }
+    expect(
+      parseGame(summary, playsFixture as unknown as NflCorePlays).pause,
+    ).toBe('long')
+  })
 })
 
 describe('quarterLabel', () => {

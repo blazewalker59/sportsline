@@ -16,6 +16,16 @@ describe('nextPollDelay', () => {
     expect(nextPollDelay('live', '', now)).toBe(5_000)
   })
 
+  it('polls slowly through a break in play, whatever the Source hint', () => {
+    expect(nextPollDelay('live', '', now, 10, 'long')).toBe(60_000)
+    expect(nextPollDelay('live', '', now, undefined, 'short')).toBe(20_000)
+    expect(nextPollDelay('live', '', now, 5, undefined)).toBe(5_000)
+  })
+
+  it('stops a finished Game even if a break was reported', () => {
+    expect(nextPollDelay('final', '', now, undefined, 'long')).toBeNull()
+  })
+
   it('stops for finished or postponed Games', () => {
     expect(nextPollDelay('final', '', now)).toBeNull()
     expect(nextPollDelay('postponed', '', now)).toBeNull()

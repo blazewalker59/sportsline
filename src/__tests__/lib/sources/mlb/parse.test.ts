@@ -113,6 +113,16 @@ describe('MLB parseFeed — live game (PHI @ ATL, in progress)', () => {
   it('passes on the Source poll hint', () => {
     expect(live.pollHintSeconds).toBe(10)
   })
+
+  it('calls the break between half-innings a short one', () => {
+    expect(live.pause).toBeUndefined()
+    expect(final.pause).toBeUndefined()
+    for (const inningState of ['Middle', 'End']) {
+      const feed = structuredClone(liveFeed) as unknown as MlbFeed
+      feed.liveData.linescore = { ...feed.liveData.linescore, inningState }
+      expect(parseFeed(feed).pause).toBe('short')
+    }
+  })
 })
 
 describe('ordinal', () => {

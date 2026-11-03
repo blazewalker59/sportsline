@@ -9,6 +9,7 @@ import { ROSTER_CONCURRENCY, mapPool } from '../pool'
 import type {
   GameStatus,
   League,
+  Pause,
   ScheduledGame,
   Score,
   SourceMilestone,
@@ -74,6 +75,22 @@ export interface EspnTeams {
       }>
     }>
   }>
+}
+
+/**
+ * A live Game's break in play, from ESPN's status: halftime is long; the end
+ * of a quarter (or of regulation, before overtime) is short.
+ */
+export function espnPause(status: EspnStatus | undefined): Pause | undefined {
+  if (status?.type?.state !== 'in') return undefined
+  switch (status.type.name) {
+    case 'STATUS_HALFTIME':
+      return 'long'
+    case 'STATUS_END_PERIOD':
+      return 'short'
+    default:
+      return undefined
+  }
 }
 
 export function mapStatus(status: EspnStatus | undefined): GameStatus {

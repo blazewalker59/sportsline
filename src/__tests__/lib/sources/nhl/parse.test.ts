@@ -115,6 +115,16 @@ describe('NHL parseGame — live (EDM @ VAN)', () => {
     expect(milestones(live).some((m) => m.milestone === 'final')).toBe(false)
   })
 
+  it('calls an intermission a long break, and play on none', () => {
+    expect(live.pause).toBe('long')
+    const playing = structuredClone(livePbp) as unknown as NhlPlayByPlay
+    playing.clock = { ...playing.clock, inIntermission: false }
+    expect(
+      parseGame(playing, liveBox as unknown as NhlBoxscore).pause,
+    ).toBeUndefined()
+    expect(final.pause).toBeUndefined()
+  })
+
   it('orders every item uniquely', () => {
     const keys = live.items.map((i) => i.key)
     expect(new Set(keys).size).toBe(keys.length)

@@ -22,6 +22,9 @@ export type Json =
 export type GameStatus =
   'scheduled' | 'live' | 'delayed' | 'final' | 'postponed'
 
+/** A break in a live Game's play (GameSnapshot.pause). */
+export type Pause = 'long' | 'short'
+
 export interface Score {
   away: number
   home: number
@@ -156,6 +159,12 @@ export interface GameSnapshot {
   box: SourceBox | null
   /** Source's suggested seconds before the next poll, if it gives one. */
   pollHintSeconds?: number
+  /**
+   * A live Game stopped between segments, so nothing new is coming for a
+   * while: `long` at halftime or an intermission, `short` between quarters
+   * or half-innings. Absent while play is on.
+   */
+  pause?: Pause
   /**
    * Why the Source answered with less than usual this time (e.g. Plays
    * without who was involved), when it fell back.

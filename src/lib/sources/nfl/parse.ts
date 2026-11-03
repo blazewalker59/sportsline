@@ -12,6 +12,7 @@
 import {
   competitorTeam,
   espnHeadshot,
+  espnPause,
   mapStatus,
   parseScoreboard as parseEspnScoreboard,
   periodEndMilestone,
@@ -326,6 +327,7 @@ export function parseGame(
       : null,
     items,
     box: box(summary, awayC, homeC),
+    pause: espnPause(competition.status),
   }
 }
 
