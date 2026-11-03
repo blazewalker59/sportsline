@@ -314,6 +314,9 @@ export function parseGame(
       : null,
     items,
     box: boxscore(box, plays, away, home),
+    ...(status === 'live' && pbp.clock?.inIntermission
+      ? { pause: 'long' as const }
+      : {}),
   }
 }
 

@@ -215,6 +215,10 @@ export function parseFeed(feed: MlbFeed): GameSnapshot {
     items,
     box: box(feed, away, home),
     pollHintSeconds: feed.metaData?.wait,
+    // Between half-innings ("Middle", "End") the teams change sides.
+    ...(status === 'live' && /^(Middle|End)$/.test(linescore?.inningState ?? '')
+      ? { pause: 'short' as const }
+      : {}),
   }
 }
 

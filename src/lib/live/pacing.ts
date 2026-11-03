@@ -3,11 +3,18 @@
  * Source while live). Pure.
  */
 
-import type { GameStatus } from '@/lib/model/types'
+import type { GameStatus, Pause } from '@/lib/model/types'
 
 const MIN_LIVE_SECONDS = 5
 const MAX_LIVE_SECONDS = 15
 const WAITING_SECONDS = 60
+/**
+ * Polls during a break in play (GameSnapshot.pause). A Durable Object is
+ * billed for the time each poll runs, and halftime or an intermission is
+ * 15–20 minutes of polls that find nothing; a short break (between
+ * quarters or half-innings) is a couple of minutes.
+ */
+export const PAUSE_SECONDS: Record<Pause, number> = { long: 60, short: 20 }
 /** Pre-game, a LiveGame wakes this long before first pitch/puck/tip. */
 export const WARMUP_MINUTES = 15
 
@@ -17,6 +24,7 @@ export function nextPollDelay(
   startsAt: string,
   now: Date,
   hintSeconds?: number,
+  pause?: Pause,
 ): number | null {
   switch (status) {
     case 'final':
@@ -25,6 +33,7 @@ export function nextPollDelay(
     case 'delayed':
       return WAITING_SECONDS * 1000
     case 'live': {
+      if (pause) return PAUSE_SECONDS[pause] * 1000
       const s = Math.min(
         MAX_LIVE_SECONDS,
         Math.max(MIN_LIVE_SECONDS, hintSeconds ?? MIN_LIVE_SECONDS),
