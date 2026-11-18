@@ -134,16 +134,15 @@ describe('contentSecurityPolicy', () => {
     }
   })
 
-  it('allows Google Fonts and self-hosted fonts', () => {
+  it('allows self-hosted fonts and no font hosts', () => {
     const policy = contentSecurityPolicy(PAGE_URL)
-    expect(directive(policy, 'style-src')).toContain(
-      'https://fonts.googleapis.com',
-    )
-    expect(directive(policy, 'font-src')).toEqual([
+    expect(directive(policy, 'style-src')).toEqual([
       "'self'",
-      'data:',
-      'https://fonts.gstatic.com',
+      "'unsafe-inline'",
     ])
+    expect(directive(policy, 'font-src')).toEqual(["'self'", 'data:'])
+    expect(policy).not.toContain('fonts.googleapis.com')
+    expect(policy).not.toContain('fonts.gstatic.com')
   })
 
   it('reports violations and forbids plugins and framing', () => {

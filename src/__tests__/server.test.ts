@@ -20,6 +20,7 @@ const state = vi.hoisted(() => ({
   ensure: 0,
   hub: 0,
   mcp: 0,
+  mcpLoaded: 0,
   errors: [] as Array<string>,
   appHeaders: false,
 }))
@@ -45,13 +46,17 @@ vi.mock('@/lib/auth/server', () => ({
   }),
 }))
 
-vi.mock('@/lib/agents/endpoint', () => ({
-  MCP_PATH: '/mcp',
-  serveMcp: () => {
-    state.mcp++
-    return Promise.resolve(new Response('mcp'))
-  },
-}))
+vi.mock('@/lib/agents/endpoint', () => {
+  // Runs when the module is first imported, not when the worker loads.
+  state.mcpLoaded++
+  return {
+    MCP_PATH: '/mcp',
+    serveMcp: () => {
+      state.mcp++
+      return Promise.resolve(new Response('mcp'))
+    },
+  }
+})
 
 vi.mock('@/lib/logoProxy', () => ({
   LOGO_PATH: '/logo',
@@ -166,6 +171,17 @@ describe('worker routing', () => {
     await Promise.all(pending)
     return response
   }
+
+  // First, while the worker is fresh: nothing else has called /mcp yet.
+  it('loads the MCP server on the first Agent call, not at startup', async () => {
+    await get('https://sportsline.test/timeline')
+    await get('https://sportsline.test/health')
+    expect(state.mcpLoaded).toBe(0)
+
+    const mcp = await get('https://sportsline.test/mcp')
+    expect(await mcp.text()).toBe('mcp')
+    expect(state.mcpLoaded).toBe(1)
+  })
 
   it('redirects every other host to the canonical one', async () => {
     const read = await get('https://www.sportsline.test/games?x=1')

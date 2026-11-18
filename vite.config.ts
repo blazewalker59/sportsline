@@ -18,6 +18,18 @@ export default defineConfig(({ command }) => {
       // commit; local builds report nothing.
       __SPORTSLINE_VERSION__: JSON.stringify(process.env.GITHUB_SHA ?? ''),
     },
+    environments: {
+      // The Worker. Its source maps sit beside each chunk in dist/server
+      // (never dist/client, so they aren't served); the deploy's re-bundle
+      // follows them and uploads one map to Cloudflare (wrangler.jsonc,
+      // upload_source_maps). The plugin's default since 1.64; explicit, as
+      // readable stack traces depend on it.
+      ssr: {
+        build: {
+          sourcemap: true,
+        },
+      },
+    },
     test: {
       globals: true,
       environment: 'node',

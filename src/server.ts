@@ -21,7 +21,6 @@ import { getAuth } from '@/lib/auth/server'
 import { canonicalRedirect } from '@/lib/canonical'
 import { serverRequestContext } from '@/lib/db'
 import { LIVE_PATH } from '@/lib/live/LiveHub'
-import { MCP_PATH, serveMcp } from '@/lib/agents/endpoint'
 import { LOGO_PATH, serveLogo } from '@/lib/logoProxy'
 import { reportError } from '@/lib/ops/errors'
 import {
@@ -34,6 +33,9 @@ export { LiveGame } from '@/lib/live/LiveGame'
 export { LiveHub } from '@/lib/live/LiveHub'
 export { Scheduler } from '@/lib/live/Scheduler'
 export { ViewerSync } from '@/lib/live/ViewerSync'
+
+/** Where Agents reach the MCP server; the same path as `endpoint.MCP_PATH`. */
+const MCP_PATH = '/mcp'
 
 /**
  * Any request makes sure the Scheduler loop is running, at most once per
@@ -103,8 +105,13 @@ async function route(
     return env.LIVE_HUB.get(env.LIVE_HUB.idFromName('global')).fetch(request)
   }
 
-  // Agents sign in with an API token, not a session (docs/adr/0007).
-  if (url.pathname === MCP_PATH) return serveMcp(request, env)
+  // Agents sign in with an API token, not a session (docs/adr/0007). The
+  // MCP server loads on its first call: a page view never needs it, so it
+  // stays out of what every new isolate evaluates before its first request.
+  if (url.pathname === MCP_PATH) {
+    const { serveMcp } = await import('@/lib/agents/endpoint')
+    return serveMcp(request, env)
+  }
 
   if (url.pathname.startsWith('/api/auth')) {
     return getAuth(env, url.origin).handler(request)

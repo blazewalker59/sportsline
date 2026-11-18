@@ -28,18 +28,11 @@ const IMAGE_HOSTS = [
 ]
 
 /**
- * Google Fonts, until the fonts are self-hosted: the stylesheet comes from
- * fonts.googleapis.com and the font files from fonts.gstatic.com.
- */
-const FONT_CSS_HOST = 'https://fonts.googleapis.com'
-const FONT_FILE_HOST = 'https://fonts.gstatic.com'
-
-/**
  * The report-only policy for a page served at `origin`. `connect-src`
  * names the page's own wss:// (and ws:// in local development) for the
  * /live socket, since older Safari doesn't count those as 'self'; and the
- * image and font hosts, because sharing a Reaction (modern-screenshot)
- * fetches the images and fonts it draws.
+ * image hosts, because sharing a Reaction (modern-screenshot) fetches the
+ * images it draws. Fonts are self-hosted, so 'self' covers them.
  */
 export function contentSecurityPolicy(origin: URL): string {
   const socket = `${origin.protocol === 'https:' ? 'wss' : 'ws'}://${origin.host}`
@@ -49,17 +42,11 @@ export function contentSecurityPolicy(origin: URL): string {
     // data are inline and carry no nonce yet.
     'script-src': ["'self'", "'unsafe-inline'"],
     // Team colors are inline style attributes from data.
-    'style-src': ["'self'", "'unsafe-inline'", FONT_CSS_HOST],
+    'style-src': ["'self'", "'unsafe-inline'"],
     // data: and blob: for the Reaction share image as it renders.
     'img-src': ["'self'", 'data:', 'blob:', ...IMAGE_HOSTS],
-    'font-src': ["'self'", 'data:', FONT_FILE_HOST],
-    'connect-src': [
-      "'self'",
-      socket,
-      ...IMAGE_HOSTS,
-      FONT_CSS_HOST,
-      FONT_FILE_HOST,
-    ],
+    'font-src': ["'self'", 'data:'],
+    'connect-src': ["'self'", socket, ...IMAGE_HOSTS],
     'worker-src': ["'self'"],
     'manifest-src': ["'self'"],
     'object-src': ["'none'"],
