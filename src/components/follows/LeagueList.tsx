@@ -1,5 +1,5 @@
 /**
- * The Viewer's Scope row on the Follows screen: Leagues and college
+ * The Viewer’s League row on the Follows screen: Leagues and college
  * football's groups. Drag the handle (or use the arrow keys on it) to
  * reorder, Hide/Show to drop an item from the row (a League also from
  * All), and Follow Leagues as before.

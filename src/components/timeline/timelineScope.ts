@@ -10,6 +10,7 @@ import type { PredictionView } from '@/lib/kalshi/predictionViews'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { League } from '@/lib/model/types'
 import { parseScope } from '@/lib/model/scope'
+import { notifyDeviceValue } from '@/lib/useDeviceValue'
 import { inConference, isRanked } from '@/lib/model/timeline'
 import { isConference } from '@/lib/model/leagues'
 
@@ -26,7 +27,10 @@ export function readStoredScope(): Scope | undefined {
 
 export function storeScope(scope: Scope): void {
   try {
+    if (localStorage.getItem(SCOPE_KEY) === scope) return
     localStorage.setItem(SCOPE_KEY, scope)
+    // The nav reads it too (useCurrentScope), for an address without one.
+    notifyDeviceValue()
   } catch {
     // Private mode: the Scope just isn't remembered.
   }

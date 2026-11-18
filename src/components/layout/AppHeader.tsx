@@ -105,7 +105,7 @@ function AccountButton() {
           />
           <nav
             aria-label="Account"
-            className="animate-in fade-in slide-in-from-top-1 absolute right-0 z-50 mt-2 w-72 overflow-hidden rounded-card border border-border bg-surface text-sm shadow-xl duration-150"
+            className="animate-in fade-in slide-in-from-top-1 absolute right-0 z-50 mt-2 max-h-[calc(100dvh-4.5rem)] w-72 overflow-y-auto rounded-card border border-border bg-surface text-sm shadow-xl duration-150"
           >
             <div className="flex items-center gap-3 border-b border-border px-3 py-3">
               <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-background font-semibold text-muted">
@@ -129,7 +129,33 @@ function AccountButton() {
                 </span>
               </span>
             </div>
-            {/* Timeline, Predictions, Fantasy and Follows live in the main navigation (AppNav). */}
+            {/*
+              The main navigation's tabs are the Timeline's Scopes; the
+              screens for managing what's behind them are here.
+            */}
+            <MenuGroup title="Manage">
+              <MenuItem
+                to="/follows"
+                icon="follows"
+                label="Follows"
+                hint="Teams, Players, your League row"
+                onPick={() => setOpen(false)}
+              />
+              <MenuItem
+                to="/predictions"
+                icon="predictions"
+                label="Predictions"
+                hint="Record and Kalshi connection"
+                onPick={() => setOpen(false)}
+              />
+              <MenuItem
+                to="/fantasy"
+                icon="fantasy"
+                label="Fantasy"
+                hint="Leagues and connections"
+                onPick={() => setOpen(false)}
+              />
+            </MenuGroup>
             <MenuGroup title="Your feed">
               <MenuItem
                 to="/reactions"
@@ -223,7 +249,14 @@ function MenuItem({
   hint,
   onPick,
 }: {
-  to: '/reactions' | '/alerts' | '/agents' | '/admin'
+  to:
+    | '/follows'
+    | '/predictions'
+    | '/fantasy'
+    | '/reactions'
+    | '/alerts'
+    | '/agents'
+    | '/admin'
   icon: IconName
   label: string
   hint: string

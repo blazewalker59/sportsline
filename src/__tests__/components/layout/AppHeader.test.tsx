@@ -6,7 +6,14 @@ import {
   createRootRoute,
   createRouter,
 } from '@tanstack/react-router'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { ViewerState } from '@/lib/viewer/server'
 import { AppHeader } from '@/components/layout/AppHeader'
@@ -57,13 +64,24 @@ describe('AppHeader account menu', () => {
     expect(menu.textContent).toContain('Sign out')
   })
 
-  it('leaves the main navigation’s destinations to it', async () => {
+  it('has the screens for managing Follows, Predictions and Fantasy', async () => {
     const menu = await openMenu()
-    const hrefs = Array.from(menu.querySelectorAll('a')).map((a) =>
+    const items = Array.from(menu.querySelectorAll('a')).map((a) => [
       a.getAttribute('href'),
-    )
-    expect(hrefs).not.toContain('/predictions')
-    expect(hrefs).not.toContain('/fantasy')
-    expect(hrefs).not.toContain('/follows')
+      a.textContent,
+    ])
+    expect(items.slice(0, 3)).toEqual([
+      ['/follows', 'FollowsTeams, Players, your League row'],
+      ['/predictions', 'PredictionsRecord and Kalshi connection'],
+      ['/fantasy', 'FantasyLeagues and connections'],
+    ])
+    // Under a heading that says what they're for.
+    expect(menu.textContent).toContain('Manage')
+  })
+
+  it('closes when one is picked', async () => {
+    const menu = await openMenu()
+    fireEvent.click(within(menu).getByRole('link', { name: /^Predictions/ }))
+    expect(screen.queryByRole('navigation', { name: 'Account' })).toBeNull()
   })
 })

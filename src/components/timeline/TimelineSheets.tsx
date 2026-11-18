@@ -28,6 +28,7 @@ export function TimelineSheets({
   onMatchupClose,
   prediction,
   onPredictionClose,
+  onPredictionNavigate = onPredictionClose,
   recap,
   onRecapClose,
   live,
@@ -47,6 +48,8 @@ export function TimelineSheets({
   onMatchupClose: () => void
   prediction: PredictionView | null
   onPredictionClose: () => void
+  /** One of its links was followed (by default, it closes). */
+  onPredictionNavigate?: () => void
   /** The catch-up, when its sheet is open. */
   recap: CatchUp | null
   onRecapClose: () => void
@@ -73,7 +76,11 @@ export function TimelineSheets({
       )}
 
       {prediction && (
-        <PredictionSheet prediction={prediction} onClose={onPredictionClose} />
+        <PredictionSheet
+          prediction={prediction}
+          onClose={onPredictionClose}
+          onNavigate={onPredictionNavigate}
+        />
       )}
 
       {recap && <CatchUpSheet catchUp={recap} onClose={onRecapClose} />}

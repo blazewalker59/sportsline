@@ -27,6 +27,7 @@ import type {
   MatchupView,
 } from '@/lib/fantasy/matchup'
 import type { GameSummary } from '@/lib/model/timeline'
+import type { SheetFrame } from '@/components/chat/Sheet'
 import { MatchupRace } from '@/components/charts/lazy'
 import { Sheet } from '@/components/chat/Sheet'
 import { InlineError } from '@/components/layout/RouteStates'
@@ -60,13 +61,20 @@ function previewOf(own: MatchupView, other: LeagueMatchup): MatchupView {
   }
 }
 
+/** A Matchup in full, as a bottom sheet (MatchupDetail). */
 export function MatchupSheet({
-  league,
-  other,
-  games = [],
-  leagueLink = true,
   onClose,
-}: {
+  ...props
+}: Omit<MatchupDetailProps, 'frame'> & { onClose: () => void }) {
+  return (
+    <MatchupDetail
+      {...props}
+      frame={(parts) => <Sheet {...parts} onClose={onClose} />}
+    />
+  )
+}
+
+interface MatchupDetailProps {
   league: FantasyLeagueView
   /** Another Matchup in the league, in place of the Viewer's. */
   other?: LeagueMatchup
@@ -74,8 +82,21 @@ export function MatchupSheet({
   games?: ReadonlyArray<GameSummary>
   /** Link to the league's page (not when it's open there). */
   leagueLink?: boolean
-  onClose: () => void
-}) {
+  /** Lays it out: a Sheet, or the wide Timeline's pane. */
+  frame: SheetFrame
+}
+
+/**
+ * A Matchup in full: the score pinned, then the categories or the race,
+ * and both Lineups, in whichever frame holds it.
+ */
+export function MatchupDetail({
+  league,
+  other,
+  games = [],
+  leagueLink = true,
+  frame,
+}: MatchupDetailProps) {
   const otherTeam = other?.left.teamId
   const read = useQuery({
     ...leagueMatchupQuery(league.id, otherTeam ?? 0),
@@ -179,37 +200,33 @@ export function MatchupSheet({
       )}
     </span>
   )
-  return (
-    <Sheet
-      title={m.leagueName}
-      action={
-        leagueLink && (
-          <Link
-            to="/fantasy/$leagueId"
-            params={{ leagueId: league.id }}
-            className="shrink-0 text-[13px] font-semibold text-muted hover:text-foreground"
-          >
-            League ›
-          </Link>
-        )
-      }
-      subject={matchupSubject(colors)}
-      // The score stays in view however far down the Lineups go.
-      pinned={
-        <header className="flex items-start gap-3">
-          {side(m.mine, 'left')}
-          <span className="pt-6 text-sm text-muted">vs</span>
-          {m.opponent ? (
-            side(m.opponent, 'right')
-          ) : (
-            <span className="flex-1 pt-6 text-right text-sm text-muted">
-              Bye week
-            </span>
-          )}
-        </header>
-      }
-      onClose={onClose}
-    >
+  return frame({
+    title: m.leagueName,
+    action: leagueLink && (
+      <Link
+        to="/fantasy/$leagueId"
+        params={{ leagueId: league.id }}
+        className="shrink-0 text-[13px] font-semibold text-muted hover:text-foreground"
+      >
+        League ›
+      </Link>
+    ),
+    subject: matchupSubject(colors),
+    // The score stays in view however far down the Lineups go.
+    pinned: (
+      <header className="flex items-start gap-3">
+        {side(m.mine, 'left')}
+        <span className="pt-6 text-sm text-muted">vs</span>
+        {m.opponent ? (
+          side(m.opponent, 'right')
+        ) : (
+          <span className="flex-1 pt-6 text-right text-sm text-muted">
+            Bye week
+          </span>
+        )}
+      </header>
+    ),
+    children: (
       <div
         // The charts read each side's color from here (CHART_COLORS).
         className="contents [&>*]:shrink-0"
@@ -306,6 +323,6 @@ export function MatchupSheet({
             : `Read from ${source}. Points refresh every couple of minutes; tap a player’s points for the breakdown.`}
         </p>
       </div>
-    </Sheet>
-  )
+    ),
+  })
 }

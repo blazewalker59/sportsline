@@ -10,16 +10,24 @@ import {
   createRoute,
   createRouter,
 } from '@tanstack/react-router'
-import { act, cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ViewerState } from '@/lib/viewer/server'
 import {
   AppShell,
-  DESTINATIONS,
   NAV_INSET_LEFT,
-  activeDestination,
+  TABS,
+  activeTab,
 } from '@/components/layout/AppNav'
 import { VIEWER_KEY } from '@/lib/viewer/queries'
+import { DEFAULT_LEAGUE_SETTINGS } from '@/lib/model/leagues'
 
 const signedIn = {
   viewer: {
@@ -30,7 +38,12 @@ const signedIn = {
   },
   follows: [],
   readAt: null,
-  leagues: { order: [], hidden: [] },
+  leagues: DEFAULT_LEAGUE_SETTINGS,
+} as unknown as ViewerState
+
+const following = {
+  ...signedIn,
+  follows: [{ follow: { kind: 'team', teamId: 'tm_pit' } }],
 } as unknown as ViewerState
 
 const signedOut: ViewerState = { ...signedIn, viewer: null }
@@ -74,73 +87,155 @@ async function renderAt(path: string, state: ViewerState) {
     </QueryClientProvider>,
   )
   await screen.findByText(/^screen /)
+  return { router }
 }
 
-/** The labels of the tabs marked as the current page. */
-const current = () =>
-  screen
-    .queryAllByRole('link')
-    .filter((a) => a.getAttribute('aria-current') === 'page')
-    .map((a) => a.textContent)
+const nav = () => screen.getByRole('navigation', { name: 'Main' })
+const tabs = () => Array.from(nav().querySelectorAll<HTMLElement>('li a'))
+const tab = (scope: string) =>
+  nav().querySelector<HTMLElement>(`[data-scope-tab="${scope}"]`)!
 
-/** The active tab's lozenge. */
+/** The Scopes of the tabs marked as the current page. */
+const current = () =>
+  tabs()
+    .filter((a) => a.getAttribute('aria-current') === 'page')
+    .map((a) => a.dataset.scopeTab)
+
+/** The current tab's lozenge. */
 const lozengeEl = () => {
-  const el = screen
-    .getByRole('navigation', { name: 'Main' })
-    .querySelector<HTMLElement>('[data-nav-lozenge]')
+  const el = nav().querySelector<HTMLElement>('[data-nav-lozenge]')
   if (!el) throw new Error('no lozenge')
   return el
 }
 
-describe('AppNav', () => {
-  afterEach(cleanup)
+beforeEach(() => localStorage.clear())
+afterEach(cleanup)
 
-  it('offers the four destinations in order', async () => {
+describe('AppNav: the Timeline’s Scopes', () => {
+  it('offers the four Scopes in order', async () => {
     await renderAt('/predictions', signedIn)
-    const nav = screen.getByRole('navigation', { name: 'Main' })
-    const labels = Array.from(nav.querySelectorAll('li a')).map(
-      (a) => a.textContent,
-    )
-    expect(labels).toEqual(['Timeline', 'Predictions', 'Fantasy', 'Follows'])
+    expect(tabs().map((a) => a.textContent)).toEqual([
+      'Following',
+      'All',
+      'Predictions',
+      'Fantasy',
+    ])
+    expect(screen.getByRole('link', { name: 'All Leagues' })).toBe(tab('all'))
   })
 
   it.each([
-    ['/', 'Timeline'],
-    ['/?game=nfl-1&scope=nfl', 'Timeline'],
-    ['/predictions', 'Predictions'],
-    ['/fantasy', 'Fantasy'],
-    ['/fantasy/espn-123', 'Fantasy'],
-    ['/follows', 'Follows'],
-  ])('marks %s as %s with aria-current', async (path, label) => {
+    ['/?scope=following', 'following'],
+    ['/?scope=all', 'all'],
+    ['/?scope=predictions', 'predictions'],
+    ['/?scope=fantasy', 'fantasy'],
+  ])('marks the Scope on %s as current', async (path, scope) => {
     await renderAt(path, signedIn)
-    expect(current()).toEqual([label])
+    expect(current()).toEqual([scope])
+    const lozenge = lozengeEl()
+    const index = TABS.findIndex((t) => t.scope === scope)
+    expect(lozenge.getAttribute('data-active')).toBe(String(index))
+    expect(lozenge.style.getPropertyValue('--i')).toBe(String(index))
   })
 
-  it('marks no tab on a screen outside the four', async () => {
-    await renderAt('/reactions', signedIn)
-    expect(current()).toEqual([])
-  })
-
-  it.each([
-    ['/', 0],
-    ['/?game=nfl-1&scope=nfl', 0],
-    ['/predictions', 1],
-    ['/fantasy', 2],
-    ['/fantasy/espn-123', 2],
-    ['/follows', 3],
-  ])(
-    'slides the glass lozenge behind the current tab on %s',
-    async (path, index) => {
-      await renderAt(path, signedIn)
-      const lozenge = lozengeEl()
-      expect(lozenge.getAttribute('data-active')).toBe(String(index))
-      expect(lozenge.style.getPropertyValue('--i')).toBe(String(index))
-      // The tab it sits behind is the one marked current.
-      expect(current()).toEqual([DESTINATIONS[index].label])
+  it.each(['nfl', 'top25', 'sec', 'cfb'])(
+    'marks All as current for the League-shaped Scope %s',
+    async (scope) => {
+      await renderAt(`/?scope=${scope}`, signedIn)
+      expect(current()).toEqual(['all'])
     },
   )
 
-  it('hides the lozenge on a screen outside the four', async () => {
+  it('follows narrowing to one Prediction or Matchup, and a Game open', async () => {
+    await renderAt('/?prediction=p1', signedIn)
+    expect(current()).toEqual(['predictions'])
+    cleanup()
+    await renderAt('/?matchup=espn-1', signedIn)
+    expect(current()).toEqual(['fantasy'])
+    cleanup()
+    await renderAt('/?game=nfl-1&scope=nfl', signedIn)
+    expect(current()).toEqual(['all'])
+  })
+
+  it('with no Scope asked for, marks the remembered one, else the default', async () => {
+    await renderAt('/', signedIn)
+    expect(current()).toEqual(['all'])
+    cleanup()
+    await renderAt('/', following)
+    expect(current()).toEqual(['following'])
+    cleanup()
+    localStorage.setItem('sportsline:scope', 'fantasy')
+    await renderAt('/', following)
+    await waitFor(() => expect(current()).toEqual(['fantasy']))
+  })
+
+  it.each(['following', 'predictions', 'fantasy'] as const)(
+    'tapping %s shows the Timeline in that Scope',
+    async (scope) => {
+      const { router } = await renderAt('/?scope=nba', signedIn)
+      fireEvent.click(tab(scope))
+      await waitFor(() =>
+        expect(router.state.location.search).toMatchObject({ scope }),
+      )
+      expect(current()).toEqual([scope])
+    },
+  )
+
+  it('tapping a tab drops any Game, Play or narrowing, and keeps the day', async () => {
+    const { router } = await renderAt(
+      '/?scope=nba&day=2026-11-01&game=g1&play=p1',
+      signedIn,
+    )
+    fireEvent.click(tab('fantasy'))
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({
+        scope: 'fantasy',
+      }),
+    )
+    const search = router.state.location.search as Record<string, unknown>
+    expect(search.day).toBe('2026-11-01')
+    expect(search.game).toBeUndefined()
+    expect(search.play).toBeUndefined()
+  })
+
+  it('All returns to the League choice last made under it', async () => {
+    const { router } = await renderAt('/?scope=top25', signedIn)
+    fireEvent.click(tab('fantasy'))
+    await waitFor(() => expect(current()).toEqual(['fantasy']))
+    // Its address already points back there.
+    expect(tab('all').getAttribute('href')).toContain('scope=top25')
+    fireEvent.click(tab('all'))
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({ scope: 'top25' }),
+    )
+    expect(current()).toEqual(['all'])
+  })
+
+  it('All goes to All Leagues when no League was chosen', async () => {
+    const { router } = await renderAt('/?scope=following', following)
+    fireEvent.click(tab('all'))
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({ scope: 'all' }),
+    )
+  })
+
+  it.each(['/predictions', '/fantasy', '/fantasy/espn-123', '/follows'])(
+    'marks no tab on %s, and its tabs go back to the Timeline',
+    async (path) => {
+      const { router } = await renderAt(path, signedIn)
+      expect(current()).toEqual([])
+      expect(lozengeEl().getAttribute('data-active')).toBe('-1')
+      expect(tab('predictions').getAttribute('href')).toBe(
+        '/?scope=predictions',
+      )
+      fireEvent.click(tab('predictions'))
+      await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+      expect(router.state.location.search).toEqual({ scope: 'predictions' })
+      await screen.findByText('screen /')
+      expect(current()).toEqual(['predictions'])
+    },
+  )
+
+  it('hides the lozenge away from the Timeline', async () => {
     await renderAt('/reactions', signedIn)
     const lozenge = lozengeEl()
     expect(lozenge.getAttribute('data-active')).toBe('-1')
@@ -150,13 +245,12 @@ describe('AppNav', () => {
   })
 
   it('wears the glass, with each tab hooked for its press, focus and tone', async () => {
-    await renderAt('/fantasy', signedIn)
-    const nav = screen.getByRole('navigation', { name: 'Main' })
-    expect(nav.classList.contains('glass-nav')).toBe(true)
-    const tabs = Array.from(nav.querySelectorAll('li a'))
-    expect(tabs.every((a) => a.classList.contains('glass-nav-tab'))).toBe(true)
-    const fantasy = screen.getByRole('link', { name: 'Fantasy' })
-    expect((fantasy as HTMLElement).style.getPropertyValue('--nav-tone')).toBe(
+    await renderAt('/?scope=fantasy', signedIn)
+    expect(nav().classList.contains('glass-nav')).toBe(true)
+    expect(tabs().every((a) => a.classList.contains('glass-nav-tab'))).toBe(
+      true,
+    )
+    expect(tab('fantasy').style.getPropertyValue('--nav-tone')).toBe(
       'var(--section-fantasy)',
     )
   })
@@ -173,35 +267,32 @@ describe('AppNav', () => {
 
   it('stays out of Scope swipes and has its own View Transition layer', async () => {
     await renderAt('/', signedIn)
-    const nav = screen.getByRole('navigation', { name: 'Main' })
-    expect(nav.hasAttribute('data-no-swipe')).toBe(true)
-    expect(nav.style.viewTransitionName).toBe('app-nav')
+    expect(nav().hasAttribute('data-no-swipe')).toBe(true)
+    expect(nav().style.viewTransitionName).toBe('app-nav')
   })
 
   it('is not shown to a signed-out visitor (the Landing)', async () => {
     await renderAt('/', signedOut)
     expect(screen.queryByRole('navigation')).toBeNull()
-    expect(screen.queryByRole('link', { name: 'Timeline' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Following' })).toBeNull()
     // No room kept for a bar that isn't there.
     const shell = screen.getByText('screen /').parentElement
     expect(shell?.className ?? '').not.toContain('pb-24')
   })
 })
 
-describe('activeDestination', () => {
+describe('activeTab', () => {
   it.each([
-    ['/', 0],
-    ['/predictions', 1],
-    ['/predictions/', 1],
-    ['/fantasy', 2],
-    ['/fantasy/espn-123', 2],
-    ['/follows', 3],
-    ['/reactions', -1],
-    ['/games/nfl-1', -1],
-    // A sibling path that merely starts with a destination's name.
-    ['/fantasyland', -1],
-  ])('finds %s at %i', (path, index) => {
-    expect(activeDestination(path)).toBe(index)
+    [null, -1],
+    ['following', 0],
+    ['all', 1],
+    ['nhl', 1],
+    ['top25', 1],
+    ['big12', 1],
+    ['predictions', 2],
+    ['fantasy', 3],
+  ] as const)('finds %s at %i', (scope, index) => {
+    expect(activeTab(scope)).toBe(index)
   })
 })
 
@@ -246,5 +337,14 @@ describe('the glass stylesheet', () => {
       .find((r) => r.includes('.glass-nav-lozenge'))
     expect(rules).toBeDefined()
     expect(rules).toContain('transition: none')
+  })
+
+  it('lets the lozenge slide through a Scope change’s View Transition', () => {
+    expect(block('::view-transition-old(app-nav)')).toContain('display: none')
+    expect(block('::view-transition-new(app-nav)')).toContain('animation: none')
+  })
+
+  it('styles the current tab by aria-current', () => {
+    expect(css).toContain(".glass-nav-tab[aria-current='page'] .glass-nav-icon")
   })
 })

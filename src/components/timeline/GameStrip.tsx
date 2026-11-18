@@ -67,7 +67,12 @@ function GameCard({
   return (
     <Link
       to="/"
-      search={(prev) => ({ ...prev, game: selected ? undefined : game.id })}
+      search={(prev) => ({
+        ...prev,
+        game: selected ? undefined : game.id,
+        // The wide pane shows one thing: the Game replaces any Prediction.
+        detail: undefined,
+      })}
       viewTransition
       resetScroll={false}
       aria-pressed={selected}

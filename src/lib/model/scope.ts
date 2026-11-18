@@ -1,6 +1,7 @@
 /**
- * A Timeline's Scope (CONTEXT.md): All, Following, one League, or one of
- * college football's groups (Top 25, a major Conference).
+ * A Timeline's Scope (CONTEXT.md): All, Following, Predictions, Fantasy,
+ * one League, or one of college football's groups (Top 25, a major
+ * Conference), and the main navigation's four tabs over them.
  */
 
 import { DEFAULT_FOLLOWS } from './timeline'
@@ -64,33 +65,72 @@ export function scopeFollows(
 }
 
 /**
- * The top-level views in the order the Scope chips show them: the League
- * choice, then Following, Predictions and Fantasy when the Viewer has them.
+ * The four tabs of the main navigation, each a way into the Timeline
+ * (CONTEXT.md, "Scope"), in the order the nav shows them. All stands for
+ * every League-shaped Scope: All, one League, Top 25 or a Conference.
  */
-export function scopeStops(
-  lastLeague: 'all' | RowItem,
-  offered: { following: boolean; predictions: boolean; fantasy: boolean },
-): Array<Scope> {
-  return [
-    lastLeague,
-    ...(offered.following ? (['following'] as const) : []),
-    ...(offered.predictions ? (['predictions'] as const) : []),
-    ...(offered.fantasy ? (['fantasy'] as const) : []),
-  ]
+export type ScopeTab = 'following' | 'all' | 'predictions' | 'fantasy'
+
+export const SCOPE_TABS: ReadonlyArray<ScopeTab> = [
+  'following',
+  'all',
+  'predictions',
+  'fantasy',
+]
+
+/** The tab a Scope sits under: All for any League-shaped Scope. */
+export function scopeTab(scope: Scope): ScopeTab {
+  return scope === 'following' || scope === 'predictions' || scope === 'fantasy'
+    ? scope
+    : 'all'
 }
 
 /**
- * The view a step moves to from `scope` (1: the next chip, -1: the one
+ * The Scope the Timeline shows: narrowing to one Prediction or Matchup
+ * implies its Scope; otherwise the one asked for (the link, or a tab),
+ * else the one last chosen on this device, else the default (Following
+ * for a Viewer who follows anything, otherwise All). A Scope with nothing
+ * behind it yet (no Follows, no Kalshi, no Fantasy) is still that Scope:
+ * the Timeline offers to set it up rather than quietly showing another.
+ */
+export function resolveScope({
+  requested,
+  stored,
+  viewerFollows,
+  predictionId,
+  matchupId,
+}: {
+  requested?: Scope
+  stored?: Scope
+  viewerFollows: ReadonlyArray<Follow>
+  predictionId?: string | null
+  matchupId?: string | null
+}): Scope {
+  if (predictionId) return 'predictions'
+  if (matchupId) return 'fantasy'
+  return requested ?? stored ?? defaultScope(viewerFollows)
+}
+
+/**
+ * The Scopes a swipe steps through, in the nav's order: Following, the
+ * League choice (the last one the Viewer chose under All), Predictions,
+ * Fantasy. Always all four, so the order never reshuffles.
+ */
+export function scopeStops(lastLeague: 'all' | RowItem): Array<Scope> {
+  return SCOPE_TABS.map((tab) => (tab === 'all' ? lastLeague : tab))
+}
+
+/**
+ * The Scope a step moves to from `scope` (1: the next tab, -1: the one
  * before), or null at either end: it doesn't wrap. Any League choice
- * stands in the League chip's place.
+ * stands in the All tab's place.
  */
 export function neighborScope(
   stops: ReadonlyArray<Scope>,
   scope: Scope,
   step: 1 | -1,
 ): Scope | null {
-  const views: ReadonlyArray<Scope> = ['following', 'predictions', 'fantasy']
-  const at = views.includes(scope) ? stops.indexOf(scope) : 0
+  const at = stops.findIndex((s) => scopeTab(s) === scopeTab(scope))
   if (at === -1) return null
   return stops[at + step] ?? null
 }

@@ -1,4 +1,7 @@
-/** A Prediction's sheet (CONTEXT.md): its Odds, money, and every Leg. */
+/**
+ * A Prediction in full (CONTEXT.md): its Odds, money, and every Leg. A
+ * sheet, or beside the wide Timeline its pane (same content, another frame).
+ */
 
 import { Link } from '@tanstack/react-router'
 import {
@@ -12,6 +15,7 @@ import {
 } from './PredictionParts'
 import { PredictionGames } from './PredictionGames'
 import type { LegView, PredictionView } from '@/lib/kalshi/predictionViews'
+import type { SheetFrame } from '@/components/chat/Sheet'
 import { OddsChart } from '@/components/charts/lazy'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
@@ -110,18 +114,42 @@ function LegRow({
   )
 }
 
+/** A Prediction in full, as a bottom sheet (PredictionDetail). */
+export function PredictionSheet({
+  prediction,
+  onClose,
+  onNavigate = onClose,
+}: {
+  prediction: PredictionView
+  onClose: () => void
+  /** A link inside it was followed (by default, it closes). */
+  onNavigate?: () => void
+}) {
+  return (
+    <PredictionDetail
+      prediction={prediction}
+      onNavigate={onNavigate}
+      frame={(parts) => <Sheet {...parts} onClose={onClose} />}
+    />
+  )
+}
+
 /**
  * A Prediction in full: Odds, money, and every Leg with its Game. It
  * wears its team's color (the Player's, the team picked, or a combo's on
  * one team), or both teams' when it's on one Game (a total, a same-game
- * combo); otherwise each Leg shows its own team.
+ * combo); otherwise each Leg shows its own team. `frame` lays it out: a
+ * Sheet, or the wide Timeline's pane.
  */
-export function PredictionSheet({
+export function PredictionDetail({
   prediction: p,
-  onClose,
+  onNavigate,
+  frame,
 }: {
   prediction: PredictionView
-  onClose: () => void
+  /** A link inside it was followed (a sheet closes; a pane is replaced). */
+  onNavigate: () => void
+  frame: SheetFrame
 }) {
   const move = movement(p)
   const settled = p.status !== 'open'
@@ -129,117 +157,119 @@ export function PredictionSheet({
   const subject = predictionSubject(p.legs)
   // Each Leg's own team, unless the whole sheet is one team's.
   const pips = !subject || isPair(subject)
-  return (
-    <Sheet
-      title={combo ? 'Combo' : 'Prediction'}
-      subject={subject}
-      onClose={onClose}
-    >
-      <header className="flex flex-col gap-1">
-        <h2 className="text-lg leading-snug font-bold">
-          {p.side === 'no' && <span className="text-muted">Not: </span>}
-          {p.title}
-        </h2>
-        {settled ? (
-          <span
-            className={cn(
-              'text-sm font-semibold',
-              p.result === 'won' ? 'text-scoring' : 'text-muted',
-            )}
-          >
-            {p.status === 'closed'
-              ? 'Closed out'
-              : p.result === 'won'
-                ? 'Won'
-                : p.result === 'lost'
-                  ? 'Lost'
-                  : 'Voided'}
-            {p.pnl !== null && ` · ${p.pnl >= 0 ? '+' : ''}${money(p.pnl)}`}
-          </span>
-        ) : (
-          <span className="flex items-end justify-between gap-3">
-            <span className="flex flex-col">
-              <span className="text-3xl leading-none font-bold tabular-nums">
-                {p.chance === null ? '—' : pct(p.chance)}
-              </span>
-              {move !== null && (
-                <span
-                  className={cn(
-                    'text-sm font-semibold tabular-nums',
-                    move > 0
-                      ? 'text-scoring'
-                      : move < 0
-                        ? 'text-live'
-                        : 'text-muted',
-                  )}
-                >
-                  {move > 0 ? '▲' : move < 0 ? '▼' : '·'} {Math.abs(move)} pts
-                  from {pct(p.entryChance!)} when you got in
-                </span>
+  return frame({
+    title: combo ? 'Combo' : 'Prediction',
+    subject,
+    children: (
+      <>
+        <header className="flex flex-col gap-1">
+          <h2 className="text-lg leading-snug font-bold">
+            {p.side === 'no' && <span className="text-muted">Not: </span>}
+            {p.title}
+          </h2>
+          {settled ? (
+            <span
+              className={cn(
+                'text-sm font-semibold',
+                p.result === 'won' ? 'text-scoring' : 'text-muted',
               )}
+            >
+              {p.status === 'closed'
+                ? 'Closed out'
+                : p.result === 'won'
+                  ? 'Won'
+                  : p.result === 'lost'
+                    ? 'Lost'
+                    : 'Voided'}
+              {p.pnl !== null && ` · ${p.pnl >= 0 ? '+' : ''}${money(p.pnl)}`}
             </span>
-          </span>
-        )}
-      </header>
-      <OddsChart predictionId={p.id} />
-      <dl className="grid grid-cols-3 gap-2 rounded-card border border-border bg-surface p-3 text-center text-xs text-muted">
-        <div>
-          <dt className="subject-ink">Contracts</dt>
-          <dd className="text-base font-semibold text-foreground tabular-nums">
-            {Number.isInteger(p.contracts)
-              ? p.contracts
-              : p.contracts.toFixed(2)}
-          </dd>
-        </div>
-        <div>
-          <dt className="subject-ink">Cost</dt>
-          <dd className="text-base font-semibold text-foreground tabular-nums">
-            {money(p.cost)}
-          </dd>
-        </div>
-        <div>
-          <dt className="subject-ink">{settled ? 'Payout' : 'Cash out now'}</dt>
-          <dd className="text-base font-semibold text-foreground tabular-nums">
-            {settled
-              ? p.payout === null
-                ? '—'
-                : money(p.payout)
-              : p.value === null
-                ? '—'
-                : money(p.value)}
-            {!settled &&
-              (() => {
-                const profit = profitOf(p)
-                return profit ? (
+          ) : (
+            <span className="flex items-end justify-between gap-3">
+              <span className="flex flex-col">
+                <span className="text-3xl leading-none font-bold tabular-nums">
+                  {p.chance === null ? '—' : pct(p.chance)}
+                </span>
+                {move !== null && (
                   <span
                     className={cn(
-                      'block text-2xs font-semibold',
-                      toneOf(profit.dollars),
+                      'text-sm font-semibold tabular-nums',
+                      move > 0
+                        ? 'text-scoring'
+                        : move < 0
+                          ? 'text-live'
+                          : 'text-muted',
                     )}
                   >
-                    {profitText(profit, 'dollars')}
-                    {profit.percent !== null &&
-                      ` (${profitText(profit, 'percent')})`}
+                    {move > 0 ? '▲' : move < 0 ? '▼' : '·'} {Math.abs(move)} pts
+                    from {pct(p.entryChance!)} when you got in
                   </span>
-                ) : null
-              })()}
-          </dd>
-        </div>
-      </dl>
-      <section>
-        <h3 className="subject-ink mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-          {combo ? `${p.legs.length} legs` : 'Market'}
-        </h3>
-        <ul className="divide-y divide-border rounded-card border border-border bg-surface">
-          {p.legs.map((leg, i) => (
-            <LegRow key={i} leg={leg} pip={pips} onNavigate={onClose} />
-          ))}
-        </ul>
-      </section>
-      <PredictionGames prediction={p} onNavigate={onClose} />
-      <p className="text-2xs text-muted">
-        Read from your Kalshi account. Odds are Kalshi’s market prices.
-      </p>
-    </Sheet>
-  )
+                )}
+              </span>
+            </span>
+          )}
+        </header>
+        <OddsChart predictionId={p.id} />
+        <dl className="grid grid-cols-3 gap-2 rounded-card border border-border bg-surface p-3 text-center text-xs text-muted">
+          <div>
+            <dt className="subject-ink">Contracts</dt>
+            <dd className="text-base font-semibold text-foreground tabular-nums">
+              {Number.isInteger(p.contracts)
+                ? p.contracts
+                : p.contracts.toFixed(2)}
+            </dd>
+          </div>
+          <div>
+            <dt className="subject-ink">Cost</dt>
+            <dd className="text-base font-semibold text-foreground tabular-nums">
+              {money(p.cost)}
+            </dd>
+          </div>
+          <div>
+            <dt className="subject-ink">
+              {settled ? 'Payout' : 'Cash out now'}
+            </dt>
+            <dd className="text-base font-semibold text-foreground tabular-nums">
+              {settled
+                ? p.payout === null
+                  ? '—'
+                  : money(p.payout)
+                : p.value === null
+                  ? '—'
+                  : money(p.value)}
+              {!settled &&
+                (() => {
+                  const profit = profitOf(p)
+                  return profit ? (
+                    <span
+                      className={cn(
+                        'block text-2xs font-semibold',
+                        toneOf(profit.dollars),
+                      )}
+                    >
+                      {profitText(profit, 'dollars')}
+                      {profit.percent !== null &&
+                        ` (${profitText(profit, 'percent')})`}
+                    </span>
+                  ) : null
+                })()}
+            </dd>
+          </div>
+        </dl>
+        <section>
+          <h3 className="subject-ink mb-2 text-xs font-bold tracking-wide text-muted uppercase">
+            {combo ? `${p.legs.length} legs` : 'Market'}
+          </h3>
+          <ul className="divide-y divide-border rounded-card border border-border bg-surface">
+            {p.legs.map((leg, i) => (
+              <LegRow key={i} leg={leg} pip={pips} onNavigate={onNavigate} />
+            ))}
+          </ul>
+        </section>
+        <PredictionGames prediction={p} onNavigate={onNavigate} />
+        <p className="text-2xs text-muted">
+          Read from your Kalshi account. Odds are Kalshi’s market prices.
+        </p>
+      </>
+    ),
+  })
 }
