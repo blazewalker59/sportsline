@@ -1,0 +1,14 @@
+# Headers for static assets, which Workers Static Assets serves without
+# running the Worker (src/server.ts adds its own to everything it serves).
+# Copied into dist/client by `vite build`; never served itself.
+
+# Vite's build output: every filename carries a content hash, so a file
+# never changes under its name. Everything else here (sw.js, manifest.json,
+# icons) keeps Cloudflare's default, revalidating on every use.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin

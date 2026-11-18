@@ -7,7 +7,9 @@
  * (`/mcp`) directly; everything else falls through to TanStack
  * Start inside a per-request context carrying the env. Also exports the
  * Durable Object classes, and keeps the Scheduler loop running
- * (docs/adr/0001, "Scheduling").
+ * (docs/adr/0001, "Scheduling"), from requests and from a five-minute Cron
+ * Trigger as a safety net. Every response but a WebSocket upgrade gets the
+ * security headers (src/lib/securityHeaders.ts).
  */
 
 import {
@@ -22,6 +24,11 @@ import { LIVE_PATH } from '@/lib/live/LiveHub'
 import { MCP_PATH, serveMcp } from '@/lib/agents/endpoint'
 import { LOGO_PATH, serveLogo } from '@/lib/logoProxy'
 import { reportError } from '@/lib/ops/errors'
+import {
+  CSP_REPORT_PATH,
+  receiveCspReport,
+  withSecurityHeaders,
+} from '@/lib/securityHeaders'
 
 export { LiveGame } from '@/lib/live/LiveGame'
 export { LiveHub } from '@/lib/live/LiveHub'
@@ -47,6 +54,67 @@ const startFetch = createStartHandler(defaultStreamHandler) as (
   ctx: ExecutionContext,
 ) => Promise<Response>
 
+/** The response to one request, before the security headers. */
+async function route(
+  request: Request,
+  env: CloudflareEnv,
+  ctx: ExecutionContext,
+  url: URL,
+): Promise<Response> {
+  // One canonical address (one sign-in, one cache): www and workers.dev
+  // permanently redirect to the same path on CANONICAL_HOST.
+  const redirect = canonicalRedirect(url, request.method, env.CANONICAL_HOST)
+  if (redirect) return redirect
+
+  // The deploy smoke check hits /health, which starts the loop right away.
+  if (url.pathname === '/health') {
+    try {
+      await env.DB.prepare('SELECT 1').first()
+      await ensureScheduler(env)
+      return Response.json({
+        ok: true,
+        version: __SPORTSLINE_VERSION__ || undefined,
+      })
+    } catch {
+      return Response.json({ ok: false }, { status: 503 })
+    }
+  }
+
+  if (url.pathname === LOGO_PATH && request.method === 'GET') {
+    return serveLogo(url)
+  }
+
+  if (url.pathname === CSP_REPORT_PATH) return receiveCspReport(request)
+
+  if (Date.now() - lastKick > KICK_EVERY_MS) {
+    ctx.waitUntil(
+      ensureScheduler(env).catch((error: unknown) =>
+        reportError(env, 'scheduler', error),
+      ),
+    )
+  }
+
+  if (url.pathname === LIVE_PATH) {
+    // Live updates are for signed-in Viewers, like everything else.
+    const session = await getAuth(env, url.origin).api.getSession({
+      headers: request.headers,
+    })
+    if (!session?.user) return new Response('Sign in required', { status: 401 })
+    return env.LIVE_HUB.get(env.LIVE_HUB.idFromName('global')).fetch(request)
+  }
+
+  // Agents sign in with an API token, not a session (docs/adr/0007).
+  if (url.pathname === MCP_PATH) return serveMcp(request, env)
+
+  if (url.pathname.startsWith('/api/auth')) {
+    return getAuth(env, url.origin).handler(request)
+  }
+
+  return serverRequestContext.run({ headers: request.headers, env }, () =>
+    startFetch(request, env, ctx),
+  )
+}
+
 export default {
   async fetch(
     request: Request,
@@ -54,57 +122,20 @@ export default {
     ctx: ExecutionContext,
   ): Promise<Response> {
     const url = new URL(request.url)
+    return withSecurityHeaders(await route(request, env, ctx, url), url)
+  },
 
-    // One canonical address (one sign-in, one cache): www and workers.dev
-    // permanently redirect to the same path on CANONICAL_HOST.
-    const redirect = canonicalRedirect(url, request.method, env.CANONICAL_HOST)
-    if (redirect) return redirect
-
-    // The deploy smoke check hits /health, which starts the loop right away.
-    if (url.pathname === '/health') {
-      try {
-        await env.DB.prepare('SELECT 1').first()
-        await ensureScheduler(env)
-        return Response.json({
-          ok: true,
-          version: __SPORTSLINE_VERSION__ || undefined,
-        })
-      } catch {
-        return Response.json({ ok: false }, { status: 503 })
-      }
-    }
-
-    if (url.pathname === LOGO_PATH && request.method === 'GET') {
-      return serveLogo(url)
-    }
-
-    if (Date.now() - lastKick > KICK_EVERY_MS) {
-      ctx.waitUntil(
-        ensureScheduler(env).catch((error: unknown) =>
-          reportError(env, 'scheduler', error),
-        ),
-      )
-    }
-
-    if (url.pathname === LIVE_PATH) {
-      // Live updates are for signed-in Viewers, like everything else.
-      const session = await getAuth(env, url.origin).api.getSession({
-        headers: request.headers,
-      })
-      if (!session?.user)
-        return new Response('Sign in required', { status: 401 })
-      return env.LIVE_HUB.get(env.LIVE_HUB.idFromName('global')).fetch(request)
-    }
-
-    // Agents sign in with an API token, not a session (docs/adr/0007).
-    if (url.pathname === MCP_PATH) return serveMcp(request, env)
-
-    if (url.pathname.startsWith('/api/auth')) {
-      return getAuth(env, url.origin).handler(request)
-    }
-
-    return serverRequestContext.run({ headers: request.headers, env }, () =>
-      startFetch(request, env, ctx),
+  /**
+   * A safety net, not the schedule: every five minutes, make sure the
+   * Scheduler loop is running (docs/adr/0001, "Scheduling"). Harmless if
+   * the trigger never fires, and a no-op while the loop runs.
+   */
+  async scheduled(
+    _controller: ScheduledController,
+    env: CloudflareEnv,
+  ): Promise<void> {
+    await ensureScheduler(env).catch((error: unknown) =>
+      reportError(env, 'scheduler', error),
     )
   },
 }

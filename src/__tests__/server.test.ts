@@ -79,12 +79,13 @@ type Worker = {
     env: object,
     ctx: { waitUntil: (p: Promise<unknown>) => void },
   ) => Promise<Response>
+  scheduled: (controller: object, env: object) => Promise<void>
 }
 
 async function loadWorker(): Promise<Worker> {
   vi.resetModules()
   const mod = await import('@/server')
-  return mod.default as Worker
+  return mod.default as unknown as Worker
 }
 
 function testEnv() {
@@ -219,6 +220,48 @@ describe('worker routing', () => {
     const page = await get('https://sportsline.test/timeline')
     expect(await page.text()).toBe('app:/timeline')
     expect(state.appHeaders).toBe(true)
+  })
+
+  it('adds security headers to every response but the live socket', async () => {
+    const redirect = await get('https://www.sportsline.test/games')
+    expect(redirect.status).toBe(301)
+    expect(redirect.headers.get('x-content-type-options')).toBe('nosniff')
+
+    const health = await get('https://sportsline.test/health')
+    expect(health.headers.get('strict-transport-security')).toContain(
+      'max-age=',
+    )
+
+    const page = await get('https://sportsline.test/timeline')
+    expect(page.headers.get('x-frame-options')).toBe('DENY')
+
+    state.session = { user: { id: 'u1' } }
+    const live = await get('https://sportsline.test/live')
+    expect(live.status).toBe(101)
+    expect(live.headers.get('x-frame-options')).toBeNull()
+  })
+
+  it('takes CSP reports without starting the scheduler', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const response = await worker.fetch(
+      new Request('https://sportsline.test/csp-report', {
+        method: 'POST',
+        body: '{"csp-report":{}}',
+      }),
+      testEnv(),
+      ctx(),
+    )
+    expect(response.status).toBe(204)
+    expect(state.ensure).toBe(0)
+  })
+
+  it('makes sure the scheduler is running when the Cron Trigger fires', async () => {
+    await worker.scheduled({}, testEnv())
+    expect(state.ensure).toBe(1)
+
+    state.schedFail = true
+    await expect(worker.scheduled({}, testEnv())).resolves.toBeUndefined()
+    expect(state.errors).toEqual(['scheduler'])
   })
 
   it('kicks the scheduler on a request, then not again for five minutes', async () => {
