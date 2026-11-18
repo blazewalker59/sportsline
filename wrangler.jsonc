@@ -13,13 +13,22 @@
   // observability, triggers, migrations, assets, and compatibility settings
   // are inherited from the top level.
   "name": "sportsline",
-  "compatibility_date": "2025-09-01",
+  // The newest date the pinned workerd (local dev, tests, vite build)
+  // supports, so local runs behave like production. Raise it with wrangler.
+  "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
   "main": "./src/server.ts",
   "workers_dev": true,
   "observability": {
     "logs": {
       "enabled": true,
+    },
+    // Workers traces (fetch, D1, Durable Object RPC and alarm spans). From
+    // 2026-12-01 stored traces bill as Observability usage, so sample 10%:
+    // LiveGame alarms alone run every few seconds per live Game.
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.1,
     },
   },
   "assets": {
@@ -35,7 +44,7 @@
   ],
   // One LiveGame per live Game polls its Source and diffs Plays; one LiveHub
   // relays them to connected Viewers; one Scheduler runs global jobs every
-  // minute on its own alarm, in place of a Cron Trigger (docs/adr/0001); one
+  // minute on its own alarm, not on a Cron Trigger (docs/adr/0001); one
   // ViewerSync per Viewer runs their Kalshi and fantasy syncing (0005).
   "durable_objects": {
     "bindings": [
@@ -45,11 +54,12 @@
       { "name": "VIEWER_SYNC", "class_name": "ViewerSync" },
     ],
   },
-  // No Cron Triggers: the Scheduler Durable Object runs the schedule sync
-  // (docs/adr/0001). Declared empty so deploys remove any registered
-  // trigger; leaving `triggers` out keeps whatever was there.
+  // The Scheduler Durable Object runs the schedule sync on its own alarm
+  // (docs/adr/0001). This trigger is only a safety net: every five minutes
+  // the `scheduled` handler (src/server.ts) makes sure that loop is running.
+  // Nothing depends on it firing; a 2026-10 `* * * * *` trigger never did.
   "triggers": {
-    "crons": [],
+    "crons": ["*/5 * * * *"],
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["LiveGame", "LiveHub"] },

@@ -18,3 +18,5 @@ Game Durable Objects push new Plays, Revisions, Removals and Game Milestones to 
 ## Scheduling
 
 The once-a-minute schedule sync runs on a Scheduler Durable Object's own alarm, not a Cron Trigger. On 2026-10-02 the `* * * * *` Cron Trigger was registered and the script exposed a `scheduled` handler, yet Cloudflare never invoked it (zero scheduled invocations over 25+ minutes; a minimal probe Worker with the same cron also never fired), while other Workers' daily crons on the account ran normally. Rather than block on that, the Scheduler reschedules itself every minute and is started by the first request after a deploy (the CI smoke check hits `/health`). If Cron Triggers are revisited, verify one actually fires before moving the sync back.
+
+Since 2026-11 a `*/5 * * * *` Cron Trigger runs a `scheduled` handler that does one thing: call the Scheduler's idempotent `ensureRunning()`, so the loop restarts within five minutes if it ever stops and no request comes in. It is a safety net, not the schedule: the Scheduler's alarm still runs every job, and nothing depends on the trigger firing. Whether it fires has not been verified; if it never does, nothing is lost.
