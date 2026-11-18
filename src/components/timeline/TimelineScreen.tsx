@@ -18,7 +18,8 @@ import { FeedFooter, TimelineFeed } from './TimelineFeed'
 import { GamePane } from './GamePane'
 import { TimelineSheets } from './TimelineSheets'
 import { TimelineTop } from './TimelineTop'
-import { useGoToScope, useLastLeague } from './ScopeBar'
+import { useGoToScope, useLastLeague } from './scopeNav'
+import { ScopePrompt } from './ScopePrompt'
 import { followsGame } from './timelineScope'
 import { usePastDay } from './usePastDay'
 import { useTimelineScope } from './useTimelineScope'
@@ -166,19 +167,15 @@ function Timeline({
   const panelHidden = cardsHidden && !dayOpen
   // The spacer under the fixed top section follows its full height.
   const topRef = useRef<HTMLDivElement>(null)
-  // Swiping across the Timeline steps through the Scope chips (not while
-  // one Game is open: that's a drill-in, not a view).
+  // Swiping across the Timeline steps through the nav's four Scopes, in
+  // its order (not while one Game is open: that's a drill-in, not a view).
   const rootRef = useRef<HTMLDivElement>(null)
   const lastLeague = useLastLeague(scope, s.rowItems)
   const goToScope = useGoToScope()
   useSwipe(rootRef, (direction) => {
     if (gameId) return
     const next = neighborScope(
-      scopeStops(lastLeague, {
-        following: s.viewerFollows.length > 0,
-        predictions: Boolean(s.kalshi.data),
-        fantasy: s.fantasyLeagues.length > 0,
-      }),
+      scopeStops(lastLeague),
       scope,
       direction === 'left' ? 1 : -1,
     )
@@ -311,7 +308,6 @@ function Timeline({
       <TimelineTop
         topRef={topRef}
         scope={s}
-        lastLeague={lastLeague}
         sportsDay={sportsDay}
         today={today}
         gameId={gameId}
@@ -330,9 +326,6 @@ function Timeline({
         onPrediction={setPredictionOpen}
         onMatchup={(id, other) => setMatchupOpen({ id, other })}
       />
-
-      {/* A Viewer with no Follows: pick Leagues, then Teams, once. */}
-      {viewer && !gameId && <FirstRunFollows />}
 
       {/* Tags plays by either side's Starters, in the Fantasy view. */}
       <FantasyTagsProvider
@@ -356,21 +349,32 @@ function Timeline({
               className="mb-3"
               style={{ height: topHeight }}
             />
-            <TimelineFeed
-              entries={scopeEntries}
-              typing={scopeTyping}
-              gameId={null}
-              dimmed={dimmed}
-              loading={timeline.loading}
-              recap={recap}
-              readAt={readAt}
-              dividerAt={dividerAt}
-              newCount={newCount}
-              onRecap={() => setRecapOpen(true)}
-              onLive={() => setLiveOpen(true)}
-              sharpPicks={scope === 'predictions'}
-            />
-            {feedFooter}
+            {/* A Viewer with no Follows: pick Leagues, then Teams, once. */}
+            {viewer && !gameId && <FirstRunFollows />}
+            {s.setup ? (
+              // The picker above already asks a new Viewer to follow.
+              (s.setup !== 'following' || data?.firstRunDone !== false) && (
+                <ScopePrompt setup={s.setup} />
+              )
+            ) : (
+              <>
+                <TimelineFeed
+                  entries={scopeEntries}
+                  typing={scopeTyping}
+                  gameId={null}
+                  dimmed={dimmed}
+                  loading={timeline.loading}
+                  recap={recap}
+                  readAt={readAt}
+                  dividerAt={dividerAt}
+                  newCount={newCount}
+                  onRecap={() => setRecapOpen(true)}
+                  onLive={() => setLiveOpen(true)}
+                  sharpPicks={scope === 'predictions'}
+                />
+                {feedFooter}
+              </>
+            )}
           </div>
         )}
 

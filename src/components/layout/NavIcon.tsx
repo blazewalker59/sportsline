@@ -6,7 +6,7 @@
 import { cn } from '@/lib/utils'
 
 export type IconName =
-  | 'timeline'
+  | 'all'
   | 'follows'
   | 'reactions'
   | 'predictions'
@@ -18,7 +18,7 @@ export type IconName =
 
 /** Each section's color, so items read apart at a glance. */
 export const ICON_TONES: Record<IconName, string> = {
-  timeline: 'bg-accent/15 text-accent',
+  all: 'bg-accent/15 text-accent',
   follows: 'bg-accent/15 text-accent',
   reactions: 'bg-section-reactions/15 text-section-reactions',
   predictions: 'bg-section-predictions/15 text-section-predictions',
@@ -30,10 +30,13 @@ export const ICON_TONES: Record<IconName, string> = {
 }
 
 const ICON_PATHS: Record<IconName, React.ReactNode> = {
-  timeline: (
+  // Every League: four tiles.
+  all: (
     <>
-      <path d="M5 4h10a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H9l-4 3v-3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" />
-      <path d="M19 9a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1v3l-4-3h-4a1 1 0 0 1-1-1v-1" />
+      <rect x="4" y="4" width="7" height="7" rx="1.5" />
+      <rect x="13" y="4" width="7" height="7" rx="1.5" />
+      <rect x="4" y="13" width="7" height="7" rx="1.5" />
+      <rect x="13" y="13" width="7" height="7" rx="1.5" />
     </>
   ),
   follows: (

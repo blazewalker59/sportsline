@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { Follow } from '@/lib/model/timeline'
 import {
+  SCOPE_TABS,
   defaultScope,
   neighborScope,
   parseScope,
+  resolveScope,
   scopeFollows,
   scopeStops,
+  scopeTab,
 } from '@/lib/model/scope'
 import { DEFAULT_FOLLOWS } from '@/lib/model/timeline'
 
@@ -40,45 +43,83 @@ describe('Top 25 Scope', () => {
   })
 })
 
-describe('swiping between views', () => {
-  const all = { following: true, predictions: true, fantasy: true }
+describe('the nav’s Scope tabs', () => {
+  it('are Following, All, Predictions and Fantasy, in that order', () => {
+    expect(SCOPE_TABS).toEqual(['following', 'all', 'predictions', 'fantasy'])
+  })
 
-  it('orders the views as the chips show them, skipping what isn’t offered', () => {
-    expect(scopeStops('nfl', all)).toEqual([
-      'nfl',
+  it.each([
+    ['following', 'following'],
+    ['predictions', 'predictions'],
+    ['fantasy', 'fantasy'],
+    ['all', 'all'],
+    ['nfl', 'all'],
+    ['top25', 'all'],
+    ['sec', 'all'],
+  ] as const)('puts %s under the %s tab', (scope, tab) => {
+    expect(scopeTab(scope)).toBe(tab)
+  })
+})
+
+describe('resolveScope', () => {
+  it('takes the asked-for Scope, then the remembered one, then the default', () => {
+    expect(
+      resolveScope({ requested: 'nba', stored: 'fantasy', viewerFollows: [] }),
+    ).toBe('nba')
+    expect(resolveScope({ stored: 'fantasy', viewerFollows: [] })).toBe(
+      'fantasy',
+    )
+    expect(resolveScope({ viewerFollows: mine })).toBe('following')
+    expect(resolveScope({ viewerFollows: [] })).toBe('all')
+  })
+
+  it('keeps a Scope with nothing behind it (its tab offers to set it up)', () => {
+    expect(resolveScope({ requested: 'following', viewerFollows: [] })).toBe(
       'following',
+    )
+    expect(resolveScope({ stored: 'predictions', viewerFollows: [] })).toBe(
+      'predictions',
+    )
+  })
+
+  it('reads one Prediction or Matchup narrowed to as its Scope', () => {
+    expect(
+      resolveScope({ requested: 'all', predictionId: 'p1', viewerFollows: [] }),
+    ).toBe('predictions')
+    expect(resolveScope({ matchupId: 'espn-1', viewerFollows: [] })).toBe(
+      'fantasy',
+    )
+  })
+})
+
+describe('swiping between Scopes', () => {
+  it('steps through all four tabs in the nav’s order, the League choice for All', () => {
+    expect(scopeStops('nfl')).toEqual([
+      'following',
+      'nfl',
       'predictions',
       'fantasy',
     ])
-    expect(
-      scopeStops('all', {
-        following: false,
-        predictions: true,
-        fantasy: false,
-      }),
-    ).toEqual(['all', 'predictions'])
+    expect(scopeStops('all')).toEqual([
+      'following',
+      'all',
+      'predictions',
+      'fantasy',
+    ])
   })
 
-  it('steps to the next or previous view, and stops at the ends', () => {
-    const stops = scopeStops('nfl', all)
-    expect(neighborScope(stops, 'following', 1)).toBe('predictions')
-    expect(neighborScope(stops, 'predictions', -1)).toBe('following')
+  it('steps to the next or previous tab, and stops at the ends', () => {
+    const stops = scopeStops('nfl')
+    expect(neighborScope(stops, 'following', 1)).toBe('nfl')
+    expect(neighborScope(stops, 'nfl', 1)).toBe('predictions')
+    expect(neighborScope(stops, 'predictions', -1)).toBe('nfl')
     expect(neighborScope(stops, 'fantasy', 1)).toBeNull()
-    expect(neighborScope(stops, 'nfl', -1)).toBeNull()
+    expect(neighborScope(stops, 'following', -1)).toBeNull()
   })
 
-  it('treats any League choice as the League chip', () => {
-    const stops = scopeStops('nfl', all)
-    expect(neighborScope(stops, 'top25', 1)).toBe('following')
-    expect(neighborScope(stops, 'following', -1)).toBe('nfl')
-  })
-
-  it('goes nowhere from a view that isn’t offered', () => {
-    const stops = scopeStops('all', {
-      following: false,
-      predictions: true,
-      fantasy: false,
-    })
-    expect(neighborScope(stops, 'fantasy', -1)).toBeNull()
+  it('treats any League choice as the All tab', () => {
+    const stops = scopeStops('nfl')
+    expect(neighborScope(stops, 'top25', 1)).toBe('predictions')
+    expect(neighborScope(stops, 'sec', -1)).toBe('following')
   })
 })

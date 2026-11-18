@@ -20,13 +20,20 @@ import {
   useKalshiConnection,
   usePredictions,
 } from '@/lib/kalshi/usePredictions'
-import { defaultScope, scopeFollows } from '@/lib/model/scope'
+import { resolveScope, scopeFollows } from '@/lib/model/scope'
 import {
   DEFAULT_LEAGUE_SETTINGS,
   visibleLeagues,
   visibleRowItems,
 } from '@/lib/model/leagues'
 import { useViewer } from '@/lib/viewer/useViewer'
+
+/**
+ * What a Scope still needs before it has anything to show: Follows, a
+ * Kalshi connection, a Fantasy connection, or (connected) a Matchup.
+ */
+export type ScopeSetup =
+  'following' | 'predictions' | 'fantasy' | 'fantasy-matchups'
 
 export function useTimelineScope({
   requestedScope,
@@ -93,18 +100,30 @@ export function useTimelineScope({
   useEffect(() => {
     if (requestedScope) storeScope(requestedScope)
   }, [requestedScope])
-  const wanted = requestedScope ?? storedScope
-  const scope: Scope = selectedPrediction
-    ? 'predictions'
-    : selectedMatchup
-      ? 'fantasy'
-      : (wanted === 'following' && viewerFollows.length === 0) ||
-          (wanted === 'predictions' && !kalshi.data && !kalshi.isPending) ||
-          (wanted === 'fantasy' &&
+  const scope: Scope = resolveScope({
+    requested: requestedScope,
+    stored: storedScope,
+    viewerFollows,
+    predictionId,
+    matchupId,
+  })
+  // A Scope with nothing behind it yet: the Timeline offers to set it up
+  // (its nav tab is always there) instead of an empty or borrowed feed.
+  const setup: ScopeSetup | null =
+    scope === 'following' && viewerFollows.length === 0
+      ? 'following'
+      : scope === 'predictions' && !kalshi.data && !kalshi.isPending
+        ? 'predictions'
+        : scope === 'fantasy' &&
             !fantasyConnection.connected &&
-            !fantasyConnection.pending)
-        ? 'all'
-        : (wanted ?? defaultScope(viewerFollows))
+            !fantasyConnection.pending
+          ? 'fantasy'
+          : scope === 'fantasy' &&
+              !matchupId &&
+              fantasy.isSuccess &&
+              fantasyLeagues.length === 0
+            ? 'fantasy-matchups'
+            : null
   // The Viewer's row in their order, hidden items left out; All covers
   // the visible Leagues.
   const settings = data?.leagues ?? DEFAULT_LEAGUE_SETTINGS
@@ -112,18 +131,23 @@ export function useTimelineScope({
   const leagues = useMemo(() => visibleLeagues(settings), [settings])
   const follows = useMemo(
     () =>
-      selectedPrediction
-        ? predictionFollows(selectedPrediction)
-        : selectedMatchup
-          ? matchupFollows(selectedMatchup)
-          : scopeFollows(
-              scope,
-              viewerFollows,
-              leagues,
-              predictionGames,
-              fantasyPlayers,
-            ),
+      // Nothing to read until the Scope is set up (Following would
+      // otherwise borrow All's Follows).
+      setup
+        ? []
+        : selectedPrediction
+          ? predictionFollows(selectedPrediction)
+          : selectedMatchup
+            ? matchupFollows(selectedMatchup)
+            : scopeFollows(
+                scope,
+                viewerFollows,
+                leagues,
+                predictionGames,
+                fantasyPlayers,
+              ),
     [
+      setup,
       selectedPrediction,
       selectedMatchup,
       scope,
@@ -173,6 +197,7 @@ export function useTimelineScope({
 
   return {
     scope,
+    setup,
     follows,
     viewerFollows,
     rowItems,

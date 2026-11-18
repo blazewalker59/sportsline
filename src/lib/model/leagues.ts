@@ -1,5 +1,5 @@
 /**
- * How a Viewer arranges the Scope row (CONTEXT.md, "League"): the order of
+ * How a Viewer arranges the League row (CONTEXT.md, "League"): the order of
  * Leagues and college football's groups (Top 25 and the major
  * conferences), and which are hidden. A hidden League is also left out of
  * All. Pure.
@@ -16,7 +16,7 @@ export type Conference = (typeof CONFERENCES)[number]
 const CFB_GROUPS = ['top25', ...CONFERENCES] as const
 type CfbGroup = (typeof CFB_GROUPS)[number]
 
-/** Anything with a place on the Scope row. */
+/** Anything with a place on the League row. */
 export type RowItem = League | CfbGroup
 
 /** The default row: college football's groups follow its League. */

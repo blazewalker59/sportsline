@@ -2,7 +2,7 @@
  * A quick sideways swipe on an element, for moving between views. Touch
  * only, and out of the way of what already uses sideways movement: a
  * swipe never starts in something that scrolls sideways (strips of cards,
- * the Scope chips), in a sheet or dialog, on a form control or slider, or
+ * the League row), in a sheet or dialog, on a form control or slider, or
  * at the screen's edge (where iOS swipes back).
  */
 

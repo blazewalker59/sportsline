@@ -1,7 +1,8 @@
 /**
  * The Timeline's pinned top: the header (day, Highlights, connection) with
- * the day strip under it, then the Scope chips and the cards for the Scope:
- * Fantasy Matchups, Predictions, or the day's Games. Pinned over the content
+ * the day strip under it, then (under the All tab) the League row, and the
+ * cards for the Scope: Fantasy Matchups, Predictions, or the day's Games.
+ * The Scope itself is chosen from the main navigation. Pinned over the content
  * rather than in its flow: hiding the cards slides them up behind the
  * header without changing the page's height, so scrolling never feeds back
  * into the hide/show.
@@ -13,13 +14,12 @@
 
 import { DayButton } from './DayButton'
 import { DayStrip } from './DayStrip'
-import { ScopeBar } from './ScopeBar'
+import { LeagueBar } from './LeagueBar'
 import { GameStrip } from './GameStrip'
 import { Collapse, ConnectionDot, HighlightsButton } from './TimelineControls'
 import { inScope } from './timelineScope'
 import type { TimelineScopeState } from './useTimelineScope'
 import type { GameSummary, TimelineItem } from '@/lib/model/timeline'
-import type { RowItem } from '@/lib/model/leagues'
 import type { Connection } from '@/lib/timeline/useLiveTimeline'
 import type { LeagueMatchup } from '@/lib/fantasy/matchup'
 import { FantasyStrip } from '@/components/fantasy/FantasyParts'
@@ -27,13 +27,13 @@ import { PredictionStrip } from '@/components/predictions/PredictionCard'
 import { PredictionSummary } from '@/components/predictions/PredictionPortfolio'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { NAV_INSET_LEFT } from '@/components/layout/AppNav'
+import { scopeTab } from '@/lib/model/scope'
 import { withViewTransition } from '@/lib/viewTransition'
 import { cn } from '@/lib/utils'
 
 export function TimelineTop({
   topRef,
   scope: s,
-  lastLeague,
   sportsDay,
   today,
   gameId,
@@ -54,15 +54,13 @@ export function TimelineTop({
 }: {
   topRef: React.Ref<HTMLDivElement>
   scope: TimelineScopeState
-  /** The League choice the Scope chips return to. */
-  lastLeague: 'all' | RowItem
   sportsDay: string
   today: string
   gameId: string | null
   dayOpen: boolean
   onDayToggle: () => void
   onDayClose: () => void
-  /** The Scope chips and cards are tucked away (reading down). */
+  /** The League row and cards are tucked away (reading down). */
   panelHidden: boolean
   highlights: boolean
   onHighlights: (on: boolean) => void
@@ -125,7 +123,7 @@ export function TimelineTop({
               />
             </Collapse>
           </div>
-          {/* Scope chips and score cards tuck away while reading down, return on the way up. */}
+          {/* The League row and score cards tuck away while reading down, return on the way up. */}
           <div
             className={cn(
               'pointer-events-auto relative z-10 border-b border-border bg-background px-4 pb-2 transition-transform duration-300 ease-out lg:px-0',
@@ -134,16 +132,12 @@ export function TimelineTop({
             inert={panelHidden}
             aria-hidden={panelHidden}
           >
-            <ScopeBar
-              scope={s.scope}
-              items={s.rowItems}
-              lastLeague={lastLeague}
-              canFollow={s.viewerFollows.length > 0}
-              canPredict={Boolean(s.kalshi.data)}
-              canFantasy={s.fantasyLeagues.length > 0}
-            />
+            {/* Which League, under the All tab (the nav's tabs are the other Scopes). */}
+            {scopeTab(s.scope) === 'all' && (
+              <LeagueBar scope={s.scope} items={s.rowItems} />
+            )}
             <div className={cn('transition-opacity', dimmed && 'opacity-50')}>
-              {s.scope === 'fantasy' && !gameId ? (
+              {s.setup ? null : s.scope === 'fantasy' && !gameId ? (
                 // Matchups move like scores: their cards replace the Games'.
                 <FantasyStrip
                   leagues={s.fantasyLeagues}

@@ -31,6 +31,7 @@ import { TimelineScreen } from '@/components/timeline/TimelineScreen'
 import { sportsDayOf } from '@/lib/model/sportsDay'
 import { VIEWER_KEY } from '@/lib/viewer/queries'
 import { DEFAULT_LEAGUE_SETTINGS } from '@/lib/model/leagues'
+import { parseScope } from '@/lib/model/scope'
 
 const day = sportsDayOf(new Date())
 const fx = timelineFixture(day)
@@ -71,14 +72,19 @@ vi.mock('@/lib/reactions/useReactions', () => ({
   useSetReaction: () => () => {},
 }))
 
-// The Scope's own queries (Kalshi, Fantasy) are server functions: the
-// All Scope over every League, with nothing connected.
+// The Scope's own queries (Kalshi, Fantasy) are server functions: by
+// default the All Scope over every League, with nothing connected; a test
+// can set the Scope (and what it still needs) through `scopeOver`.
+const scopeOver = vi.hoisted(() => ({
+  current: {} as Record<string, unknown>,
+}))
 vi.mock('@/components/timeline/useTimelineScope', async () => {
   const { visibleLeagues, visibleRowItems } =
     await import('@/lib/model/leagues')
   return {
-    useTimelineScope: () => ({
-      scope: 'all',
+    useTimelineScope: ({ requestedScope }: { requestedScope?: string }) => ({
+      scope: requestedScope ?? 'all',
+      setup: null,
       follows: visibleLeagues(DEFAULT_LEAGUE_SETTINGS).map((league) => ({
         kind: 'league',
         league,
@@ -95,9 +101,20 @@ vi.mock('@/components/timeline/useTimelineScope', async () => {
       fantasyLeagues: [],
       selectedMatchup: null,
       selectMatchup: () => {},
+      ...scopeOver.current,
     }),
   }
 })
+
+// A swipe across the Timeline, delivered straight to its handler.
+const swipe = vi.hoisted(() => ({
+  current: null as null | ((direction: 'left' | 'right') => void),
+}))
+vi.mock('@/components/layout/useSwipe', () => ({
+  useSwipe: (_ref: unknown, onSwipe: (direction: 'left' | 'right') => void) => {
+    swipe.current = onSwipe
+  },
+}))
 
 const readMarker = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/viewer/useViewer', async (importOriginal) => ({
@@ -119,26 +136,41 @@ function setWide(wide: boolean) {
   )
 }
 
-function renderTimeline(url: string) {
+function renderTimeline(url: string, viewer = viewerState()) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   })
-  queryClient.setQueryData(VIEWER_KEY, viewerState())
+  queryClient.setQueryData(VIEWER_KEY, viewer)
   const rootRoute = createRootRoute()
+  const str = (v: unknown) => (typeof v === 'string' ? v : undefined)
   const timeline = createRoute({
     getParentRoute: () => rootRoute,
     path: '/',
     validateSearch: (s: Record<string, unknown>) => ({
-      game: typeof s.game === 'string' ? s.game : undefined,
-      play: typeof s.play === 'string' ? s.play : undefined,
+      game: str(s.game),
+      play: str(s.play),
+      scope: parseScope(s.scope),
+      day: str(s.day),
     }),
     component: function Route() {
-      const { game, play } = timeline.useSearch()
-      return <TimelineScreen gameId={game} playId={play} />
+      const { game, play, scope } = timeline.useSearch()
+      return <TimelineScreen gameId={game} playId={play} scope={scope} />
     },
   })
+  // The screens a prompt links to.
+  const stub = (path: string) =>
+    createRoute({
+      getParentRoute: () => rootRoute,
+      path,
+      component: () => <p>screen {path}</p>,
+    })
   const router = createRouter({
-    routeTree: rootRoute.addChildren([timeline]),
+    routeTree: rootRoute.addChildren([
+      timeline,
+      stub('/follows'),
+      stub('/predictions'),
+      stub('/fantasy'),
+    ]),
     history: createMemoryHistory({ initialEntries: [url] }),
   })
   render(
@@ -159,7 +191,11 @@ function transitionNames(): Array<string> {
     .filter((name) => name && name !== 'none')
 }
 
-beforeEach(() => readMarker.mockClear())
+beforeEach(() => {
+  readMarker.mockClear()
+  scopeOver.current = {}
+  localStorage.clear()
+})
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
@@ -290,5 +326,112 @@ describe('TimelineScreen, narrow (one feed)', () => {
     fireEvent.keyDown(window, { key: 'Escape' })
     await act(() => Promise.resolve())
     expect(gamePane()).toBeTruthy()
+  })
+})
+
+describe('TimelineScreen, Scopes (chosen from the main navigation)', () => {
+  beforeEach(() => setWide(false))
+
+  const leagueRow = () => screen.queryByRole('list', { name: 'Leagues' })
+  const prompt = () =>
+    document.querySelector<HTMLElement>('[data-scope-prompt]')
+
+  it.each(['all', 'nfl', 'top25', 'sec'])(
+    'offers the League row under the All tab (%s)',
+    async (scope) => {
+      renderTimeline(`/?scope=${scope}`)
+      await waitFor(() => expect(scopeFeed()).toBeTruthy())
+      const row = leagueRow()!
+      expect(row).toBeTruthy()
+      const chosen = within(row)
+        .getAllByRole('button')
+        .filter((b) => b.getAttribute('aria-current') === 'true')
+      expect(chosen).toHaveLength(1)
+      // No Scope offered in two places: the nav's other tabs aren't here.
+      expect(
+        within(row).queryByRole('button', {
+          name: /Following|Predictions|Fantasy/,
+        }),
+      ).toBeNull()
+    },
+  )
+
+  it.each(['following', 'predictions', 'fantasy'])(
+    'has no League row under the %s tab',
+    async (scope) => {
+      renderTimeline(`/?scope=${scope}`)
+      await waitFor(() => expect(scopeFeed()).toBeTruthy())
+      expect(leagueRow()).toBeNull()
+    },
+  )
+
+  it('picks a League from the row', async () => {
+    const { router } = renderTimeline('/?scope=all')
+    await waitFor(() => expect(leagueRow()).toBeTruthy())
+    fireEvent.click(
+      within(leagueRow()!).getByRole('button', { name: 'Top 25' }),
+    )
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({ scope: 'top25' }),
+    )
+  })
+
+  it.each([
+    ['following', '/follows', 'Choose what to follow'],
+    ['predictions', '/predictions', 'Connect on Predictions'],
+    ['fantasy', '/fantasy', 'Connect on Fantasy'],
+    ['fantasy-matchups', '/fantasy', 'Your Fantasy leagues'],
+  ])(
+    'with nothing behind it (%s), offers to set it up instead of a feed',
+    async (setup, href, action) => {
+      const scope = setup === 'fantasy-matchups' ? 'fantasy' : setup
+      scopeOver.current = { setup }
+      const { router } = renderTimeline(`/?scope=${scope}`)
+      await waitFor(() => expect(prompt()).toBeTruthy())
+      expect(prompt()!.dataset.scopePrompt).toBe(setup)
+      // No feed under it: no plays, and no "No plays yet" either.
+      expect(scopeFeed()!.textContent).not.toContain('Jalen Brunson')
+      expect(scopeFeed()!.textContent).not.toContain('No plays yet')
+      const link = within(prompt()!).getByRole('link', { name: action })
+      expect(link.getAttribute('href')).toBe(href)
+      fireEvent.click(link)
+      await waitFor(() => expect(router.state.location.pathname).toBe(href))
+    },
+  )
+
+  it('leaves a new Viewer’s Following to the first-run picker', async () => {
+    scopeOver.current = { setup: 'following' }
+    renderTimeline('/?scope=following', viewerState({ firstRunDone: false }))
+    await waitFor(() => expect(screen.getByText(/Step 1 of 2/)).toBeTruthy())
+    expect(prompt()).toBeNull()
+  })
+
+  it.each([
+    ['following', 'left', 'nfl'],
+    ['nfl', 'left', 'predictions'],
+    ['predictions', 'left', 'fantasy'],
+    ['fantasy', 'right', 'predictions'],
+    ['predictions', 'right', 'nfl'],
+    ['top25', 'right', 'following'],
+  ] as const)(
+    'a swipe from %s (%s) steps to %s, in the nav’s order',
+    async (from, direction, to) => {
+      // The League last chosen under All, which the All tab returns to.
+      localStorage.setItem('sportsline:leagueScope', 'nfl')
+      const { router } = renderTimeline(`/?scope=${from}`)
+      await waitFor(() => expect(scopeFeed()).toBeTruthy())
+      act(() => swipe.current!(direction))
+      await waitFor(() =>
+        expect(router.state.location.search).toMatchObject({ scope: to }),
+      )
+    },
+  )
+
+  it('a swipe stops at either end', async () => {
+    const { router } = renderTimeline('/?scope=fantasy')
+    await waitFor(() => expect(scopeFeed()).toBeTruthy())
+    act(() => swipe.current!('left'))
+    await act(() => Promise.resolve())
+    expect(router.state.location.search).toMatchObject({ scope: 'fantasy' })
   })
 })
