@@ -79,7 +79,7 @@ function PlayerCell({
         'block truncate leading-tight font-semibold whitespace-nowrap',
         ink && 'team-name',
         short.length > 14
-          ? 'text-[11px] tracking-tight'
+          ? 'text-2xs tracking-tight'
           : short.length > 11
             ? 'text-[12px] tracking-tight'
             : 'text-[12.5px]',
@@ -91,7 +91,7 @@ function PlayerCell({
   return (
     <div
       className={cn(
-        'flex min-w-0 flex-col gap-1 rounded-lg px-1 py-1.5',
+        'flex min-w-0 flex-col gap-1 rounded-control px-1 py-1.5',
         state?.onField && 'field-state',
         state?.onField && right && 'field-state--right',
         state?.redZone && 'field-state--red-zone',
@@ -119,7 +119,7 @@ function PlayerCell({
           )}
           <span
             className={cn(
-              'mt-0.5 flex flex-wrap items-center gap-x-1 text-[10px] leading-tight font-medium',
+              'mt-0.5 flex flex-wrap items-center gap-x-1 text-3xs leading-tight font-medium',
               right && 'justify-end',
             )}
           >
@@ -148,9 +148,7 @@ function PlayerCell({
               <span
                 className={cn(
                   'font-bold',
-                  tone === 'yellow'
-                    ? 'text-yellow-700 dark:text-yellow-400'
-                    : 'text-red-600 dark:text-red-400',
+                  tone === 'yellow' ? 'text-warning' : 'text-negative',
                 )}
                 title={injuryLabel(player.injury!)}
               >
@@ -169,7 +167,7 @@ function PlayerCell({
               : `${shortName(player)}: today's line`
           }
           className={cn(
-            'flex shrink-0 flex-col rounded-md px-0.5 py-0.5 tabular-nums transition-colors',
+            'flex shrink-0 flex-col rounded-control px-0.5 py-0.5 tabular-nums transition-colors',
             right ? 'items-start' : 'items-end',
             open ? 'bg-accent-soft' : 'hover:bg-notice',
           )}
@@ -178,7 +176,7 @@ function PlayerCell({
             {playerFigure(player)}
           </span>
           {player.dayLine == null && player.projected !== null && (
-            <span className="text-[10px] leading-tight text-muted">
+            <span className="text-3xs leading-tight text-muted">
               {pts(player.projected)}
             </span>
           )}
@@ -189,7 +187,7 @@ function PlayerCell({
       ) : (
         byes &&
         (player.teamId || player.teamAbbrev) && (
-          <span className="block rounded-md border border-border/60 px-1.5 py-1 text-center text-[9px] leading-none font-semibold tracking-wide text-muted uppercase">
+          <span className="block rounded-control border border-border/60 px-1.5 py-1 text-center text-3xs leading-none font-semibold tracking-wide text-muted uppercase">
             Bye week
           </span>
         )
@@ -218,15 +216,15 @@ function GameStrip({
   return (
     <span
       className={cn(
-        'block rounded-md border px-1.5 py-1 tabular-nums',
+        'block rounded-control border px-1.5 py-1 tabular-nums',
         state.upcoming
           ? 'border-border/70 bg-background/40'
           : state.live
-            ? 'border-amber-500/25 bg-amber-500/10'
+            ? 'border-in-play/25 bg-in-play/10'
             : 'border-border/40 bg-notice/60',
       )}
     >
-      <span className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 text-[10px] leading-none font-semibold">
+      <span className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 text-3xs leading-none font-semibold">
         <span className="flex min-w-0 items-center gap-1">
           <TeamLogo team={ours} size={13} />
           <span className="truncate">
@@ -245,8 +243,8 @@ function GameStrip({
       </span>
       <span
         className={cn(
-          'mt-1 block text-center text-[9px] leading-none font-semibold tracking-wide uppercase',
-          state.live ? 'text-amber-700 dark:text-amber-300' : 'text-muted',
+          'mt-1 block text-center text-3xs leading-none font-semibold tracking-wide uppercase',
+          state.live ? 'text-in-play' : 'text-muted',
         )}
       >
         {state.status}
@@ -293,7 +291,7 @@ export function LineupRows({
   const [open, setOpen] = useState<string | null>(null)
   const rows = Math.max(mine.length, theirs.length)
   return (
-    <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+    <ul className="divide-y divide-border rounded-card border border-border bg-surface">
       {Array.from({ length: rows }, (_, i) => {
         const slot = (mine[i] ?? theirs[i])?.slot ?? ''
         const toggle = (side: 'm' | 't') => () =>
@@ -314,7 +312,7 @@ export function LineupRows({
               />
               <span
                 className={cn(
-                  'mt-2 flex h-6 items-center justify-center rounded-md text-[9px] leading-none font-bold uppercase',
+                  'mt-2 flex h-6 items-center justify-center rounded-control text-3xs leading-none font-bold uppercase',
                   SLOT_TONES[slot] ?? 'bg-notice text-muted',
                 )}
               >

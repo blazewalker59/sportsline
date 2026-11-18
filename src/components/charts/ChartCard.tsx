@@ -67,12 +67,12 @@ export function ChartCard({
   return (
     <figure
       className={cn(
-        'rounded-xl border border-border bg-surface px-2 py-2.5 text-muted',
+        'rounded-card border border-border bg-surface px-2 py-2.5 text-muted',
         className,
       )}
     >
       {(legend.length > 0 || headline) && (
-        <figcaption className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-1 text-[11px]">
+        <figcaption className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-1 text-2xs">
           <span className="flex flex-wrap gap-x-3 gap-y-1">
             {legend.map((l) => (
               <span key={l.label} className="flex items-center gap-1">
@@ -96,7 +96,7 @@ export function ChartCard({
         </figcaption>
       )}
       {children}
-      {footer && <div className="mt-1 px-1 text-[11px]">{footer}</div>}
+      {footer && <div className="mt-1 px-1 text-2xs">{footer}</div>}
     </figure>
   )
 }

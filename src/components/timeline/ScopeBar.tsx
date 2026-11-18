@@ -186,7 +186,7 @@ export function ScopeBar({
           <ul
             role="menu"
             aria-label="Leagues"
-            className="animate-in fade-in slide-in-from-top-1 absolute top-full left-0 z-20 max-h-[60dvh] w-60 overflow-y-auto rounded-2xl border border-border bg-surface py-1.5 shadow-xl duration-150"
+            className="animate-in fade-in slide-in-from-top-1 absolute top-full left-0 z-20 max-h-[60dvh] w-60 overflow-y-auto rounded-card border border-border bg-surface py-1.5 shadow-xl duration-150"
           >
             {(['all', ...items] as const).map((item) => {
               const selected = item === scope
@@ -216,7 +216,7 @@ export function ScopeBar({
                           <rect x="13" y="13" width="7" height="7" rx="1.5" />
                         </svg>
                       ) : item === 'top25' ? (
-                        <span className="text-[10px] font-bold text-muted">
+                        <span className="text-3xs font-bold text-muted">
                           25
                         </span>
                       ) : (

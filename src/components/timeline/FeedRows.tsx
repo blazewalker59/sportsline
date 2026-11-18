@@ -94,7 +94,7 @@ export const Cluster = memo(function Cluster({ entry, focused }: ClusterProps) {
           viewTransition
           resetScroll={false}
           aria-label={`Show only the ${team.abbreviation} game`}
-          className="px-1 text-[11px] text-muted"
+          className="px-1 text-2xs text-muted"
         >
           <span className="font-semibold text-foreground/80">
             {team.abbreviation}
@@ -145,7 +145,7 @@ export function TypingRow({
         <LeagueAvatar league={game.league} />
       )}
       <div className={cn('flex min-w-0 flex-col gap-1', right && 'items-end')}>
-        <span className="truncate px-1 text-[11px] text-muted">
+        <span className="truncate px-1 text-2xs text-muted">
           <span className="font-semibold text-foreground/80">
             {team
               ? team.abbreviation
@@ -212,7 +212,7 @@ export function TypingSummary({
         })}
       </span>
       <span className="flex min-w-0 flex-col gap-1">
-        <span className="truncate px-1 text-[11px] text-muted">
+        <span className="truncate px-1 text-2xs text-muted">
           <span className="font-semibold text-foreground/80">
             {typing.length} games live
           </span>{' '}

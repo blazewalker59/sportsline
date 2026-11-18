@@ -69,13 +69,13 @@ export function DayStrip({
                   day: 'numeric',
                 })}
                 className={cn(
-                  'flex h-11 min-w-11 flex-col items-center justify-center rounded-xl px-2 leading-none transition-colors',
+                  'flex h-11 min-w-11 flex-col items-center justify-center rounded-card px-2 leading-none transition-colors',
                   isSelected
                     ? 'bg-foreground text-background'
                     : 'text-muted hover:bg-notice hover:text-foreground',
                 )}
               >
-                <span className="text-[11px] font-semibold">{label.top}</span>
+                <span className="text-2xs font-semibold">{label.top}</span>
                 {label.bottom && (
                   <span className="mt-0.5 text-[15px] font-bold">
                     {label.bottom}

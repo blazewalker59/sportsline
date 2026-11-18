@@ -64,7 +64,7 @@ export function PredictionGames({
           return (
             <li
               key={g.id}
-              className="overflow-hidden rounded-xl border border-border bg-surface"
+              className="overflow-hidden rounded-card border border-border bg-surface"
             >
               <button
                 type="button"
@@ -163,7 +163,7 @@ function GamePanel({
       {data.box && <Linescore box={data.box} game={data.game} />}
       {players.length > 0 && (
         <div>
-          <h4 className="subject-ink mb-1 text-[11px] font-bold tracking-wide text-muted uppercase">
+          <h4 className="subject-ink mb-1 text-2xs font-bold tracking-wide text-muted uppercase">
             Your players
           </h4>
           <ul className="flex flex-col gap-1 text-xs">
@@ -180,13 +180,13 @@ function GamePanel({
       )}
       {plays.length > 0 && (
         <div>
-          <h4 className="subject-ink mb-1 text-[11px] font-bold tracking-wide text-muted uppercase">
+          <h4 className="subject-ink mb-1 text-2xs font-bold tracking-wide text-muted uppercase">
             Latest
           </h4>
           <ul className="flex flex-col gap-1.5">
             {plays.map((item) => (
               <li key={item.id} className="text-[13px] leading-snug">
-                <span className="mr-1.5 text-[11px] font-semibold text-muted tabular-nums">
+                <span className="mr-1.5 text-2xs font-semibold text-muted tabular-nums">
                   {item.segmentLabel}
                 </span>
                 <PlayText item={item} />

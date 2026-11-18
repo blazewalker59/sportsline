@@ -219,11 +219,11 @@ export function AvailableTable({
     limit,
   )
   return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+    <div className="overflow-x-auto rounded-card border border-border bg-surface">
       <table className="w-max min-w-full border-separate border-spacing-0 text-xs tabular-nums">
         <thead>
           <tr>
-            <th className="sticky left-0 z-20 min-w-[9rem] border-r sm:min-w-[12rem] border-b border-border bg-surface px-2 py-1.5 text-left text-[10px] font-semibold tracking-wide text-muted uppercase">
+            <th className="sticky left-0 z-20 min-w-[9rem] border-r sm:min-w-[12rem] border-b border-border bg-surface px-2 py-1.5 text-left text-3xs font-semibold tracking-wide text-muted uppercase">
               {title ?? 'Player'}
             </th>
             {columns.map((c) => {
@@ -250,7 +250,7 @@ export function AvailableTable({
                       )
                     }
                     className={cn(
-                      'w-full px-1 py-1.5 text-[10px] font-semibold tracking-wide uppercase',
+                      'w-full px-1 py-1.5 text-3xs font-semibold tracking-wide uppercase',
                       on ? 'text-foreground' : 'text-muted',
                     )}
                   >
@@ -321,7 +321,7 @@ function NextGamePill({ game }: { game: NextGame }) {
   return (
     <span
       className={cn(
-        'inline-flex max-w-full items-center gap-1 self-start truncate rounded-full px-1.5 py-px text-[10px] leading-tight font-semibold whitespace-nowrap',
+        'inline-flex max-w-full items-center gap-1 self-start truncate rounded-full px-1.5 py-px text-3xs leading-tight font-semibold whitespace-nowrap',
         label.soon === 'now'
           ? 'bg-live/15 text-live'
           : label.soon === 'today'
@@ -386,17 +386,17 @@ function PlayerCell({
               <span
                 title={injuryLabel(p.injury!)}
                 className={cn(
-                  'shrink-0 text-[9px] font-bold',
+                  'shrink-0 text-3xs font-bold',
                   injuryTone(p.injury) === 'yellow'
-                    ? 'text-yellow-700 dark:text-yellow-400'
-                    : 'text-red-600 dark:text-red-400',
+                    ? 'text-warning'
+                    : 'text-negative',
                 )}
               >
                 {injury}
               </span>
             )}
           </span>
-          <span className="block truncate text-[10px] leading-tight text-muted">
+          <span className="block truncate text-3xs leading-tight text-muted">
             {/* With moves on, the Claim button says it. */}
             {[position, p.teamAbbrev, p.waivers && !onMove ? 'Waivers' : null]
               .filter(Boolean)
@@ -411,7 +411,7 @@ function PlayerCell({
           onClick={() => onMove(p)}
           aria-label={`${p.waivers ? 'Claim' : 'Add'} ${p.name}`}
           className={cn(
-            'min-h-6 shrink-0 rounded-full px-1.5 text-[10px] font-semibold hover:bg-accent hover:text-background sm:min-h-7 sm:px-2 sm:text-[11px]',
+            'min-h-6 shrink-0 rounded-full px-1.5 text-3xs font-semibold hover:bg-accent hover:text-background sm:min-h-7 sm:px-2 sm:text-2xs',
             // A claim a shade deeper than an add.
             p.waivers ? 'bg-foreground/15' : 'bg-notice',
           )}

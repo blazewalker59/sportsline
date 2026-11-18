@@ -118,7 +118,7 @@ function PlayEntry({ item }: { item: TimelineItem }) {
         <LeagueAvatar league={item.league} />
       )}
       <div className="flex min-w-0 flex-col gap-1">
-        <span className="truncate px-1 text-[11px] text-muted">
+        <span className="truncate px-1 text-2xs text-muted">
           <span className="font-semibold text-foreground/80">
             {item.awayTeam.abbreviation} {item.score.away} – {item.score.home}{' '}
             {item.homeTeam.abbreviation}

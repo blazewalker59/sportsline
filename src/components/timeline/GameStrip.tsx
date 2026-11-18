@@ -68,7 +68,7 @@ function GameCard({
       aria-pressed={selected}
       aria-label={`${game.awayTeam.abbreviation} ${game.score.away}, ${game.homeTeam.abbreviation} ${game.score.home}, ${label}${selected ? '. Showing only this game; tap to show all' : ''}`}
       className={cn(
-        'relative flex w-[124px] flex-col gap-0.5 rounded-2xl border bg-surface px-2.5 py-1.5 transition-colors',
+        'relative flex w-[124px] flex-col gap-0.5 rounded-card border bg-surface px-2.5 py-1.5 transition-colors',
         selected
           ? 'border-accent bg-accent-soft'
           : live
@@ -80,7 +80,7 @@ function GameCard({
         <LeagueLogo league={game.league} size={16} />
         <span
           className={cn(
-            'truncate text-[11px] leading-tight font-semibold',
+            'truncate text-2xs leading-tight font-semibold',
             live ? 'text-live' : 'text-muted',
           )}
         >
@@ -100,7 +100,7 @@ function GameCard({
             <TeamLogo team={team} size={22} />
             <span className="flex-1 text-[13px] font-semibold">
               {team.rank && (
-                <span className="mr-0.5 text-[10px] font-bold text-muted">
+                <span className="mr-0.5 text-3xs font-bold text-muted">
                   {team.rank}
                 </span>
               )}

@@ -71,7 +71,7 @@ export function LeagueList() {
   return (
     <ol
       ref={list}
-      className="divide-y divide-border rounded-xl border border-border bg-surface"
+      className="divide-y divide-border rounded-card border border-border bg-surface"
       aria-label="Leagues, in the order they appear"
     >
       {settings.order.map((league, index) => {
@@ -83,7 +83,7 @@ export function LeagueList() {
             className={cn(
               'relative flex h-14 items-center gap-3 bg-surface pr-3 pl-1',
               dragging
-                ? 'z-10 rounded-xl shadow-lg ring-1 ring-border'
+                ? 'z-10 rounded-card shadow-lg ring-1 ring-border'
                 : drag && 'transition-transform duration-150',
             )}
             style={
@@ -93,7 +93,7 @@ export function LeagueList() {
             <button
               type="button"
               aria-label={`Move ${rowItemName(league)}. Use the arrow keys to reorder.`}
-              className="flex h-full w-10 shrink-0 cursor-grab touch-none items-center justify-center text-muted active:cursor-grabbing"
+              className="flex h-full w-10 shrink-0 cursor-grab touch-none items-center select-none justify-center text-muted active:cursor-grabbing"
               onPointerDown={(e) => {
                 e.currentTarget.setPointerCapture(e.pointerId)
                 const row = e.currentTarget.closest('li')

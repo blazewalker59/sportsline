@@ -118,7 +118,7 @@ export function Picker<T extends string>({
         onClick={() => (open ? setOpen(false) : show())}
         onKeyDown={onButtonKey}
         className={cn(
-          'flex min-h-8 items-center gap-1 rounded-lg px-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-notice',
+          'flex min-h-8 items-center gap-1 rounded-control px-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-notice',
           open && 'bg-notice',
         )}
       >
@@ -139,7 +139,7 @@ export function Picker<T extends string>({
           aria-label={label}
           aria-activedescendant={`${id}-${active}`}
           onKeyDown={onListKey}
-          className="absolute top-full right-0 z-30 mt-1 max-h-72 min-w-36 overflow-y-auto rounded-xl border border-border bg-surface py-1 shadow-lg outline-none"
+          className="absolute top-full right-0 z-30 mt-1 max-h-72 min-w-36 overflow-y-auto rounded-card border border-border bg-surface py-1 shadow-lg outline-none"
         >
           {options.map((o, i) => (
             <li

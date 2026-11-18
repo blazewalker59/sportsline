@@ -124,7 +124,7 @@ export function PredictionRecordSection() {
             onChange={(e) =>
               e.target.value && setPicked({ ...custom, from: e.target.value })
             }
-            className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-2 py-1.5"
+            className="min-w-0 flex-1 rounded-control border border-border bg-surface px-2 py-1.5"
           />
           <span className="text-muted">to</span>
           <input
@@ -135,14 +135,14 @@ export function PredictionRecordSection() {
             onChange={(e) =>
               e.target.value && setPicked({ ...custom, to: e.target.value })
             }
-            className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-2 py-1.5"
+            className="min-w-0 flex-1 rounded-control border border-border bg-surface px-2 py-1.5"
           />
         </div>
       )}
       {history.isPending ? (
         <p className="text-sm text-muted">Loading…</p>
       ) : !record || record.totals.count === 0 ? (
-        <p className="rounded-xl border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
+        <p className="rounded-card border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
           No predictions in this range.
         </p>
       ) : (
@@ -196,7 +196,7 @@ function RecordBody({
       )}
 
       {r.insights.length > 0 && (
-        <ul className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface px-3 py-2.5">
+        <ul className="flex flex-col gap-1.5 rounded-card border border-border bg-surface px-3 py-2.5">
           {r.insights.map((i) => (
             <li key={i.text} className="flex items-start gap-2 text-[13px]">
               <span
@@ -261,7 +261,7 @@ function Breakdowns({ record: r }: { record: PredictionRecord }) {
     ['legs', 'Legs', r.legs.byMarket.length > 0],
   ]
   return (
-    <div className="rounded-xl border border-border bg-surface px-3 py-2.5">
+    <div className="rounded-card border border-border bg-surface px-3 py-2.5">
       <div role="tablist" className="mb-2 flex gap-3 text-xs font-semibold">
         {tabs
           .filter(([, , shown]) => shown)
@@ -301,7 +301,7 @@ function Breakdowns({ record: r }: { record: PredictionRecord }) {
 }
 
 const head =
-  'text-right text-[10px] font-semibold tracking-wide text-muted uppercase'
+  'text-right text-3xs font-semibold tracking-wide text-muted uppercase'
 
 /** Each group's count, win rate, stake and P&L, aligned like a table. */
 function LineTable({ lines }: { lines: ReadonlyArray<Line> }) {

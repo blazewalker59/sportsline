@@ -244,12 +244,9 @@ function Timeline({
   const [recapOpen, setRecapOpen] = useState(false)
 
   return (
-    // A chat feed, not a document: nothing selects, so long-pressing a
-    // bubble to react never makes iOS highlight the page around it.
-    <div
-      ref={rootRef}
-      className="mx-auto max-w-xl px-4 pb-16 select-none [-webkit-touch-callout:none]"
-    >
+    // Only the feed (TimelineFeed) and the reaction bar refuse selection;
+    // scores and names up here copy like any page's.
+    <div ref={rootRef} className="mx-auto max-w-xl px-4 pb-16">
       <TimelineTop
         topRef={topRef}
         scope={s}
@@ -277,7 +274,7 @@ function Timeline({
       {viewer && !followed?.length && !gameId && (
         <Link
           to="/follows"
-          className="mb-3 block rounded-2xl border border-border bg-surface px-4 py-3 text-sm"
+          className="mb-3 block rounded-card border border-border bg-surface px-4 py-3 text-sm"
         >
           You’re seeing every League.{' '}
           <span className="font-semibold text-accent">

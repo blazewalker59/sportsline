@@ -97,7 +97,7 @@ function BetRecord() {
         {data.recent.map((p) => (
           <li
             key={p.id}
-            className="flex flex-col gap-0.5 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm"
+            className="flex flex-col gap-0.5 rounded-card border border-border bg-surface px-3 py-2.5 text-sm"
           >
             <span className="flex items-baseline justify-between gap-2">
               <span className="truncate font-semibold">
@@ -107,7 +107,7 @@ function BetRecord() {
                 className={cn(
                   'shrink-0 text-xs font-semibold',
                   p.result === 'won'
-                    ? 'text-emerald-600 dark:text-emerald-400'
+                    ? 'text-positive'
                     : p.result === 'lost'
                       ? 'text-live'
                       : 'text-muted',

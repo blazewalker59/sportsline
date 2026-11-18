@@ -44,22 +44,22 @@ export function PredictionSummary({
         type="button"
         onClick={() => setPortfolioOpen(true)}
         aria-label="Your portfolio"
-        className="mt-2 flex w-full items-stretch divide-x divide-border rounded-2xl border border-border bg-surface text-center transition-colors hover:border-accent/50"
+        className="mt-2 flex w-full items-stretch divide-x divide-border rounded-card border border-border bg-surface text-center transition-colors hover:border-accent/50"
       >
         <span className="flex flex-1 flex-col justify-center px-2 py-1.5">
-          <span className="text-[11px] text-muted">Open</span>
+          <span className="text-2xs text-muted">Open</span>
           <span className="text-[15px] font-bold tabular-nums">
             {open.length}
           </span>
         </span>
         <span className="flex flex-1 flex-col justify-center px-2 py-1.5">
-          <span className="text-[11px] text-muted">Staked</span>
+          <span className="text-2xs text-muted">Staked</span>
           <span className="text-[15px] font-bold tabular-nums">
             {money(totals.staked)}
           </span>
         </span>
         <span className="flex flex-[1.4] flex-col justify-center px-2 py-1.5">
-          <span className="text-[11px] text-muted">Cash out now ›</span>
+          <span className="text-2xs text-muted">Cash out now ›</span>
           <span className="text-[15px] font-bold tabular-nums">
             {totals.profit ? money(totals.cashout) : '—'}
             {totals.profit && (
@@ -128,7 +128,7 @@ function PortfolioSheet({
   const totals = portfolioTotals(predictions)
   return (
     <Sheet title="Portfolio" onClose={onClose}>
-      <dl className="grid grid-cols-3 gap-2 rounded-xl border border-border bg-surface p-3 text-center text-xs text-muted">
+      <dl className="grid grid-cols-3 gap-2 rounded-card border border-border bg-surface p-3 text-center text-xs text-muted">
         <div>
           <dt>Staked</dt>
           <dd className="text-base font-semibold text-foreground tabular-nums">
@@ -142,7 +142,7 @@ function PortfolioSheet({
             {totals.profit && (
               <span
                 className={cn(
-                  'block text-[11px] font-semibold',
+                  'block text-2xs font-semibold',
                   toneOf(totals.profit.dollars),
                 )}
               >
@@ -158,7 +158,7 @@ function PortfolioSheet({
           </dd>
         </div>
       </dl>
-      <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+      <ul className="divide-y divide-border rounded-card border border-border bg-surface">
         {predictions.map((p) => {
           const profit = profitOf(p)
           const won = p.legs.filter((l) => l.status === 'won').length
@@ -199,7 +199,7 @@ function PortfolioSheet({
                 {profit && (
                   <span
                     className={cn(
-                      'text-[11px] font-semibold tabular-nums',
+                      'text-2xs font-semibold tabular-nums',
                       toneOf(profit.dollars),
                     )}
                   >
@@ -226,7 +226,7 @@ function PortfolioSheet({
           )
         })}
       </ul>
-      <p className="text-[11px] text-muted">
+      <p className="text-2xs text-muted">
         Cash out is what selling now would bring at Kalshi’s current prices; a
         winning contract pays $1.
       </p>

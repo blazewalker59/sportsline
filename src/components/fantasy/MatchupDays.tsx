@@ -14,7 +14,7 @@ import { formatDay, shortDay } from '@/lib/time/format'
 export type MatchupPart = number | 'summary'
 
 const arrow =
-  'size-9 rounded-lg text-xl leading-none font-semibold hover:bg-notice disabled:opacity-30 disabled:hover:bg-transparent'
+  'size-9 rounded-control text-xl leading-none font-semibold hover:bg-notice disabled:opacity-30 disabled:hover:bg-transparent'
 
 export function MatchupDays({
   m,
@@ -48,7 +48,7 @@ export function MatchupDays({
     <div className="flex flex-col gap-1.5">
       <nav
         aria-label="Matchup day"
-        className="flex items-center gap-1 rounded-xl border border-border bg-surface p-1"
+        className="flex items-center gap-1 rounded-card border border-border bg-surface p-1"
       >
         <button
           type="button"
@@ -64,17 +64,15 @@ export function MatchupDays({
           aria-expanded={open}
           aria-label={`${name}: choose a day or the summary`}
           onClick={() => setOpen((o) => !o)}
-          className="flex flex-1 flex-col items-center rounded-lg py-0.5 leading-tight hover:bg-notice"
+          className="flex flex-1 flex-col items-center rounded-control py-0.5 leading-tight hover:bg-notice"
         >
           <span className="text-sm font-semibold" aria-live="polite">
             {name}
-            <span aria-hidden="true" className="ml-1 text-[10px] text-muted">
+            <span aria-hidden="true" className="ml-1 text-3xs text-muted">
               {open ? '▴' : '▾'}
             </span>
           </span>
-          <span className="text-[10.5px] text-muted tabular-nums">
-            {detail}
-          </span>
+          <span className="text-3xs text-muted tabular-nums">{detail}</span>
         </button>
         <button
           type="button"
@@ -90,7 +88,7 @@ export function MatchupDays({
         <div
           role="listbox"
           aria-label="Matchup days"
-          className="flex gap-1 overflow-x-auto rounded-xl border border-border bg-surface p-1"
+          className="flex gap-1 overflow-x-auto rounded-card border border-border bg-surface p-1"
         >
           {matchupChoices(m, days, summary).map((c) => (
             <Pill
@@ -156,7 +154,7 @@ function Pill({
       aria-selected={selected}
       onClick={onClick}
       className={cn(
-        'flex shrink-0 flex-col items-center rounded-lg px-2.5 py-1 leading-tight',
+        'flex shrink-0 flex-col items-center rounded-control px-2.5 py-1 leading-tight',
         selected
           ? 'bg-accent-soft text-accent ring-1 ring-accent/40'
           : today
@@ -164,8 +162,8 @@ function Pill({
             : 'text-muted hover:bg-notice hover:text-foreground',
       )}
     >
-      <span className="text-[11px] font-semibold">{top}</span>
-      <span className="text-[10px] tabular-nums opacity-75">{bottom}</span>
+      <span className="text-2xs font-semibold">{top}</span>
+      <span className="text-3xs tabular-nums opacity-75">{bottom}</span>
     </button>
   )
 }

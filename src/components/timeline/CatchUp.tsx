@@ -40,7 +40,7 @@ export function CatchUpCard({
     ).values(),
   ].slice(0, 3)
   return (
-    <div className="relative flex items-center gap-3 rounded-2xl border border-accent/30 bg-accent-soft px-3.5 py-3">
+    <div className="relative flex items-center gap-3 rounded-card border border-accent/30 bg-accent-soft px-3.5 py-3">
       <button
         type="button"
         onClick={onOpen}
@@ -126,7 +126,7 @@ export function CatchUpSheet({
                   <LeagueAvatar league={item.league} />
                 )}
                 <div className="flex min-w-0 flex-col gap-1">
-                  <span className="px-1 text-[11px] text-muted">
+                  <span className="px-1 text-2xs text-muted">
                     <span className="font-semibold text-foreground/80">
                       {item.awayTeam.abbreviation} @{' '}
                       {item.homeTeam.abbreviation}

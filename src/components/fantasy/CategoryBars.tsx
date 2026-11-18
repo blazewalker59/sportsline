@@ -118,7 +118,7 @@ export function CategoryBars({
                   >
                     {figure('mine')}
                   </span>
-                  <span className="text-center text-[11px] leading-none font-semibold text-muted">
+                  <span className="text-center text-2xs leading-none font-semibold text-muted">
                     {c.label}
                     {c.reverse && (
                       <span className="sr-only"> (lower is better)</span>

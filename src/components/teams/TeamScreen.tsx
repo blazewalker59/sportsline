@@ -227,7 +227,7 @@ function GameSection({
       <h2 className="subject-ink mb-2 text-xs font-bold tracking-wide text-muted uppercase">
         {title}
       </h2>
-      <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+      <ul className="divide-y divide-border rounded-card border border-border bg-surface">
         {games.map((g) => (
           <GameRow key={g.sourceGameId} game={g} league={league} />
         ))}
@@ -279,7 +279,7 @@ function GameRow({
       <TeamLogo team={game.opponent} size={24} />
       <span className="truncate font-medium">
         {game.opponent.rank && (
-          <span className="mr-1 text-[11px] font-bold text-muted">
+          <span className="mr-1 text-2xs font-bold text-muted">
             {game.opponent.rank}
           </span>
         )}
@@ -343,7 +343,7 @@ function Outcome({ game }: { game: TeamGame }) {
     <span className="flex items-center gap-1">
       <span className="flex w-10 justify-center">
         {live ? (
-          <span className="rounded-full bg-live/15 px-1.5 text-[11px] font-bold text-live">
+          <span className="rounded-full bg-live/15 px-1.5 text-2xs font-bold text-live">
             LIVE
           </span>
         ) : (
@@ -406,7 +406,7 @@ function RecentForm({ page }: { page: TeamPage }) {
             key={g.sourceGameId}
             title={`${g.result} ${g.score.team}–${g.score.opponent} ${g.home ? 'vs' : '@'} ${g.opponent.abbreviation}`}
             className={cn(
-              'flex h-5 min-w-5 items-center justify-center rounded px-0.5 text-[10px] font-bold',
+              'flex h-5 min-w-5 items-center justify-center rounded-control px-0.5 text-3xs font-bold',
               g.result === 'W'
                 ? 'bg-scoring/15 text-scoring'
                 : 'bg-notice text-muted',
@@ -442,7 +442,7 @@ function Roster({
             {label}
             <span className="ml-1 font-normal">{players.length}</span>
           </h2>
-          <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+          <ul className="divide-y divide-border rounded-card border border-border bg-surface">
             {players.map((p) => (
               <li key={p.id}>
                 <PlayerButton

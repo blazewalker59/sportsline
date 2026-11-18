@@ -46,7 +46,7 @@ function LegRow({
         <span
           aria-label={leg.status}
           className={cn(
-            'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
+            'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-2xs font-bold',
             leg.status === 'won'
               ? 'bg-scoring/15 text-scoring'
               : leg.status === 'lost'
@@ -182,7 +182,7 @@ export function PredictionSheet({
         )}
       </header>
       <OddsChart predictionId={p.id} />
-      <dl className="grid grid-cols-3 gap-2 rounded-xl border border-border bg-surface p-3 text-center text-xs text-muted">
+      <dl className="grid grid-cols-3 gap-2 rounded-card border border-border bg-surface p-3 text-center text-xs text-muted">
         <div>
           <dt className="subject-ink">Contracts</dt>
           <dd className="text-base font-semibold text-foreground tabular-nums">
@@ -213,7 +213,7 @@ export function PredictionSheet({
                 return profit ? (
                   <span
                     className={cn(
-                      'block text-[11px] font-semibold',
+                      'block text-2xs font-semibold',
                       toneOf(profit.dollars),
                     )}
                   >
@@ -230,14 +230,14 @@ export function PredictionSheet({
         <h3 className="subject-ink mb-2 text-xs font-bold tracking-wide text-muted uppercase">
           {combo ? `${p.legs.length} legs` : 'Market'}
         </h3>
-        <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+        <ul className="divide-y divide-border rounded-card border border-border bg-surface">
           {p.legs.map((leg, i) => (
             <LegRow key={i} leg={leg} pip={pips} onNavigate={onClose} />
           ))}
         </ul>
       </section>
       <PredictionGames prediction={p} onNavigate={onClose} />
-      <p className="text-[11px] text-muted">
+      <p className="text-2xs text-muted">
         Read from your Kalshi account. Odds are Kalshi’s market prices.
       </p>
     </Sheet>

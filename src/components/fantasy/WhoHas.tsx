@@ -120,7 +120,7 @@ export function WhoHasCard({
                 disabled={result !== null || pending}
                 onClick={() => onPick(o.teamId)}
                 className={cn(
-                  'min-h-14 w-full rounded-xl border px-3 py-2 text-sm font-semibold transition-colors',
+                  'min-h-14 w-full rounded-card border px-3 py-2 text-sm font-semibold transition-colors',
                   isOwner
                     ? 'border-scoring bg-scoring/15 text-scoring'
                     : wrongPick

@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&display=swap');
-
 @import 'tailwindcss';
 
 @import 'tw-animate-css';
@@ -7,9 +5,56 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
+  Bricolage Grotesque, served from the app (OFL, see fonts/OFL.txt): one
+  variable file per subset covering opsz 12-96 and wght 200-800, which Vite
+  fingerprints into /assets. Latin is preloaded from the head (__root.tsx);
+  latin-ext loads only when a name needs it. Swap, so text never waits.
+*/
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('./fonts/bricolage-grotesque-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Bricolage Grotesque';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('./fonts/bricolage-grotesque-latin-ext.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/*
   Watch Party design language. Light is the base; `.dark` on <html> (set
   before paint from the Viewer's choice or the device) switches every
   token. Team colors come from data, never from here.
+
+  Color carries meaning, never a raw palette class:
+  - accent / notable: the app's own blue; live: on now (and a lost pick).
+  - scoring: a Scoring Play's gold (not "good": see positive).
+  - positive: won, filled, healthy, a strong grade.
+  - negative: points lost, out injured, a stale job, errors counted.
+  - warning: needs a look (stale scores, questionable injury, a failing
+    job, a penalty flag).
+  - in-play: a Fantasy Starter's Game under way.
+  - section-*: each menu section's icon, so items read apart at a glance.
+  - slot-1..8: Fantasy position groups, Sleeper-style (fantasy/format.ts).
+  Pair a tone's text with its own wash: `bg-positive/15 text-positive`.
+
+  Type: text-3xs (11px) is the floor, for caps labels, badges and chart
+  marks; text-2xs (11.5px) is small running text; then Tailwind's text-xs.
+  Radius: rounded-control (buttons, chips, tags), rounded-card (cards,
+  lists, popovers, full-width fields), rounded-sheet (sheets and chat
+  bubbles); rounded-full for pills and avatars.
 */
 :root {
   --background: #f3f4f8;
@@ -25,6 +70,25 @@
   --live: #e5372a;
   --scoring: #c24a00;
   --notable: #2d3cff;
+  --positive: #047857;
+  --negative: #dc2626;
+  --warning: #b45309;
+  --in-play: #b45309;
+  --section-reactions: #db2777;
+  --section-predictions: #059669;
+  --section-fantasy: #d97706;
+  --section-alerts: #0284c7;
+  --section-agents: #7c3aed;
+  --section-health: #dc2626;
+  /* Fantasy position groups (fantasy/format.ts SLOT_TONES). */
+  --slot-1: #e11d48; /* QB, pitchers */
+  --slot-2: #047857; /* RB, outfield, forwards */
+  --slot-3: #0369a1; /* WR, infield, guards */
+  --slot-4: #b45309; /* TE */
+  --slot-5: #6d28d9; /* flex and utility */
+  --slot-6: #334155; /* D/ST */
+  --slot-7: #a16207; /* K */
+  --slot-8: #c2410c; /* catchers, bigs */
   /* Fantasy managers' colors (lib/brand/subject.ts managerColor). */
   --manager-1: #0f8f7e;
   --manager-2: #c2410c;
@@ -50,6 +114,24 @@
   --live: #ff6b5e;
   --scoring: #ffb612;
   --notable: #8fa2ff;
+  --positive: #34d399;
+  --negative: #f87171;
+  --warning: #fbbf24;
+  --in-play: #fcd34d;
+  --section-reactions: #f472b6;
+  --section-predictions: #34d399;
+  --section-fantasy: #fbbf24;
+  --section-alerts: #38bdf8;
+  --section-agents: #a78bfa;
+  --section-health: #f87171;
+  --slot-1: #fb7185;
+  --slot-2: #34d399;
+  --slot-3: #38bdf8;
+  --slot-4: #fbbf24;
+  --slot-5: #a78bfa;
+  --slot-6: #cbd5e1;
+  --slot-7: #facc15;
+  --slot-8: #fb923c;
   --manager-1: #34d3bd;
   --manager-2: #fb8a4c;
   --manager-3: #b69cff;
@@ -74,27 +156,69 @@
   --color-live: var(--live);
   --color-scoring: var(--scoring);
   --color-notable: var(--notable);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --color-warning: var(--warning);
+  --color-in-play: var(--in-play);
+  --color-section-reactions: var(--section-reactions);
+  --color-section-predictions: var(--section-predictions);
+  --color-section-fantasy: var(--section-fantasy);
+  --color-section-alerts: var(--section-alerts);
+  --color-section-agents: var(--section-agents);
+  --color-section-health: var(--section-health);
+  --color-slot-1: var(--slot-1);
+  --color-slot-2: var(--slot-2);
+  --color-slot-3: var(--slot-3);
+  --color-slot-4: var(--slot-4);
+  --color-slot-5: var(--slot-5);
+  --color-slot-6: var(--slot-6);
+  --color-slot-7: var(--slot-7);
+  --color-slot-8: var(--slot-8);
   --font-sans: 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
+}
+
+/*
+  Theme-independent scales. The small sizes set no line-height of their own,
+  so they keep the one they inherit, as the pixel sizes they replace did.
+*/
+@theme {
+  --text-3xs: 0.6875rem; /* 11px: the floor */
+  --text-2xs: 0.71875rem; /* 11.5px */
+  --radius-control: 0.375rem;
+  --radius-card: 0.75rem;
+  --radius-sheet: 1.25rem;
 }
 
 body {
   @apply m-0 bg-background font-sans text-foreground antialiased;
   padding-bottom: env(safe-area-inset-bottom, 0px);
-  /*
-    An app, not a document: nothing selects, so a long-press (to react)
-    never makes iOS highlight text, whatever is under the finger when the
-    emoji bar appears. Fields stay editable.
-  */
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
 }
 
+/*
+  Text selects, so stats, scores and names copy. Where a long-press reacts
+  (the Timeline feed, its bubbles and the emoji bar), those elements set
+  `select-none [-webkit-touch-callout:none]` themselves so iOS never
+  highlights text under the finger when the bar appears. Fields stay
+  editable even inside them.
+*/
 input,
 textarea,
 [contenteditable='true'] {
   -webkit-user-select: text;
   user-select: text;
+}
+
+/*
+  One focus ring for everything, in the accent (light blue on dark, deep
+  blue on light). :focus-visible, so it shows for the keyboard and not for
+  a tap or click. In the base layer, so a component that draws its own
+  focus (outline-none plus a border) still wins.
+*/
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 }
 
 @keyframes typing-dot {
@@ -594,7 +718,7 @@ body:has(.subject-page) {
 }
 .ts-chart-tooltip {
   border: 1px solid var(--border);
-  border-radius: 0.75rem;
+  border-radius: var(--radius-card);
   font-size: 12px;
   line-height: 1.45;
   font-variant-numeric: tabular-nums;

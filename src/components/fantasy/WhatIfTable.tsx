@@ -27,9 +27,9 @@ export function WhatIfTable({
     )
   return (
     <div className="flex flex-col gap-2">
-      <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+      <div className="overflow-x-auto rounded-card border border-border bg-surface">
         <table className="w-full text-sm whitespace-nowrap tabular-nums">
-          <thead className="text-[11px] text-muted uppercase">
+          <thead className="text-2xs text-muted uppercase">
             <tr className="border-b border-border">
               <th className="py-2 pr-1 pl-3 text-left font-semibold">#</th>
               <th className="px-1 text-left font-semibold">Team</th>
@@ -56,7 +56,7 @@ export function WhatIfTable({
                   <td className="px-1 text-right font-semibold">
                     {record(r.whatIfWins, r.whatIfLosses, r.whatIfTies)}
                     {gained > 0 && (
-                      <span className="ml-1 text-[11px] text-scoring">
+                      <span className="ml-1 text-2xs text-scoring">
                         +{gained}
                       </span>
                     )}
@@ -68,7 +68,7 @@ export function WhatIfTable({
                   <td className="pr-3 pl-1 text-right">
                     {r.flips}
                     {r.oneMoveFlips > 0 && (
-                      <span className="text-[11px] text-muted">
+                      <span className="text-2xs text-muted">
                         {' '}
                         ({r.oneMoveFlips} by one swap)
                       </span>
@@ -80,7 +80,7 @@ export function WhatIfTable({
           </tbody>
         </table>
       </div>
-      <p className="text-[11px] text-muted">
+      <p className="text-2xs text-muted">
         Over {whatIf.weeks} finished {whatIf.weeks === 1 ? 'week' : 'weeks'}:
         each team’s record had it started its best lineup every week, against
         its opponents’ real scores. Bench: points its best lineups would have

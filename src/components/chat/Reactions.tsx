@@ -181,7 +181,11 @@ function ReactionPicker({
   const width = REACTIONS.length * 48 + 12
   const left = Math.min(Math.max(8, anchor.left), window.innerWidth - width - 8)
   return (
-    <div className="fixed inset-0 z-40" role="dialog" aria-label="React">
+    <div
+      className="fixed inset-0 z-40 select-none [-webkit-touch-callout:none]"
+      role="dialog"
+      aria-label="React"
+    >
       <button
         type="button"
         aria-label="Close reactions"
@@ -354,7 +358,7 @@ function ShareCard({
         ref={ref}
         className="flex flex-col gap-2 bg-background p-4 font-sans text-foreground"
       >
-        <span className="px-1 text-[11px] text-muted">
+        <span className="px-1 text-2xs text-muted">
           <span className="font-semibold text-foreground/80">
             {shareable.awayTeam.abbreviation} {shareable.score.away} –{' '}
             {shareable.score.home} {shareable.homeTeam.abbreviation}
@@ -379,7 +383,7 @@ function ShareCard({
             </span>
           </div>
         </div>
-        <span className="mt-2 self-end text-[11px] font-bold tracking-wide text-muted">
+        <span className="mt-2 self-end text-2xs font-bold tracking-wide text-muted">
           sportsline.dev
         </span>
       </div>

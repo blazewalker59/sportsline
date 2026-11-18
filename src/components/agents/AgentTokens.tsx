@@ -43,15 +43,15 @@ export function Tokens({ tradingReady }: { tradingReady: boolean }) {
 
   return (
     <>
-      <section className="flex flex-col gap-2 rounded-xl border border-border bg-surface px-3 py-3 text-sm">
+      <section className="flex flex-col gap-2 rounded-card border border-border bg-surface px-3 py-3 text-sm">
         <p className="font-semibold">Connect an agent</p>
         <p className="text-muted">
           Add an MCP server with this URL, sending your token as a header:
         </p>
-        <code className="rounded-lg bg-background px-2 py-1.5 font-mono text-xs break-all">
+        <code className="rounded-control bg-background px-2 py-1.5 font-mono text-xs break-all">
           {endpoint}
         </code>
-        <code className="rounded-lg bg-background px-2 py-1.5 font-mono text-xs break-all">
+        <code className="rounded-control bg-background px-2 py-1.5 font-mono text-xs break-all">
           Authorization: Bearer sl_…
         </code>
       </section>
@@ -59,14 +59,14 @@ export function Tokens({ tradingReady }: { tradingReady: boolean }) {
       {created ? (
         <section
           role="status"
-          className="flex flex-col gap-2 rounded-xl border border-accent/40 bg-accent/10 px-3 py-3 text-sm"
+          className="flex flex-col gap-2 rounded-card border border-accent/40 bg-accent/10 px-3 py-3 text-sm"
         >
           <p className="font-semibold">Your new token</p>
           <p className="text-muted">
             Copy it now: it won’t be shown again. Anyone with it can use
             Sportsline as you, so keep it in your agent’s secrets.
           </p>
-          <code className="rounded-lg bg-background px-2 py-1.5 font-mono text-xs break-all select-all">
+          <code className="rounded-control bg-background px-2 py-1.5 font-mono text-xs break-all select-all">
             {created}
           </code>
           <div className="flex gap-2">
@@ -102,7 +102,7 @@ export function Tokens({ tradingReady }: { tradingReady: boolean }) {
               maxLength={60}
               autoComplete="off"
               placeholder="What it’s for, e.g. Grok"
-              className="rounded-xl border border-border bg-surface px-3 py-2 text-sm font-normal"
+              className="rounded-card border border-border bg-surface px-3 py-2 text-sm font-normal"
             />
           </label>
           <label className="flex items-start gap-2 text-sm">
@@ -148,13 +148,13 @@ export function Tokens({ tradingReady }: { tradingReady: boolean }) {
             {tokens.data.map((t) => (
               <li
                 key={t.id}
-                className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm"
+                className="flex items-center gap-3 rounded-card border border-border bg-surface px-3 py-2.5 text-sm"
               >
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
                     <span className="truncate font-semibold">{t.name}</span>
                     {t.scopes.includes('trade') && (
-                      <span className="shrink-0 rounded-full bg-notice px-2 py-0.5 text-[10px] font-bold uppercase">
+                      <span className="shrink-0 rounded-full bg-notice px-2 py-0.5 text-3xs font-bold uppercase">
                         Can trade
                       </span>
                     )}

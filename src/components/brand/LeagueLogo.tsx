@@ -43,7 +43,7 @@ export function LeagueLogo({
     return (
       <span
         className={cn(
-          'text-[11px] font-semibold uppercase tracking-wide text-muted',
+          'text-2xs font-semibold uppercase tracking-wide text-muted',
           className,
         )}
       >

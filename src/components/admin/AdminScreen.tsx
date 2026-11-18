@@ -26,7 +26,7 @@ export function AdminScreen() {
       ) : health.isError ? (
         <p className="text-sm text-live">{health.error.message}</p>
       ) : health.data.denied ? (
-        <p className="rounded-xl border border-border bg-surface px-4 py-3 text-sm text-muted">
+        <p className="rounded-card border border-border bg-surface px-4 py-3 text-sm text-muted">
           Signed in as{' '}
           <span className="font-semibold text-foreground">
             {health.data.email}
@@ -50,9 +50,9 @@ function jobState(j: JobView): 'ok' | 'failing' | 'stale' {
 
 /** Health colors, fixed: the app's gold "scoring" reads as a warning here. */
 const DOT = {
-  ok: 'bg-emerald-500',
-  failing: 'bg-amber-400',
-  stale: 'bg-red-500',
+  ok: 'bg-positive',
+  failing: 'bg-warning',
+  stale: 'bg-negative',
 } as const
 
 function Health({ health }: { health: OpsHealth }) {
@@ -63,7 +63,7 @@ function Health({ health }: { health: OpsHealth }) {
     .reduce((n, e) => n + e.count, 0)
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-border bg-border text-center">
+      <div className="grid grid-cols-3 gap-px overflow-hidden rounded-card border border-border bg-border text-center">
         <Summary
           label="Stale jobs"
           value={states.filter((s) => s === 'stale').length}
@@ -78,7 +78,7 @@ function Health({ health }: { health: OpsHealth }) {
       </div>
 
       <Section title={`Jobs · ${health.jobs.length}`}>
-        <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+        <ul className="divide-y divide-border rounded-card border border-border bg-surface">
           {health.jobs.map((j) => {
             const state = jobState(j)
             const [task, viewer] = j.name.split(':')
@@ -122,7 +122,7 @@ function Health({ health }: { health: OpsHealth }) {
       </Section>
 
       <Section title="Accounts">
-        <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+        <ul className="divide-y divide-border rounded-card border border-border bg-surface">
           {health.accounts.map((a) => (
             <li
               key={`${a.provider}${a.viewer}`}
@@ -159,7 +159,7 @@ function Health({ health }: { health: OpsHealth }) {
         {health.errors.length === 0 ? (
           <p className="text-sm text-muted">None recorded.</p>
         ) : (
-          <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+          <ul className="divide-y divide-border rounded-card border border-border bg-surface">
             {health.errors.map((e) => (
               <ErrorRow key={e.fingerprint} error={e} now={now} />
             ))}
@@ -181,7 +181,7 @@ function ErrorRow({ error: e, now }: { error: ErrorView; now: number | null }) {
         aria-expanded={open}
         className="flex w-full items-start gap-3 px-3 py-2 text-left"
       >
-        <span className="mt-0.5 shrink-0 rounded bg-notice px-1.5 py-0.5 text-[10px] font-bold text-muted uppercase">
+        <span className="mt-0.5 shrink-0 rounded-control bg-notice px-1.5 py-0.5 text-3xs font-bold text-muted uppercase">
           {e.scope}
         </span>
         <span className="min-w-0 flex-1 text-sm leading-snug">{e.message}</span>
@@ -199,7 +199,7 @@ function ErrorRow({ error: e, now }: { error: ErrorView; now: number | null }) {
             {dateTime(e.lastAt, timeZone)}
           </p>
           {e.details && (
-            <pre className="max-h-64 overflow-auto rounded-lg bg-notice p-2 text-[11px] leading-snug whitespace-pre-wrap">
+            <pre className="max-h-64 overflow-auto rounded-control bg-notice p-2 text-2xs leading-snug whitespace-pre-wrap">
               {e.details}
             </pre>
           )}
@@ -223,14 +223,12 @@ function Summary({
       <span
         className={cn(
           'block text-2xl font-bold tabular-nums',
-          bad && value > 0
-            ? 'text-red-500'
-            : 'text-emerald-600 dark:text-emerald-400',
+          bad && value > 0 ? 'text-negative' : 'text-positive',
         )}
       >
         {value}
       </span>
-      <span className="text-[11px] font-semibold tracking-wide text-muted uppercase">
+      <span className="text-2xs font-semibold tracking-wide text-muted uppercase">
         {label}
       </span>
     </div>

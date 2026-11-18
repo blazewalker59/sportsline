@@ -68,7 +68,7 @@ export function PlayerSheet({
           <PlayerDetailSections player={player} onNavigate={onClose} />
           {page.data && page.data.items.length > 0 && (
             <Section title="Recent plays">
-              <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+              <ul className="divide-y divide-border rounded-card border border-border bg-surface">
                 {page.data.items.slice(0, RECENT_PLAYS).map((item) => (
                   <PlayRow
                     key={item.id}
@@ -104,7 +104,7 @@ function PlayRow({ item, onOpen }: { item: TimelineItem; onOpen: () => void }) {
         onClick={onOpen}
         className="flex w-full flex-col gap-0.5 px-3 py-2.5 text-left"
       >
-        <span className="text-[11px] text-muted">
+        <span className="text-2xs text-muted">
           <span className="font-semibold text-foreground/80">
             {item.awayTeam.abbreviation} {item.score.away} – {item.score.home}{' '}
             {item.homeTeam.abbreviation}
@@ -201,7 +201,7 @@ export function PlayerDetailSections({
           />
           {overview?.note && (
             <Section title="Latest">
-              <div className="rounded-xl border border-border bg-surface px-3 py-2.5">
+              <div className="rounded-card border border-border bg-surface px-3 py-2.5">
                 <p className="text-sm font-semibold">
                   {overview.note.headline}
                 </p>
@@ -249,7 +249,7 @@ function GameSection({
     if (!next) return null
     return (
       <Section title="Next game">
-        <div className="rounded-xl border border-border bg-surface px-3 py-2.5 text-sm">
+        <div className="rounded-card border border-border bg-surface px-3 py-2.5 text-sm">
           <span className="font-semibold">
             {next.home ? 'vs' : '@'} {next.opponent}
           </span>
@@ -265,7 +265,7 @@ function GameSection({
   const started = live || game.status === 'final'
   return (
     <Section title={live ? 'Live now' : started ? 'Today' : 'Next game'}>
-      <div className="overflow-hidden rounded-xl border border-border bg-surface">
+      <div className="overflow-hidden rounded-card border border-border bg-surface">
         <Link
           to="/games/$gameId"
           params={{ gameId: game.id }}
@@ -335,7 +335,7 @@ function GameSide({
 function LineTable({ line }: { line: PlayerLine }) {
   return (
     <div className="border-t border-border px-3 py-2">
-      <p className="subject-ink mb-1 text-[11px] font-semibold text-muted">
+      <p className="subject-ink mb-1 text-2xs font-semibold text-muted">
         {line.title}
       </p>
       <div className="overflow-x-auto [scrollbar-width:none]">
@@ -384,11 +384,11 @@ function SeasonSection({
         {groups.map((g, gi) => (
           <div key={gi}>
             {g.name && (
-              <p className="subject-ink mb-1 text-[11px] font-semibold text-muted">
+              <p className="subject-ink mb-1 text-2xs font-semibold text-muted">
                 {g.name}
               </p>
             )}
-            <ul className="grid grid-cols-4 gap-px overflow-hidden rounded-xl border border-border bg-border">
+            <ul className="grid grid-cols-4 gap-px overflow-hidden rounded-card border border-border bg-border">
               {g.stats.map((s, i) => (
                 <li
                   key={i}
@@ -397,7 +397,7 @@ function SeasonSection({
                   <span className="text-base font-bold tabular-nums">
                     {s.value}
                   </span>
-                  <span className="subject-ink text-[10px] font-semibold text-muted uppercase">
+                  <span className="subject-ink text-3xs font-semibold text-muted uppercase">
                     {s.label}
                   </span>
                 </li>
@@ -432,7 +432,7 @@ function RecentSection({
   return (
     <Section title="Recent games">
       {form && <PlayerForm form={form} recent={recent} />}
-      <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+      <ul className="divide-y divide-border rounded-card border border-border bg-surface">
         {recent.map((g, i) => (
           <li key={i} className="flex items-center gap-3 px-3 py-2 text-sm">
             <span className="w-14 shrink-0 text-xs text-muted">
@@ -488,7 +488,7 @@ function NewsSection({ news }: { news: PlayerOverview['news'] }) {
   const timeZone = useTimeZone()
   return (
     <Section title="News">
-      <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+      <ul className="divide-y divide-border rounded-card border border-border bg-surface">
         {news.map((n, i) => (
           <li key={i}>
             <a
@@ -501,7 +501,7 @@ function NewsSection({ news }: { news: PlayerOverview['news'] }) {
                 {n.headline}
               </span>
               {n.published && (
-                <span className="text-[11px] text-muted">
+                <span className="text-2xs text-muted">
                   {dateLabel(n.published, timeZone)}
                 </span>
               )}
@@ -526,7 +526,7 @@ function FantasySection({ playerId }: { playerId: string }) {
   if (entries.length === 0) return null
   return (
     <Section title="Fantasy">
-      <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+      <ul className="divide-y divide-border rounded-card border border-border bg-surface">
         {entries.map((e) => {
           const key = `${e.league.id}~${e.side}`
           const tone = injuryTone(e.player.injury)
@@ -552,9 +552,7 @@ function FantasySection({ playerId }: { playerId: string }) {
                       <span
                         className={cn(
                           'font-semibold',
-                          tone === 'red'
-                            ? 'text-red-600 dark:text-red-400'
-                            : 'text-yellow-700 dark:text-yellow-400',
+                          tone === 'red' ? 'text-negative' : 'text-warning',
                         )}
                       >
                         {' '}
@@ -570,7 +568,7 @@ function FantasySection({ playerId }: { playerId: string }) {
                       : e.player.points.toFixed(1)}
                   </span>
                   {e.player.projected !== null && (
-                    <span className="text-[11px] text-muted">
+                    <span className="text-2xs text-muted">
                       proj {e.player.projected.toFixed(1)}
                     </span>
                   )}

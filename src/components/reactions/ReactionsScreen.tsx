@@ -46,7 +46,7 @@ export function ReactionsScreen({ playId }: { playId: string | null }) {
   }, [playId])
 
   return (
-    <div className="mx-auto max-w-xl px-4 pb-16 select-none [-webkit-touch-callout:none]">
+    <div className="mx-auto max-w-xl px-4 pb-16">
       <AppHeader />
       <h1 className="mb-4 text-xl font-bold tracking-tight">Reactions</h1>
       {isPending ? null : !signedIn ? (
@@ -105,7 +105,7 @@ function ReactionEntry({
         <LeagueAvatar league={item.league} />
       )}
       <div className="flex min-w-0 flex-col gap-1">
-        <span className="truncate px-1 text-[11px] text-muted">
+        <span className="truncate px-1 text-2xs text-muted">
           <span className="font-semibold text-foreground/80">
             {item.awayTeam.abbreviation} {item.score.away} – {item.score.home}{' '}
             {item.homeTeam.abbreviation}

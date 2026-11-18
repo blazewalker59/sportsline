@@ -32,7 +32,7 @@ export function BoxScore({ box, game }: { box: GameBox; game: GameSummary }) {
     <section
       aria-label="Box score"
       className={cn(
-        'subject-cards overflow-hidden rounded-xl border border-border bg-surface',
+        'subject-cards overflow-hidden rounded-card border border-border bg-surface',
         side === 'home' && 'subject-b',
       )}
     >

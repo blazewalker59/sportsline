@@ -87,7 +87,7 @@ export function CategoryLineup({
       aria-selected={side === value}
       onClick={() => setSide(value)}
       className={cn(
-        'min-w-0 flex-1 truncate rounded-md px-3 py-1 text-xs font-semibold transition-colors',
+        'min-w-0 flex-1 truncate rounded-control px-3 py-1 text-xs font-semibold transition-colors',
         side === value
           ? 'bg-surface text-foreground shadow-sm'
           : 'text-muted hover:text-foreground',
@@ -126,7 +126,7 @@ export function CategoryLineup({
             >
               <span
                 className={cn(
-                  'inline-block rounded px-1 py-0.5 leading-none',
+                  'inline-block rounded-control px-1 py-0.5 leading-none',
                   cell === '–'
                     ? 'text-muted/50'
                     : leads
@@ -160,24 +160,24 @@ export function CategoryLineup({
           <div
             role="tablist"
             aria-label="Whose lineup"
-            className="flex w-44 gap-0.5 rounded-lg bg-notice p-0.5"
+            className="flex w-44 gap-0.5 rounded-control bg-notice p-0.5"
           >
             {tab('mine', mine.abbrev, CHART_COLORS.mine)}
             {tab('opponent', opponent.abbrev, CHART_COLORS.opponent)}
           </div>
         )}
       </div>
-      <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+      <div className="overflow-x-auto rounded-card border border-border bg-surface">
         <table className="w-max min-w-full border-separate border-spacing-0 text-xs tabular-nums">
           <thead>
             <tr>
-              <th className="sticky left-0 z-20 min-w-[9.5rem] border-r border-b border-border bg-surface px-2 py-1.5 text-left text-[10px] font-semibold tracking-wide text-muted uppercase">
+              <th className="sticky left-0 z-20 min-w-[9.5rem] border-r border-b border-border bg-surface px-2 py-1.5 text-left text-3xs font-semibold tracking-wide text-muted uppercase">
                 {side === 'mine' || !opponent ? mine.name : opponent.name}
               </th>
               {columns.map((c) => (
                 <th
                   key={c.statId}
-                  className="min-w-[2.75rem] border-b border-border px-1 py-1.5 text-center text-[10px] font-semibold tracking-wide text-muted uppercase"
+                  className="min-w-[2.75rem] border-b border-border px-1 py-1.5 text-center text-3xs font-semibold tracking-wide text-muted uppercase"
                 >
                   {c.label}
                 </th>
@@ -189,7 +189,7 @@ export function CategoryLineup({
             <tr className="bg-notice/60 font-semibold">
               <th
                 scope="row"
-                className="sticky left-0 z-10 border-r border-b border-border bg-notice px-2 py-1.5 text-left text-[10px] tracking-wide uppercase"
+                className="sticky left-0 z-10 border-r border-b border-border bg-notice px-2 py-1.5 text-left text-3xs tracking-wide uppercase"
               >
                 {summary ? 'Matchup' : 'Starters'}
               </th>
@@ -256,11 +256,7 @@ function PlayerLabel({
       <span className="text-foreground/80">
         {state.home ? 'vs' : '@'}
         {them.abbreviation}{' '}
-        <span
-          className={cn(
-            state.live ? 'text-amber-700 dark:text-amber-300' : 'text-muted',
-          )}
-        >
+        <span className={cn(state.live ? 'text-in-play' : 'text-muted')}>
           {state.status}
         </span>
         {!state.upcoming && (
@@ -289,7 +285,7 @@ function PlayerLabel({
             name
           )}
           {slot && !player.starter && (
-            <span className="shrink-0 rounded bg-notice px-1 text-[8px] leading-tight font-bold text-muted uppercase">
+            <span className="shrink-0 rounded-control bg-notice px-1 text-3xs leading-tight font-bold text-muted uppercase">
               {player.slot === 'Bench' ? 'BN' : player.slot}
             </span>
           )}
@@ -297,17 +293,17 @@ function PlayerLabel({
             <span
               title={injuryLabel(player.injury!)}
               className={cn(
-                'shrink-0 text-[9px] font-bold',
+                'shrink-0 text-3xs font-bold',
                 injuryTone(player.injury) === 'yellow'
-                  ? 'text-yellow-700 dark:text-yellow-400'
-                  : 'text-red-600 dark:text-red-400',
+                  ? 'text-warning'
+                  : 'text-negative',
               )}
             >
               {injury}
             </span>
           )}
         </span>
-        <span className="block truncate text-[10px] leading-tight text-muted">
+        <span className="block truncate text-3xs leading-tight text-muted">
           {[position, player.teamAbbrev].filter(Boolean).join(' · ')}
           {game && <> · {game}</>}
         </span>

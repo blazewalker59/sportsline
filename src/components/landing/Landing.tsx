@@ -107,7 +107,7 @@ export function Landing() {
       <header className="mx-auto flex w-full max-w-5xl items-center gap-2 px-5 pt-[max(env(safe-area-inset-top),1.25rem)]">
         <img src="/favicon.svg" alt="" width={28} height={28} />
         <span className="text-lg font-bold tracking-tight">Sportsline</span>
-        <span className="ml-1 flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase">
+        <span className="ml-1 flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-3xs font-bold tracking-wider uppercase">
           <span className="landing-live size-1.5 rounded-full bg-[#ff5a4e]" />
           Live
         </span>
@@ -154,7 +154,7 @@ export function Landing() {
           {FEEDS.map((f, i) => (
             <li
               key={f.title}
-              className="landing-rise rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 backdrop-blur-sm"
+              className="landing-rise rounded-card border border-white/10 bg-white/[0.04] px-4 py-3 backdrop-blur-sm"
               style={{ animationDelay: `${0.25 + i * 0.12}s` }}
             >
               <p className="text-sm font-bold">{f.title}</p>
@@ -194,8 +194,8 @@ function Phone() {
             key={s}
             className={
               i === 0
-                ? 'rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-[#111318]'
-                : 'rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white/60'
+                ? 'rounded-full bg-white px-2.5 py-1 text-3xs font-semibold text-[#111318]'
+                : 'rounded-full bg-white/10 px-2.5 py-1 text-3xs font-semibold text-white/60'
             }
           >
             {s}
@@ -214,7 +214,7 @@ function Phone() {
             </span>
             <span className="flex min-w-0 flex-col gap-1">
               <span
-                className="flex flex-col gap-1 rounded-2xl rounded-bl-md px-3.5 py-2.5"
+                className="flex flex-col gap-1 rounded-sheet rounded-bl-control px-3.5 py-2.5"
                 style={{ background: m.color, color: m.ink }}
               >
                 <span className="text-[17px] leading-none font-extrabold tracking-tight">
@@ -223,12 +223,12 @@ function Phone() {
                 <span className="text-[13px] leading-snug font-bold">
                   {m.who}
                 </span>
-                <span className="text-[11px] font-semibold opacity-80 tabular-nums">
+                <span className="text-2xs font-semibold opacity-80 tabular-nums">
                   {m.line}
                 </span>
               </span>
               {m.tag && (
-                <span className="px-1 text-[10px] font-semibold text-[#ffb612]">
+                <span className="px-1 text-3xs font-semibold text-[#ffb612]">
                   {m.tag}
                 </span>
               )}
@@ -237,7 +237,7 @@ function Phone() {
         ))}
         <li className="landing-typing flex items-center gap-2">
           <span className="size-8 shrink-0 rounded-full bg-white/10" />
-          <span className="flex gap-1 rounded-2xl bg-white/10 px-3 py-2.5">
+          <span className="flex gap-1 rounded-sheet bg-white/10 px-3 py-2.5">
             {[0, 1, 2].map((d) => (
               <span
                 key={d}

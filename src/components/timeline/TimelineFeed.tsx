@@ -45,9 +45,11 @@ export function TimelineFeed({
   sharpPicks?: boolean
 }) {
   return (
+    // A chat feed, not a document: nothing selects, so long-pressing a
+    // bubble to react never makes iOS highlight the feed around it.
     <ol
       className={cn(
-        'flex flex-col gap-3 transition-opacity',
+        'flex flex-col gap-3 transition-opacity select-none [-webkit-touch-callout:none]',
         dimmed && 'opacity-50',
       )}
       aria-busy={loading}
@@ -126,7 +128,7 @@ export function FeedFooter({
       {error && (
         <div
           role="alert"
-          className="mt-6 flex items-center justify-between gap-3 rounded-xl border border-live/40 bg-live/10 px-3 py-2 text-sm text-live"
+          className="mt-6 flex items-center justify-between gap-3 rounded-card border border-live/40 bg-live/10 px-3 py-2 text-sm text-live"
         >
           Couldn’t load this feed.
           <button

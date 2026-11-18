@@ -54,7 +54,7 @@ export function FantasyTag({
   return (
     <span
       className={cn(
-        'flex px-2 text-[11px] font-semibold',
+        'flex px-2 text-2xs font-semibold',
         align === 'right' ? 'justify-end' : 'justify-start',
         side === 'mine' ? 'text-scoring' : 'text-live',
       )}
