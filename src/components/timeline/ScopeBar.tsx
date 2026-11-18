@@ -216,7 +216,7 @@ export function ScopeBar({
                           <rect x="13" y="13" width="7" height="7" rx="1.5" />
                         </svg>
                       ) : item === 'top25' ? (
-                        <span className="text-3xs font-bold text-muted">
+                        <span className="text-3xs font-bold text-muted tabular-nums">
                           25
                         </span>
                       ) : (

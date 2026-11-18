@@ -39,13 +39,15 @@ export function TeamAvatar({
 }) {
   return (
     <span
-      className="flex shrink-0 items-center justify-center rounded-full border border-bubble-border bg-surface"
-      style={{ width: size, height: size }}
+      className="flex shrink-0 items-center justify-center rounded-full border border-bubble-border bg-surface px-1"
+      style={{ minWidth: size, height: size }}
       title={team.abbreviation}
     >
       <TeamLogo team={team} size={size - 8} />
       {!team.logoUrl && (
-        <span className="text-3xs font-bold">{team.abbreviation}</span>
+        <span className="text-3xs leading-none font-bold tracking-tight">
+          {team.abbreviation}
+        </span>
       )}
     </span>
   )

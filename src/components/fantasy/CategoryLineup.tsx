@@ -285,7 +285,7 @@ function PlayerLabel({
             name
           )}
           {slot && !player.starter && (
-            <span className="shrink-0 rounded-control bg-notice px-1 text-3xs leading-tight font-bold text-muted uppercase">
+            <span className="shrink-0 rounded-control bg-notice px-1 text-3xs leading-tight font-bold whitespace-nowrap text-muted uppercase">
               {player.slot === 'Bench' ? 'BN' : player.slot}
             </span>
           )}

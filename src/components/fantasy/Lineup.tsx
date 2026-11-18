@@ -79,7 +79,7 @@ function PlayerCell({
         'block truncate leading-tight font-semibold whitespace-nowrap',
         ink && 'team-name',
         short.length > 14
-          ? 'text-2xs tracking-tight'
+          ? 'text-3xs tracking-tight'
           : short.length > 11
             ? 'text-[12px] tracking-tight'
             : 'text-[12.5px]',
@@ -300,7 +300,7 @@ export function LineupRows({
           open === `m${i}` ? mine[i] : open === `t${i}` ? theirs[i] : undefined
         return (
           <li key={i}>
-            <div className="grid grid-cols-[minmax(0,1fr)_2rem_minmax(0,1fr)] items-start gap-x-0.5 px-0.5 py-1">
+            <div className="grid grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)] items-start gap-x-0.5 px-0.5 py-1">
               <PlayerCell
                 sport={sport}
                 player={mine[i]}
@@ -312,7 +312,7 @@ export function LineupRows({
               />
               <span
                 className={cn(
-                  'mt-2 flex h-6 items-center justify-center rounded-control text-3xs leading-none font-bold uppercase',
+                  'mt-2 flex h-6 items-center justify-center rounded-control px-0.5 text-3xs leading-none font-bold tracking-tight whitespace-nowrap uppercase',
                   SLOT_TONES[slot] ?? 'bg-notice text-muted',
                 )}
               >

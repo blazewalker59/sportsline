@@ -87,7 +87,7 @@ export function PredictionCard({
             // At a glance: what cashing out now would make or lose.
             <span
               className={cn(
-                'text-2xs font-semibold tabular-nums',
+                'text-2xs font-semibold whitespace-nowrap tabular-nums',
                 toneOf(profit.dollars),
               )}
             >
@@ -102,7 +102,7 @@ export function PredictionCard({
             move !== null && (
               <span
                 className={cn(
-                  'text-2xs font-semibold tabular-nums',
+                  'text-2xs font-semibold whitespace-nowrap tabular-nums',
                   toneOf(move),
                 )}
               >

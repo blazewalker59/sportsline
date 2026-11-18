@@ -51,7 +51,7 @@
   Pair a tone's text with its own wash: `bg-positive/15 text-positive`.
 
   Type: text-3xs (11px) is the floor, for caps labels, badges and chart
-  marks; text-2xs (11.5px) is small running text; then Tailwind's text-xs.
+  marks; text-2xs (12px, text-xs without its line-height) is small running text.
   Radius: rounded-control (buttons, chips, tags), rounded-card (cards,
   lists, popovers, full-width fields), rounded-sheet (sheets and chat
   bubbles); rounded-full for pills and avatars.
@@ -183,7 +183,7 @@
 */
 @theme {
   --text-3xs: 0.6875rem; /* 11px: the floor */
-  --text-2xs: 0.71875rem; /* 11.5px */
+  --text-2xs: 0.75rem; /* 12px, without text-xs's line-height */
   --radius-control: 0.375rem;
   --radius-card: 0.75rem;
   --radius-sheet: 1.25rem;

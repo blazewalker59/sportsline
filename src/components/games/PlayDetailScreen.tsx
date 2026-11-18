@@ -414,7 +414,7 @@ function MlbContext({ detail }: { detail: MlbDetail }) {
                   className="flex items-center gap-2 border-b border-border/50 py-1.5 last:border-0"
                 >
                   <span
-                    className="flex size-5 shrink-0 items-center justify-center rounded-full text-3xs font-bold text-background"
+                    className="flex size-6 shrink-0 items-center justify-center rounded-full text-3xs font-bold text-background tabular-nums"
                     style={{ background: pitchColor(p) }}
                   >
                     {p.number ?? i + 1}

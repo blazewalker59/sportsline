@@ -343,7 +343,7 @@ function Outcome({ game }: { game: TeamGame }) {
     <span className="flex items-center gap-1">
       <span className="flex w-10 justify-center">
         {live ? (
-          <span className="rounded-full bg-live/15 px-1.5 text-2xs font-bold text-live">
+          <span className="rounded-full bg-live/15 px-1 text-3xs font-bold text-live">
             LIVE
           </span>
         ) : (
@@ -406,7 +406,7 @@ function RecentForm({ page }: { page: TeamPage }) {
             key={g.sourceGameId}
             title={`${g.result} ${g.score.team}–${g.score.opponent} ${g.home ? 'vs' : '@'} ${g.opponent.abbreviation}`}
             className={cn(
-              'flex h-5 min-w-5 items-center justify-center rounded-control px-0.5 text-3xs font-bold',
+              'flex h-5 min-w-5 items-center justify-center rounded-control px-1 text-3xs font-bold',
               g.result === 'W'
                 ? 'bg-scoring/15 text-scoring'
                 : 'bg-notice text-muted',

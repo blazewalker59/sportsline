@@ -333,7 +333,9 @@ function NextGamePill({ game }: { game: NextGame }) {
       <span className="sm:hidden">{label.short}</span>
       <span className="hidden sm:inline">{label.when}</span>
       {label.versus && (
-        <span className="font-normal opacity-80">{label.versus}</span>
+        <span className="min-w-0 truncate font-normal opacity-80">
+          {label.versus}
+        </span>
       )}
     </span>
   )

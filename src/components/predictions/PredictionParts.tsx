@@ -156,7 +156,7 @@ export function PropProgress({
       <span
         className={cn(
           'flex items-baseline justify-between gap-2 tabular-nums',
-          compact ? 'text-2xs' : 'text-xs',
+          compact ? 'text-3xs' : 'text-xs',
         )}
       >
         <span className={cn('font-semibold', hit && 'text-scoring')}>
