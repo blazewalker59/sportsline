@@ -22,6 +22,7 @@ import { FantasyStrip } from '@/components/fantasy/FantasyParts'
 import { PredictionStrip } from '@/components/predictions/PredictionCard'
 import { PredictionSummary } from '@/components/predictions/PredictionPortfolio'
 import { AppHeader } from '@/components/layout/AppHeader'
+import { NAV_INSET_LEFT } from '@/components/layout/AppNav'
 import { withViewTransition } from '@/lib/viewTransition'
 import { cn } from '@/lib/utils'
 
@@ -76,7 +77,10 @@ export function TimelineTop({
   return (
     <div
       ref={topRef}
-      className="pointer-events-none fixed inset-x-0 top-0 z-10"
+      className={cn(
+        'pointer-events-none fixed inset-x-0 top-0 z-10',
+        NAV_INSET_LEFT,
+      )}
       style={{ viewTransitionName: 'pinned' }}
     >
       <div className="mx-auto max-w-xl">
