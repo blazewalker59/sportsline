@@ -7,7 +7,7 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import { and, eq, like, or, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, like, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { optionalViewerMiddleware, viewerMiddleware } from './middleware'
 import type { ViewerProfile } from './session'
@@ -33,7 +33,11 @@ import {
 } from '@/lib/model/leagues'
 import { startViewerSync } from '@/lib/live/startViewerSync'
 import { isAdmin, reportError } from '@/lib/ops/errors'
-import { priceDisplayOf } from '@/lib/viewer/prefs'
+import {
+  firstRunDoneOf,
+  markFirstRunDone,
+  priceDisplayOf,
+} from '@/lib/viewer/prefs'
 import { UserError } from '@/lib/userError'
 
 /** A Follow with what the UI needs to show it. */
@@ -59,6 +63,8 @@ export interface ViewerState {
   isAdmin?: boolean
   /** Kalshi prices as cents or as a payout multiplier. */
   priceDisplay?: PriceDisplay
+  /** The first-run Follow picker is behind them (finished, skipped or moot). */
+  firstRunDone?: boolean
 }
 
 const LEAGUE_LABELS: Record<League, string> = {
@@ -177,20 +183,25 @@ export const getViewerState = createServerFn({ method: 'GET' })
         leagues: DEFAULT_LEAGUE_SETTINGS,
       }
     keepSyncing(viewer.id)
-    const [entries, marker, arrangement, priceDisplay] = await Promise.all([
-      followEntries(db, viewer.id),
-      db
-        .select({ readAt: readMarkers.readAt })
-        .from(readMarkers)
-        .where(eq(readMarkers.viewerId, viewer.id))
-        .get(),
-      db
-        .select({ order: leagueSettings.order, hidden: leagueSettings.hidden })
-        .from(leagueSettings)
-        .where(eq(leagueSettings.viewerId, viewer.id))
-        .get(),
-      priceDisplayOf(db, viewer.id),
-    ])
+    const [entries, marker, arrangement, priceDisplay, firstRunDone] =
+      await Promise.all([
+        followEntries(db, viewer.id),
+        db
+          .select({ readAt: readMarkers.readAt })
+          .from(readMarkers)
+          .where(eq(readMarkers.viewerId, viewer.id))
+          .get(),
+        db
+          .select({
+            order: leagueSettings.order,
+            hidden: leagueSettings.hidden,
+          })
+          .from(leagueSettings)
+          .where(eq(leagueSettings.viewerId, viewer.id))
+          .get(),
+        priceDisplayOf(db, viewer.id),
+        firstRunDoneOf(db, viewer.id),
+      ])
     return {
       viewer,
       follows: entries,
@@ -198,7 +209,15 @@ export const getViewerState = createServerFn({ method: 'GET' })
       leagues: normalizeLeagueSettings(arrangement),
       isAdmin: isAdmin(getCloudflareEnv(), viewer.email),
       priceDisplay,
+      firstRunDone,
     }
+  })
+
+/** Skip the first-run Follow picker; it isn't offered again, on any device. */
+export const dismissFirstRun = createServerFn({ method: 'POST' })
+  .middleware([viewerMiddleware])
+  .handler(async ({ context: { db, viewerId } }) => {
+    await markFirstRunDone(db, viewerId)
   })
 
 /** Show Kalshi prices as cents or as a payout multiplier, everywhere. */
@@ -275,6 +294,8 @@ export const setFollow = createServerFn({ method: 'POST' })
             createdAt: new Date().toISOString(),
           })
           .onConflictDoNothing()
+        // Following anything puts the first-run picker behind them.
+        await markFirstRunDone(db, viewerId)
       } else {
         await db
           .delete(follows)
@@ -385,4 +406,33 @@ export const searchFollowables = createServerFn({ method: 'GET' })
         headshotUrl: p.headshotUrl,
       })),
     ]
+  })
+
+/** Every Team in these Leagues, by name, for the first-run Follow picker. */
+export const leagueFollowables = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
+  .validator((data: { leagues: Array<string> }) =>
+    z
+      .object({ leagues: z.array(z.enum(LEAGUES)).min(1).max(LEAGUES.length) })
+      .parse(data),
+  )
+  .handler(async ({ data, context: { db } }): Promise<Array<Followable>> => {
+    const rows = await db
+      .select({
+        id: teams.id,
+        name: teams.name,
+        abbreviation: teams.abbreviation,
+        league: teams.league,
+        logoUrl: teams.logoUrl,
+      })
+      .from(teams)
+      .where(inArray(teams.league, data.leagues))
+      .orderBy(asc(teams.name))
+    return rows.map((t) => ({
+      follow: { kind: 'team' as const, teamId: t.id },
+      label: t.name,
+      detail: t.abbreviation,
+      league: t.league,
+      logoUrl: t.logoUrl,
+    }))
   })

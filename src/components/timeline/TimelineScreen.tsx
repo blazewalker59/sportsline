@@ -6,7 +6,7 @@
  */
 
 import { useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useRouter } from '@tanstack/react-router'
+import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { entryTime } from './FeedRows'
 import { FeedFooter, TimelineFeed } from './TimelineFeed'
@@ -18,6 +18,7 @@ import { usePastDay } from './usePastDay'
 import { useTimelineScope } from './useTimelineScope'
 import type { Scope } from '@/lib/model/scope'
 import type { LeagueMatchup } from '@/lib/fantasy/matchup'
+import { FirstRunFollows } from '@/components/follows/FirstRunFollows'
 import { neighborScope, scopeStops } from '@/lib/model/scope'
 import { useSwipe } from '@/components/layout/useSwipe'
 import { FantasyTagsProvider } from '@/components/fantasy/FantasyParts'
@@ -271,18 +272,8 @@ function Timeline({
       />
       <div aria-hidden="true" className="mb-3" style={{ height: topHeight }} />
 
-      {viewer && !followed?.length && !gameId && (
-        <Link
-          to="/follows"
-          className="mb-3 block rounded-card border border-border bg-surface px-4 py-3 text-sm"
-        >
-          You’re seeing every League.{' '}
-          <span className="font-semibold text-accent">
-            Follow Teams and Players
-          </span>{' '}
-          to make this Timeline yours.
-        </Link>
-      )}
+      {/* A Viewer with no Follows: pick Leagues, then Teams, once. */}
+      {viewer && !gameId && <FirstRunFollows />}
 
       {/* Tags plays by either side's Starters, in the Fantasy view. */}
       <FantasyTagsProvider

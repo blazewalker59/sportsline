@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import {
+  dismissFirstRun,
   markRead,
   setFollow,
   setLeagueSettings,
@@ -142,5 +143,18 @@ export function useSetPriceDisplay() {
       )
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: VIEWER_KEY }),
+  })
+}
+
+/** Skip the first-run Follow picker; the Viewer's state says so at once. */
+export function useDismissFirstRun() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => dismissFirstRun(),
+    onMutate: () => {
+      queryClient.setQueryData<ViewerState>(VIEWER_KEY, (old) =>
+        old ? { ...old, firstRunDone: true } : old,
+      )
+    },
   })
 }
