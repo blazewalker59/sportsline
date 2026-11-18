@@ -106,10 +106,10 @@ export function Linescore({ box, game }: { box: GameBox; game: GameSummary }) {
     </tr>
   )
   return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-surface py-1.5">
+    <div className="overflow-x-auto rounded-card border border-border bg-surface py-1.5">
       <table className="w-full border-separate border-spacing-0 text-[13px] tabular-nums">
         <thead>
-          <tr className="text-[11px] text-muted">
+          <tr className="text-2xs text-muted">
             <th className={pinnedLeft} />
             {ls.segments.map((seg) => (
               <th key={seg} className="min-w-6 px-1 font-normal">

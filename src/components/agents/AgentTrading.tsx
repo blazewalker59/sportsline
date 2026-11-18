@@ -48,7 +48,7 @@ export function Pending({ trades }: { trades: Array<TradeView> }) {
         return (
           <article
             key={t.id}
-            className="flex flex-col gap-2 rounded-xl border border-accent/40 bg-accent/10 px-3 py-3 text-sm"
+            className="flex flex-col gap-2 rounded-card border border-accent/40 bg-accent/10 px-3 py-3 text-sm"
           >
             <p className="text-xs text-muted">
               {t.agentName} proposes
@@ -56,9 +56,9 @@ export function Pending({ trades }: { trades: Array<TradeView> }) {
             </p>
             <p className="font-semibold">{describeOrder(t, display)}</p>
             <p>{t.marketTitle}</p>
-            <p className="font-mono text-[11px] text-muted">{t.marketTicker}</p>
+            <p className="font-mono text-2xs text-muted">{t.marketTicker}</p>
             {t.note && (
-              <p className="rounded-lg bg-background px-2 py-1.5 text-xs">
+              <p className="rounded-control bg-background px-2 py-1.5 text-xs">
                 “{t.note}”
               </p>
             )}
@@ -154,7 +154,7 @@ function ConnectTradeKey() {
         Sportsline needs a separate Kalshi key that can trade but never withdraw
         or transfer money. Your read-only key stays as it is.
       </p>
-      <ol className="list-decimal space-y-1 rounded-xl border border-border bg-surface py-3 pr-3 pl-8 text-sm">
+      <ol className="list-decimal space-y-1 rounded-card border border-border bg-surface py-3 pr-3 pl-8 text-sm">
         <li>On Kalshi, open Account → API Keys and create a new key.</li>
         <li>
           Give it only the <span className="font-semibold">Read</span> and{' '}
@@ -170,7 +170,7 @@ function ConnectTradeKey() {
           onChange={(e) => setKeyId(e.target.value)}
           autoComplete="off"
           spellCheck={false}
-          className="rounded-xl border border-border bg-surface px-3 py-2 font-mono text-sm font-normal"
+          className="rounded-card border border-border bg-surface px-3 py-2 font-mono text-sm font-normal"
         />
       </label>
       <label className="flex flex-col gap-1 text-sm font-semibold">
@@ -181,7 +181,7 @@ function ConnectTradeKey() {
           autoComplete="off"
           spellCheck={false}
           rows={5}
-          className="rounded-xl border border-border bg-surface px-3 py-2 font-mono text-xs font-normal"
+          className="rounded-card border border-border bg-surface px-3 py-2 font-mono text-xs font-normal"
         />
       </label>
       <Limits
@@ -202,7 +202,7 @@ function ConnectTradeKey() {
       >
         {connect.isPending ? 'Checking with Kalshi…' : 'Connect trade key'}
       </button>
-      <p className="text-[11px] text-muted">
+      <p className="text-2xs text-muted">
         The private key is encrypted before it’s stored and only used to place
         orders you approve. Disconnect any time to delete it.
       </p>
@@ -227,7 +227,7 @@ function Limits(props: {
           max={CAP_LIMITS.maxOrderDollars}
           value={props.perOrder}
           onChange={(e) => props.onPerOrder(e.target.value)}
-          className="rounded-xl border border-border bg-surface px-3 py-2 text-sm font-normal"
+          className="rounded-card border border-border bg-surface px-3 py-2 text-sm font-normal"
         />
       </label>
       <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
@@ -239,7 +239,7 @@ function Limits(props: {
           max={CAP_LIMITS.maxDailyDollars}
           value={props.perDay}
           onChange={(e) => props.onPerDay(e.target.value)}
-          className="rounded-xl border border-border bg-surface px-3 py-2 text-sm font-normal"
+          className="rounded-card border border-border bg-surface px-3 py-2 text-sm font-normal"
         />
       </label>
     </div>
@@ -271,7 +271,7 @@ function KeyConnected({ state }: { state: TradingState }) {
     onSuccess: refresh,
   })
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface px-3 py-3 text-sm">
+    <div className="flex flex-col gap-3 rounded-card border border-border bg-surface px-3 py-3 text-sm">
       <div className="flex items-center gap-3">
         <span className="min-w-0 flex-1">
           <span className="block font-semibold">
@@ -370,7 +370,7 @@ function History({ trades }: { trades: Array<TradeView> }) {
       {trades.map((t) => (
         <li
           key={t.id}
-          className="flex flex-col gap-0.5 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm"
+          className="flex flex-col gap-0.5 rounded-card border border-border bg-surface px-3 py-2.5 text-sm"
         >
           <span className="flex items-baseline justify-between gap-2">
             <span className="font-semibold">{describeOrder(t, display)}</span>
@@ -378,7 +378,7 @@ function History({ trades }: { trades: Array<TradeView> }) {
               className={cn(
                 'shrink-0 text-xs font-semibold',
                 t.status === 'filled' || t.status === 'partial'
-                  ? 'text-emerald-600 dark:text-emerald-400'
+                  ? 'text-positive'
                   : t.status === 'failed'
                     ? 'text-live'
                     : 'text-muted',

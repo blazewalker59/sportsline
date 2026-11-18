@@ -61,7 +61,7 @@ function ConnectForm() {
         Follow your Kalshi predictions here: their odds move with the game, and
         you’ll get Alerts for every big play in the games they depend on.
       </p>
-      <ol className="list-decimal space-y-1 rounded-xl border border-border bg-surface py-3 pr-3 pl-8 text-sm">
+      <ol className="list-decimal space-y-1 rounded-card border border-border bg-surface py-3 pr-3 pl-8 text-sm">
         <li>On Kalshi, open Account → API Keys and create a key.</li>
         <li>
           Give it <span className="font-semibold">read-only</span> access.
@@ -76,7 +76,7 @@ function ConnectForm() {
           onChange={(e) => setKeyId(e.target.value)}
           autoComplete="off"
           spellCheck={false}
-          className="rounded-xl border border-border bg-surface px-3 py-2 font-mono text-sm font-normal"
+          className="rounded-card border border-border bg-surface px-3 py-2 font-mono text-sm font-normal"
           placeholder="a952bcbe-ec3b-4b5b-…"
         />
       </label>
@@ -88,7 +88,7 @@ function ConnectForm() {
           autoComplete="off"
           spellCheck={false}
           rows={6}
-          className="rounded-xl border border-border bg-surface px-3 py-2 font-mono text-xs font-normal"
+          className="rounded-card border border-border bg-surface px-3 py-2 font-mono text-xs font-normal"
           placeholder={
             '-----BEGIN RSA PRIVATE KEY-----\n…\n-----END RSA PRIVATE KEY-----'
           }
@@ -106,7 +106,7 @@ function ConnectForm() {
       >
         {connect.isPending ? 'Checking with Kalshi…' : 'Connect Kalshi'}
       </button>
-      <p className="text-[11px] text-muted">
+      <p className="text-2xs text-muted">
         The private key is encrypted before it’s stored and only used to read
         your positions. Disconnect any time to delete it.
       </p>
@@ -129,7 +129,7 @@ function Connected() {
   const c = connection.data!
   return (
     <div className="flex flex-col gap-6">
-      <section className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 text-sm">
+      <section className="flex items-center gap-3 rounded-card border border-border bg-surface px-3 py-2.5 text-sm">
         <span
           className={cn(
             'size-2 shrink-0 rounded-full',
@@ -216,7 +216,7 @@ function Connected() {
       {list.isError && (
         <p
           role="alert"
-          className="rounded-xl border border-live/40 bg-live/10 px-3 py-2 text-sm text-live"
+          className="rounded-card border border-live/40 bg-live/10 px-3 py-2 text-sm text-live"
         >
           Couldn’t load your Predictions: {list.error.message}
         </p>
@@ -269,7 +269,7 @@ function PredictionList({
       {predictions.length === 0 ? (
         <p className="text-sm text-muted">{empty}</p>
       ) : (
-        <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+        <ul className="divide-y divide-border rounded-card border border-border bg-surface">
           {predictions.map((p) => (
             <li key={p.id}>
               <button
@@ -308,7 +308,7 @@ function PredictionList({
                         return profit ? (
                           <span
                             className={cn(
-                              'text-[11px] font-semibold tabular-nums',
+                              'text-2xs font-semibold tabular-nums',
                               profit.dollars > 0.004
                                 ? 'text-scoring'
                                 : profit.dollars < -0.004

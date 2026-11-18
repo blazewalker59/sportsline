@@ -103,7 +103,7 @@ export function KeyPlayPanel({
   const none = index === -1
   return (
     <div
-      className="mt-1.5 flex min-h-[4.75rem] items-center gap-2 rounded-lg border border-border bg-background/60 px-1.5 text-[11px]"
+      className="mt-1.5 flex min-h-[4.75rem] items-center gap-2 rounded-control border border-border bg-background/60 px-1.5 text-2xs"
       aria-live="polite"
     >
       <StepButton
@@ -121,7 +121,7 @@ export function KeyPlayPanel({
           </p>
         ) : (
           <>
-            <p className="mb-0.5 flex items-center justify-between text-[10px] text-muted tabular-nums">
+            <p className="mb-0.5 flex items-center justify-between text-3xs text-muted tabular-nums">
               {index + 1} of {count}
               <button
                 type="button"

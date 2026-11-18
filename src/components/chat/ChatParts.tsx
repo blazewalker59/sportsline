@@ -39,13 +39,15 @@ export function TeamAvatar({
 }) {
   return (
     <span
-      className="flex shrink-0 items-center justify-center rounded-full border border-bubble-border bg-surface"
-      style={{ width: size, height: size }}
+      className="flex shrink-0 items-center justify-center rounded-full border border-bubble-border bg-surface px-1"
+      style={{ minWidth: size, height: size }}
       title={team.abbreviation}
     >
       <TeamLogo team={team} size={size - 8} />
       {!team.logoUrl && (
-        <span className="text-[10px] font-bold">{team.abbreviation}</span>
+        <span className="text-3xs leading-none font-bold tracking-tight">
+          {team.abbreviation}
+        </span>
       )}
     </span>
   )
@@ -93,24 +95,25 @@ function corner(
   position: 'single' | 'first' | 'middle' | 'last',
 ): string {
   // Chat-style tails: the corner nearest the avatar tightens on the last bubble.
-  const tight = align === 'left' ? 'rounded-bl-md' : 'rounded-br-md'
-  const stackTight = align === 'left' ? 'rounded-l-md' : 'rounded-r-md'
+  const tight = align === 'left' ? 'rounded-bl-control' : 'rounded-br-control'
+  const stackTight =
+    align === 'left' ? 'rounded-l-control' : 'rounded-r-control'
   switch (position) {
     case 'single':
     case 'last':
       return cn(
-        'rounded-[20px]',
+        'rounded-sheet',
         tight,
         position === 'last' &&
-          (align === 'left' ? 'rounded-tl-md' : 'rounded-tr-md'),
+          (align === 'left' ? 'rounded-tl-control' : 'rounded-tr-control'),
       )
     case 'first':
       return cn(
-        'rounded-[20px]',
-        align === 'left' ? 'rounded-bl-md' : 'rounded-br-md',
+        'rounded-sheet',
+        align === 'left' ? 'rounded-bl-control' : 'rounded-br-control',
       )
     case 'middle':
-      return cn('rounded-[20px]', stackTight)
+      return cn('rounded-sheet', stackTight)
   }
 }
 
@@ -300,7 +303,7 @@ function PlayBubbleLink({
       {lead && <span className="mr-1 font-bold text-notable">{lead}.</span>}
       <PlayText item={item} />
       {item.revisedAt && item.status === 'active' && (
-        <span className="ml-1.5 align-middle text-[11px] font-semibold text-muted">
+        <span className="ml-1.5 align-middle text-2xs font-semibold text-muted">
           · updated
         </span>
       )}
@@ -474,8 +477,8 @@ export function TypingDots({ align }: { align: Align }) {
   return (
     <span
       className={cn(
-        'flex w-14 items-center justify-center gap-1 rounded-[20px] bg-bubble px-3.5 py-3',
-        align === 'left' ? 'rounded-bl-md' : 'rounded-br-md',
+        'flex w-14 items-center justify-center gap-1 rounded-sheet bg-bubble px-3.5 py-3',
+        align === 'left' ? 'rounded-bl-control' : 'rounded-br-control',
       )}
       role="img"
       aria-label="Play in progress"

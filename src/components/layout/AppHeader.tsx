@@ -103,7 +103,7 @@ function AccountButton() {
           />
           <nav
             aria-label="Account"
-            className="animate-in fade-in slide-in-from-top-1 absolute right-0 z-50 mt-2 w-72 overflow-hidden rounded-2xl border border-border bg-surface text-sm shadow-xl duration-150"
+            className="animate-in fade-in slide-in-from-top-1 absolute right-0 z-50 mt-2 w-72 overflow-hidden rounded-card border border-border bg-surface text-sm shadow-xl duration-150"
           >
             <div className="flex items-center gap-3 border-b border-border px-3 py-3">
               <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-background font-semibold text-muted">
@@ -193,7 +193,7 @@ function AccountButton() {
                     void queryClient.invalidateQueries({ queryKey: VIEWER_KEY })
                   })
                 }
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left font-medium text-live hover:bg-live/10"
+                className="flex w-full items-center gap-3 rounded-card px-3 py-2 text-left font-medium text-live hover:bg-live/10"
               >
                 <MenuIcon name="signOut" />
                 Sign out
@@ -215,7 +215,7 @@ function MenuGroup({
 }) {
   return (
     <div className="border-b border-border px-1 py-1.5 last:border-b-0">
-      <p className="px-3 pt-1 pb-1 text-[10px] font-bold tracking-wider text-muted uppercase">
+      <p className="px-3 pt-1 pb-1 text-3xs font-bold tracking-wider text-muted uppercase">
         {title}
       </p>
       {children}
@@ -236,12 +236,12 @@ type IconName =
 /** Each section's color, so items read apart at a glance. */
 const ICON_TONES: Record<IconName, string> = {
   follows: 'bg-accent/15 text-accent',
-  reactions: 'bg-pink-500/15 text-pink-600 dark:text-pink-400',
-  predictions: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
-  fantasy: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
-  alerts: 'bg-sky-500/15 text-sky-600 dark:text-sky-400',
-  agents: 'bg-violet-500/15 text-violet-600 dark:text-violet-400',
-  health: 'bg-red-500/15 text-red-600 dark:text-red-400',
+  reactions: 'bg-section-reactions/15 text-section-reactions',
+  predictions: 'bg-section-predictions/15 text-section-predictions',
+  fantasy: 'bg-section-fantasy/15 text-section-fantasy',
+  alerts: 'bg-section-alerts/15 text-section-alerts',
+  agents: 'bg-section-agents/15 text-section-agents',
+  health: 'bg-section-health/15 text-section-health',
   signOut: 'bg-live/10 text-live',
 }
 
@@ -276,7 +276,7 @@ function MenuIcon({ name }: { name: IconName }) {
   return (
     <span
       className={cn(
-        'flex size-8 shrink-0 items-center justify-center rounded-lg',
+        'flex size-8 shrink-0 items-center justify-center rounded-control',
         ICON_TONES[name],
       )}
     >
@@ -315,13 +315,13 @@ function MenuItem({
     <Link
       to={to}
       onClick={onPick}
-      className="flex items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-background"
+      className="flex items-center gap-3 rounded-card px-2 py-1.5 hover:bg-background"
       activeProps={{ className: 'bg-background', 'aria-current': 'page' }}
     >
       <MenuIcon name={icon} />
       <span className="min-w-0 flex-1">
         <span className="block font-medium">{label}</span>
-        <span className="block truncate text-[11px] text-muted">{hint}</span>
+        <span className="block truncate text-2xs text-muted">{hint}</span>
       </span>
       <svg
         viewBox="0 0 24 24"

@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 
 export function StatGrid({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-border bg-border">
+    <div className="grid grid-cols-3 gap-px overflow-hidden rounded-card border border-border bg-border">
       {children}
     </div>
   )
@@ -28,7 +28,7 @@ export function StatTile({
 }) {
   return (
     <div className="flex flex-col bg-surface px-3 py-2">
-      <span className="text-[10px] font-semibold tracking-wide text-muted uppercase">
+      <span className="text-3xs font-semibold tracking-wide text-muted uppercase">
         {label}
       </span>
       <span
@@ -39,7 +39,7 @@ export function StatTile({
       >
         {value}
       </span>
-      {sub && <span className="text-[11px] text-muted">{sub}</span>}
+      {sub && <span className="text-2xs text-muted">{sub}</span>}
     </div>
   )
 }

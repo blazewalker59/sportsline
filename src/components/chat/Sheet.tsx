@@ -213,7 +213,7 @@ export function Sheet({
       />
       <div
         className={cn(
-          'animate-in slide-in-from-bottom relative mx-auto flex max-h-[calc(100dvh-max(env(safe-area-inset-top),1.5rem))] w-full max-w-xl flex-col rounded-t-3xl bg-background pb-[env(safe-area-inset-bottom)] shadow-2xl duration-300',
+          'animate-in slide-in-from-bottom relative mx-auto flex max-h-[calc(100dvh-max(env(safe-area-inset-top),1.5rem))] w-full max-w-xl flex-col rounded-t-sheet bg-background pb-[env(safe-area-inset-bottom)] shadow-2xl duration-300',
           subject && 'subject subject-crown',
           subject && isPair(subject) && 'subject-crown--split',
         )}

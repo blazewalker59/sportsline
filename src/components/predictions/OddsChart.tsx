@@ -111,14 +111,14 @@ export function OddsChart({ predictionId }: { predictionId: string }) {
   const detail = usePredictionDetail(predictionId)
   if (detail.isPending) {
     return (
-      <p className="rounded-xl border border-border bg-surface px-3 py-6 text-center text-xs text-muted">
+      <p className="rounded-card border border-border bg-surface px-3 py-6 text-center text-xs text-muted">
         Loading the odds…
       </p>
     )
   }
   if (!detail.data || detail.data.history.length < 2) {
     return (
-      <p className="rounded-xl border border-border bg-surface px-3 py-3 text-center text-xs text-muted">
+      <p className="rounded-card border border-border bg-surface px-3 py-3 text-center text-xs text-muted">
         No odds history kept for this one.
       </p>
     )

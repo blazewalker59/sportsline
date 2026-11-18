@@ -9,6 +9,7 @@ import {
 import { useEffect, useState } from 'react'
 
 import appCss from '../styles.css?url'
+import fontLatin from '../fonts/bricolage-grotesque-latin.woff2?url'
 import { THEME_BOOT, THEME_COLOR_BOOT } from '../lib/theme'
 
 import type { QueryClient } from '@tanstack/react-query'
@@ -59,6 +60,13 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       },
     ],
     links: [
+      {
+        rel: 'preload',
+        href: fontLatin,
+        as: 'font',
+        type: 'font/woff2',
+        crossOrigin: 'anonymous',
+      },
       { rel: 'stylesheet', href: appCss },
       { rel: 'manifest', href: '/manifest.json' },
       { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },

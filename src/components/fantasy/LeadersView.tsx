@@ -23,7 +23,7 @@ import { PlayerButton } from '@/components/players/playerSheet'
 import { cn } from '@/lib/utils'
 
 const LIST =
-  'divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface'
+  'divide-y divide-border overflow-hidden rounded-card border border-border bg-surface'
 
 /** Each position's leaders under its name, positions sharing one merged. */
 export function positionGroups(
@@ -166,7 +166,7 @@ function CategoryRow({
           className="w-10 shrink-0 self-stretch text-left text-xs font-bold text-muted"
         >
           {label}
-          {most && <span className="block text-[10px] font-normal">most</span>}
+          {most && <span className="block text-3xs font-normal">most</span>}
         </button>
         {lead}
         {count > 1 && (
@@ -263,7 +263,7 @@ function PlayerBoard({
           }
         >
           {(c.minimum || c.reverse) && (
-            <p className="px-3 pt-1.5 text-[11px] text-muted">
+            <p className="px-3 pt-1.5 text-2xs text-muted">
               {c.minimum
                 ? `${c.minimum} to rank${c.reverse ? ', lowest first' : ''}.`
                 : `Most first: fewer wins ${c.label}.`}
@@ -327,7 +327,7 @@ export function TeamBoard({
             }
           >
             {c.reverse && (
-              <p className="px-3 pt-1.5 text-[11px] text-muted">
+              <p className="px-3 pt-1.5 text-2xs text-muted">
                 Lowest first: fewer wins {c.label}.
               </p>
             )}
@@ -355,9 +355,7 @@ function CategoryFigure({ p }: { p: CategoryPlace }) {
   return (
     <span className="shrink-0 text-right tabular-nums">
       <span className="block text-sm font-bold">{p.value}</span>
-      {p.parts && (
-        <span className="block text-[11px] text-muted">{p.parts}</span>
-      )}
+      {p.parts && <span className="block text-2xs text-muted">{p.parts}</span>}
     </span>
   )
 }
@@ -462,7 +460,7 @@ function LeaderName({ sport, p }: { sport: FantasySport; p: LeaderPlayer }) {
       />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-semibold">{p.name}</span>
-        <span className="block truncate text-[11px] text-muted">
+        <span className="block truncate text-2xs text-muted">
           {[p.teamAbbrev, p.fantasyTeam, p.starter ? null : 'bench']
             .filter(Boolean)
             .join(' · ')}

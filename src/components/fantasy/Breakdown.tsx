@@ -19,16 +19,14 @@ export function Breakdown({
 }) {
   const tone = injuryTone(player.injury)
   return (
-    <div className="mx-2 mb-2 rounded-lg bg-notice px-3 py-2.5 text-xs">
+    <div className="mx-2 mb-2 rounded-control bg-notice px-3 py-2.5 text-xs">
       <p className="mb-2 flex items-baseline gap-2">
         <span className="font-semibold">{player.name}</span>
         {player.injury && (
           <span
             className={cn(
               'font-semibold',
-              tone === 'red'
-                ? 'text-red-600 dark:text-red-400'
-                : 'text-yellow-700 dark:text-yellow-400',
+              tone === 'red' ? 'text-negative' : 'text-warning',
             )}
           >
             {injuryLabel(player.injury)}
@@ -65,13 +63,13 @@ function PointsTable({
   const cell = 'text-right tabular-nums'
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_3.5rem_3.5rem] gap-x-3 gap-y-1">
-      <span className="text-[10px] font-semibold tracking-wide text-muted uppercase">
+      <span className="text-3xs font-semibold tracking-wide text-muted uppercase">
         Stat
       </span>
       <span
         className={cn(
           cell,
-          'text-[10px] font-semibold tracking-wide text-muted uppercase',
+          'text-3xs font-semibold tracking-wide text-muted uppercase',
         )}
       >
         Value
@@ -79,7 +77,7 @@ function PointsTable({
       <span
         className={cn(
           cell,
-          'text-[10px] font-semibold tracking-wide text-muted uppercase',
+          'text-3xs font-semibold tracking-wide text-muted uppercase',
         )}
       >
         Pts
@@ -96,7 +94,7 @@ function PointsTable({
             className={cn(
               cell,
               'font-semibold',
-              b.points < 0 && 'text-red-600 dark:text-red-400',
+              b.points < 0 && 'text-negative',
             )}
           >
             {b.points > 0 ? '+' : ''}
@@ -128,7 +126,7 @@ function DayLine({ line }: { line: NonNullable<LineupPlayer['dayLine']> }) {
       {line.map((l) => (
         <span key={l.label} className="flex flex-col items-center">
           <span className="text-sm font-bold tabular-nums">{l.value}</span>
-          <span className="text-[10px] font-semibold tracking-wide text-muted uppercase">
+          <span className="text-3xs font-semibold tracking-wide text-muted uppercase">
             {l.label}
           </span>
         </span>

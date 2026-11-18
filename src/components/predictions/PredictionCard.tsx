@@ -47,7 +47,7 @@ export function PredictionCard({
       onClick={onSelect}
       aria-pressed={selected}
       className={cn(
-        'flex h-full w-[176px] flex-col gap-1 rounded-2xl border bg-surface px-2.5 py-1.5 text-left transition-colors',
+        'flex h-full w-[176px] flex-col gap-1 rounded-card border bg-surface px-2.5 py-1.5 text-left transition-colors',
         selected
           ? 'border-accent bg-accent-soft'
           : lost
@@ -55,10 +55,10 @@ export function PredictionCard({
             : 'border-border',
       )}
     >
-      <span className="flex min-w-0 items-center gap-1.5 overflow-hidden text-[11px] font-semibold whitespace-nowrap text-muted">
+      <span className="flex min-w-0 items-center gap-1.5 overflow-hidden text-2xs font-semibold whitespace-nowrap text-muted">
         {p.kind === 'combo' ? (
           <>
-            <span className="rounded bg-accent-soft px-1 text-accent">
+            <span className="rounded-control bg-accent-soft px-1 text-accent">
               Combo
             </span>
             {won}/{p.legs.length}
@@ -87,7 +87,7 @@ export function PredictionCard({
             // At a glance: what cashing out now would make or lose.
             <span
               className={cn(
-                'text-[11px] font-semibold tabular-nums',
+                'text-2xs font-semibold whitespace-nowrap tabular-nums',
                 toneOf(profit.dollars),
               )}
             >
@@ -102,7 +102,7 @@ export function PredictionCard({
             move !== null && (
               <span
                 className={cn(
-                  'text-[11px] font-semibold tabular-nums',
+                  'text-2xs font-semibold whitespace-nowrap tabular-nums',
                   toneOf(move),
                 )}
               >
@@ -120,7 +120,7 @@ export function PredictionCard({
         {progress ? (
           <PropProgress progress={progress} compact />
         ) : (
-          <span className="flex h-[22px] items-center justify-between text-[11px] text-muted tabular-nums">
+          <span className="flex h-[22px] items-center justify-between text-2xs text-muted tabular-nums">
             <span>Pays {money(p.contracts)}</span>
             {p.kind === 'combo' && (
               <span>

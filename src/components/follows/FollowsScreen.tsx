@@ -49,10 +49,10 @@ export function FollowsScreen() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search, e.g. Yankees or Aaron Judge"
             autoComplete="off"
-            className="w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-base outline-none focus:border-foreground/50"
+            className="w-full rounded-card border border-border bg-surface px-4 py-2.5 text-base outline-none focus:border-foreground/50"
           />
           {q.length >= 2 && (
-            <ul className="mt-2 divide-y divide-border rounded-xl border border-border bg-surface">
+            <ul className="mt-2 divide-y divide-border rounded-card border border-border bg-surface">
               {results.data?.length === 0 && (
                 <li className="px-4 py-3 text-sm text-muted">No matches.</li>
               )}
@@ -74,7 +74,7 @@ export function FollowsScreen() {
               shows every League.
             </p>
           ) : (
-            <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+            <ul className="divide-y divide-border rounded-card border border-border bg-surface">
               {data.follows.map((f) => (
                 <EntryRow key={f.label + f.league} entry={f} />
               ))}

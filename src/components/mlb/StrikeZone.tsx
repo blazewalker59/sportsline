@@ -73,7 +73,7 @@ export function StrikeZone({ pitches }: { pitches: Array<ZonePitch> }) {
           <text
             textAnchor="middle"
             dy="4"
-            className="fill-background text-[11px] font-bold"
+            className="fill-background text-2xs font-bold"
           >
             {p.number ?? i + 1}
           </text>

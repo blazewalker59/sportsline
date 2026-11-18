@@ -137,7 +137,7 @@ export function ActivityFeed({
               {day}
             </h2>
           )}
-          <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+          <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
             {entries.map((e) => (
               <li
                 key={e.id}
@@ -201,7 +201,7 @@ export function ActivityFeed({
                         Every claim
                       </span>
                     </summary>
-                    <ol className="mt-1.5 flex flex-col gap-1 rounded-lg bg-background px-2.5 py-2">
+                    <ol className="mt-1.5 flex flex-col gap-1 rounded-control bg-background px-2.5 py-2">
                       {e.claims.map((c) => (
                         <li
                           key={c.teamId}

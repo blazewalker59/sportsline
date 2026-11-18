@@ -186,7 +186,7 @@ export function TimeOverview({
         {/* The strip's track, under the series. */}
         <div
           aria-hidden="true"
-          className="absolute rounded-md bg-background/60"
+          className="absolute rounded-control bg-background/60"
           style={{
             top: PAD,
             height: STRIP,
@@ -207,7 +207,7 @@ export function TimeOverview({
           className="pointer-events-none absolute inset-0 z-[2]"
         >
           <div
-            className="absolute rounded-l-md bg-surface/70"
+            className="absolute rounded-l-control bg-surface/70"
             style={{
               top: PAD,
               height: STRIP,
@@ -216,7 +216,7 @@ export function TimeOverview({
             }}
           />
           <div
-            className="absolute rounded-r-md bg-surface/70"
+            className="absolute rounded-r-control bg-surface/70"
             style={{
               top: PAD,
               height: STRIP,
@@ -228,7 +228,7 @@ export function TimeOverview({
           <Grip x={right} side="end" />
         </div>
       </div>
-      <div className="mt-0.5 flex items-center justify-between gap-2 px-1 text-[11px]">
+      <div className="mt-0.5 flex items-center justify-between gap-2 px-1 text-2xs">
         <span className="tabular-nums" aria-live="polite">
           {format(view.start)} – {format(view.end)}
         </span>

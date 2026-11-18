@@ -88,7 +88,7 @@ export function MoveSheet({
       {intent.kind !== 'drop' && (
         <PlayerButton
           playerId={intent.player.playerId}
-          className="flex items-center gap-2.5 rounded-xl border border-border bg-surface px-3 py-2"
+          className="flex items-center gap-2.5 rounded-card border border-border bg-surface px-3 py-2"
         >
           <PlayerAvatar
             name={intent.player.name}
@@ -118,7 +118,7 @@ export function MoveSheet({
         <p
           role="status"
           className={cn(
-            'rounded-xl px-3 py-3 text-sm',
+            'rounded-card px-3 py-3 text-sm',
             result.status === 'done' || result.status === 'pending'
               ? 'bg-scoring/10'
               : 'bg-notice',
@@ -132,7 +132,7 @@ export function MoveSheet({
             <legend className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
               {intent.kind === 'drop' ? 'Who to drop' : 'Drop someone?'}
             </legend>
-            <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+            <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
               {intent.kind !== 'drop' && (
                 <DropChoice
                   checked={dropId === null}
@@ -172,7 +172,7 @@ export function MoveSheet({
                   step={1}
                   value={bid}
                   onChange={(e) => setBid(e.target.value)}
-                  className="min-h-10 w-24 rounded-xl border border-border bg-surface px-3 font-normal tabular-nums"
+                  className="min-h-10 w-24 rounded-card border border-border bg-surface px-3 font-normal tabular-nums"
                 />
                 <span className="text-xs font-normal text-muted">
                   ${budget.left} of ${budget.total} left
@@ -257,9 +257,7 @@ function DropChoice({
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold">{label}</span>
           {detail && (
-            <span className="block truncate text-[11px] text-muted">
-              {detail}
-            </span>
+            <span className="block truncate text-2xs text-muted">{detail}</span>
           )}
         </span>
       </label>

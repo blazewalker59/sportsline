@@ -23,7 +23,7 @@ export function WhoHasSwitch({
       aria-checked={shown}
       disabled={set.isPending}
       onClick={() => set.mutate(!on)}
-      className="flex w-full items-center gap-3 rounded-lg border border-border px-3 py-2.5 text-left disabled:opacity-60"
+      className="flex w-full items-center gap-3 rounded-control border border-border px-3 py-2.5 text-left disabled:opacity-60"
     >
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-semibold">Who Has?</span>

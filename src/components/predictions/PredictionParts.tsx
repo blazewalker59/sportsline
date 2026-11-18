@@ -125,7 +125,7 @@ export function LegDots({ legs }: { legs: ReadonlyArray<LegView> }) {
         />
       ))}
       {rest > 0 && (
-        <span className="shrink-0 text-[10px] leading-none tabular-nums">
+        <span className="shrink-0 text-3xs leading-none tabular-nums">
           +{rest}
         </span>
       )}
@@ -156,7 +156,7 @@ export function PropProgress({
       <span
         className={cn(
           'flex items-baseline justify-between gap-2 tabular-nums',
-          compact ? 'text-[11px]' : 'text-xs',
+          compact ? 'text-3xs' : 'text-xs',
         )}
       >
         <span className={cn('font-semibold', hit && 'text-scoring')}>

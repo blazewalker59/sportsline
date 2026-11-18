@@ -67,7 +67,7 @@ function DeviceSection() {
       aria-checked={on}
       disabled={busy}
       onClick={() => void (on ? disable() : enable())}
-      className="flex w-full items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-left disabled:opacity-60"
+      className="flex w-full items-center gap-3 rounded-card border border-border bg-surface px-4 py-3 text-left disabled:opacity-60"
     >
       <span className="flex-1">
         <span className="block font-semibold">Alerts on this device</span>
@@ -103,7 +103,7 @@ function Notice({
   children: React.ReactNode
 }) {
   return (
-    <div className="rounded-xl border border-border bg-surface px-4 py-3 text-sm">
+    <div className="rounded-card border border-border bg-surface px-4 py-3 text-sm">
       <p className="mb-1 font-semibold">{title}</p>
       <p className="text-muted">{children}</p>
     </div>
@@ -179,7 +179,7 @@ function Levels() {
           <div
             role="radiogroup"
             aria-label={`${title} Alerts`}
-            className="divide-y divide-border rounded-xl border border-border bg-surface"
+            className="divide-y divide-border rounded-card border border-border bg-surface"
           >
             {(CHOICES[source] as ReadonlyArray<Choice<typeof source>>).map(
               (c) => {

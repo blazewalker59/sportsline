@@ -130,7 +130,7 @@ function Connections() {
           </button>
         )}
       </h2>
-      <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+      <ul className="divide-y divide-border rounded-card border border-border bg-surface">
         {rows.map((r) => (
           <li key={r.key}>
             <div className="flex items-center gap-3 px-3 py-2.5 text-sm">
@@ -259,7 +259,7 @@ function SleeperForm() {
           autoCapitalize="none"
           spellCheck={false}
           placeholder="username"
-          className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm"
+          className="min-w-0 flex-1 rounded-card border border-border bg-background px-3 py-2 text-sm"
         />
         <button
           type="submit"
@@ -274,7 +274,7 @@ function SleeperForm() {
           {connect.error.message}
         </p>
       )}
-      <p className="text-[11px] text-muted">
+      <p className="text-2xs text-muted">
         Sleeper’s leagues are public, so there’s no password or key: your NFL
         leagues this season are found from your username.
       </p>
@@ -317,7 +317,7 @@ function ConnectForm() {
   }, [origin])
   return (
     <div className="flex flex-col gap-5">
-      <section className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-3">
+      <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">
         <h2 className="text-sm font-semibold">The easy way</h2>
         <ol className="list-decimal space-y-1 pl-5 text-sm text-muted">
           <li>Drag this button to your bookmarks bar:</li>
@@ -356,7 +356,7 @@ function ConnectForm() {
             onChange={(e) => setSwid(e.target.value)}
             autoComplete="off"
             spellCheck={false}
-            className="rounded-xl border border-border bg-surface px-3 py-2 font-mono text-sm font-normal"
+            className="rounded-card border border-border bg-surface px-3 py-2 font-mono text-sm font-normal"
             placeholder="{8A1C…-…}"
           />
         </label>
@@ -368,7 +368,7 @@ function ConnectForm() {
             autoComplete="off"
             spellCheck={false}
             rows={4}
-            className="rounded-xl border border-border bg-surface px-3 py-2 font-mono text-xs font-normal"
+            className="rounded-card border border-border bg-surface px-3 py-2 font-mono text-xs font-normal"
             placeholder="AEB…"
           />
         </label>
@@ -384,7 +384,7 @@ function ConnectForm() {
         >
           {connect.isPending ? 'Checking with ESPN…' : 'Connect ESPN'}
         </button>
-        <p className="text-[11px] text-muted">
+        <p className="text-2xs text-muted">
           These cookies are your ESPN session, so they’re encrypted before
           they’re stored and used to read your leagues (and, only if you turn
           roster moves on, to make the moves you confirm). Disconnect any time
@@ -450,7 +450,7 @@ function Leagues() {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="ESPN or Sleeper league URL"
-              className="min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 py-2 text-sm"
+              className="min-w-0 flex-1 rounded-card border border-border bg-surface px-3 py-2 text-sm"
             />
             <button
               type="submit"
@@ -500,7 +500,7 @@ function LeagueList({
   )
   return (
     <ol
-      className="divide-y divide-border rounded-xl border border-border bg-surface"
+      className="divide-y divide-border rounded-card border border-border bg-surface"
       aria-label="Your leagues, in order"
     >
       {leagues.map((l, index) => (
@@ -509,7 +509,7 @@ function LeagueList({
           className={cn(
             'relative flex min-h-14 items-center gap-2 bg-surface py-1.5 pr-2 pl-0.5',
             dragging === l.id
-              ? 'z-10 rounded-xl shadow-lg ring-1 ring-border'
+              ? 'z-10 rounded-card shadow-lg ring-1 ring-border'
               : active && 'transition-transform duration-150',
           )}
           style={
@@ -519,7 +519,7 @@ function LeagueList({
           <button
             type="button"
             aria-label={`Move ${l.name}. Use the arrow keys to reorder.`}
-            className="flex h-11 w-8 shrink-0 cursor-grab touch-none items-center justify-center text-muted active:cursor-grabbing"
+            className="flex h-11 w-8 shrink-0 cursor-grab touch-none items-center select-none justify-center text-muted active:cursor-grabbing"
             {...handle(l.id, index)}
           >
             <svg
@@ -538,7 +538,7 @@ function LeagueList({
             to="/fantasy/$leagueId"
             params={{ leagueId: l.id }}
             className={cn(
-              'flex min-w-0 flex-1 items-center gap-2.5 rounded-lg hover:bg-notice',
+              'flex min-w-0 flex-1 items-center gap-2.5 rounded-control hover:bg-notice',
               !l.enabled && 'opacity-45',
             )}
           >
@@ -569,7 +569,7 @@ function LeagueList({
               type="button"
               onClick={() => onOpen(l.id)}
               aria-label={`${l.name} matchup`}
-              className="flex shrink-0 flex-col items-end rounded-lg px-1.5 py-0.5 tabular-nums hover:bg-notice"
+              className="flex shrink-0 flex-col items-end rounded-control px-1.5 py-0.5 tabular-nums hover:bg-notice"
             >
               <MatchupScore league={l} />
             </button>
@@ -630,7 +630,7 @@ function MatchupScore({ league }: { league: FantasyLeagueView }) {
           </>
         )}
       </span>
-      <span className="text-[10px] leading-tight text-muted">
+      <span className="text-3xs leading-tight text-muted">
         {m.opponent ? `vs ${m.opponent.abbrev}` : 'Bye'}
       </span>
     </>

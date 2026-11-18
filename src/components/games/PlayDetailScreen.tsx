@@ -74,7 +74,7 @@ function NflContext({ detail }: { detail: NflDetail }) {
         <Stat label="After" value={detail.after ?? '–'} />
       </section>
       {detail.drive && (
-        <p className="rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-muted">
+        <p className="rounded-card border border-border bg-surface px-4 py-2.5 text-sm text-muted">
           Drive {detail.drive.number}
           {detail.drive.description && ` · ${detail.drive.description}`}
           {detail.drive.result && ` · ${detail.drive.result}`}
@@ -119,7 +119,7 @@ function NhlContext({
         </section>
       )}
       {detail.x != null && detail.y != null && (
-        <section className="rounded-xl border border-border bg-surface p-3">
+        <section className="rounded-card border border-border bg-surface p-3">
           <Rink
             x={detail.x}
             y={detail.y}
@@ -231,7 +231,7 @@ function Play({ detail }: { detail: PlayDetail }) {
           play: undefined,
           ...gameSearch(game.id, game.sportsDay),
         })}
-        className="flex items-center justify-between rounded-xl border border-border bg-surface px-4 py-2.5 text-sm"
+        className="flex items-center justify-between rounded-card border border-border bg-surface px-4 py-2.5 text-sm"
       >
         <span className="flex items-center gap-2 tabular-nums">
           <LeagueLogo league={item.league} size={18} />
@@ -306,7 +306,7 @@ function Play({ detail }: { detail: PlayDetail }) {
           <h2 className="subject-ink mb-2 text-sm font-semibold text-muted">
             Players
           </h2>
-          <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+          <ul className="divide-y divide-border rounded-card border border-border bg-surface">
             {detail.players.map(({ player, lines, headshotUrl, team }) => (
               <li
                 key={player.id}
@@ -339,7 +339,7 @@ function Play({ detail }: { detail: PlayDetail }) {
             ))}
           </ul>
           {item.league === 'mlb' && (
-            <p className="mt-1.5 px-1 text-[11px] text-muted">
+            <p className="mt-1.5 px-1 text-2xs text-muted">
               Stats are for this game, through this play.
             </p>
           )}
@@ -355,7 +355,7 @@ function MlbContext({ detail }: { detail: MlbDetail }) {
   return (
     <>
       {(detail.basesBefore || detail.outs != null) && (
-        <section className="flex items-center justify-around rounded-xl border border-border bg-surface px-4 py-3 text-xs text-muted">
+        <section className="flex items-center justify-around rounded-card border border-border bg-surface px-4 py-3 text-xs text-muted">
           {detail.basesBefore && (
             <BaseState label="Before" bases={detail.basesBefore} />
           )}
@@ -405,7 +405,7 @@ function MlbContext({ detail }: { detail: MlbDetail }) {
           <h2 className="subject-ink mb-2 text-sm font-semibold text-muted">
             {pitches.length} {pitches.length === 1 ? 'pitch' : 'pitches'}
           </h2>
-          <div className="flex flex-col items-center gap-4 rounded-xl border border-border bg-surface p-4 sm:flex-row sm:items-start">
+          <div className="flex flex-col items-center gap-4 rounded-card border border-border bg-surface p-4 sm:flex-row sm:items-start">
             <StrikeZone pitches={pitches} />
             <ol className="w-full flex-1 text-sm">
               {pitches.map((p, i) => (
@@ -414,7 +414,7 @@ function MlbContext({ detail }: { detail: MlbDetail }) {
                   className="flex items-center gap-2 border-b border-border/50 py-1.5 last:border-0"
                 >
                   <span
-                    className="flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-background"
+                    className="flex size-6 shrink-0 items-center justify-center rounded-full text-3xs font-bold text-background tabular-nums"
                     style={{ background: pitchColor(p) }}
                   >
                     {p.number ?? i + 1}
@@ -436,7 +436,7 @@ function MlbContext({ detail }: { detail: MlbDetail }) {
               ))}
             </ol>
           </div>
-          <p className="mt-1.5 px-1 text-[11px] text-muted">
+          <p className="mt-1.5 px-1 text-2xs text-muted">
             Catcher’s view. Count shown after each pitch.
           </p>
         </section>
@@ -477,9 +477,9 @@ function BaseState({
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-border bg-surface px-2 py-2.5">
+    <div className="rounded-card border border-border bg-surface px-2 py-2.5">
       <p className="text-base font-semibold tabular-nums">{value}</p>
-      <p className="subject-ink text-[11px] text-muted">{label}</p>
+      <p className="subject-ink text-2xs text-muted">{label}</p>
     </div>
   )
 }

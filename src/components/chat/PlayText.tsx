@@ -76,7 +76,7 @@ function styleFor(s: Segment, onFill: boolean): string | undefined {
     kind === 'player' && 'team-name font-bold',
     kind === 'player' && muted && 'opacity-80',
     kind === 'result' && 'font-bold text-foreground',
-    kind === 'flag' && 'font-bold text-amber-700 dark:text-amber-400',
+    kind === 'flag' && 'font-bold text-warning',
     (kind === 'plain' || kind === 'place') && 'text-foreground/55',
     kind === 'aside' && 'text-[0.9em] text-foreground/50',
   )

@@ -20,7 +20,7 @@ function Placeholder({ height }: { height: number }) {
   return (
     <div
       aria-hidden="true"
-      className="animate-pulse rounded-xl border border-border bg-surface"
+      className="animate-pulse rounded-card border border-border bg-surface"
       style={{ height }}
     />
   )

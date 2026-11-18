@@ -62,7 +62,7 @@ function MatchupCard({
       onClick={onSelect}
       aria-pressed={selected}
       className={cn(
-        'flex h-full w-[150px] flex-col gap-0.5 rounded-2xl border px-2.5 py-1.5 text-left transition-colors',
+        'flex h-full w-[150px] flex-col gap-0.5 rounded-card border px-2.5 py-1.5 text-left transition-colors',
         selected
           ? 'border-accent bg-accent-soft'
           : lead === 'mine'
@@ -72,7 +72,7 @@ function MatchupCard({
               : 'border-border bg-surface',
       )}
     >
-      <span className="flex items-center gap-1.5 text-[11px] font-semibold text-muted">
+      <span className="flex items-center gap-1.5 text-2xs font-semibold text-muted">
         <LeagueLogo league={SPORTS[m.sport].league} size={14} />
         <span className="min-w-0 flex-1 truncate">{m.leagueName}</span>
         {age && (
@@ -82,10 +82,7 @@ function MatchupCard({
                 ? (league.lastError ?? 'These scores haven’t updated lately')
                 : 'Updated'
             }
-            className={cn(
-              'shrink-0 tabular-nums',
-              age.stale && 'text-amber-600 dark:text-amber-400',
-            )}
+            className={cn('shrink-0 tabular-nums', age.stale && 'text-warning')}
           >
             {age.stale && '⚠ '}
             {age.label}
@@ -99,12 +96,12 @@ function MatchupCard({
         <span className="text-[13px] text-muted">Bye week</span>
       )}
       {m.categories ? (
-        <span className="mt-auto text-[11px] text-muted tabular-nums">
+        <span className="mt-auto text-2xs text-muted tabular-nums">
           Categories {categoryRecord(m)}
         </span>
       ) : (
         (m.mine.projected !== null || m.opponent?.projected != null) && (
-          <span className="mt-auto text-[11px] text-muted tabular-nums">
+          <span className="mt-auto text-2xs text-muted tabular-nums">
             Proj {pts(m.mine.projected)}
             {m.opponent && ` – ${pts(m.opponent.projected)}`}
           </span>
@@ -186,7 +183,7 @@ function LeagueMatchups({
         className="flex items-center gap-1.5 pt-1.5"
         aria-label={`Other matchups in ${m.leagueName}`}
       >
-        <li className="shrink-0 pr-0.5 text-[11px] font-semibold text-muted">
+        <li className="shrink-0 pr-0.5 text-2xs font-semibold text-muted">
           League
         </li>
         {others.map((o) => {

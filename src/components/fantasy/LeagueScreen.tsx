@@ -317,7 +317,7 @@ function YourMoves({
           None yet. Tap Add or Claim on a player below.
         </p>
       ) : (
-        <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+        <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
           {moves.map((m) => (
             <li key={m.id} className="flex items-start gap-2 px-3 py-2">
               <span className="min-w-0 flex-1">
@@ -325,12 +325,10 @@ function YourMoves({
                   {moveSummary(m)}
                 </span>
                 {m.reason && (
-                  <span className="block text-[11px] text-muted">
-                    {m.reason}
-                  </span>
+                  <span className="block text-2xs text-muted">{m.reason}</span>
                 )}
               </span>
-              <span className="shrink-0 text-right text-[11px]">
+              <span className="shrink-0 text-right text-2xs">
                 <span
                   className={cn(
                     'block font-semibold',
@@ -435,7 +433,7 @@ function Slate({
                     : `${left.name}, bye week`
                 }
                 className={cn(
-                  'flex min-w-0 flex-1 flex-col gap-0.5 rounded-xl border px-2.5 py-2 text-left hover:bg-notice',
+                  'flex min-w-0 flex-1 flex-col gap-0.5 rounded-card border px-2.5 py-2 text-left hover:bg-notice',
                   mine
                     ? 'border-accent bg-accent-soft'
                     : 'border-border bg-surface',
@@ -448,7 +446,7 @@ function Slate({
                   <span className="text-[13px] text-muted">Bye week</span>
                 )}
                 {(mine || (o.ties ?? 0) > 0) && (
-                  <span className="text-[11px] text-muted">
+                  <span className="text-2xs text-muted">
                     {[mine && 'Your matchup', o.ties && `${o.ties} tied`]
                       .filter(Boolean)
                       .join(' · ')}
@@ -473,9 +471,9 @@ export function StandingsTable({ standings }: { standings: Standings }) {
   const ties = standings.rows.some((r) => r.ties > 0)
   const cut = standings.playoffTeams
   return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+    <div className="overflow-x-auto rounded-card border border-border bg-surface">
       <table className="w-full text-sm whitespace-nowrap tabular-nums">
-        <thead className="text-[11px] text-muted uppercase">
+        <thead className="text-2xs text-muted uppercase">
           <tr className="border-b border-border">
             <th className="py-2 pr-1 pl-3 text-left font-semibold">#</th>
             <th className="px-1 text-left font-semibold">Team</th>
@@ -538,7 +536,7 @@ export function StandingsTable({ standings }: { standings: Standings }) {
         </tbody>
       </table>
       {cut !== null && cut < standings.rows.length && (
-        <p className="border-t border-border px-3 py-1.5 text-[11px] text-muted">
+        <p className="border-t border-border px-3 py-1.5 text-2xs text-muted">
           Top {cut} make the playoffs.
         </p>
       )}

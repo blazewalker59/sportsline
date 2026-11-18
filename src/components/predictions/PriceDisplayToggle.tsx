@@ -19,7 +19,7 @@ export function PriceDisplayToggle() {
     <section className="flex items-center justify-between gap-3 text-sm">
       <span className="text-muted">
         Show prices as
-        <span className="block text-[11px]">
+        <span className="block text-2xs">
           {display === 'multiplier'
             ? 'What $1 pays back, after Kalshi’s fee: 1.79x'
             : 'What a contract costs: 54¢'}

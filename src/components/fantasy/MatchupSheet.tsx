@@ -164,7 +164,7 @@ export function MatchupSheet({
       <span className="subject-ink truncate text-sm font-semibold">
         {s.name}
       </span>
-      {s.record && <span className="text-[11px] text-muted">{s.record}</span>}
+      {s.record && <span className="text-2xs text-muted">{s.record}</span>}
       <span className="text-3xl leading-tight font-bold tabular-nums">
         {m.categories
           ? sideRecord(m, align === 'left' ? 'mine' : 'opponent')
@@ -233,7 +233,7 @@ export function MatchupSheet({
           other === undefined && <MatchupRace leagueId={league.id} m={m} />
         )}
         {reading ? (
-          <p className="rounded-xl border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
+          <p className="rounded-card border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
             {read.isError
               ? read.error.message
               : read.isSuccess
@@ -241,7 +241,7 @@ export function MatchupSheet({
                 : 'Loading lineups…'}
           </p>
         ) : !today && !summary && !past.data ? (
-          <p className="rounded-xl border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
+          <p className="rounded-card border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
             {past.isError
               ? 'Couldn’t read that day from ESPN.'
               : `Loading ${label === 'Yesterday' || label === 'Tomorrow' ? label.toLowerCase() : label}’s lineups…`}
@@ -285,7 +285,7 @@ export function MatchupSheet({
             </section>
           </>
         )}
-        <p className="text-[11px] text-muted">
+        <p className="text-2xs text-muted">
           {m.categories
             ? `Read from ${source}: categories through yesterday plus today’s starters, refreshed every couple of minutes; toggle above the categories between the whole matchup and the day. Step through the matchup’s days with ‹ ›, or tap the day for any day or the whole matchup’s summary; switch sides above the lineup, and scroll it sideways for every category.`
             : `Read from ${source}. Points refresh every couple of minutes; tap a player’s points for the breakdown.`}
