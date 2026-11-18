@@ -5,6 +5,10 @@
  * rather than in its flow: hiding the cards slides them up behind the
  * header without changing the page's height, so scrolling never feeds back
  * into the hide/show.
+ *
+ * From `lg` the Timeline is two columns (the feed, and the selected Game's
+ * pane); this top lays itself out on the same grid and stays over the
+ * feed's column, since the day, Scope and Games are the feed's context.
  */
 
 import { DayButton } from './DayButton'
@@ -83,112 +87,118 @@ export function TimelineTop({
       )}
       style={{ viewTransitionName: 'pinned' }}
     >
-      <div className="mx-auto max-w-xl">
-        <div
-          className={cn(
-            'pointer-events-auto relative z-20 bg-background px-4 transition-[border-color]',
-            'border-b',
-            panelHidden ? 'border-border' : 'border-transparent',
-          )}
-        >
-          <AppHeader
-            pinned={false}
-            title={
-              <DayButton
+      <div className="mx-auto max-w-xl lg:grid lg:max-w-5xl lg:grid-cols-2 lg:gap-6 lg:px-4">
+        <div>
+          <div
+            className={cn(
+              'pointer-events-auto relative z-20 bg-background px-4 transition-[border-color] lg:px-0',
+              'border-b',
+              panelHidden ? 'border-border' : 'border-transparent',
+            )}
+          >
+            <AppHeader
+              pinned={false}
+              title={
+                <DayButton
+                  sportsDay={sportsDay}
+                  today={today}
+                  open={dayOpen}
+                  onToggle={onDayToggle}
+                />
+              }
+              right={
+                <HighlightsButton
+                  on={highlights}
+                  onChange={(value) =>
+                    withViewTransition(() => onHighlights(value))
+                  }
+                />
+              }
+            >
+              <ConnectionDot connection={connection} />
+            </AppHeader>
+            <Collapse open={dayOpen}>
+              <DayStrip
                 sportsDay={sportsDay}
                 today={today}
-                open={dayOpen}
-                onToggle={onDayToggle}
+                onPick={onDayClose}
               />
-            }
-            right={
-              <HighlightsButton
-                on={highlights}
-                onChange={(value) =>
-                  withViewTransition(() => onHighlights(value))
-                }
-              />
-            }
+            </Collapse>
+          </div>
+          {/* Scope chips and score cards tuck away while reading down, return on the way up. */}
+          <div
+            className={cn(
+              'pointer-events-auto relative z-10 border-b border-border bg-background px-4 pb-2 transition-transform duration-300 ease-out lg:px-0',
+              panelHidden && '-translate-y-full',
+            )}
+            inert={panelHidden}
+            aria-hidden={panelHidden}
           >
-            <ConnectionDot connection={connection} />
-          </AppHeader>
-          <Collapse open={dayOpen}>
-            <DayStrip sportsDay={sportsDay} today={today} onPick={onDayClose} />
-          </Collapse>
-        </div>
-        {/* Scope chips and score cards tuck away while reading down, return on the way up. */}
-        <div
-          className={cn(
-            'pointer-events-auto relative z-10 border-b border-border bg-background px-4 pb-2 transition-transform duration-300 ease-out',
-            panelHidden && '-translate-y-full',
-          )}
-          inert={panelHidden}
-          aria-hidden={panelHidden}
-        >
-          <ScopeBar
-            scope={s.scope}
-            items={s.rowItems}
-            lastLeague={lastLeague}
-            canFollow={s.viewerFollows.length > 0}
-            canPredict={Boolean(s.kalshi.data)}
-            canFantasy={s.fantasyLeagues.length > 0}
-          />
-          <div className={cn('transition-opacity', dimmed && 'opacity-50')}>
-            {s.scope === 'fantasy' && !gameId ? (
-              // Matchups move like scores: their cards replace the Games'.
-              <FantasyStrip
-                leagues={s.fantasyLeagues}
-                selected={s.selectedMatchup?.id}
-                onSelect={s.selectMatchup}
-                onDetails={onMatchup}
-              />
-            ) : s.scope === 'predictions' && !gameId ? (
-              // Predictions move like scores: their cards replace the Games'.
-              <>
-                <PredictionStrip
-                  predictions={s.openPredictions}
-                  selected={s.selectedPrediction?.id}
-                  onSelect={s.selectPrediction}
-                  onDetails={onPrediction}
-                  display={display}
+            <ScopeBar
+              scope={s.scope}
+              items={s.rowItems}
+              lastLeague={lastLeague}
+              canFollow={s.viewerFollows.length > 0}
+              canPredict={Boolean(s.kalshi.data)}
+              canFantasy={s.fantasyLeagues.length > 0}
+            />
+            <div className={cn('transition-opacity', dimmed && 'opacity-50')}>
+              {s.scope === 'fantasy' && !gameId ? (
+                // Matchups move like scores: their cards replace the Games'.
+                <FantasyStrip
+                  leagues={s.fantasyLeagues}
+                  selected={s.selectedMatchup?.id}
+                  onSelect={s.selectMatchup}
+                  onDetails={onMatchup}
                 />
-                <PredictionSummary
-                  predictions={s.openPredictions}
-                  display={display}
-                  onOpen={onPrediction}
-                />
-              </>
-            ) : (
-              <>
-                <GameStrip
-                  games={(dimmed && previousGames.length
-                    ? previousGames
-                    : games
-                  ).filter((g) =>
-                    inScope(
-                      g,
-                      s.scope,
-                      s.viewerFollows,
-                      items,
-                      s.leagues,
-                      s.predictionGames,
-                    ),
-                  )}
-                  selected={gameId ?? undefined}
-                  onBox={onBox}
-                />
-                {gameId && (
+              ) : s.scope === 'predictions' && !gameId ? (
+                // Predictions move like scores: their cards replace the Games'.
+                <>
                   <PredictionStrip
-                    predictions={s.openPredictions.filter((p) =>
-                      p.legs.some((l) => l.game?.id === gameId),
-                    )}
+                    predictions={s.openPredictions}
+                    selected={s.selectedPrediction?.id}
                     onSelect={s.selectPrediction}
                     onDetails={onPrediction}
                     display={display}
                   />
-                )}
-              </>
-            )}
+                  <PredictionSummary
+                    predictions={s.openPredictions}
+                    display={display}
+                    onOpen={onPrediction}
+                  />
+                </>
+              ) : (
+                <>
+                  <GameStrip
+                    games={(dimmed && previousGames.length
+                      ? previousGames
+                      : games
+                    ).filter((g) =>
+                      inScope(
+                        g,
+                        s.scope,
+                        s.viewerFollows,
+                        items,
+                        s.leagues,
+                        s.predictionGames,
+                      ),
+                    )}
+                    selected={gameId ?? undefined}
+                    onBox={onBox}
+                  />
+                  {gameId && (
+                    <PredictionStrip
+                      predictions={s.openPredictions.filter((p) =>
+                        p.legs.some((l) => l.game?.id === gameId),
+                      )}
+                      onSelect={s.selectPrediction}
+                      onDetails={onPrediction}
+                      display={display}
+                    />
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>

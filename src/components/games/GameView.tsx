@@ -1,7 +1,8 @@
 /**
- * One Game inside the Timeline (design direction "Watch Party"). Selecting
- * a Game only filters the feed; its box score opens as a sheet over it,
- * so it never feels like a new screen.
+ * One Game inside the Timeline (design direction "Watch Party"). On phones,
+ * selecting a Game only filters the feed and its box score opens as a
+ * sheet over it, so it never feels like a new screen. Beside the wide
+ * Timeline the Game has its own pane, with the box score inline.
  */
 
 import type { GameSummary } from '@/lib/model/timeline'
@@ -37,6 +38,26 @@ export function BoxSheet({
       )}
       onClose={onClose}
     >
+      <BoxBody game={game} box={box} />
+    </Sheet>
+  )
+}
+
+/**
+ * What the box score shows: each team with its Follow button, the
+ * linescore, the Game's flow and the stat tables. In a sheet on phones;
+ * inline in the Game's pane beside the wide Timeline (GamePane), under a
+ * `subject` with both teams' colors.
+ */
+export function BoxBody({
+  game,
+  box,
+}: {
+  game: GameSummary
+  box: GameBox | null
+}) {
+  return (
+    <>
       <div className="flex justify-between gap-2">
         {[game.awayTeam, game.homeTeam].map((team, i) => (
           <div
@@ -57,7 +78,7 @@ export function BoxSheet({
           No box score yet.
         </p>
       )}
-    </Sheet>
+    </>
   )
 }
 

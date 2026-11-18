@@ -23,7 +23,7 @@ import {
   scoringHeadline,
   textOn,
 } from '@/lib/timeline/chat'
-import { gameSearch, vtName } from '@/lib/timeline/gameLink'
+import { gameSearch, useVtName } from '@/lib/timeline/gameLink'
 import { markPlayOpened } from '@/lib/timeline/playSheet'
 import { scoringSummary } from '@/lib/timeline/sides'
 import { cn } from '@/lib/utils'
@@ -367,6 +367,7 @@ export function BubbleStack({
   compact?: boolean
 }) {
   const flat = bubbles
+  const vtName = useVtName()
   return (
     <div
       className={cn(
