@@ -13,7 +13,7 @@ import type { CatchUp } from '@/lib/timeline/catchup'
 import { SharpPicksBanner } from '@/components/predictions/SharpPicks'
 import { Notice, ReadDivider } from '@/components/chat/ChatParts'
 import { BubblesSkeleton } from '@/components/layout/Skeleton'
-import { vtName } from '@/lib/timeline/gameLink'
+import { useVtName } from '@/lib/timeline/gameLink'
 import { cn } from '@/lib/utils'
 
 export function TimelineFeed({
@@ -45,6 +45,7 @@ export function TimelineFeed({
   /** Lead with the day's Sharp picks banner (the Predictions Scope). */
   sharpPicks?: boolean
 }) {
+  const vtName = useVtName()
   return (
     // A chat feed, not a document: nothing selects, so long-pressing a
     // bubble to react never makes iOS highlight the feed around it.
@@ -61,12 +62,12 @@ export function TimelineFeed({
         </li>
       )}
       {recap && readAt && (
-        <li style={{ viewTransitionName: 'catchup' }}>
+        <li style={{ viewTransitionName: vtName('catchup') && 'catchup' }}>
           <CatchUpCard catchUp={recap} readAt={readAt} onOpen={onRecap} />
         </li>
       )}
       {typing.length > 1 ? (
-        <li style={{ viewTransitionName: 'typing' }}>
+        <li style={{ viewTransitionName: vtName('typing') && 'typing' }}>
           <TypingSummary typing={typing} onOpen={onLive} />
         </li>
       ) : (

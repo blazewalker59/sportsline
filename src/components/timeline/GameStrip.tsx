@@ -10,8 +10,9 @@ import { useTimeZone } from '@/lib/time/useTimeZone'
  * The Sports Day's Games as small score cards, live first. Tapping one
  * filters the Timeline to that Game (a View Transition, so the feed just
  * loses the other Games' messages); tapping it again shows everything.
- * Selecting never changes the strip's layout: the selected card's corner
- * badge opens its box score.
+ * Selecting never changes the strip's layout: on phones the selected
+ * card's corner badge opens its box score (beside the wide Timeline the
+ * box score is inline in the Game's pane, so the badge hides from `lg`).
  */
 export function GameStrip({
   games,
@@ -31,7 +32,11 @@ export function GameStrip({
           <li key={game.id} className="relative shrink-0">
             <GameCard game={game} selected={game.id === selected} />
             {game.id === selected && onBox && (
-              <CornerButton label="Box score" onClick={onBox}>
+              <CornerButton
+                label="Box score"
+                onClick={onBox}
+                className="lg:hidden"
+              >
                 <rect x="3" y="4" width="18" height="16" rx="2" />
                 <path d="M3 10h18M9 10v10M15 10v10" />
               </CornerButton>
@@ -52,7 +57,7 @@ function GameCard({
 }) {
   const live = game.status === 'live' || game.status === 'delayed'
   const started = live || game.status === 'final'
-  const label = status(game, useTimeZone())
+  const label = gameStatusLabel(game, useTimeZone())
   const leader =
     game.score.away === game.score.home
       ? null
@@ -121,10 +126,12 @@ function GameCard({
 export function CornerButton({
   label,
   onClick,
+  className,
   children,
 }: {
   label: string
   onClick: () => void
+  className?: string
   children: React.ReactNode
 }) {
   return (
@@ -133,7 +140,10 @@ export function CornerButton({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="animate-in fade-in zoom-in-75 absolute -top-2 -right-1.5 z-10 flex size-7 items-center justify-center rounded-full bg-accent text-background shadow-md ring-2 ring-background duration-200 active:scale-90"
+      className={cn(
+        'animate-in fade-in zoom-in-75 absolute -top-2 -right-1.5 z-10 flex size-7 items-center justify-center rounded-full bg-accent text-background shadow-md ring-2 ring-background duration-200 active:scale-90',
+        className,
+      )}
     >
       <svg
         width="14"
@@ -151,7 +161,11 @@ export function CornerButton({
   )
 }
 
-function status(game: GameSummary, timeZone: string | null): string {
+/** A Game's state in a word or two: its segment, Final, or start time. */
+export function gameStatusLabel(
+  game: GameSummary,
+  timeZone: string | null,
+): string {
   switch (game.status) {
     case 'live':
       return game.situation?.segmentLabel ?? 'Live'

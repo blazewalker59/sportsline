@@ -1,3 +1,4 @@
+import { createContext, useContext } from 'react'
 import { sportsDayOf } from '@/lib/model/sportsDay'
 
 /**
@@ -26,4 +27,20 @@ export function playSearch(
 /** A valid, unique view-transition-name for a Timeline element. */
 export function vtName(id: string): string {
   return `m-${id.replace(/[^a-zA-Z0-9_-]/g, '_')}`
+}
+
+/**
+ * Whether the feed under it names its messages for View Transitions. Two
+ * feeds can show the same Play (the two-pane Timeline), and a name may
+ * appear only once on the page, so the second feed turns its names off.
+ */
+export const FeedNames = createContext(true)
+
+/** vtName for this feed, or none where FeedNames turns names off. */
+export function useVtName(): (id: string) => string | undefined {
+  return useContext(FeedNames) ? vtName : noName
+}
+
+function noName(): undefined {
+  return undefined
 }
