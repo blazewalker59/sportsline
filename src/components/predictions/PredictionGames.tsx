@@ -13,6 +13,8 @@ import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { PlayText } from '@/components/chat/PlayText'
 import { Linescore } from '@/components/games/GameView'
+import { InlineError } from '@/components/layout/RouteStates'
+import { Skeleton, SkeletonStatus } from '@/components/layout/Skeleton'
 import { useLiveGame } from '@/lib/games/useLiveGame'
 import { typingFor } from '@/lib/timeline/chat'
 import { gameSearch } from '@/lib/timeline/gameLink'
@@ -143,9 +145,37 @@ function GamePanel({
   legs: ReadonlyArray<LegView>
   onNavigate: () => void
 }) {
-  const { data, isPending } = useLiveGame(gameId)
-  if (isPending || !data) {
-    return <p className="px-3 pb-3 text-xs text-muted">Loading the game…</p>
+  const game = useLiveGame(gameId)
+  const { data } = game
+  if (!data && game.isError) {
+    return (
+      <div className="px-3 pb-3">
+        <InlineError
+          what="the game"
+          error={game.error}
+          onRetry={() => game.refetch()}
+        />
+      </div>
+    )
+  }
+  if (data === null) {
+    return (
+      <p className="px-3 pb-3 text-xs text-muted">This game isn’t available.</p>
+    )
+  }
+  if (!data) {
+    // The panel's own lines (situation, linescore, plays) while it loads.
+    return (
+      <SkeletonStatus
+        label="Loading the game"
+        className="flex flex-col gap-3 border-t border-border px-3 py-3"
+      >
+        <Skeleton className="h-4 w-2/5" />
+        <Skeleton className="h-14 w-full" />
+        <Skeleton className="h-3 w-11/12" />
+        <Skeleton className="h-3 w-3/4" />
+      </SkeletonStatus>
+    )
   }
   const situation = typingFor(data.game)?.text
   const plays = data.items

@@ -3,6 +3,10 @@
  * what it was asked for, or is still loading: each keeps the app's header,
  * so one bad query never blanks the whole app. Routes hand these to the
  * router as errorComponent, notFoundComponent and pendingComponent.
+ *
+ * Screens that load inside themselves use the in-screen halves: a
+ * ScreenError (their main query failed) or a NotFoundState under their
+ * own header, and an InlineError where one part among several failed.
  */
 
 import { Link, useRouter, useRouterState } from '@tanstack/react-router'
@@ -12,7 +16,8 @@ import { DetailHeaderSkeleton, RowsSkeleton } from './Skeleton'
 import type { ErrorComponentProps } from '@tanstack/react-router'
 import { isStaleBuild, reloadForNewBuild } from '@/lib/ops/staleBuild'
 import { sendClientError } from '@/lib/ops/useClientErrors'
-import { GENERIC_MESSAGE, UserError } from '@/lib/userError'
+import { GENERIC_MESSAGE, UserError, isSignInRequired } from '@/lib/userError'
+import { cn } from '@/lib/utils'
 
 /** The column every screen sits in, with the header on top. */
 function Frame({ children }: { children: React.ReactNode }) {
@@ -62,11 +67,19 @@ function TimelineLink({ primary }: { primary?: boolean }) {
   )
 }
 
-/** A message the Viewer can read: a UserError's own words, else ours. */
-function messageFor(error: unknown): string {
+/** A UserError's own words, written for the Viewer; else null. */
+function userMessage(error: unknown): string | null {
   if (error instanceof UserError && error.message !== GENERIC_MESSAGE)
     return error.message
-  return 'This screen didn’t load. It’s been reported; trying again usually works.'
+  return null
+}
+
+/** A message the Viewer can read: a UserError's own words, else ours. */
+function messageFor(error: unknown): string {
+  return (
+    userMessage(error) ??
+    'This screen didn’t load. It’s been reported; trying again usually works.'
+  )
 }
 
 /**
@@ -126,13 +139,24 @@ export function NotFoundPanel({
 }) {
   return (
     <Frame>
-      <Panel
-        title={`No such ${what}`}
-        body={`This ${what} doesn’t exist, or the link to it is out of date.`}
-      >
-        <TimelineLink primary />
-      </Panel>
+      <NotFoundState what={what} />
     </Frame>
+  )
+}
+
+/**
+ * NotFoundPanel's message without the frame, for a screen that finds out
+ * itself (its query answered null) under its own header: a bad id reads
+ * the same whether the route or the screen caught it.
+ */
+export function NotFoundState({ what = 'page' }: { what?: string }) {
+  return (
+    <Panel
+      title={`No such ${what}`}
+      body={`This ${what} doesn’t exist, or the link to it is out of date.`}
+    >
+      <TimelineLink primary />
+    </Panel>
   )
 }
 
@@ -148,5 +172,117 @@ export function RoutePending({
       {shape === 'detail' && <DetailHeaderSkeleton className="mt-2 mb-6" />}
       <RowsSkeleton className="mt-2" />
     </Frame>
+  )
+}
+
+/**
+ * Should the browser report this failed query? Not when the server already
+ * did: safeErrors reports an unexpected failure and sends the generic
+ * message in its place. Not a UserError either, which is an answer written
+ * for the Viewer (Kalshi refused, a bad league URL), not a fault; nor
+ * signing out, which the Gate answers with the Landing.
+ */
+export function shouldReport(error: unknown): boolean {
+  if (error instanceof UserError || isSignInRequired(error)) return false
+  if (error instanceof Error && error.message === GENERIC_MESSAGE) return false
+  return true
+}
+
+/** Report a failed query once per failure, as the rest of the app does. */
+export function useReportError(error: unknown): void {
+  useEffect(() => {
+    if (error && shouldReport(error)) sendClientError(error, 'query')
+  }, [error])
+}
+
+/** Runs a retry (a query's refetch), and says so while it's under way. */
+function useRetry(onRetry: () => Promise<unknown>) {
+  const [retrying, setRetrying] = useState(false)
+  const retry = async () => {
+    setRetrying(true)
+    try {
+      await onRetry()
+    } finally {
+      setRetrying(false)
+    }
+  }
+  return { retrying, retry: () => void retry() }
+}
+
+/**
+ * A screen's main query failed: what RouteErrorPanel says, in place under
+ * the screen's own header, with Try again refetching that query.
+ */
+export function ScreenError({
+  error,
+  onRetry,
+}: {
+  error: unknown
+  /** Refetch what failed, e.g. `() => query.refetch()`. */
+  onRetry: () => Promise<unknown>
+}) {
+  useReportError(error)
+  const { retrying, retry } = useRetry(onRetry)
+  return (
+    <div role="alert">
+      <Panel title="Couldn’t load this" body={messageFor(error)}>
+        <button
+          type="button"
+          onClick={retry}
+          disabled={retrying}
+          className="min-h-11 rounded-full bg-foreground px-5 text-sm font-semibold text-background disabled:opacity-60"
+        >
+          {retrying ? 'Trying…' : 'Try again'}
+        </button>
+        <TimelineLink />
+      </Panel>
+    </div>
+  )
+}
+
+/**
+ * One part of a screen failed (a section, a tab, a sheet) while the rest
+ * stands: a card in its place that says so, with Try again.
+ */
+export function InlineError({
+  error,
+  onRetry,
+  what,
+  className,
+}: {
+  error: unknown
+  /** Refetch what failed, e.g. `() => query.refetch()`. */
+  onRetry: () => Promise<unknown>
+  /** What didn't load, finishing "Couldn’t load …": "your record". */
+  what: string
+  className?: string
+}) {
+  useReportError(error)
+  const { retrying, retry } = useRetry(onRetry)
+  return (
+    <div
+      role="alert"
+      className={cn(
+        'flex items-center gap-3 rounded-card border border-border bg-surface px-3 py-2.5 text-sm',
+        className,
+      )}
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold text-negative">
+          {`Couldn’t load ${what}.`}
+        </span>
+        <span className="block text-xs text-muted">
+          {userMessage(error) ?? 'Trying again usually works.'}
+        </span>
+      </span>
+      <button
+        type="button"
+        onClick={retry}
+        disabled={retrying}
+        className="min-h-9 shrink-0 rounded-full bg-notice px-3 text-sm font-semibold disabled:opacity-60"
+      >
+        {retrying ? 'Trying…' : 'Try again'}
+      </button>
+    </div>
   )
 }

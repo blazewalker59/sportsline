@@ -16,6 +16,8 @@ import { buildRecord, calibrationOf, winRate } from '@/lib/kalshi/record'
 import { usePredictionRecord } from '@/lib/kalshi/usePredictions'
 import { useStoredValue } from '@/lib/useStoredValue'
 import { StatGrid, StatTile } from '@/components/layout/StatTile'
+import { InlineError } from '@/components/layout/RouteStates'
+import { CardSkeleton } from '@/components/layout/Skeleton'
 import { cn } from '@/lib/utils'
 import { dayOf, formatNumber, shiftDay, startOfDay } from '@/lib/time/format'
 import { useTimeZone } from '@/lib/time/useTimeZone'
@@ -140,7 +142,13 @@ export function PredictionRecordSection() {
         </div>
       )}
       {history.isPending ? (
-        <p className="text-sm text-muted">Loading…</p>
+        <CardSkeleton label="Loading your record" />
+      ) : history.isError && history.data === undefined ? (
+        <InlineError
+          what="your record"
+          error={history.error}
+          onRetry={() => history.refetch()}
+        />
       ) : !record || record.totals.count === 0 ? (
         <p className="rounded-card border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
           No predictions in this range.

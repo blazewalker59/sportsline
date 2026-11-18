@@ -8,6 +8,12 @@ import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useCallback, useEffect } from 'react'
 import type { TimelineItem } from '@/lib/model/timeline'
 import { AppHeader } from '@/components/layout/AppHeader'
+import { NotFoundState, ScreenError } from '@/components/layout/RouteStates'
+import {
+  BubblesSkeleton,
+  CardSkeleton,
+  DetailHeaderSkeleton,
+} from '@/components/layout/Skeleton'
 import { SubjectPage } from '@/components/brand/SubjectPage'
 import { teamSubject } from '@/lib/brand/subject'
 import {
@@ -58,11 +64,16 @@ export function PlayerScreen({
     <div className="mx-auto max-w-xl px-4 pb-16">
       <AppHeader />
       {query.isPending ? (
-        <p className="mt-16 text-center text-sm text-muted">Loading…</p>
+        <>
+          <DetailHeaderSkeleton className="mt-2 mb-6" />
+          <CardSkeleton className="mb-6" />
+          <BubblesSkeleton rows={3} />
+        </>
+      ) : query.isError && query.data === undefined ? (
+        // Failed with nothing to show: not the same as no such Player.
+        <ScreenError error={query.error} onRetry={() => query.refetch()} />
       ) : !first ? (
-        <p className="mt-16 text-center text-sm text-muted">
-          Player not found.
-        </p>
+        <NotFoundState what="player" />
       ) : (
         <SubjectPage subject={teamSubject(first.player.team?.colors)}>
           <PlayerHeader player={first.player} />

@@ -39,6 +39,8 @@ import {
   windowTicks,
   withinWindow,
 } from '@/components/charts/timeWindow'
+import { InlineError } from '@/components/layout/RouteStates'
+import { Skeleton, SkeletonStatus } from '@/components/layout/Skeleton'
 import { usePredictionDetail } from '@/lib/kalshi/usePredictions'
 import { cn } from '@/lib/utils'
 import { clockTime, shortDate } from '@/lib/time/format'
@@ -111,9 +113,18 @@ export function OddsChart({ predictionId }: { predictionId: string }) {
   const detail = usePredictionDetail(predictionId)
   if (detail.isPending) {
     return (
-      <p className="rounded-card border border-border bg-surface px-3 py-6 text-center text-xs text-muted">
-        Loading the odds…
-      </p>
+      <SkeletonStatus label="Loading the odds">
+        <Skeleton className="h-16 rounded-card" />
+      </SkeletonStatus>
+    )
+  }
+  if (detail.isError && detail.data === undefined) {
+    return (
+      <InlineError
+        what="the odds"
+        error={detail.error}
+        onRetry={() => detail.refetch()}
+      />
     )
   }
   if (!detail.data || detail.data.history.length < 2) {

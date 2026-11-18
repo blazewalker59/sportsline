@@ -27,6 +27,12 @@ import {
 } from '@/components/fantasy/FantasyParts'
 import { FollowButton } from '@/components/follows/FollowButton'
 import { PlaySheet } from '@/components/games/PlayDetailScreen'
+import { InlineError } from '@/components/layout/RouteStates'
+import {
+  CardSkeleton,
+  DetailHeaderSkeleton,
+  RowsSkeleton,
+} from '@/components/layout/Skeleton'
 import { teamSubject } from '@/lib/brand/subject'
 import { SPORTS } from '@/lib/fantasy/sports'
 import { useFantasy } from '@/lib/fantasy/useFantasy'
@@ -57,7 +63,17 @@ export function PlayerSheet({
       onClose={onClose}
     >
       {page.isPending ? (
-        <p className="py-10 text-center text-sm text-muted">Loading…</p>
+        <div className="flex flex-col gap-5">
+          <DetailHeaderSkeleton />
+          <RowsSkeleton rows={3} />
+        </div>
+      ) : page.isError && page.data === undefined ? (
+        <InlineError
+          what="this player"
+          error={page.error}
+          onRetry={() => page.refetch()}
+          className="my-6"
+        />
       ) : !player ? (
         <p className="py-10 text-center text-sm text-muted">
           Player not found.
@@ -188,9 +204,13 @@ export function PlayerDetailSections({
       <FantasySection playerId={player.id} />
       <PredictionsSection playerId={player.id} />
       {detail.isPending ? (
-        <p className="py-6 text-center text-sm text-muted">
-          Loading their season…
-        </p>
+        <CardSkeleton label="Loading their season" />
+      ) : detail.isError && detail.data === undefined ? (
+        <InlineError
+          what="their season"
+          error={detail.error}
+          onRetry={() => detail.refetch()}
+        />
       ) : (
         <>
           <GameSection

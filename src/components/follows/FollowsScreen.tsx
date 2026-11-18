@@ -9,6 +9,8 @@ import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
 import { AppHeader } from '@/components/layout/AppHeader'
+import { InlineError } from '@/components/layout/RouteStates'
+import { RowsSkeleton } from '@/components/layout/Skeleton'
 import { followablesQuery } from '@/lib/viewer/queries'
 import { useViewer } from '@/lib/viewer/useViewer'
 
@@ -51,7 +53,16 @@ export function FollowsScreen() {
             autoComplete="off"
             className="w-full rounded-card border border-border bg-surface px-4 py-2.5 text-base outline-none focus:border-foreground/50"
           />
-          {q.length >= 2 && (
+          {q.length < 2 ? null : results.isPending ? (
+            <RowsSkeleton rows={3} label="Searching" className="mt-2" />
+          ) : results.isError && results.data === undefined ? (
+            <InlineError
+              what="search results"
+              error={results.error}
+              onRetry={() => results.refetch()}
+              className="mt-2"
+            />
+          ) : (
             <ul className="mt-2 divide-y divide-border rounded-card border border-border bg-surface">
               {results.data?.length === 0 && (
                 <li className="px-4 py-3 text-sm text-muted">No matches.</li>

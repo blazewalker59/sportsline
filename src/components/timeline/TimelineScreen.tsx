@@ -305,16 +305,15 @@ function Timeline({
         error={Boolean(timeline.error)}
         onRetry={() => void timeline.reload()}
         empty={items.length === 0 && typing.length === 0}
+        loading={
+          gameId ? game.isPending : backfill === 'loading' || timeline.loading
+        }
         emptyText={
           gameId
-            ? game.isPending
-              ? 'Loading…'
-              : 'No plays in this game yet.'
-            : backfill === 'loading' || timeline.loading
-              ? 'Loading this day’s games…'
-              : isToday
-                ? 'No plays yet today.'
-                : 'No plays on this day.'
+            ? 'No plays in this game yet.'
+            : isToday
+              ? 'No plays yet today.'
+              : 'No plays on this day.'
         }
         hasMore={!gameId && timeline.hasMore}
         loadingMore={timeline.loadingMore}

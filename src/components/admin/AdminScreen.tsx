@@ -7,6 +7,8 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import type { ErrorView, JobView, OpsHealth } from '@/lib/ops/server'
 import { AppHeader } from '@/components/layout/AppHeader'
+import { ScreenError } from '@/components/layout/RouteStates'
+import { Skeleton, SkeletonStatus } from '@/components/layout/Skeleton'
 import { timeAgo, useNow } from '@/components/timeline/format'
 import { opsHealthQuery } from '@/lib/ops/queries'
 import { cn } from '@/lib/utils'
@@ -22,9 +24,9 @@ export function AdminScreen() {
       <AppHeader />
       <h1 className="mb-4 text-xl font-bold tracking-tight">Health</h1>
       {health.isPending ? (
-        <p className="text-sm text-muted">Loading…</p>
-      ) : health.isError ? (
-        <p className="text-sm text-live">{health.error.message}</p>
+        <HealthSkeleton />
+      ) : health.data === undefined ? (
+        <ScreenError error={health.error} onRetry={() => health.refetch()} />
       ) : health.data.denied ? (
         <p className="rounded-card border border-border bg-surface px-4 py-3 text-sm text-muted">
           Signed in as{' '}
@@ -37,6 +39,23 @@ export function AdminScreen() {
         <Health health={health.data} />
       )}
     </div>
+  )
+}
+
+/** The page's shape while it loads: the three counts, then the jobs. */
+function HealthSkeleton() {
+  return (
+    <SkeletonStatus className="flex flex-col gap-6">
+      <div className="grid grid-cols-3 gap-2">
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} className="h-16 rounded-card" />
+        ))}
+      </div>
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="h-72 rounded-card" />
+      </div>
+    </SkeletonStatus>
   )
 }
 

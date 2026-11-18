@@ -13,6 +13,8 @@ import { PriceDisplayToggle } from './PriceDisplayToggle'
 import type { ChangeDisplay } from '@/lib/kalshi/server'
 import type { PredictionView } from '@/lib/kalshi/predictionViews'
 import { AppHeader } from '@/components/layout/AppHeader'
+import { InlineError, ScreenError } from '@/components/layout/RouteStates'
+import { CardSkeleton, RowsSkeleton } from '@/components/layout/Skeleton'
 import { timeAgo, useNow } from '@/components/timeline/format'
 import {
   useConnectKalshi,
@@ -32,10 +34,21 @@ export function PredictionsScreen() {
     <div className="mx-auto max-w-xl px-4 pb-16">
       <AppHeader />
       <h1 className="mb-4 text-xl font-bold tracking-tight">Predictions</h1>
-      {isPending || connection.isPending ? null : !viewerState?.viewer ? (
+      {isPending ? null : !viewerState?.viewer ? (
         <p className="mt-16 text-center text-sm text-muted">
           Sign in to connect your Kalshi account.
         </p>
+      ) : connection.isPending ? (
+        <div className="flex flex-col gap-6">
+          <CardSkeleton />
+          <CardSkeleton />
+        </div>
+      ) : connection.isError && connection.data === undefined ? (
+        // Not knowing isn't the same as not connected: no connect form.
+        <ScreenError
+          error={connection.error}
+          onRetry={() => connection.refetch()}
+        />
       ) : connection.data ? (
         <Connected />
       ) : (
@@ -213,16 +226,14 @@ function Connected() {
 
       <PredictionRecordSection />
 
-      {list.isError && (
-        <p
-          role="alert"
-          className="rounded-card border border-live/40 bg-live/10 px-3 py-2 text-sm text-live"
-        >
-          Couldn’t load your Predictions: {list.error.message}
-        </p>
-      )}
       {list.isPending ? (
-        <p className="text-sm text-muted">Loading…</p>
+        <RowsSkeleton rows={3} label="Loading your Predictions" />
+      ) : list.isError && list.data === undefined ? (
+        <InlineError
+          what="your Predictions"
+          error={list.error}
+          onRetry={() => list.refetch()}
+        />
       ) : (
         <PredictionList
           title="Open"

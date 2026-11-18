@@ -6,6 +6,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useSyncExternalStore } from 'react'
 import { timeAgo, useNow } from '@/components/timeline/format'
+import { InlineError } from '@/components/layout/RouteStates'
+import { RowsSkeleton } from '@/components/layout/Skeleton'
 import { createApiToken, revokeApiToken } from '@/lib/agents/server'
 import { apiTokensQuery, useApiTokens } from '@/lib/agents/queries'
 
@@ -140,7 +142,13 @@ export function Tokens({ tradingReady }: { tradingReady: boolean }) {
           Your tokens
         </h2>
         {tokens.isPending ? (
-          <p className="text-sm text-muted">Loading…</p>
+          <RowsSkeleton rows={2} label="Loading your tokens" />
+        ) : tokens.isError && tokens.data === undefined ? (
+          <InlineError
+            what="your tokens"
+            error={tokens.error}
+            onRetry={() => tokens.refetch()}
+          />
         ) : !tokens.data?.length ? (
           <p className="text-sm text-muted">None yet.</p>
         ) : (
