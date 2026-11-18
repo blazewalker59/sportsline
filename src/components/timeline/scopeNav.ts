@@ -92,8 +92,8 @@ export function useRowItems(): ReadonlyArray<RowItem> {
 
 /**
  * Show the Timeline in a Scope. On the Timeline it is a View Transition
- * over cached data that keeps the day and drops any Game, Play or
- * narrowing; from another screen it opens the Timeline (today) in it.
+ * over cached data that keeps the day and drops any Game, Play, open
+ * Prediction or Matchup, or narrowing; from another screen it opens the Timeline (today) in it.
  */
 export function useGoToScope(): (value: Scope) => void {
   const navigate = useNavigate()
@@ -110,6 +110,7 @@ export function useGoToScope(): (value: Scope) => void {
         scope: value,
         game: undefined,
         play: undefined,
+        detail: undefined,
         // A Scope replaces any one Prediction the Timeline was narrowed to.
         prediction: undefined,
         matchup: undefined,

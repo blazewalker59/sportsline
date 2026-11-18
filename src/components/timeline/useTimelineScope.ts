@@ -198,6 +198,13 @@ export function useTimelineScope({
   return {
     scope,
     setup,
+    /** The Viewer's Predictions are still being read. */
+    predictionsLoading:
+      kalshi.isPending || (Boolean(kalshi.data) && predictionList.isPending),
+    /** Their Fantasy leagues are still being read. */
+    fantasyLoading:
+      fantasyConnection.pending ||
+      (fantasyConnection.connected && fantasy.isPending),
     follows,
     viewerFollows,
     rowItems,

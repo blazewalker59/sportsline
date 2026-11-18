@@ -25,8 +25,14 @@ import {
 } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { viewerState } from '../screenHarness'
-import { timelineFixture } from './fixtures'
+import {
+  fantasyLeagueFixture,
+  predictionFixture,
+  timelineFixture,
+} from './fixtures'
 import type * as ViewerModule from '@/lib/viewer/useViewer'
+import type * as ChartsModule from '@/components/charts/lazy'
+import type * as FantasyQueries from '@/lib/fantasy/queries'
 import { TimelineScreen } from '@/components/timeline/TimelineScreen'
 import { sportsDayOf } from '@/lib/model/sportsDay'
 import { VIEWER_KEY } from '@/lib/viewer/queries'
@@ -71,6 +77,39 @@ vi.mock('@/lib/reactions/useReactions', () => ({
   useReactions: () => ({ data: undefined }),
   useSetReaction: () => () => {},
 }))
+
+// Charts read their own server functions; they aren't what's under test.
+vi.mock('@/components/charts/lazy', async (importOriginal) => ({
+  ...(await importOriginal<typeof ChartsModule>()),
+  OddsChart: () => null,
+  MatchupRace: () => null,
+}))
+
+// A Matchup's server functions: another Matchup in the league reads as
+// its two teams, and no Games this week.
+vi.mock('@/lib/fantasy/queries', async (importOriginal) => {
+  const actual = await importOriginal<typeof FantasyQueries>()
+  const { fantasyLeagueFixture: leagueFx } = await import('./fixtures')
+  return {
+    ...actual,
+    leagueMatchupQuery: (leagueId: string, teamId: number) => ({
+      queryKey: ['league-matchup', leagueId, teamId],
+      queryFn: () => {
+        const m = leagueFx().matchup!
+        const o = m.others!.find((x) => x.left.teamId === teamId)!
+        return Promise.resolve({
+          ...m,
+          mine: { ...o.left, projected: null, lineup: [] },
+          opponent: { ...o.right!, projected: null, lineup: [] },
+        })
+      },
+    }),
+    matchupGamesQuery: (leagueId: string) => ({
+      queryKey: ['matchup-games', leagueId],
+      queryFn: () => Promise.resolve([]),
+    }),
+  }
+})
 
 // The Scope's own queries (Kalshi, Fantasy) are server functions: by
 // default the All Scope over every League, with nothing connected; a test
@@ -151,10 +190,20 @@ function renderTimeline(url: string, viewer = viewerState()) {
       play: str(s.play),
       scope: parseScope(s.scope),
       day: str(s.day),
+      prediction: str(s.prediction),
+      matchup: str(s.matchup),
+      detail: str(s.detail),
     }),
     component: function Route() {
-      const { game, play, scope } = timeline.useSearch()
-      return <TimelineScreen gameId={game} playId={play} scope={scope} />
+      const { game, play, scope, detail } = timeline.useSearch()
+      return (
+        <TimelineScreen
+          gameId={game}
+          playId={play}
+          scope={scope}
+          detail={detail}
+        />
+      )
     },
   })
   // The screens a prompt links to.
@@ -433,5 +482,226 @@ describe('TimelineScreen, Scopes (chosen from the main navigation)', () => {
     act(() => swipe.current!('left'))
     await act(() => Promise.resolve())
     expect(router.state.location.search).toMatchObject({ scope: 'fantasy' })
+  })
+})
+
+const pred = predictionFixture(fx.mlb)
+const league = fantasyLeagueFixture()
+/** The Predictions Scope, with one open Prediction (its card selected). */
+const predictionsScope = (over: Record<string, unknown> = {}) => ({
+  scope: 'predictions',
+  kalshi: { data: { changeDisplay: 'dollars' }, isPending: false },
+  predictionList: { data: [pred] },
+  openPredictions: [pred],
+  predictionGames: [fx.mlb.id],
+  selectedPrediction: pred,
+  ...over,
+})
+/** The Fantasy Scope, with one league's Matchup (its card selected). */
+const fantasyScope = (over: Record<string, unknown> = {}) => ({
+  scope: 'fantasy',
+  fantasyLeagues: [league],
+  selectedMatchup: league,
+  ...over,
+})
+const detailPane = () =>
+  document.querySelector<HTMLElement>('[data-detail-pane]')
+const search = (router: { state: { location: { search: unknown } } }) =>
+  router.state.location.search as Record<string, unknown>
+
+describe('TimelineScreen, wide: Predictions and Matchups in the pane', () => {
+  beforeEach(() => setWide(true))
+
+  it('opens a Prediction beside the feed, not as a sheet', async () => {
+    scopeOver.current = predictionsScope()
+    const { router } = renderTimeline('/?scope=predictions')
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Prediction details' }),
+    )
+    await waitFor(() => expect(detailPane()).toBeTruthy())
+    // In the address, like a Game, so reload and Back behave the same.
+    expect(search(router).detail).toBe('prediction:pred_1')
+    const pane = detailPane()!
+    expect(pane.dataset.detailPane).toBe('prediction')
+    expect(within(pane).getByText('Phillies to win')).toBeTruthy()
+    // Its sheet's content: the Odds, the money, the Leg and its Game.
+    expect(within(pane).getByText('Cash out now')).toBeTruthy()
+    expect(within(pane).getByText('Market')).toBeTruthy()
+    expect(
+      within(pane).getByRole('link', { name: 'Close prediction' }),
+    ).toBeTruthy()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    // The feed stays where it was beside it.
+    expect(scopeFeed()).toBeTruthy()
+    expect(pane.style.getPropertyValue('view-transition-name')).toBe(
+      'game-pane',
+    )
+  })
+
+  it('a Prediction card narrows the feed and opens it in the pane', async () => {
+    scopeOver.current = predictionsScope({ selectedPrediction: null })
+    const { router } = renderTimeline('/?scope=predictions')
+    const strip = await screen.findByRole('list', { name: 'Your Predictions' })
+    fireEvent.click(within(strip).getByRole('button', { pressed: false }))
+    await waitFor(() =>
+      expect(search(router)).toMatchObject({
+        scope: 'predictions',
+        prediction: 'pred_1',
+        detail: 'prediction:pred_1',
+      }),
+    )
+    await waitFor(() => expect(detailPane()).toBeTruthy())
+  })
+
+  it('opens a Matchup beside the feed, and another in the league', async () => {
+    scopeOver.current = fantasyScope()
+    const { router } = renderTimeline('/?scope=fantasy')
+    fireEvent.click(await screen.findByRole('button', { name: 'Matchup' }))
+    await waitFor(() => expect(detailPane()).toBeTruthy())
+    expect(search(router).detail).toBe('matchup:espn-1')
+    let pane = detailPane()!
+    expect(pane.dataset.detailPane).toBe('matchup')
+    expect(within(pane).getByText('The League')).toBeTruthy()
+    expect(within(pane).getByText('Gridiron Gang')).toBeTruthy()
+    expect(within(pane).getByRole('link', { name: 'League ›' })).toBeTruthy()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    // Another Matchup in the league replaces it.
+    fireEvent.click(screen.getByRole('button', { name: /^Monday Kings/ }))
+    await waitFor(() => expect(search(router).detail).toBe('matchup:espn-1@3'))
+    await waitFor(() =>
+      expect(within(detailPane()!).getByText('Taco Corp')).toBeTruthy(),
+    )
+    pane = detailPane()!
+    expect(within(pane).queryByText('Gridiron Gang')).toBeNull()
+  })
+
+  it('shows one thing at a time: Prediction, Game, Prediction, Matchup, Game', async () => {
+    scopeOver.current = { ...predictionsScope(), fantasyLeagues: [league] }
+    const { router } = renderTimeline(
+      '/?scope=predictions&detail=prediction%3Apred_1',
+    )
+    await waitFor(() => expect(detailPane()).toBeTruthy())
+    // A Leg's Game, from inside the Prediction: the pane swaps to it.
+    fireEvent.click(
+      within(detailPane()!).getAllByRole('link', { name: /PHI/ })[0],
+    )
+    await waitFor(() => expect(gamePane()).toBeTruthy())
+    expect(gamePane()!.dataset.gamePane).toBe('g_mlb')
+    expect(detailPane()).toBeNull()
+    expect(search(router).detail).toBeUndefined()
+    // The Game's Predictions under the strip: one opens in its place.
+    const strip = screen.getByRole('list', { name: 'Your Predictions' })
+    fireEvent.click(within(strip).getAllByRole('button')[0])
+    await waitFor(() => expect(detailPane()).toBeTruthy())
+    expect(gamePane()).toBeNull()
+    expect(search(router).game).toBeUndefined()
+    // A Matchup replaces the Prediction.
+    await act(() =>
+      router.navigate({
+        to: '/',
+        search: { scope: 'fantasy', detail: 'matchup:espn-1' } as never,
+      }),
+    )
+    await waitFor(() =>
+      expect(detailPane()!.dataset.detailPane).toBe('matchup'),
+    )
+    expect(document.querySelectorAll('[data-detail-pane]')).toHaveLength(1)
+    // And a Game from the strip replaces the Matchup.
+    scopeOver.current = { ...scopeOver.current, scope: 'all' }
+    await act(() =>
+      router.navigate({
+        to: '/',
+        search: { scope: 'all', detail: 'matchup:espn-1' } as never,
+      }),
+    )
+    fireEvent.click(screen.getByRole('link', { name: /^BOS 108, NYK 112/ }))
+    await waitFor(() => expect(gamePane()!.dataset.gamePane).toBe('g_nba'))
+    expect(detailPane()).toBeNull()
+    expect(search(router).detail).toBeUndefined()
+  })
+
+  it('Close clears it and leaves the feed', async () => {
+    scopeOver.current = predictionsScope()
+    const { router } = renderTimeline(
+      '/?scope=predictions&detail=prediction%3Apred_1',
+    )
+    await waitFor(() => expect(detailPane()).toBeTruthy())
+    fireEvent.click(screen.getByRole('link', { name: 'Close prediction' }))
+    await waitFor(() => expect(detailPane()).toBeNull())
+    expect(search(router).detail).toBeUndefined()
+    expect(scopeFeed()).toBeTruthy()
+    expect(screen.getByText(/Prediction’s details/)).toBeTruthy()
+  })
+
+  it('Escape closes it, but not while a sheet is open', async () => {
+    scopeOver.current = fantasyScope()
+    renderTimeline('/?scope=fantasy&detail=matchup%3Aespn-1')
+    await waitFor(() => expect(detailPane()).toBeTruthy())
+    const sheet = document.createElement('div')
+    sheet.setAttribute('role', 'dialog')
+    document.body.appendChild(sheet)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await act(() => Promise.resolve())
+    expect(detailPane()).toBeTruthy()
+    sheet.remove()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await waitFor(() => expect(detailPane()).toBeNull())
+  })
+
+  it('says so when what it points to is gone', async () => {
+    scopeOver.current = predictionsScope()
+    renderTimeline('/?scope=predictions&detail=prediction%3Agone')
+    await waitFor(() => expect(detailPane()).toBeTruthy())
+    expect(detailPane()!.textContent).toContain('isn’t in your Kalshi account')
+  })
+})
+
+describe('TimelineScreen, narrow: Predictions and Matchups stay sheets', () => {
+  beforeEach(() => setWide(false))
+
+  it('opens a Prediction as a sheet, out of the address', async () => {
+    scopeOver.current = predictionsScope()
+    const { router } = renderTimeline('/?scope=predictions')
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Prediction details' }),
+    )
+    const sheet = await screen.findByRole('dialog', { name: 'Prediction' })
+    expect(within(sheet).getByText('Phillies to win')).toBeTruthy()
+    expect(detailPane()).toBeNull()
+    expect(search(router).detail).toBeUndefined()
+  })
+
+  it('a Prediction card only narrows the feed', async () => {
+    const selectPrediction = vi.fn()
+    scopeOver.current = predictionsScope({
+      selectedPrediction: null,
+      selectPrediction,
+    })
+    renderTimeline('/?scope=predictions')
+    const strip = await screen.findByRole('list', { name: 'Your Predictions' })
+    fireEvent.click(within(strip).getByRole('button', { pressed: false }))
+    expect(selectPrediction).toHaveBeenCalledWith('pred_1')
+    expect(detailPane()).toBeNull()
+  })
+
+  it('opens a Matchup as a sheet', async () => {
+    scopeOver.current = fantasyScope()
+    renderTimeline('/?scope=fantasy')
+    fireEvent.click(await screen.findByRole('button', { name: 'Matchup' }))
+    const sheet = await screen.findByRole('dialog', { name: 'The League' })
+    expect(within(sheet).getByText('Gridiron Gang')).toBeTruthy()
+    expect(detailPane()).toBeNull()
+  })
+
+  it('shows one left in the address as its sheet, and Done clears it', async () => {
+    scopeOver.current = predictionsScope()
+    const { router } = renderTimeline(
+      '/?scope=predictions&detail=prediction%3Apred_1',
+    )
+    const sheet = await screen.findByRole('dialog', { name: 'Prediction' })
+    expect(detailPane()).toBeNull()
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Done' }))
+    await waitFor(() => expect(search(router).detail).toBeUndefined())
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 })

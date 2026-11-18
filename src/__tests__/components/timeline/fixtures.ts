@@ -5,6 +5,8 @@
 
 import type { GameSummary, TimelineItem } from '@/lib/model/timeline'
 import type { GameBox } from '@/lib/model/types'
+import type { PredictionView } from '@/lib/kalshi/predictionViews'
+import type { FantasyLeagueView } from '@/lib/fantasy/server'
 
 export function team(abbreviation: string, name: string) {
   return {
@@ -201,4 +203,86 @@ export function timelineFixture(sportsDay: string) {
     }
   }
   return { games, items, mlb, nba, nfl, box, detail }
+}
+
+/** An open Prediction with one Leg on `game` (which links to it). */
+export function predictionFixture(game: GameSummary): PredictionView {
+  return {
+    id: 'pred_1',
+    kind: 'single',
+    side: 'yes',
+    title: 'Phillies to win',
+    contracts: 10,
+    cost: 4.5,
+    status: 'open',
+    result: null,
+    payout: null,
+    pnl: null,
+    openedAt: `${game.sportsDay}T20:00:00Z`,
+    settledAt: null,
+    chance: 0.62,
+    entryChance: 0.45,
+    value: 6.2,
+    history: [],
+    legs: [
+      {
+        title: 'Philadelphia Phillies',
+        side: 'yes',
+        chance: 0.62,
+        status: 'pending',
+        game,
+        playerId: null,
+        playerName: null,
+        teamId: game.awayTeam.id,
+        progress: null,
+      },
+    ],
+  }
+}
+
+const side = (teamId: number, name: string, abbrev: string, score: number) => ({
+  teamId,
+  name,
+  abbrev,
+  logo: null,
+  record: '7-3',
+  score,
+})
+
+/** A points league's Matchup this week, with one other in the league. */
+export function fantasyLeagueFixture(): FantasyLeagueView {
+  return {
+    id: 'espn-1',
+    sport: 'football',
+    provider: 'espn',
+    name: 'The League',
+    teamName: 'Sam’s Squad',
+    enabled: true,
+    whoHasEnabled: false,
+    lastError: null,
+    updatedAt: '2026-11-01T00:00:00Z',
+    matchup: {
+      sport: 'football',
+      leagueName: 'The League',
+      scoringType: 'H2H_POINTS',
+      matchupPeriod: 10,
+      scoringPeriod: 10,
+      mine: {
+        ...side(1, 'Sam’s Squad', 'SAM', 88.4),
+        projected: 110,
+        lineup: [],
+      },
+      opponent: {
+        ...side(2, 'Gridiron Gang', 'GG', 71.2),
+        projected: 104,
+        lineup: [],
+      },
+      others: [
+        {
+          left: side(3, 'Monday Kings', 'MK', 95.1),
+          right: side(4, 'Taco Corp', 'TC', 60.5),
+        },
+      ],
+    },
+  }
 }

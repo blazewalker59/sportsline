@@ -5,9 +5,11 @@
  * (TimelineFeed), the selected Game (GamePane) and the sheets it opens
  * (TimelineSheets).
  *
- * On phones a selected Game takes the feed's place, filtered to it. From
- * `lg` (useWideTimeline) the Game opens in a pane beside the Scope's feed,
- * which stays exactly as it was.
+ * On phones a selected Game takes the feed's place, filtered to it, and a
+ * Prediction or Matchup opens as a bottom sheet. From `lg`
+ * (useWideTimeline) each opens in a pane beside the Scope's feed, which
+ * stays exactly as it was: one at a time, kept in the address (`game`, or
+ * `detail` for a Prediction or Matchup) so reload and Back behave alike.
  */
 
 import { useQueryClient } from '@tanstack/react-query'
@@ -16,6 +18,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { entryTime } from './FeedRows'
 import { FeedFooter, TimelineFeed } from './TimelineFeed'
 import { GamePane } from './GamePane'
+import { DetailPane, DetailPaneMissing } from './DetailPane'
 import { TimelineSheets } from './TimelineSheets'
 import { TimelineTop } from './TimelineTop'
 import { useGoToScope, useLastLeague } from './scopeNav'
@@ -28,10 +31,17 @@ import type { Typing } from '@/lib/timeline/chat'
 import type { GameSummary, TimelineItem } from '@/lib/model/timeline'
 import type { Scope } from '@/lib/model/scope'
 import type { LeagueMatchup } from '@/lib/fantasy/matchup'
+import type { TimelineScopeState } from './useTimelineScope'
+import type { PaneDetail } from '@/lib/timeline/gameLink'
+import { detailParam, parseDetail } from '@/lib/timeline/gameLink'
+import { PredictionDetail } from '@/components/predictions/PredictionSheet'
 import { FirstRunFollows } from '@/components/follows/FirstRunFollows'
 import { neighborScope, scopeStops } from '@/lib/model/scope'
 import { useSwipe } from '@/components/layout/useSwipe'
-import { FantasyTagsProvider } from '@/components/fantasy/FantasyParts'
+import {
+  FantasyTagsProvider,
+  MatchupDetail,
+} from '@/components/fantasy/FantasyParts'
 import { ReactionsProvider } from '@/components/chat/Reactions'
 import { takePlayOpened } from '@/lib/timeline/playSheet'
 import { useHideOnScroll } from '@/lib/useHideOnScroll'
@@ -52,6 +62,7 @@ export function TimelineScreen({
   playId,
   predictionId,
   matchupId,
+  detail,
 }: {
   day?: string
   gameId?: string
@@ -59,6 +70,8 @@ export function TimelineScreen({
   playId?: string
   predictionId?: string
   matchupId?: string
+  /** A Prediction or Matchup open beside the wide Timeline (parseDetail). */
+  detail?: string
 }) {
   const viewerState = useViewer()
   // Rolls over at the Sports Day boundary: today's Timeline moves on with it.
@@ -85,6 +98,7 @@ export function TimelineScreen({
         playId={playId ?? null}
         predictionId={predictionId ?? null}
         matchupId={matchupId ?? null}
+        detail={detail}
       />
     </ReactionsProvider>
   )
@@ -98,6 +112,7 @@ function Timeline({
   playId,
   predictionId,
   matchupId,
+  detail,
 }: {
   sportsDay: string
   today: string
@@ -108,6 +123,7 @@ function Timeline({
   predictionId: string | null
   /** One Fantasy Matchup selected: the Timeline narrows to its Starters. */
   matchupId: string | null
+  detail?: string
 }) {
   const isToday = sportsDay === today
   const { data } = useViewer()
@@ -154,6 +170,64 @@ function Timeline({
   // the feed's place, and the Scope's feed isn't rendered at all.
   const wide = useWideTimeline()
   const showScope = !gameId || wide
+  // A Prediction or Matchup open in the pane (a Game takes precedence,
+  // though opening either clears the other).
+  const paneDetail = gameId ? null : parseDetail(detail)
+  const showDetail = useCallback(
+    (next: PaneDetail | null) =>
+      void navigate({
+        to: '/',
+        search: (prev) => ({
+          ...prev,
+          detail: next ? detailParam(next) : undefined,
+          game: undefined,
+        }),
+        viewTransition: true,
+        resetScroll: false,
+      }),
+    [navigate],
+  )
+  // Beside the wide feed they open in the pane; on phones, as sheets.
+  const openPrediction = (id: string) =>
+    wide ? showDetail({ kind: 'prediction', id }) : setPredictionOpen(id)
+  const openMatchup = (id: string, other?: LeagueMatchup) =>
+    wide
+      ? showDetail({
+          kind: 'matchup',
+          leagueId: id,
+          teamId: other?.left.teamId,
+        })
+      : setMatchupOpen({ id, other })
+  // Tapping a card narrows the Timeline to it; beside the wide feed it
+  // also opens in the pane (and tapping again clears both), so the space
+  // shows what the feed is narrowed to.
+  const selectWide = (kind: 'prediction' | 'matchup', id: string | null) =>
+    void navigate({
+      to: '/',
+      search: (prev) => ({
+        ...prev,
+        scope: kind === 'prediction' ? 'predictions' : 'fantasy',
+        prediction: kind === 'prediction' ? (id ?? undefined) : undefined,
+        matchup: kind === 'matchup' ? (id ?? undefined) : undefined,
+        detail:
+          id === null
+            ? undefined
+            : detailParam(
+                kind === 'prediction' ? { kind, id } : { kind, leagueId: id },
+              ),
+        game: undefined,
+        play: undefined,
+      }),
+      viewTransition: true,
+      resetScroll: false,
+    })
+  const selectPrediction = (id: string | null) =>
+    wide ? selectWide('prediction', id) : s.selectPrediction(id)
+  const selectMatchup = (id: string | null) =>
+    wide ? selectWide('matchup', id) : s.selectMatchup(id)
+  // One left in the address on a phone (a link, or a window narrowed):
+  // it shows as its sheet there.
+  const sheetDetail = wide ? null : paneDetail
   // Only today's Timeline moves the Read Marker; browsing history must not,
   // nor a phone reading one Game.
   useReadMarkerWriter(timeline.items, viewer !== null && isToday && showScope)
@@ -265,23 +339,19 @@ function Timeline({
   )
   const [recapOpen, setRecapOpen] = useState(false)
 
-  // Escape closes the Game's pane beside the wide feed, unless a sheet is
-  // open (Escape is the sheet's then).
+  // Escape closes the pane beside the wide feed (a Game, a Prediction or a
+  // Matchup), unless a sheet is open (Escape is the sheet's then).
+  const paneOpen = Boolean(gameId || paneDetail)
   useEffect(() => {
-    if (!gameId || !wide) return
+    if (!paneOpen || !wide) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return
       if (document.querySelector('[role="dialog"]')) return
-      void navigate({
-        to: '/',
-        search: (prev) => ({ ...prev, game: undefined }),
-        viewTransition: true,
-        resetScroll: false,
-      })
+      showDetail(null)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [gameId, wide, navigate])
+  }, [paneOpen, wide, showDetail])
 
   const feedFooter = (
     <FeedFooter
@@ -323,8 +393,10 @@ function Timeline({
         previousGames={timeline.previousGames}
         items={timeline.items}
         onBox={() => setBoxOpen(true)}
-        onPrediction={setPredictionOpen}
-        onMatchup={(id, other) => setMatchupOpen({ id, other })}
+        onPrediction={openPrediction}
+        onMatchup={openMatchup}
+        onSelectPrediction={selectPrediction}
+        onSelectMatchup={selectMatchup}
       />
 
       {/* Tags plays by either side's Starters, in the Fantasy view. */}
@@ -397,29 +469,49 @@ function Timeline({
             feedError={Boolean(timeline.error)}
             onFeedRetry={() => void timeline.reload()}
           />
+        ) : paneDetail && wide ? (
+          <TimelineDetailPane
+            // A new subject is a new pane: its scroll starts at the top.
+            key={detail}
+            detail={paneDetail}
+            scope={s}
+            games={timeline.games}
+          />
         ) : (
-          wide && <PanePlaceholder />
+          wide && <PanePlaceholder scope={scope} />
         )}
       </FantasyTagsProvider>
 
       <TimelineSheets
         playId={playId}
         onPlayClose={closePlay}
-        matchup={
-          matchupOpen
-            ? (s.fantasyLeagues.find((l) => l.id === matchupOpen.id) ?? null)
-            : null
-        }
-        otherMatchup={matchupOpen?.other}
+        {...(matchupOpen
+          ? {
+              matchup: findLeague(s, matchupOpen.id),
+              otherMatchup: matchupOpen.other,
+              onMatchupClose: () => setMatchupOpen(null),
+            }
+          : sheetDetail?.kind === 'matchup'
+            ? {
+                matchup: findLeague(s, sheetDetail.leagueId),
+                otherMatchup: findOther(s, sheetDetail),
+                onMatchupClose: () => showDetail(null),
+              }
+            : { matchup: null, onMatchupClose: noop })}
         games={timeline.games}
-        onMatchupClose={() => setMatchupOpen(null)}
-        prediction={
-          predictionOpen
-            ? (s.predictionList.data?.find((x) => x.id === predictionOpen) ??
-              null)
-            : null
-        }
-        onPredictionClose={() => setPredictionOpen(null)}
+        {...(predictionOpen
+          ? {
+              prediction: findPrediction(s, predictionOpen),
+              onPredictionClose: () => setPredictionOpen(null),
+            }
+          : sheetDetail?.kind === 'prediction'
+            ? {
+                prediction: findPrediction(s, sheetDetail.id),
+                onPredictionClose: () => showDetail(null),
+                // Its links replace `detail` themselves.
+                onPredictionNavigate: noop,
+              }
+            : { prediction: null, onPredictionClose: noop })}
         recap={recapOpen ? recap : null}
         onRecapClose={() => setRecapOpen(false)}
         live={liveOpen && scopeTyping.length > 1 ? scopeTyping : null}
@@ -448,18 +540,86 @@ function typingRows(
   })
 }
 
+function noop() {}
+
+function findPrediction(s: TimelineScopeState, id: string) {
+  return s.predictionList.data?.find((p) => p.id === id) ?? null
+}
+
+function findLeague(s: TimelineScopeState, id: string) {
+  return s.fantasyLeagues.find((l) => l.id === id) ?? null
+}
+
+/** Another Matchup in the league, by its first team (or the Viewer's: none). */
+function findOther(
+  s: TimelineScopeState,
+  d: Extract<PaneDetail, { kind: 'matchup' }>,
+): LeagueMatchup | undefined {
+  if (d.teamId === undefined) return undefined
+  return findLeague(s, d.leagueId)?.matchup?.others?.find(
+    (o) => o.left.teamId === d.teamId,
+  )
+}
+
 /**
- * Beside the wide feed with no Game open: where a Game will show. It keeps
- * the feed in the column it stays in when one opens.
+ * A Prediction or Matchup beside the wide feed: its sheet's content in
+ * the pane. Its Game links swap the pane to that Game (they set `game`
+ * and drop `detail`); a Play or Player still opens as its sheet.
  */
-function PanePlaceholder() {
+function TimelineDetailPane({
+  detail,
+  scope: s,
+  games,
+}: {
+  detail: PaneDetail
+  scope: TimelineScopeState
+  games: Array<GameSummary>
+}) {
+  if (detail.kind === 'prediction') {
+    const prediction = findPrediction(s, detail.id)
+    if (!prediction)
+      return (
+        <DetailPaneMissing kind="prediction" loading={s.predictionsLoading} />
+      )
+    return (
+      <PredictionDetail
+        prediction={prediction}
+        onNavigate={noop}
+        frame={(parts) => <DetailPane kind="prediction" {...parts} />}
+      />
+    )
+  }
+  const league = findLeague(s, detail.leagueId)
+  const other = findOther(s, detail)
+  if (!league || (detail.teamId !== undefined && !other))
+    return <DetailPaneMissing kind="matchup" loading={s.fantasyLoading} />
+  return (
+    <MatchupDetail
+      league={league}
+      other={other}
+      games={games}
+      frame={(parts) => <DetailPane kind="matchup" {...parts} />}
+    />
+  )
+}
+
+/**
+ * Beside the wide feed with nothing open: where a Game (or a Prediction,
+ * or a Matchup) will show. It keeps the feed in the column it stays in
+ * when one opens.
+ */
+function PanePlaceholder({ scope }: { scope: Scope }) {
   return (
     <div
       aria-hidden="true"
       className="sticky top-0 hidden h-dvh items-center justify-center border-l border-border px-6 lg:flex"
     >
       <p className="max-w-60 text-center text-sm text-muted">
-        Pick a game from the strip or the feed to follow it here.
+        {scope === 'predictions'
+          ? 'Pick a Prediction’s details, or a game, to see it in full here.'
+          : scope === 'fantasy'
+            ? 'Pick a Matchup’s details, or a game, to see it in full here.'
+            : 'Pick a game from the strip or the feed to follow it here.'}
       </p>
     </div>
   )

@@ -56,6 +56,23 @@ function trapTab(e: KeyboardEvent, node: HTMLElement) {
 }
 
 /**
+ * What a sheet's content brings besides itself: its title, a quiet action
+ * beside it, the Subject it wears, and what stays pinned under the title.
+ * Content that shows both as a sheet and elsewhere (the wide Timeline's
+ * pane) hands these to whichever frame holds it.
+ */
+export interface SheetParts {
+  title: string
+  action?: React.ReactNode
+  subject?: Subject | null
+  pinned?: React.ReactNode
+  children: React.ReactNode
+}
+
+/** Lays out content's SheetParts: a Sheet, or the wide Timeline's pane. */
+export type SheetFrame = (parts: SheetParts) => React.ReactNode
+
+/**
  * A bottom sheet over the Timeline (box score, Play Detail), so drilling
  * in never leaves the conversation: closing lands exactly where you were.
  * Swipe it down (from the handle or header, or from the content when it is

@@ -51,6 +51,8 @@ export function TimelineTop({
   onBox,
   onPrediction,
   onMatchup,
+  onSelectPrediction,
+  onSelectMatchup,
 }: {
   topRef: React.Ref<HTMLDivElement>
   scope: TimelineScopeState
@@ -71,9 +73,14 @@ export function TimelineTop({
   previousGames: Array<GameSummary>
   items: ReadonlyArray<TimelineItem>
   onBox: () => void
+  /** Open a Prediction in full (a sheet, or the wide Timeline's pane). */
   onPrediction: (id: string) => void
-  /** Open a league's sheet: the Viewer's Matchup, or another in it. */
+  /** Open a league's Matchup in full: the Viewer's, or another in it. */
   onMatchup: (id: string, other?: LeagueMatchup) => void
+  /** Narrow the Timeline to one Prediction (a card tapped), or clear it. */
+  onSelectPrediction: (id: string | null) => void
+  /** Narrow the Timeline to one Matchup, or clear it. */
+  onSelectMatchup: (id: string | null) => void
 }) {
   const display = s.kalshi.data?.changeDisplay
   return (
@@ -142,7 +149,7 @@ export function TimelineTop({
                 <FantasyStrip
                   leagues={s.fantasyLeagues}
                   selected={s.selectedMatchup?.id}
-                  onSelect={s.selectMatchup}
+                  onSelect={onSelectMatchup}
                   onDetails={onMatchup}
                 />
               ) : s.scope === 'predictions' && !gameId ? (
@@ -151,7 +158,7 @@ export function TimelineTop({
                   <PredictionStrip
                     predictions={s.openPredictions}
                     selected={s.selectedPrediction?.id}
-                    onSelect={s.selectPrediction}
+                    onSelect={onSelectPrediction}
                     onDetails={onPrediction}
                     display={display}
                   />
@@ -185,7 +192,7 @@ export function TimelineTop({
                       predictions={s.openPredictions.filter((p) =>
                         p.legs.some((l) => l.game?.id === gameId),
                       )}
-                      onSelect={s.selectPrediction}
+                      onSelect={onSelectPrediction}
                       onDetails={onPrediction}
                       display={display}
                     />
