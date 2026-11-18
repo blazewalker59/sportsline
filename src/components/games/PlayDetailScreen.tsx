@@ -9,6 +9,8 @@ import { PlayText } from '@/components/chat/PlayText'
 import { FollowButton } from '@/components/follows/FollowButton'
 import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
 import { AppHeader } from '@/components/layout/AppHeader'
+import { InlineError } from '@/components/layout/RouteStates'
+import { CardSkeleton } from '@/components/layout/Skeleton'
 import { Bases } from '@/components/mlb/Bases'
 import { StrikeZone, pitchColor } from '@/components/mlb/StrikeZone'
 import { Rink } from '@/components/nhl/Rink'
@@ -197,7 +199,8 @@ export function PlaySheet({
   playId: string
   onClose: () => void
 }) {
-  const { data, isPending } = useQuery(playDetailQuery(playId))
+  const query = useQuery(playDetailQuery(playId))
+  const { data, isPending } = query
   const item = data?.item
   const acting = item?.side
     ? item.side === 'home'
@@ -207,7 +210,14 @@ export function PlaySheet({
   return (
     <Sheet title="Play" subject={teamSubject(acting?.colors)} onClose={onClose}>
       {isPending ? (
-        <p className="py-10 text-center text-sm text-muted">Loading…</p>
+        <CardSkeleton />
+      ) : query.isError && data === undefined ? (
+        <InlineError
+          what="this play"
+          error={query.error}
+          onRetry={() => query.refetch()}
+          className="my-6"
+        />
       ) : !data ? (
         <p className="py-10 text-center text-sm text-muted">Play not found.</p>
       ) : (

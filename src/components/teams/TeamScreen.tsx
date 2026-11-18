@@ -10,6 +10,11 @@ import { useState } from 'react'
 import type { RosterPlayer, TeamGame, TeamPage } from '@/lib/teams/server'
 import { TeamResults } from '@/components/charts/lazy'
 import { AppHeader } from '@/components/layout/AppHeader'
+import { NotFoundState, ScreenError } from '@/components/layout/RouteStates'
+import {
+  DetailHeaderSkeleton,
+  RowsSkeleton,
+} from '@/components/layout/Skeleton'
 import { SubjectPage } from '@/components/brand/SubjectPage'
 import { teamSubject } from '@/lib/brand/subject'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
@@ -41,9 +46,15 @@ export function TeamScreen({ teamId }: { teamId: string }) {
     <div className="mx-auto max-w-xl px-4 pb-16">
       <AppHeader />
       {page.isPending ? (
-        <p className="mt-16 text-center text-sm text-muted">Loading…</p>
+        <>
+          <DetailHeaderSkeleton className="mt-2 mb-6" />
+          <RowsSkeleton />
+        </>
+      ) : page.isError && data === undefined ? (
+        // Failed with nothing to show: not the same as no such Team.
+        <ScreenError error={page.error} onRetry={() => page.refetch()} />
       ) : !data ? (
-        <p className="mt-16 text-center text-sm text-muted">Team not found.</p>
+        <NotFoundState what="team" />
       ) : (
         <SubjectPage subject={teamSubject(data.team.colors)}>
           <TeamHeader page={data} canFollow={Boolean(viewerState?.viewer)} />

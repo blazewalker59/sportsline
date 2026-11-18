@@ -7,6 +7,8 @@ import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useCallback, useEffect } from 'react'
 import type { MyReaction } from '@/lib/reactions/server'
 import { AppHeader } from '@/components/layout/AppHeader'
+import { ScreenError } from '@/components/layout/RouteStates'
+import { BubblesSkeleton } from '@/components/layout/Skeleton'
 import {
   LeagueAvatar,
   PlayBubble,
@@ -54,7 +56,9 @@ export function ReactionsScreen({ playId }: { playId: string | null }) {
           Sign in to keep your Reactions.
         </p>
       ) : query.isPending ? (
-        <p className="mt-16 text-center text-sm text-muted">Loading…</p>
+        <BubblesSkeleton label="Loading Reactions" />
+      ) : query.isError && query.data === undefined ? (
+        <ScreenError error={query.error} onRetry={() => query.refetch()} />
       ) : reactions.length === 0 ? (
         <p className="mt-16 text-center text-sm text-muted">
           Long-press any Play on the Timeline to react. Your Reactions collect

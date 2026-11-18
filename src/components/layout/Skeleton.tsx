@@ -21,6 +21,18 @@ export function Skeleton({ className }: { className?: string }) {
   )
 }
 
+/**
+ * One "Loading" status around blocks laid out by hand, for a screen whose
+ * shape none of the ready-made skeletons below matches.
+ */
+export function SkeletonStatus(props: {
+  label?: string
+  className?: string
+  children: React.ReactNode
+}) {
+  return <Loading label="Loading" {...props} />
+}
+
 function Loading({
   label,
   className,
@@ -75,6 +87,41 @@ export function RowsSkeleton({
             <Skeleton className="h-3 w-2/5" />
           </div>
           <Skeleton className="h-3 w-10 shrink-0" />
+        </div>
+      ))}
+    </Loading>
+  )
+}
+
+/**
+ * Plays as chat bubbles, like the Timeline, a Player's plays or Reactions:
+ * a team avatar at the foot of each, a caption line, then the bubble.
+ */
+export function BubblesSkeleton({
+  rows = 4,
+  label = 'Loading',
+  className,
+}: {
+  rows?: number
+  label?: string
+  className?: string
+}) {
+  // Bubbles of a few sizes, so it reads as a conversation, not a grid.
+  const shapes = ['h-16 w-4/5', 'h-11 w-3/5', 'h-20 w-11/12', 'h-11 w-2/3']
+  return (
+    <Loading label={label} className={cn('flex flex-col gap-3', className)}>
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} data-skeleton-row="" className="flex items-end gap-2">
+          <Skeleton className="size-8 shrink-0 rounded-full" />
+          <div className="flex max-w-[300px] min-w-0 flex-1 flex-col gap-1">
+            <Skeleton className="mx-1 h-3 w-28" />
+            <Skeleton
+              className={cn(
+                'rounded-sheet rounded-bl-control',
+                shapes[i % shapes.length],
+              )}
+            />
+          </div>
         </div>
       ))}
     </Loading>

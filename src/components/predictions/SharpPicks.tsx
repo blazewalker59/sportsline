@@ -22,6 +22,7 @@ import { formatPrice } from '@/lib/model/price'
 import { usePriceDisplay } from '@/lib/viewer/useViewer'
 import { useStoredValue } from '@/lib/useStoredValue'
 import { StatGrid, StatTile } from '@/components/layout/StatTile'
+import { InlineError } from '@/components/layout/RouteStates'
 import { cn } from '@/lib/utils'
 import { clockTime, shortDay } from '@/lib/time/format'
 import { useTimeZone } from '@/lib/time/useTimeZone'
@@ -181,7 +182,13 @@ export function SharpPicksSection() {
         </button>
       </div>
       {explain && <Explainer />}
-      {!data ? (
+      {!data && slate.isError ? (
+        <InlineError
+          what="today’s Sharp picks"
+          error={slate.error}
+          onRetry={() => slate.refetch()}
+        />
+      ) : !data ? (
         <p className="rounded-card border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
           The first slate comes out at 10am Eastern.
         </p>

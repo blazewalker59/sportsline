@@ -12,6 +12,8 @@ import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import { gamesQuery } from '@/lib/timeline/queries'
 import { useToday } from '@/lib/timeline/useToday'
 import { AppHeader } from '@/components/layout/AppHeader'
+import { InlineError, ScreenError } from '@/components/layout/RouteStates'
+import { CardSkeleton, RowsSkeleton } from '@/components/layout/Skeleton'
 import { GRIP_DOTS, useDragReorder } from '@/components/layout/useDragReorder'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { timeAgo, useNow } from '@/components/timeline/format'
@@ -38,14 +40,31 @@ import { cn } from '@/lib/utils'
 export function FantasyScreen() {
   const { data: viewerState, isPending } = useViewer()
   const { connected, pending } = useFantasyConnected()
+  // The same cached reads, for whether either failed.
+  const espn = useEspnConnection()
+  const sleeper = useSleeperConnection()
+  const failed = [espn, sleeper].filter(
+    (q) => q.isError && q.data === undefined,
+  )
   return (
     <div className="mx-auto max-w-xl px-4 pb-16">
       <AppHeader />
       <h1 className="mb-4 text-xl font-bold tracking-tight">Fantasy</h1>
-      {isPending || pending ? null : !viewerState?.viewer ? (
+      {isPending ? null : !viewerState?.viewer ? (
         <p className="mt-16 text-center text-sm text-muted">
           Sign in to connect your fantasy leagues.
         </p>
+      ) : failed.length > 0 ? (
+        // Not knowing isn't the same as not connected: no Connect buttons.
+        <ScreenError
+          error={failed[0].error}
+          onRetry={() => Promise.all(failed.map((q) => q.refetch()))}
+        />
+      ) : pending ? (
+        <div className="flex flex-col gap-6">
+          <RowsSkeleton rows={2} label="Loading your connections" />
+          <CardSkeleton />
+        </div>
       ) : (
         <div className="flex flex-col gap-6">
           {!connected && (
@@ -417,7 +436,16 @@ function Leagues() {
           Your leagues
         </h2>
         {fantasy.isPending ? (
-          <p className="text-sm text-muted">Loading…</p>
+          <div className="flex flex-col gap-2">
+            <CardSkeleton label="Loading your leagues" />
+            <CardSkeleton label="Loading your leagues" />
+          </div>
+        ) : fantasy.isError && fantasy.data === undefined ? (
+          <InlineError
+            what="your leagues"
+            error={fantasy.error}
+            onRetry={() => fantasy.refetch()}
+          />
         ) : leagues.length === 0 ? (
           <p className="text-sm text-muted">
             No leagues found yet. Add one by its URL below, or sync again.

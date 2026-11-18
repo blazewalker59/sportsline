@@ -25,6 +25,16 @@ import type { LeagueMatchup, LeagueMatchupSide } from '@/lib/fantasy/matchup'
 import type { FantasyMove } from '@/lib/fantasy/moves'
 import type { Standings } from '@/lib/fantasy/standings'
 import { AppHeader } from '@/components/layout/AppHeader'
+import {
+  InlineError,
+  NotFoundState,
+  ScreenError,
+} from '@/components/layout/RouteStates'
+import {
+  RowsSkeleton,
+  Skeleton,
+  SkeletonStatus,
+} from '@/components/layout/Skeleton'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import {
   availablePlayersQuery,
@@ -79,11 +89,12 @@ export function LeagueScreen({ leagueId }: { leagueId: string }) {
           Sign in to see your fantasy leagues.
         </p>
       ) : page.isPending ? (
-        <p className="mt-16 text-center text-sm text-muted">Loading…</p>
+        <LeagueSkeleton />
+      ) : page.isError && page.data === undefined ? (
+        // Failed with nothing to show: not the same as no such league.
+        <ScreenError error={page.error} onRetry={() => page.refetch()} />
       ) : !league ? (
-        <p className="mt-16 text-center text-sm text-muted">
-          League not found.
-        </p>
+        <NotFoundState what="fantasy league" />
       ) : (
         <div className="flex flex-col gap-6">
           <header className="flex items-center gap-3">
@@ -170,6 +181,35 @@ export function LeagueScreen({ leagueId }: { leagueId: string }) {
   )
 }
 
+/** The league page's shape while it loads: header, tabs, the Matchups. */
+function LeagueSkeleton() {
+  return (
+    <SkeletonStatus className="flex flex-col gap-6">
+      <div className="flex items-center gap-3">
+        <Skeleton className="size-7 shrink-0 rounded-full" />
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <Skeleton className="h-6 w-3/5" />
+          <Skeleton className="h-3 w-2/5" />
+        </div>
+      </div>
+      <div className="-mt-2 flex gap-5 border-b border-border pb-3">
+        {TABS.map((t) => (
+          <Skeleton key={t.key} className="h-4 w-16" />
+        ))}
+      </div>
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-3 w-24" />
+        <div className="grid grid-cols-2 gap-2">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-16 rounded-card" />
+          ))}
+        </div>
+      </div>
+      <Skeleton className="h-40 rounded-card" />
+    </SkeletonStatus>
+  )
+}
+
 /**
  * The Standings, and in a football points league a choice of its
  * What-if standings, read when chosen.
@@ -207,8 +247,12 @@ function StandingsTab({
       {view === 'whatIf' ? (
         whatIf.isPending ? (
           <p className="text-sm text-muted">Reading past weeks…</p>
-        ) : whatIf.isError ? (
-          <p className="text-sm text-live">{whatIf.error.message}</p>
+        ) : whatIf.isError && whatIf.data === undefined ? (
+          <InlineError
+            what="the What-if standings"
+            error={whatIf.error}
+            onRetry={() => whatIf.refetch()}
+          />
         ) : whatIf.data ? (
           <WhatIfTable
             whatIf={whatIf.data}
@@ -257,9 +301,13 @@ function PlayersTab({ league }: { league: FantasyLeagueView }) {
         />
       )}
       {available.isPending ? (
-        <p className="text-sm text-muted">Loading available players…</p>
-      ) : available.isError ? (
-        <p className="text-sm text-live">{available.error.message}</p>
+        <RowsSkeleton rows={6} label="Loading available players" />
+      ) : available.isError && available.data === undefined ? (
+        <InlineError
+          what="available players"
+          error={available.error}
+          onRetry={() => available.refetch()}
+        />
       ) : !available.data ? (
         <p className="text-sm text-muted">League not found.</p>
       ) : (
@@ -360,9 +408,15 @@ function ActivityTab({ league }: { league: FantasyLeagueView }) {
   const activity = useQuery(leagueActivityQuery(league.id))
   const timeZone = useTimeZone()
   if (activity.isPending)
-    return <p className="text-sm text-muted">Loading activity…</p>
-  if (activity.isError)
-    return <p className="text-sm text-live">{activity.error.message}</p>
+    return <RowsSkeleton rows={4} label="Loading activity" />
+  if (activity.isError && activity.data === undefined)
+    return (
+      <InlineError
+        what="the league’s activity"
+        error={activity.error}
+        onRetry={() => activity.refetch()}
+      />
+    )
   if (!activity.data)
     return <p className="text-sm text-muted">League not found.</p>
   return (

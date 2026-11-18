@@ -10,6 +10,8 @@ import { Pending, Trading } from './AgentTrading'
 import { money } from './shared'
 import type { BetRecordView } from '@/lib/agents/server'
 import { AppHeader } from '@/components/layout/AppHeader'
+import { InlineError } from '@/components/layout/RouteStates'
+import { CardSkeleton } from '@/components/layout/Skeleton'
 import { StatGrid, StatTile } from '@/components/layout/StatTile'
 import { PriceDisplayToggle } from '@/components/predictions/PriceDisplayToggle'
 import { timeAgo, useNow } from '@/components/timeline/format'
@@ -49,7 +51,17 @@ function Signed() {
       <PriceDisplayToggle />
       {pending && pending.length > 0 && <Pending trades={pending} />}
       <Tokens tradingReady={Boolean(trading.data?.key)} />
-      {trading.data && <Trading state={trading.data} />}
+      {trading.data ? (
+        <Trading state={trading.data} />
+      ) : trading.isError ? (
+        <InlineError
+          what="trading"
+          error={trading.error}
+          onRetry={() => trading.refetch()}
+        />
+      ) : (
+        <CardSkeleton label="Loading trading" />
+      )}
       <BetRecord />
     </div>
   )
@@ -62,6 +74,15 @@ function BetRecord() {
   const record = useBetRecord()
   const now = useNow()
   const data: BetRecordView | undefined = record.data
+  if (!data && record.isError)
+    return (
+      <InlineError
+        what="the trend picks agents asked for"
+        error={record.error}
+        onRetry={() => record.refetch()}
+      />
+    )
+  // Nothing to hold room for while it loads: it shows only once used.
   if (!data || data.stats.requests === 0) return null
   const s = data.stats
   const tile = (label: string, value: string) => (

@@ -29,6 +29,8 @@ import type {
 import type { GameSummary } from '@/lib/model/timeline'
 import { MatchupRace } from '@/components/charts/lazy'
 import { Sheet } from '@/components/chat/Sheet'
+import { InlineError } from '@/components/layout/RouteStates'
+import { RowsSkeleton } from '@/components/layout/Skeleton'
 import {
   leagueMatchupQuery,
   matchupDayQuery,
@@ -233,19 +235,32 @@ export function MatchupSheet({
           other === undefined && <MatchupRace leagueId={league.id} m={m} />
         )}
         {reading ? (
-          <p className="rounded-card border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
-            {read.isError
-              ? read.error.message
-              : read.isSuccess
-                ? 'This matchup isn’t in the league’s schedule any more.'
-                : 'Loading lineups…'}
-          </p>
+          read.isError ? (
+            <InlineError
+              what="this matchup"
+              error={read.error}
+              onRetry={() => read.refetch()}
+            />
+          ) : read.isSuccess ? (
+            <p className="rounded-card border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
+              This matchup isn’t in the league’s schedule any more.
+            </p>
+          ) : (
+            <RowsSkeleton rows={9} label="Loading lineups" />
+          )
         ) : !today && !summary && !past.data ? (
-          <p className="rounded-card border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
-            {past.isError
-              ? 'Couldn’t read that day from ESPN.'
-              : `Loading ${label === 'Yesterday' || label === 'Tomorrow' ? label.toLowerCase() : label}’s lineups…`}
-          </p>
+          past.isError ? (
+            <InlineError
+              what="that day’s lineups"
+              error={past.error}
+              onRetry={() => past.refetch()}
+            />
+          ) : (
+            <RowsSkeleton
+              rows={9}
+              label={`Loading ${label === 'Yesterday' || label === 'Tomorrow' ? label.toLowerCase() : label}’s lineups`}
+            />
+          )
         ) : m.categories ? (
           <CategoryLineup
             sport={m.sport}

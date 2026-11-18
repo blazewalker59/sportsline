@@ -12,6 +12,7 @@ import type { GameSummary } from '@/lib/model/timeline'
 import type { CatchUp } from '@/lib/timeline/catchup'
 import { SharpPicksBanner } from '@/components/predictions/SharpPicks'
 import { Notice, ReadDivider } from '@/components/chat/ChatParts'
+import { BubblesSkeleton } from '@/components/layout/Skeleton'
 import { vtName } from '@/lib/timeline/gameLink'
 import { cn } from '@/lib/utils'
 
@@ -108,6 +109,7 @@ export function FeedFooter({
   error,
   onRetry,
   empty,
+  loading = false,
   emptyText,
   hasMore,
   loadingMore,
@@ -117,6 +119,8 @@ export function FeedFooter({
   onRetry: () => void
   /** Nothing to show (no plays, nothing live). */
   empty: boolean
+  /** Nothing yet because it's still loading: bubbles, not the empty text. */
+  loading?: boolean
   emptyText: string
   /** More plays to page in (never inside one Game). */
   hasMore: boolean
@@ -141,7 +145,11 @@ export function FeedFooter({
         </div>
       )}
 
-      {!error && empty && (
+      {!error && empty && loading && (
+        <BubblesSkeleton label="Loading plays" className="mt-3" />
+      )}
+
+      {!error && empty && !loading && (
         <p className="mt-16 text-center text-sm text-muted">{emptyText}</p>
       )}
 

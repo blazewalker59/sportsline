@@ -3,11 +3,18 @@
  * each source's Alert level: Following, Predictions, Fantasy.
  */
 
+import { useQuery } from '@tanstack/react-query'
 import type { AlertLevels } from '@/lib/push/alerts'
 import { AppHeader } from '@/components/layout/AppHeader'
+import { InlineError } from '@/components/layout/RouteStates'
+import { RowsSkeleton } from '@/components/layout/Skeleton'
 import { useFantasyConnected } from '@/lib/fantasy/useFantasy'
 import { useKalshiConnection } from '@/lib/kalshi/usePredictions'
-import { useAlertLevels, useAlerts } from '@/lib/push/useAlerts'
+import {
+  alertLevelsQuery,
+  useAlertLevels,
+  useAlerts,
+} from '@/lib/push/useAlerts'
 import { useViewer } from '@/lib/viewer/useViewer'
 import { cn } from '@/lib/utils'
 
@@ -161,9 +168,28 @@ const CHOICES: { [K in keyof AlertLevels]: ReadonlyArray<Choice<K>> } = {
 function Levels() {
   const { state } = useAlerts()
   const { levels, set } = useAlertLevels(true)
+  // The same cached read, for whether it's still loading or failed.
+  const read = useQuery(alertLevelsQuery())
   const kalshi = useKalshiConnection()
   const fantasy = useFantasyConnected()
-  if (!levels) return null
+  if (!levels) {
+    if (read.isError)
+      return (
+        <InlineError
+          what="your Alert choices"
+          error={read.error}
+          onRetry={() => read.refetch()}
+        />
+      )
+    // Where the first section's choices will be, under its heading's room.
+    return (
+      <RowsSkeleton
+        rows={3}
+        label="Loading your Alert choices"
+        className="mt-6"
+      />
+    )
+  }
   const sections: ReadonlyArray<readonly [keyof AlertLevels, string]> = [
     ['following', 'Following'],
     ...(kalshi.data ? [['predictions', 'Predictions'] as const] : []),

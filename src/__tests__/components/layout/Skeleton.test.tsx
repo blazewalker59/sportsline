@@ -2,10 +2,12 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  BubblesSkeleton,
   CardSkeleton,
   DetailHeaderSkeleton,
   RowsSkeleton,
   Skeleton,
+  SkeletonStatus,
 } from '@/components/layout/Skeleton'
 
 afterEach(cleanup)
@@ -29,6 +31,15 @@ describe.each([
   ['RowsSkeleton', () => <RowsSkeleton />],
   ['CardSkeleton', () => <CardSkeleton />],
   ['DetailHeaderSkeleton', () => <DetailHeaderSkeleton />],
+  ['BubblesSkeleton', () => <BubblesSkeleton />],
+  [
+    'SkeletonStatus',
+    () => (
+      <SkeletonStatus>
+        <Skeleton className="h-6 w-20" />
+      </SkeletonStatus>
+    ),
+  ],
 ])('%s', (_, make) => {
   it('is one labelled loading status, its blocks hidden from assistive tech', () => {
     render(make())
@@ -40,6 +51,16 @@ describe.each([
     expect(blocks(status).every((b) => hidden!.contains(b))).toBe(true)
     for (const b of blocks(status))
       expect(b.className).toContain('motion-safe:animate-pulse')
+  })
+})
+
+describe('BubblesSkeleton', () => {
+  it('draws as many bubbles as asked, four by default, under its label', () => {
+    const { container, rerender } = render(<BubblesSkeleton />)
+    expect(container.querySelectorAll('[data-skeleton-row]')).toHaveLength(4)
+    rerender(<BubblesSkeleton rows={2} label="Loading plays" />)
+    expect(container.querySelectorAll('[data-skeleton-row]')).toHaveLength(2)
+    expect(screen.getByRole('status', { name: 'Loading plays' })).toBeTruthy()
   })
 })
 
