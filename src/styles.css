@@ -98,6 +98,28 @@
   --manager-6: #a16207;
   --manager-7: #15803d;
   --manager-8: #4f46e5;
+  /*
+    Glass, for the floating navigation (.glass-nav). The fill is opaque
+    enough that glass-ink-muted keeps 4.5:1 even over solid black (this
+    fill over #000 is #b4b4b6: 4.7:1), so labels read over any team color.
+  */
+  --glass-fill: rgb(250 251 253 / 0.72);
+  --glass-sheen: rgb(255 255 255 / 0.5);
+  --glass-backdrop: blur(14px) saturate(190%) brightness(1.06);
+  --glass-solid: rgb(250 251 253 / 0.96);
+  --glass-highlight: rgb(255 255 255 / 0.95);
+  --glass-lowlight: rgb(255 255 255 / 0.45);
+  --glass-border: rgb(21 23 29 / 0.12);
+  --glass-shadow:
+    0 10px 30px -8px rgb(21 23 29 / 0.28), 0 2px 8px -2px rgb(21 23 29 / 0.1);
+  --glass-ink: #15171d;
+  --glass-ink-muted: #3f4350;
+  --glass-hover: rgb(21 23 29 / 0.05);
+  --glass-lozenge: rgb(255 255 255 / 0.88);
+  --glass-lozenge-edge: rgb(21 23 29 / 0.08);
+  --glass-lozenge-shadow: 0 1px 4px rgb(21 23 29 / 0.14);
+  /* The active icon's section color, pulled toward ink for 3:1 on glass. */
+  --glass-tone-strength: 80%;
 }
 
 .dark {
@@ -140,6 +162,26 @@
   --manager-6: #e8b53a;
   --manager-7: #4ade80;
   --manager-8: #8f94ff;
+  /*
+    Dark glass: a deeper fill, and the backdrop dimmed, so a white logo
+    behind it still leaves glass-ink-muted at 4.5:1.
+  */
+  --glass-fill: rgb(30 33 42 / 0.74);
+  --glass-sheen: rgb(255 255 255 / 0.07);
+  --glass-backdrop: blur(14px) saturate(170%) brightness(0.7);
+  --glass-solid: rgb(24 27 35 / 0.97);
+  --glass-highlight: rgb(255 255 255 / 0.2);
+  --glass-lowlight: rgb(255 255 255 / 0.06);
+  --glass-border: rgb(0 0 0 / 0.55);
+  --glass-shadow:
+    0 12px 32px -8px rgb(0 0 0 / 0.7), 0 2px 8px -2px rgb(0 0 0 / 0.4);
+  --glass-ink: #f4f5f9;
+  --glass-ink-muted: #d3d6df;
+  --glass-hover: rgb(255 255 255 / 0.06);
+  --glass-lozenge: rgb(255 255 255 / 0.09);
+  --glass-lozenge-edge: rgb(255 255 255 / 0.14);
+  --glass-lozenge-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+  --glass-tone-strength: 75%;
 }
 
 @theme inline {
@@ -174,6 +216,9 @@
   --color-slot-6: var(--slot-6);
   --color-slot-7: var(--slot-7);
   --color-slot-8: var(--slot-8);
+  --color-glass-ink: var(--glass-ink);
+  --color-glass-ink-muted: var(--glass-ink-muted);
+  --color-glass-hover: var(--glass-hover);
   --font-sans: 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
 }
 
@@ -187,6 +232,7 @@
   --radius-control: 0.375rem;
   --radius-card: 0.75rem;
   --radius-sheet: 1.25rem;
+  --radius-glass: 1.75rem; /* the navigation's floating rail */
 }
 
 body {
@@ -218,6 +264,182 @@ textarea,
   :focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
+  }
+}
+
+/*
+  The navigation's glass (layout/AppNav.tsx): a floating sheet the screen
+  scrolls beneath. A tinted fill over a blurred, saturated backdrop; a
+  sheen across its top; a rim brighter on the top-leading edge than the
+  opposite one; a hairline and a soft shadow lifting it off the page. The
+  active tab sits on a lozenge of brighter glass that slides between tabs.
+  No refraction filter: Safari (the installed app) cannot use one in
+  backdrop-filter, and Chrome would re-run it on every scrolled frame.
+*/
+.glass-nav {
+  background:
+    linear-gradient(to bottom, var(--glass-sheen), transparent 2rem),
+    var(--glass-fill);
+  -webkit-backdrop-filter: var(--glass-backdrop);
+  backdrop-filter: var(--glass-backdrop);
+  box-shadow:
+    0 0 0 0.5px var(--glass-border),
+    var(--glass-shadow);
+}
+.glass-nav::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    160deg,
+    var(--glass-highlight),
+    transparent 35%,
+    transparent 65%,
+    var(--glass-lowlight)
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+
+/* The active tab's lozenge: a quarter of the bar, a row of the rail. */
+.glass-nav-lozenge {
+  position: absolute;
+  top: 0.25rem;
+  bottom: 0.25rem;
+  left: 0.25rem;
+  width: calc((100% - 0.5rem) / 4);
+  border-radius: 9999px;
+  background:
+    linear-gradient(to bottom, var(--glass-sheen), transparent 70%),
+    var(--glass-lozenge);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    inset 0 0 0 0.5px var(--glass-lozenge-edge),
+    var(--glass-lozenge-shadow);
+  transform: translateX(calc(var(--i, 0) * 100%));
+  transition:
+    transform 460ms cubic-bezier(0.3, 1.3, 0.5, 1),
+    opacity 200ms ease;
+}
+.glass-nav-lozenge[data-active='-1'] {
+  opacity: 0;
+  transition: none;
+}
+@media (width >= 48rem) {
+  .glass-nav-lozenge {
+    top: 0;
+    bottom: auto;
+    left: 0.25rem;
+    right: 0.25rem;
+    width: auto;
+    height: 3.5rem;
+    border-radius: var(--radius-card);
+    transform: translateY(calc(var(--i, 0) * (100% + 0.25rem)));
+  }
+}
+@media (width >= 64rem) {
+  .glass-nav-lozenge {
+    left: 0.5rem;
+    right: 0.5rem;
+    height: 2.75rem;
+  }
+}
+
+.glass-nav-tab {
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 160ms ease,
+    background-color 160ms ease;
+}
+/* Press: the tab gives a little under the finger. */
+.glass-nav-tab:active {
+  transform: scale(0.92);
+}
+@media (hover: hover) {
+  .glass-nav-tab:not([data-status='active']):hover {
+    background-color: var(--glass-hover);
+  }
+}
+/* The focus ring inside the tab, so it reads on the glass, not the page. */
+.glass-nav-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.glass-nav-tab[data-status='active'] .glass-nav-icon {
+  color: color-mix(
+    in oklab,
+    var(--nav-tone) var(--glass-tone-strength),
+    var(--glass-ink)
+  );
+}
+
+/* No backdrop blur: a near-solid fill, so the labels still read. */
+@supports not (
+  (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+) {
+  .glass-nav {
+    background: var(--glass-solid);
+  }
+}
+
+/* Less transparency, or more contrast: solid, bordered, no glass. */
+@media (prefers-reduced-transparency: reduce) {
+  .glass-nav {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow:
+      0 0 0 1px var(--border),
+      var(--glass-shadow);
+  }
+  .glass-nav::before {
+    display: none;
+  }
+  .glass-nav-lozenge {
+    background: var(--background);
+    box-shadow: inset 0 0 0 1px var(--border);
+  }
+}
+@media (prefers-contrast: more) {
+  .glass-nav {
+    --glass-ink-muted: var(--foreground);
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: 0 0 0 1.5px var(--foreground);
+  }
+  .glass-nav::before {
+    display: none;
+  }
+  .glass-nav-lozenge {
+    background: var(--background);
+    box-shadow: inset 0 0 0 1.5px var(--foreground);
+  }
+}
+@media (forced-colors: active) {
+  .glass-nav {
+    border: 1px solid CanvasText;
+  }
+  .glass-nav-lozenge {
+    border: 2px solid Highlight;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-nav-lozenge,
+  .glass-nav-tab {
+    transition: none;
+  }
+  .glass-nav-tab:active {
+    transform: none;
   }
 }
 
