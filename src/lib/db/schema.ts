@@ -989,4 +989,9 @@ export const viewerSettings = sqliteTable('viewer_settings', {
     .$type<'cents' | 'multiplier'>()
     .notNull()
     .default('cents'),
+  /**
+   * When the Viewer finished or skipped the first-run Follow picker, or
+   * first followed anything; null while it's still to offer.
+   */
+  firstRunDoneAt: text('first_run_done_at'),
 })

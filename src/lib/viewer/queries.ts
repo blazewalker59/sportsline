@@ -4,9 +4,10 @@
  */
 
 import { queryOptions } from '@tanstack/react-query'
-import { getViewerState, searchFollowables } from './server'
+import { getViewerState, leagueFollowables, searchFollowables } from './server'
 import type { QueryClient } from '@tanstack/react-query'
 import type { ViewerState } from './server'
+import type { League } from '@/lib/model/types'
 
 export const VIEWER_KEY = ['viewer'] as const
 
@@ -39,5 +40,16 @@ export function followablesQuery(q: string) {
     queryFn: () => searchFollowables({ data: { q } }),
     enabled: q.length >= 2,
     staleTime: 5 * 60_000,
+  })
+}
+
+/** Every Team in these Leagues, for the first-run Follow picker. */
+export function leagueFollowablesQuery(leagues: ReadonlyArray<League>) {
+  const sorted = [...leagues].sort()
+  return queryOptions({
+    queryKey: ['followables', 'leagues', sorted] as const,
+    queryFn: () => leagueFollowables({ data: { leagues: sorted } }),
+    enabled: sorted.length > 0,
+    staleTime: 60 * 60_000,
   })
 }

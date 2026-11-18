@@ -239,6 +239,13 @@
       "when": 1793502411054,
       "tag": "0033_fantasy_who_has_opt_in",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1794971353603,
+      "tag": "0034_first_run",
+      "breakpoints": true
     }
   ]
 }
