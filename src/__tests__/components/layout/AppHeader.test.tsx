@@ -71,9 +71,9 @@ describe('AppHeader account menu', () => {
       a.textContent,
     ])
     expect(items.slice(0, 3)).toEqual([
-      ['/follows', 'FollowsTeams, Players and your League row'],
-      ['/predictions', 'PredictionsYour record and Kalshi connection'],
-      ['/fantasy', 'FantasyLeagues, standings and connections'],
+      ['/follows', 'FollowsTeams, Players, your League row'],
+      ['/predictions', 'PredictionsRecord and Kalshi connection'],
+      ['/fantasy', 'FantasyLeagues and connections'],
     ])
     // Under a heading that says what they're for.
     expect(menu.textContent).toContain('Manage')

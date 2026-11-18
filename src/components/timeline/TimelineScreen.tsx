@@ -478,7 +478,7 @@ function Timeline({
             games={timeline.games}
           />
         ) : (
-          wide && <PanePlaceholder scope={scope} />
+          wide && <PanePlaceholder scope={s.setup ? null : scope} />
         )}
       </FantasyTagsProvider>
 
@@ -608,19 +608,22 @@ function TimelineDetailPane({
  * or a Matchup) will show. It keeps the feed in the column it stays in
  * when one opens.
  */
-function PanePlaceholder({ scope }: { scope: Scope }) {
+function PanePlaceholder({ scope }: { scope: Scope | null }) {
   return (
     <div
       aria-hidden="true"
       className="sticky top-0 hidden h-dvh items-center justify-center border-l border-border px-6 lg:flex"
     >
-      <p className="max-w-60 text-center text-sm text-muted">
-        {scope === 'predictions'
-          ? 'Pick a Prediction’s details, or a game, to see it in full here.'
-          : scope === 'fantasy'
-            ? 'Pick a Matchup’s details, or a game, to see it in full here.'
-            : 'Pick a game from the strip or the feed to follow it here.'}
-      </p>
+      {/* Nothing to pick while the Scope is still to be set up. */}
+      {scope && (
+        <p className="max-w-60 text-center text-sm text-muted">
+          {scope === 'predictions'
+            ? 'Pick a Prediction, or a game, to see it in full here.'
+            : scope === 'fantasy'
+              ? 'Pick a Matchup, or a game, to see it in full here.'
+              : 'Pick a game from the strip or the feed to follow it here.'}
+        </p>
+      )}
     </div>
   )
 }

@@ -630,7 +630,7 @@ describe('TimelineScreen, wide: Predictions and Matchups in the pane', () => {
     await waitFor(() => expect(detailPane()).toBeNull())
     expect(search(router).detail).toBeUndefined()
     expect(scopeFeed()).toBeTruthy()
-    expect(screen.getByText(/Prediction’s details/)).toBeTruthy()
+    expect(screen.getByText(/Pick a Prediction, or a game/)).toBeTruthy()
   })
 
   it('Escape closes it, but not while a sheet is open', async () => {

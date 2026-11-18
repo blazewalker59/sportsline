@@ -36,7 +36,7 @@ export function DetailPane({
         ...subjectStyle(subject),
       }}
       className={cn(
-        'sticky top-0 hidden h-dvh flex-col border-l border-border pl-4 lg:flex',
+        'sticky top-0 hidden h-dvh min-w-0 flex-col border-l border-border px-4 lg:flex',
         subject && 'subject subject-crown',
         subject && isPair(subject) && 'subject-crown--split',
       )}

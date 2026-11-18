@@ -138,21 +138,21 @@ function AccountButton() {
                 to="/follows"
                 icon="follows"
                 label="Follows"
-                hint="Teams, Players and your League row"
+                hint="Teams, Players, your League row"
                 onPick={() => setOpen(false)}
               />
               <MenuItem
                 to="/predictions"
                 icon="predictions"
                 label="Predictions"
-                hint="Your record and Kalshi connection"
+                hint="Record and Kalshi connection"
                 onPick={() => setOpen(false)}
               />
               <MenuItem
                 to="/fantasy"
                 icon="fantasy"
                 label="Fantasy"
-                hint="Leagues, standings and connections"
+                hint="Leagues and connections"
                 onPick={() => setOpen(false)}
               />
             </MenuGroup>
