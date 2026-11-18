@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import * as z from 'zod/mini'
+import { RouteErrorPanel } from '@/components/layout/RouteStates'
 import { TimelineScreen } from '@/components/timeline/TimelineScreen'
 import { readStoredScope } from '@/components/timeline/timelineScope'
 import { gameDetailQuery } from '@/lib/games/queries'
@@ -77,4 +78,6 @@ export const Route = createFileRoute('/')({
       />
     )
   },
+  // The loader only warms the cache in the browser: no pendingComponent.
+  errorComponent: RouteErrorPanel,
 })

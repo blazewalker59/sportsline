@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import * as z from 'zod/mini'
+import { RouteErrorPanel } from '@/components/layout/RouteStates'
 import { ReactionsScreen } from '@/components/reactions/ReactionsScreen'
 
 export const Route = createFileRoute('/reactions')({
@@ -11,4 +12,5 @@ export const Route = createFileRoute('/reactions')({
     const { play } = Route.useSearch()
     return <ReactionsScreen playId={play ?? null} />
   },
+  errorComponent: RouteErrorPanel,
 })
