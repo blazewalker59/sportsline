@@ -13,11 +13,23 @@
   // observability, triggers, migrations, assets, and compatibility settings
   // are inherited from the top level.
   "name": "sportsline",
-  // The newest date the pinned workerd (local dev, tests, vite build)
-  // supports, so local runs behave like production. Raise it with wrangler.
+  // Kept at 2026-10-01, within what the pinned workerd (local dev, vite
+  // build, preview) supports, so local runs behave like production. Nothing
+  // defaults on between here and 2026-11-16; 2026-11-17 turns on
+  // new_module_registry, pipe_to_backward_propagation, enable_request_signal
+  // and cache_option_preserves_cache_control, each worth its own check.
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
   "main": "./src/server.ts",
+  // Upload the source map with every deploy, and fail the deploy if it can't
+  // be resolved. The deploy re-bundles dist/server/index.js with esbuild,
+  // which follows the maps `vite build` writes beside each server chunk
+  // (vite.config.ts), so the uploaded map points at src/ and node_modules.
+  // Cloudflare remaps uncaught exceptions in Workers Logs and Workers Issues.
+  // `error.stack` read inside the Worker (reportError, src/lib/ops/errors.ts)
+  // is not remapped, but keeps function and class names: wrangler's
+  // keep_names is on by default.
+  "upload_source_maps": true,
   "workers_dev": true,
   "observability": {
     "logs": {
@@ -70,6 +82,11 @@
   "env": {
     "production": {
       "name": "sportsline",
+      // Minify the deployed bundle. Set here, not at the top level: the Vite
+      // plugin, which reads the top level for dev and `vite build`, ignores
+      // `minify` and warns about it. The deploy re-bundles with wrangler,
+      // which applies it.
+      "minify": true,
       // Production is sportsline.dev (a Custom Domain, declared here so every
       // deploy keeps it, as dreamteam does). www and workers.dev stay on but
       // redirect to it (src/server.ts, CANONICAL_HOST). workers_dev is

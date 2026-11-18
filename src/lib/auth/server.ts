@@ -3,7 +3,10 @@
  * adapter on D1, plus a short-lived session cookie cache.
  */
 
-import { betterAuth } from 'better-auth'
+// The minimal build leaves out Kysely (over 500 KB of the Worker), which
+// Better Auth only needs for its built-in database dialects; the Drizzle
+// adapter talks to D1 itself.
+import { betterAuth } from 'better-auth/minimal'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { tanstackStartCookies } from 'better-auth/tanstack-start'
 import type { CloudflareEnv } from '@/lib/db'

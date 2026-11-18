@@ -43,7 +43,7 @@
     "zod": "^4.3.4"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.63.1",
+    "@cloudflare/vite-plugin": "1.70.0",
     "@cloudflare/workers-types": "^4.20260628.1",
     "@tanstack/devtools-vite": "^0.3.11",
     "@tanstack/eslint-config": "^0.4.0",
@@ -66,7 +66,7 @@
     "vite": "^7.1.0",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^4.1.0",
-    "wrangler": "4.149.0"
+    "wrangler": "4.163.0"
   },
   "trustedDependencies": [
     "unrs-resolver"
