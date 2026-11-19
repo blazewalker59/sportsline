@@ -24,7 +24,8 @@ import { DetailPane, DetailPaneMissing } from './DetailPane'
 import { TimelineSheets } from './TimelineSheets'
 import { TimelineTop } from './TimelineTop'
 import { ScopePager, pagerSummary } from './ScopePager'
-import { currentPageKey, pageSearch, scopePages } from './scopePages'
+import { currentPageKey, pageKey, pageSearch, scopePages } from './scopePages'
+import { ScopeListSheet } from './ScopeListSheet'
 import { useCompactTimeline } from './useCompactTimeline'
 import { useGoToScope, useLastLeague } from './scopeNav'
 import { ScopePrompt } from './ScopePrompt'
@@ -144,6 +145,8 @@ function Timeline({
     other?: LeagueMatchup
   } | null>(null)
   const [portfolioOpen, setPortfolioOpen] = useState(false)
+  // Every Game or Matchup the Scope bar pages through, as a sheet.
+  const [listOpen, setListOpen] = useState(false)
   const navigate = useNavigate()
   // The divider marks where the Viewer stopped last time, so it is fixed at
   // load while the stored marker keeps moving.
@@ -424,9 +427,20 @@ function Timeline({
       pagedTo.current = page.kind === 'all' ? null : router.state.location.href
     })
   }
+  const summary = pagerSummary({
+    scope,
+    gameId,
+    games: pagerGames,
+    predictions: s.openPredictions,
+    leagues: s.fantasyLeagues,
+    display,
+  })
   const openPage = (page: ScopePage) => {
-    if (page.kind === 'all') setPortfolioOpen(true)
-    else if (page.kind === 'game') setBoxOpen(true)
+    if (page.kind === 'all') {
+      // The portfolio is Predictions' list; everything else lists its pages.
+      if (pages.some((p) => p.kind === 'prediction')) setPortfolioOpen(true)
+      else setListOpen(true)
+    } else if (page.kind === 'game') setBoxOpen(true)
     else if (page.kind === 'prediction') openPrediction(page.id)
     else openMatchup(page.id)
   }
@@ -580,18 +594,28 @@ function Timeline({
         <ScopePager
           pages={pages}
           current={currentPage}
-          summary={pagerSummary({
-            scope,
-            gameId,
-            games: pagerGames,
-            predictions: s.openPredictions,
-            leagues: s.fantasyLeagues,
-            display,
-          })}
+          summary={summary}
           display={display}
           onSelect={pickPage}
           onOpen={openPage}
           className="md:hidden"
+        />
+      )}
+      {listOpen && (
+        <ScopeListSheet
+          title={
+            pages.some((p) => p.kind === 'matchup')
+              ? 'Your Matchups'
+              : summary.kicker
+          }
+          pages={pages}
+          current={currentPage}
+          onPick={(page) => {
+            setListOpen(false)
+            // The one already showing: just back to it.
+            if (pageKey(page) !== currentPage) pickPage(page)
+          }}
+          onClose={() => setListOpen(false)}
         />
       )}
 
