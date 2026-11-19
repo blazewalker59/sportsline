@@ -1,6 +1,6 @@
 /**
  * Open Predictions (CONTEXT.md) together: the summary across the strip and
- * the portfolio sheet it opens.
+ * the portfolio sheet it opens (also opened from the phone's Scope bar).
  */
 
 import { useState } from 'react'
@@ -94,7 +94,8 @@ export function PredictionSummary({
   )
 }
 
-function portfolioTotals(open: ReadonlyArray<PredictionView>) {
+/** Across open Predictions: staked, what cashing out now brings, the payout. */
+export function portfolioTotals(open: ReadonlyArray<PredictionView>) {
   const staked = open.reduce((n, p) => n + p.cost, 0)
   const priced = open.filter((p) => p.value !== null)
   const cashout = priced.reduce((n, p) => n + (p.value ?? 0), 0)
@@ -114,7 +115,7 @@ function portfolioTotals(open: ReadonlyArray<PredictionView>) {
 }
 
 /** Every open Prediction with its status and payout, and the totals. */
-function PortfolioSheet({
+export function PortfolioSheet({
   predictions,
   display,
   onClose,

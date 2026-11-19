@@ -5,7 +5,9 @@
  * categories show the Matchup's totals or, toggled, the day's, and the
  * Lineups are that day's. Another Matchup in the league ("League
  * Matchups") opens the same way, read when it opens, without the race
- * (only the Viewer's own is recorded).
+ * (only the Viewer's own is recorded). Where the Timeline's cards (and
+ * the League Matchups under them) aren't shown, on a phone, the sheet
+ * lists the league's Matchups itself, to move between them.
  */
 
 import { useQuery } from '@tanstack/react-query'
@@ -84,6 +86,11 @@ interface MatchupDetailProps {
   leagueLink?: boolean
   /** Lays it out: a Sheet, or the wide Timeline's pane. */
   frame: SheetFrame
+  /**
+   * List the league's Matchups at the end, each opening in this one's
+   * place (undefined: the Viewer's own). Left out, it isn't listed.
+   */
+  onOther?: (other: LeagueMatchup | undefined) => void
 }
 
 /**
@@ -96,6 +103,7 @@ export function MatchupDetail({
   games = [],
   leagueLink = true,
   frame,
+  onOther,
 }: MatchupDetailProps) {
   const otherTeam = other?.left.teamId
   const read = useQuery({
@@ -317,6 +325,13 @@ export function MatchupDetail({
             </section>
           </>
         )}
+        {onOther && (league.matchup?.others?.length ?? 0) > 0 && (
+          <LeagueMatchupList
+            own={league.matchup!}
+            current={otherTeam}
+            onOpen={onOther}
+          />
+        )}
         <p className="text-2xs text-muted">
           {m.categories
             ? `Read from ${source}: categories through yesterday plus today’s starters, refreshed every couple of minutes; toggle above the categories between the whole matchup and the day. Step through the matchup’s days with ‹ ›, or tap the day for any day or the whole matchup’s summary; switch sides above the lineup, and scroll it sideways for every category.`
@@ -325,4 +340,102 @@ export function MatchupDetail({
       </div>
     ),
   })
+}
+
+/**
+ * The league's Matchups this period ("League Matchups"), the Viewer's
+ * first: each opens in the sheet's place; the one showing is marked.
+ */
+function LeagueMatchupList({
+  own,
+  current,
+  onOpen,
+}: {
+  own: MatchupView
+  /** The other Matchup showing, by its first team; undefined: the Viewer's. */
+  current: number | undefined
+  onOpen: (other: LeagueMatchup | undefined) => void
+}) {
+  const row = (
+    key: string | number,
+    here: boolean,
+    left: { abbrev: string; name: string; score: number },
+    right: { abbrev: string; name: string; score: number } | null,
+    open: () => void,
+  ) => {
+    const lead =
+      !right || left.score === right.score
+        ? null
+        : left.score > right.score
+          ? 'left'
+          : 'right'
+    return (
+      <li key={key}>
+        <button
+          type="button"
+          onClick={open}
+          disabled={here}
+          aria-current={here ? 'true' : undefined}
+          aria-label={
+            right
+              ? `${left.name} ${scoreText(own, left.score)}, ${right.name} ${scoreText(own, right.score)}`
+              : `${left.name}, bye week`
+          }
+          className={cn(
+            'flex w-full items-center gap-2 rounded-card border px-3 py-2 text-sm tabular-nums',
+            here
+              ? 'border-accent bg-accent-soft'
+              : 'border-border bg-surface hover:bg-notice',
+          )}
+        >
+          <span
+            className={cn(
+              'flex-1 truncate text-left',
+              lead === 'left' ? 'font-bold' : 'text-foreground/75',
+            )}
+          >
+            {left.name}
+          </span>
+          <span className={cn(lead === 'left' && 'font-bold')}>
+            {scoreText(own, left.score)}
+          </span>
+          <span className="text-muted">–</span>
+          {right ? (
+            <>
+              <span className={cn(lead === 'right' && 'font-bold')}>
+                {scoreText(own, right.score)}
+              </span>
+              <span
+                className={cn(
+                  'flex-1 truncate text-right',
+                  lead === 'right' ? 'font-bold' : 'text-foreground/75',
+                )}
+              >
+                {right.name}
+              </span>
+            </>
+          ) : (
+            <span className="flex-1 text-right text-muted">Bye</span>
+          )}
+        </button>
+      </li>
+    )
+  }
+  return (
+    <section>
+      <h3 className="subject-ink mb-2 text-xs font-bold tracking-wide text-muted uppercase">
+        League matchups
+      </h3>
+      <ul className="flex flex-col gap-1.5">
+        {row('mine', current === undefined, own.mine, own.opponent, () =>
+          onOpen(undefined),
+        )}
+        {(own.others ?? []).map((o) =>
+          row(o.left.teamId, current === o.left.teamId, o.left, o.right, () =>
+            onOpen(o),
+          ),
+        )}
+      </ul>
+    </section>
+  )
 }
