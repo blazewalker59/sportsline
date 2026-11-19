@@ -10,6 +10,10 @@
  * From `lg` the Timeline is two columns (the feed, and the selected Game's
  * pane); this top lays itself out on the same grid and stays over the
  * feed's column, since the day, Scope and Games are the feed's context.
+ *
+ * Below `md` (a phone, with the tab bar) the cards aren't here: the Scope
+ * bar over the tab bar pages through the same things (ScopePager), so the
+ * top is the header and, under All, the League row.
  */
 
 import { DayButton } from './DayButton'
@@ -33,6 +37,7 @@ import { cn } from '@/lib/utils'
 
 export function TimelineTop({
   topRef,
+  compact,
   scope: s,
   sportsDay,
   today,
@@ -55,6 +60,8 @@ export function TimelineTop({
   onSelectMatchup,
 }: {
   topRef: React.Ref<HTMLDivElement>
+  /** A phone's Timeline (useCompactTimeline): null until it's known. */
+  compact: boolean | null
   scope: TimelineScopeState
   sportsDay: string
   today: string
@@ -83,6 +90,10 @@ export function TimelineTop({
   onSelectMatchup: (id: string | null) => void
 }) {
   const display = s.kalshi.data?.changeDisplay
+  // Which League, under the All tab (the nav's tabs are the other Scopes).
+  const leagueRow = scopeTab(s.scope) === 'all'
+  // On a phone the League row is all that's left under the header.
+  const panel = compact !== true || leagueRow
   return (
     <div
       ref={topRef}
@@ -99,6 +110,8 @@ export function TimelineTop({
               'pointer-events-auto relative z-20 bg-background px-4 transition-[border-color] lg:px-0',
               'border-b',
               panelHidden ? 'border-border' : 'border-transparent',
+              // Nothing under it on a phone: the header ends the top.
+              !leagueRow && 'max-md:border-border',
             )}
           >
             <AppHeader
@@ -131,76 +144,83 @@ export function TimelineTop({
             </Collapse>
           </div>
           {/* The League row and score cards tuck away while reading down, return on the way up. */}
-          <div
-            className={cn(
-              'pointer-events-auto relative z-10 border-b border-border bg-background px-4 pb-2 transition-transform duration-300 ease-out lg:px-0',
-              panelHidden && '-translate-y-full',
-            )}
-            inert={panelHidden}
-            aria-hidden={panelHidden}
-          >
-            {/* Which League, under the All tab (the nav's tabs are the other Scopes). */}
-            {scopeTab(s.scope) === 'all' && (
-              <LeagueBar scope={s.scope} items={s.rowItems} />
-            )}
-            <div className={cn('transition-opacity', dimmed && 'opacity-50')}>
-              {s.setup ? null : s.scope === 'fantasy' && !gameId ? (
-                // Matchups move like scores: their cards replace the Games'.
-                <FantasyStrip
-                  leagues={s.fantasyLeagues}
-                  selected={s.selectedMatchup?.id}
-                  onSelect={onSelectMatchup}
-                  onDetails={onMatchup}
-                />
-              ) : s.scope === 'predictions' && !gameId ? (
-                // Predictions move like scores: their cards replace the Games'.
-                <>
-                  <PredictionStrip
-                    predictions={s.openPredictions}
-                    selected={s.selectedPrediction?.id}
-                    onSelect={onSelectPrediction}
-                    onDetails={onPrediction}
-                    display={display}
-                  />
-                  <PredictionSummary
-                    predictions={s.openPredictions}
-                    display={display}
-                    onOpen={onPrediction}
-                  />
-                </>
-              ) : (
-                <>
-                  <GameStrip
-                    games={(dimmed && previousGames.length
-                      ? previousGames
-                      : games
-                    ).filter((g) =>
-                      inScope(
-                        g,
-                        s.scope,
-                        s.viewerFollows,
-                        items,
-                        s.leagues,
-                        s.predictionGames,
-                      ),
-                    )}
-                    selected={gameId ?? undefined}
-                    onBox={onBox}
-                  />
-                  {gameId && (
-                    <PredictionStrip
-                      predictions={s.openPredictions.filter((p) =>
-                        p.legs.some((l) => l.game?.id === gameId),
-                      )}
-                      onSelect={onSelectPrediction}
-                      onDetails={onPrediction}
-                      display={display}
-                    />
+          {panel && (
+            <div
+              className={cn(
+                'pointer-events-auto relative z-10 border-b border-border bg-background px-4 pb-2 transition-transform duration-300 ease-out lg:px-0',
+                panelHidden && '-translate-y-full',
+                !leagueRow && 'max-md:hidden',
+              )}
+              inert={panelHidden}
+              aria-hidden={panelHidden}
+            >
+              {leagueRow && <LeagueBar scope={s.scope} items={s.rowItems} />}
+              {compact !== true && (
+                <div
+                  className={cn(
+                    'transition-opacity max-md:hidden',
+                    dimmed && 'opacity-50',
                   )}
-                </>
+                >
+                  {s.setup ? null : s.scope === 'fantasy' && !gameId ? (
+                    // Matchups move like scores: their cards replace the Games'.
+                    <FantasyStrip
+                      leagues={s.fantasyLeagues}
+                      selected={s.selectedMatchup?.id}
+                      onSelect={onSelectMatchup}
+                      onDetails={onMatchup}
+                    />
+                  ) : s.scope === 'predictions' && !gameId ? (
+                    // Predictions move like scores: their cards replace the Games'.
+                    <>
+                      <PredictionStrip
+                        predictions={s.openPredictions}
+                        selected={s.selectedPrediction?.id}
+                        onSelect={onSelectPrediction}
+                        onDetails={onPrediction}
+                        display={display}
+                      />
+                      <PredictionSummary
+                        predictions={s.openPredictions}
+                        display={display}
+                        onOpen={onPrediction}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <GameStrip
+                        games={(dimmed && previousGames.length
+                          ? previousGames
+                          : games
+                        ).filter((g) =>
+                          inScope(
+                            g,
+                            s.scope,
+                            s.viewerFollows,
+                            items,
+                            s.leagues,
+                            s.predictionGames,
+                          ),
+                        )}
+                        selected={gameId ?? undefined}
+                        onBox={onBox}
+                      />
+                      {gameId && (
+                        <PredictionStrip
+                          predictions={s.openPredictions.filter((p) =>
+                            p.legs.some((l) => l.game?.id === gameId),
+                          )}
+                          onSelect={onSelectPrediction}
+                          onDetails={onPrediction}
+                          display={display}
+                        />
+                      )}
+                    </>
+                  )}
+                </div>
               )}
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

@@ -6,7 +6,9 @@
  * (TimelineSheets).
  *
  * On phones a selected Game takes the feed's place, filtered to it, and a
- * Prediction or Matchup opens as a bottom sheet. From `lg`
+ * Prediction or Matchup opens as a bottom sheet; what the Scope covers is
+ * picked from the bar over the tab bar (ScopePager) rather than cards at
+ * the top (useCompactTimeline). From `lg`
  * (useWideTimeline) each opens in a pane beside the Scope's feed, which
  * stays exactly as it was: one at a time, kept in the address (`game`, or
  * `detail` for a Prediction or Matchup) so reload and Back behave alike.
@@ -21,12 +23,16 @@ import { GamePane } from './GamePane'
 import { DetailPane, DetailPaneMissing } from './DetailPane'
 import { TimelineSheets } from './TimelineSheets'
 import { TimelineTop } from './TimelineTop'
+import { ScopePager, pagerSummary } from './ScopePager'
+import { currentPageKey, pageSearch, scopePages } from './scopePages'
+import { useCompactTimeline } from './useCompactTimeline'
 import { useGoToScope, useLastLeague } from './scopeNav'
 import { ScopePrompt } from './ScopePrompt'
-import { followsGame } from './timelineScope'
+import { followsGame, inScope } from './timelineScope'
 import { usePastDay } from './usePastDay'
 import { useTimelineScope } from './useTimelineScope'
 import { useWideTimeline } from './useWideTimeline'
+import type { ScopePage } from './scopePages'
 import type { Typing } from '@/lib/timeline/chat'
 import type { GameSummary, TimelineItem } from '@/lib/model/timeline'
 import type { Scope } from '@/lib/model/scope'
@@ -137,6 +143,7 @@ function Timeline({
     id: string
     other?: LeagueMatchup
   } | null>(null)
+  const [portfolioOpen, setPortfolioOpen] = useState(false)
   const navigate = useNavigate()
   // The divider marks where the Viewer stopped last time, so it is fixed at
   // load while the stored marker keeps moving.
@@ -169,6 +176,8 @@ function Timeline({
   // Beside the wide feed a Game opens in its own pane; on phones it takes
   // the feed's place, and the Scope's feed isn't rendered at all.
   const wide = useWideTimeline()
+  // Below `md` the Scope bar over the tab bar stands in for the cards.
+  const compact = useCompactTimeline()
   const showScope = !gameId || wide
   // A Prediction or Matchup open in the pane (a Game takes precedence,
   // though opening either clears the other).
@@ -228,6 +237,10 @@ function Timeline({
   // One left in the address on a phone (a link, or a window narrowed):
   // it shows as its sheet there.
   const sheetDetail = wide ? null : paneDetail
+  // The league whose Matchup's sheet is open, whichever way it opened.
+  const sheetLeague =
+    matchupOpen?.id ??
+    (sheetDetail?.kind === 'matchup' ? sheetDetail.leagueId : null)
   // Only today's Timeline moves the Read Marker; browsing history must not,
   // nor a phone reading one Game.
   useReadMarkerWriter(timeline.items, viewer !== null && isToday && showScope)
@@ -339,6 +352,85 @@ function Timeline({
   )
   const [recapOpen, setRecapOpen] = useState(false)
 
+  // The phone's Scope bar: the same Games the cards would show, the open
+  // Predictions or the Matchups, the selection in the address deciding
+  // which page is current.
+  const pagerGames = useMemo(
+    () =>
+      (dimmed && timeline.previousGames.length
+        ? timeline.previousGames
+        : timeline.games
+      ).filter((g) =>
+        inScope(
+          g,
+          scope,
+          s.viewerFollows,
+          timeline.items,
+          s.leagues,
+          s.predictionGames,
+        ),
+      ),
+    [
+      dimmed,
+      timeline.previousGames,
+      timeline.games,
+      timeline.items,
+      scope,
+      s.viewerFollows,
+      s.leagues,
+      s.predictionGames,
+    ],
+  )
+  const pages = scopePages({
+    scope,
+    gameId,
+    selectedGame,
+    games: pagerGames,
+    predictions: s.openPredictions,
+    leagues: s.fantasyLeagues,
+  })
+  const currentPage = currentPageKey({
+    gameId,
+    predictionId: s.selectedPrediction?.id ?? null,
+    matchupId: s.selectedMatchup?.id ?? null,
+  })
+  const display = s.kalshi.data?.changeDisplay
+  // Paging from the first page into the Scope is one step in history
+  // (Back returns to the whole Scope); paging on from there replaces it,
+  // so Back doesn't retrace every page swiped past, and paging back to
+  // the first page is Back. `pagedTo` is where the bar last took the
+  // address: anywhere else since (a link, a sheet), and it starts over.
+  const pagedTo = useRef<string | null>(null)
+  const pickPage = (page: ScopePage) => {
+    const here = router.state.location.href
+    if (page.kind === 'all' && pagedTo.current === here) {
+      pagedTo.current = null
+      router.history.back()
+      return
+    }
+    const into = currentPage === 'all' && page.kind !== 'all'
+    void navigate({
+      to: '/',
+      search: (prev) => ({
+        ...prev,
+        ...pageSearch(page, gameId),
+        detail: undefined,
+        play: undefined,
+      }),
+      replace: !into,
+      viewTransition: true,
+      resetScroll: false,
+    }).then(() => {
+      pagedTo.current = page.kind === 'all' ? null : router.state.location.href
+    })
+  }
+  const openPage = (page: ScopePage) => {
+    if (page.kind === 'all') setPortfolioOpen(true)
+    else if (page.kind === 'game') setBoxOpen(true)
+    else if (page.kind === 'prediction') openPrediction(page.id)
+    else openMatchup(page.id)
+  }
+
   // Escape closes the pane beside the wide feed (a Game, a Prediction or a
   // Matchup), unless a sheet is open (Escape is the sheet's then).
   const paneOpen = Boolean(gameId || paneDetail)
@@ -377,6 +469,7 @@ function Timeline({
     >
       <TimelineTop
         topRef={topRef}
+        compact={compact}
         scope={s}
         sportsDay={sportsDay}
         today={today}
@@ -482,6 +575,26 @@ function Timeline({
         )}
       </FantasyTagsProvider>
 
+      {/* Null while the width isn't known: CSS shows it only below `md`. */}
+      {compact !== false && !s.setup && (
+        <ScopePager
+          pages={pages}
+          current={currentPage}
+          summary={pagerSummary({
+            scope,
+            gameId,
+            games: pagerGames,
+            predictions: s.openPredictions,
+            leagues: s.fantasyLeagues,
+            display,
+          })}
+          display={display}
+          onSelect={pickPage}
+          onOpen={openPage}
+          className="md:hidden"
+        />
+      )}
+
       <TimelineSheets
         playId={playId}
         onPlayClose={closePlay}
@@ -498,7 +611,25 @@ function Timeline({
                 onMatchupClose: () => showDetail(null),
               }
             : { matchup: null, onMatchupClose: noop })}
+        // No cards on a phone (nor their League Matchups): the sheet lists
+        // the league's Matchups itself.
+        onMatchupOther={
+          compact && sheetLeague
+            ? (other) => {
+                // One left in the address gives way to the one picked here.
+                if (!matchupOpen) showDetail(null)
+                setMatchupOpen({ id: sheetLeague, other })
+              }
+            : undefined
+        }
         games={timeline.games}
+        portfolio={portfolioOpen ? s.openPredictions : null}
+        display={display}
+        onPortfolioClose={() => setPortfolioOpen(false)}
+        onPortfolioOpen={(id) => {
+          setPortfolioOpen(false)
+          openPrediction(id)
+        }}
         {...(predictionOpen
           ? {
               prediction: findPrediction(s, predictionOpen),

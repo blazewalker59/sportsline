@@ -1,7 +1,8 @@
 /**
  * The sheets the Timeline opens over itself: a Play, a Matchup, a
- * Prediction, the catch-up, what's live now, and the selected Game's box
- * score. Each opens only when asked for and its subject still exists.
+ * Prediction, the portfolio, the catch-up, what's live now, and the
+ * selected Game's box score. Each opens only when asked for and its
+ * subject still exists.
  */
 
 import { CatchUpSheet } from './CatchUp'
@@ -13,8 +14,10 @@ import type { CatchUp } from '@/lib/timeline/catchup'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { PredictionView } from '@/lib/kalshi/predictionViews'
 import type { LeagueMatchup } from '@/lib/fantasy/matchup'
+import type { ChangeDisplay } from '@/lib/kalshi/server'
 import { MatchupSheet } from '@/components/fantasy/FantasyParts'
 import { PredictionSheet } from '@/components/predictions/PredictionSheet'
+import { PortfolioSheet } from '@/components/predictions/PredictionPortfolio'
 import { PlaySheet } from '@/components/games/PlayDetailScreen'
 import { BoxSheet } from '@/components/games/GameView'
 import { Sheet } from '@/components/chat/Sheet'
@@ -26,9 +29,14 @@ export function TimelineSheets({
   otherMatchup,
   games,
   onMatchupClose,
+  onMatchupOther,
   prediction,
   onPredictionClose,
   onPredictionNavigate = onPredictionClose,
+  portfolio = null,
+  display = 'dollars',
+  onPortfolioClose = () => {},
+  onPortfolioOpen,
   recap,
   onRecapClose,
   live,
@@ -46,10 +54,22 @@ export function TimelineSheets({
   /** Today's Games, for each Starter's game state. */
   games: Array<GameSummary>
   onMatchupClose: () => void
+  /**
+   * Move the Matchup's sheet to another in its league (or back to the
+   * Viewer's): given, the sheet lists them (where no cards do).
+   */
+  onMatchupOther?: (other: LeagueMatchup | undefined) => void
   prediction: PredictionView | null
   onPredictionClose: () => void
   /** One of its links was followed (by default, it closes). */
   onPredictionNavigate?: () => void
+  /** The open Predictions, when the portfolio's sheet is open. */
+  portfolio?: ReadonlyArray<PredictionView> | null
+  /** Profit or loss in dollars or percent return. */
+  display?: ChangeDisplay
+  onPortfolioClose?: () => void
+  /** One Prediction picked from the portfolio. */
+  onPortfolioOpen?: (id: string) => void
   /** The catch-up, when its sheet is open. */
   recap: CatchUp | null
   onRecapClose: () => void
@@ -72,6 +92,7 @@ export function TimelineSheets({
           other={otherMatchup}
           games={games}
           onClose={onMatchupClose}
+          onOther={onMatchupOther}
         />
       )}
 
@@ -80,6 +101,15 @@ export function TimelineSheets({
           prediction={prediction}
           onClose={onPredictionClose}
           onNavigate={onPredictionNavigate}
+        />
+      )}
+
+      {portfolio && (
+        <PortfolioSheet
+          predictions={portfolio}
+          display={display}
+          onClose={onPortfolioClose}
+          onOpen={onPortfolioOpen}
         />
       )}
 
