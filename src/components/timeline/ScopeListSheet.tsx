@@ -2,8 +2,9 @@
  * Everything the phone's Scope bar pages through, at a glance: the
  * Scope's Games (Following, All, a League) or the Viewer's Matchups, a row
  * each, opened from the bar's first page. Picking one jumps the bar (and
- * the Timeline) straight to it, as if paged there. Predictions have their
- * own such sheet, the portfolio (PortfolioSheet).
+ * the Timeline) straight to it, as if paged there, and opens it in full:
+ * its box score or the Matchup's sheet. Predictions have their own such
+ * sheet, the portfolio (PortfolioSheet), which does the same.
  */
 
 import { gameStatusLabel } from './GameStrip'

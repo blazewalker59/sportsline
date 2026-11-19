@@ -250,7 +250,16 @@ function Timeline({
   const backfill = usePastDay(sportsDay, isToday, timeline.reload)
   // Today's Timeline socket already carries the Game's events.
   const game = useLiveGame(gameId, { shared: isToday })
-  const [boxOpen, setBoxOpen] = useState(false)
+  // Whose box score is open: it stays shut for any other Game, so moving
+  // to another Game closes it, and one opened for a Game still on its way
+  // (picked from a list) shows once it's there.
+  const [boxFor, setBoxFor] = useState<string | null>(null)
+  const boxOpen = boxFor !== null && boxFor === gameId
+  // Moving to another Game puts it away, so coming back doesn't reopen it.
+  useEffect(
+    () => setBoxFor((open) => (open === gameId ? open : null)),
+    [gameId],
+  )
   const [dayOpen, setDayOpen] = useState(false)
   useEffect(() => setDayOpen(false), [sportsDay])
   const cardsHidden = useHideOnScroll()
@@ -294,8 +303,6 @@ function Timeline({
   useEffect(() => {
     if (!playId) takePlayOpened()
   }, [playId])
-  useEffect(() => setBoxOpen(false), [gameId])
-
   // Two feeds: the Scope's, and the selected Game's. On phones selecting a
   // Game only swaps one for the other (newest first, same bubbles); from
   // `lg` they sit side by side (useWideTimeline).
@@ -427,6 +434,13 @@ function Timeline({
       pagedTo.current = page.kind === 'all' ? null : router.state.location.href
     })
   }
+  // Picked from a list (the first page's sheet, or the portfolio): what
+  // you're after is its detail, so the bar and Timeline jump to it and it
+  // opens in full at once, rather than waiting for a tap on its page.
+  const jumpAndOpen = (page: ScopePage) => {
+    if (pageKey(page) !== currentPage) pickPage(page)
+    openPage(page)
+  }
   const summary = pagerSummary({
     scope,
     gameId,
@@ -440,7 +454,7 @@ function Timeline({
       // The portfolio is Predictions' list; everything else lists its pages.
       if (pages.some((p) => p.kind === 'prediction')) setPortfolioOpen(true)
       else setListOpen(true)
-    } else if (page.kind === 'game') setBoxOpen(true)
+    } else if (page.kind === 'game') setBoxFor(page.id)
     else if (page.kind === 'prediction') openPrediction(page.id)
     else openMatchup(page.id)
   }
@@ -499,7 +513,7 @@ function Timeline({
         games={timeline.games}
         previousGames={timeline.previousGames}
         items={timeline.items}
-        onBox={() => setBoxOpen(true)}
+        onBox={() => setBoxFor(gameId)}
         onPrediction={openPrediction}
         onMatchup={openMatchup}
         onSelectPrediction={selectPrediction}
@@ -612,8 +626,7 @@ function Timeline({
           current={currentPage}
           onPick={(page) => {
             setListOpen(false)
-            // The one already showing: just back to it.
-            if (pageKey(page) !== currentPage) pickPage(page)
+            jumpAndOpen(page)
           }}
           onClose={() => setListOpen(false)}
         />
@@ -652,7 +665,9 @@ function Timeline({
         onPortfolioClose={() => setPortfolioOpen(false)}
         onPortfolioOpen={(id) => {
           setPortfolioOpen(false)
-          openPrediction(id)
+          const page = pages.find((p) => pageKey(p) === `prediction:${id}`)
+          if (page) jumpAndOpen(page)
+          else openPrediction(id)
         }}
         {...(predictionOpen
           ? {
@@ -673,7 +688,7 @@ function Timeline({
         onLiveClose={() => setLiveOpen(false)}
         boxGame={boxOpen && !wide ? selectedGame : null}
         box={game.data?.box ?? null}
-        onBoxClose={() => setBoxOpen(false)}
+        onBoxClose={() => setBoxFor(null)}
       />
     </div>
   )
