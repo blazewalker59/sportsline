@@ -729,8 +729,9 @@ describe('TimelineScreen, narrow: the Scope bar over the tab bar', () => {
         screen.queryByRole('link', { name: /^BOS 108, NYK 112/ }),
       ).toBeNull()
       // The Scope as a whole first, and current.
+      // Every tab's first page opens its list: a button.
       const current = within(pager()!)
-        .getAllByRole(scope === 'predictions' ? 'button' : 'group')
+        .getAllByRole('button')
         .find((el) => el.getAttribute('aria-current') === 'true')!
       expect(current.getAttribute('aria-label')).toMatch(
         {
@@ -798,6 +799,44 @@ describe('TimelineScreen, narrow: the Scope bar over the tab bar', () => {
     expect(
       await screen.findByRole('dialog', { name: 'Prediction' }),
     ).toBeTruthy()
+  })
+
+  it('the first page under All lists the games; picking one jumps to it', async () => {
+    const { router } = renderTimeline('/?scope=all')
+    await waitFor(() => expect(pager()).toBeTruthy())
+    fireEvent.click(pagerPage(/See all the games$/))
+    const sheet = await screen.findByRole('dialog', { name: 'All Leagues' })
+    const rows = within(sheet).getAllByRole('button', { name: /^(?!Done)/ })
+    expect(rows.length).toBeGreaterThanOrEqual(3)
+    fireEvent.click(within(sheet).getByText('Boston Celtics'))
+    await waitFor(() => expect(search(router).game).toBe('g_nba'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    // The bar is on that Game, and the Timeline narrowed to it.
+    expect(gamePane()!.dataset.gamePane).toBe('g_nba')
+    expect(pagerPage(/^BOS 108, NYK 112/)).toBeTruthy()
+  })
+
+  it('the first page under Fantasy lists the Matchups; picking one jumps to it', async () => {
+    scopeOver.current = fantasyScope({
+      selectedMatchup: null,
+      fromAddress: true,
+    })
+    const { router } = renderTimeline('/?scope=fantasy')
+    await waitFor(() => expect(pager()).toBeTruthy())
+    fireEvent.click(pagerPage(/See all your matchups$/))
+    const sheet = await screen.findByRole('dialog', { name: 'Your Matchups' })
+    expect(within(sheet).getByText('Gridiron Gang')).toBeTruthy()
+    expect(within(sheet).getByText('Leading')).toBeTruthy()
+    fireEvent.click(within(sheet).getByText('Sam’s Squad'))
+    await waitFor(() =>
+      expect(search(router)).toMatchObject({
+        scope: 'fantasy',
+        matchup: 'espn-1',
+      }),
+    )
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    // Only narrowed: the Matchup's own sheet waits for a tap on its page.
+    expect(pagerPage(/^The League/)).toBeTruthy()
   })
 
   it('Back from a page returns to the whole Scope, however many were paged past', async () => {

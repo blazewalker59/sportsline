@@ -6,7 +6,9 @@
  * in view opens it in full (the Game's box score, the Prediction's or
  * Matchup's sheet, or from the first page the portfolio). The selection
  * lives in the address, so the bar only follows it: a page chosen anywhere
- * else (a link, Back) scrolls into view here.
+ * else (a link, Back) scrolls into view here. It goes round: past the last
+ * page is the first again, and before the first the last (a copy of each
+ * sits at the far ends, swapped for the real one once the swipe stops).
  *
  * Only below `md`, where the navigation is the tab bar it sits on; from
  * `md` the cards at the top of the Timeline do this (TimelineTop).
@@ -49,8 +51,11 @@ export interface PagerSummary {
   title: string
   /** On the right: the portfolio's cash-out, or that Games are live. */
   figure: React.ReactNode
-  /** Tapping it opens something (the portfolio). */
-  opens: boolean
+  /**
+   * What tapping it opens, in words ("Open your portfolio"): a sheet of
+   * everything the bar pages through. Null with nothing to list.
+   */
+  opens: string | null
 }
 
 const isLive = (g: GameSummary) => g.status === 'live' || g.status === 'delayed'
@@ -87,7 +92,7 @@ export function pagerSummary({
           </span>
         </>
       ),
-      opens: predictions.length > 0,
+      opens: predictions.length > 0 ? 'Open your portfolio' : null,
     }
   }
   if (!gameId && scope === 'fantasy') {
@@ -98,7 +103,7 @@ export function pagerSummary({
       kicker: 'Your Matchups',
       title: `${leagues.length} this week${leagues.length ? ` · leading ${leading}` : ''}`,
       figure: null,
-      opens: false,
+      opens: leagues.length > 0 ? 'See all your matchups' : null,
     }
   }
   const live = games.filter(isLive).length
@@ -118,7 +123,7 @@ export function pagerSummary({
         ? 'No games yet'
         : `${games.length} game${games.length === 1 ? '' : 's'}${live ? ` · ${live} live` : ''}`,
     figure: live > 0 && <span className="font-bold text-live">● Live</span>,
-    opens: false,
+    opens: games.length > 0 ? 'See all the games' : null,
   }
 }
 
@@ -146,6 +151,13 @@ export function ScopePager({
   const found = pages.findIndex((p) => pageKey(p) === current)
   const index = Math.max(found, 0)
   const keys = pages.map(pageKey).join('|')
+  // With two pages or more it goes round: a copy of the last page before
+  // the first and of the first after the last, so every page is one swipe
+  // from the next. `slot` is where a page sits in the strip.
+  const loop = pages.length > 1
+  const offset = loop ? 1 : 0
+  // The page shown last, to tell a step round the end from a jump.
+  const shown = useRef(index)
   // A finger on the strip: the selection waits until it lets go.
   const touching = useRef(false)
   // The Viewer moved the strip (a finger, a wheel, focus) since it last
@@ -157,19 +169,32 @@ export function ScopePager({
   // The next scroll into view is a step (an arrow), not a jump.
   const glide = useRef(false)
   // The latest of everything the scroll listeners read.
-  const latest = useRef({ pages, index, onSelect })
-  latest.current = { pages, index, onSelect }
+  const latest = useRef({ pages, index, onSelect, loop, offset })
+  latest.current = { pages, index, onSelect, loop, offset }
 
   // Keep the current page in view: on first paint, and whenever the
   // selection changes or the pages move (a Game going live moves up).
   useLayoutEffect(() => {
     picked.current = null
+    const was = shown.current
+    shown.current = index
     const el = strip.current
     if (!el || touching.current || !el.clientWidth) return
-    const left = index * el.clientWidth
+    const last = pages.length - 1
+    // An arrow stepping round the end glides on to the copy beyond it
+    // (then settles on the real page), rather than back across them all.
+    const slot =
+      glide.current && loop && was === last && index === 0
+        ? last + 2
+        : glide.current && loop && was === 0 && index === last
+          ? 0
+          : index + offset
+    const left = slot * el.clientWidth
     if (Math.abs(el.scrollLeft - left) > 1)
       el.scrollTo({ left, behavior: glide.current ? 'smooth' : 'instant' })
     glide.current = false
+    // Only on a selection or new pages: not on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, keys])
 
   // A swipe that comes to rest on another page selects it.
@@ -182,8 +207,15 @@ export function ScopePager({
       if (touching.current || !el.clientWidth) return
       const viewer = byViewer.current
       byViewer.current = false
-      const at = Math.round(el.scrollLeft / el.clientWidth)
       const now = latest.current
+      const width = el.clientWidth
+      let slot = Math.round(el.scrollLeft / width)
+      // Resting on a copy at either end: swap it for the real page.
+      if (now.loop && (slot === 0 || slot === now.pages.length + 1)) {
+        slot = slot === 0 ? now.pages.length : 1
+        el.scrollTo({ left: slot * width, behavior: 'instant' })
+      }
+      const at = slot - now.offset
       if (at === now.index) {
         picked.current = null
         return
@@ -194,7 +226,10 @@ export function ScopePager({
         now.onSelect(page)
       } else if (!picked.current) {
         // Not theirs, and nothing on its way: back to the current page.
-        el.scrollTo({ left: now.index * el.clientWidth, behavior: 'instant' })
+        el.scrollTo({
+          left: (now.index + now.offset) * width,
+          behavior: 'instant',
+        })
       }
     }
     const onScroll = () => {
@@ -232,8 +267,11 @@ export function ScopePager({
     }
   }, [])
 
+  /** The page `by` along, going round the ends (null: no other page). */
+  const along = (by: number) =>
+    loop ? pages[(index + by + pages.length) % pages.length] : null
   const step = (by: number) => {
-    const next = pages[index + by]
+    const next = along(by)
     if (!next) return
     glide.current = true
     onSelect(next)
@@ -258,9 +296,16 @@ export function ScopePager({
         ref={strip}
         className="flex h-full snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none]"
       >
+        {loop && (
+          <EndCopy
+            page={pages[pages.length - 1]}
+            summary={summary}
+            display={display}
+          />
+        )}
         {pages.map((page, i) => {
           const here = i === index
-          const opens = page.kind !== 'all' || summary.opens
+          const opens = page.kind !== 'all' || summary.opens !== null
           const body = (
             <PageBody
               page={page}
@@ -278,7 +323,7 @@ export function ScopePager({
               // Off to the side (mid-swipe): bring it here first.
               onClick={() => (here ? onOpen(page) : onSelect(page))}
               aria-current={here ? 'true' : undefined}
-              aria-label={`${name(page)}${here ? `. ${openLabel(page)}` : ''}`}
+              aria-label={`${name(page)}${here ? `. ${openLabel(page, summary)}` : ''}`}
               className={pageClass}
             >
               {body}
@@ -295,19 +340,20 @@ export function ScopePager({
             </div>
           )
         })}
+        {loop && (
+          <EndCopy page={pages[0]} summary={summary} display={display} />
+        )}
       </div>
       <Arrow
         side="left"
-        label={index > 0 ? `Previous: ${name(pages[index - 1])}` : 'Previous'}
-        disabled={index === 0}
+        label={loop ? `Previous: ${name(along(-1)!)}` : 'Previous'}
+        disabled={!loop}
         onClick={() => step(-1)}
       />
       <Arrow
         side="right"
-        label={
-          index < pages.length - 1 ? `Next: ${name(pages[index + 1])}` : 'Next'
-        }
-        disabled={index >= pages.length - 1}
+        label={loop ? `Next: ${name(along(1)!)}` : 'Next'}
+        disabled={!loop}
         onClick={() => step(1)}
       />
       <div
@@ -331,6 +377,31 @@ export function ScopePager({
         )}
       </div>
     </section>
+  )
+}
+
+/**
+ * A copy of the page at the other end, so a swipe past either end goes
+ * round: only to be seen in passing, never picked or read out.
+ */
+function EndCopy({
+  page,
+  summary,
+  display,
+}: {
+  page: ScopePage
+  summary: PagerSummary
+  display?: ChangeDisplay
+}) {
+  return (
+    <div
+      aria-hidden="true"
+      inert
+      data-end-copy=""
+      className="flex h-full w-full shrink-0 snap-center snap-always items-center gap-3 px-10 pb-2 text-left"
+    >
+      <PageBody page={page} summary={summary} display={display} here={false} />
+    </div>
   )
 }
 
@@ -377,10 +448,10 @@ function pageName(page: ScopePage, summary: PagerSummary): string {
   }
 }
 
-function openLabel(page: ScopePage): string {
+function openLabel(page: ScopePage, summary: PagerSummary): string {
   switch (page.kind) {
     case 'all':
-      return 'Open your portfolio'
+      return summary.opens ?? ''
     case 'game':
       return 'Open the box score'
     case 'prediction':

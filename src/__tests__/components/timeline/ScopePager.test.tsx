@@ -40,8 +40,10 @@ const summary: PagerSummary = {
   kicker: 'All Leagues',
   title: '3 games · 2 live',
   figure: null,
-  opens: false,
+  opens: null,
 }
+/** Where page `i` sits: after the copy of the last page at the start. */
+const slot = (i: number) => (i + 1) * WIDTH
 
 function renderPager(
   over: Partial<React.ComponentProps<typeof ScopePager>> = {},
@@ -106,17 +108,17 @@ describe('ScopePager', () => {
   it('scrolls the current page into view, and follows a selection made elsewhere', () => {
     const third = pageKey(gamePages[2])
     const { strip, rerenderAt } = renderPager({ current: third })
-    expect(strip().scrollLeft).toBe(2 * WIDTH)
+    expect(strip().scrollLeft).toBe(slot(2))
     expect(currentPage().getAttribute('aria-label')).toMatch(gameName(2))
     rerenderAt('all')
-    expect(strip().scrollLeft).toBe(0)
+    expect(strip().scrollLeft).toBe(slot(0))
     expect(currentPage().getAttribute('aria-label')).toMatch(/^All Leagues/)
   })
 
   /** A finger across the strip, ending `pages` along. */
   const swipeTo = (strip: HTMLElement, pages: number) => {
     fireEvent.touchStart(strip)
-    strip.scrollLeft = pages * WIDTH
+    strip.scrollLeft = slot(pages)
     fireEvent.scroll(strip)
     fireEvent.touchEnd(strip)
   }
@@ -132,7 +134,7 @@ describe('ScopePager', () => {
     vi.useFakeTimers()
     const { strip, onSelect } = renderPager()
     fireEvent.wheel(strip())
-    strip().scrollLeft = 2 * WIDTH
+    strip().scrollLeft = slot(2)
     fireEvent.scroll(strip())
     expect(onSelect).not.toHaveBeenCalled()
     act(() => vi.advanceTimersByTime(200))
@@ -143,7 +145,7 @@ describe('ScopePager', () => {
     vi.useFakeTimers()
     const { strip, onSelect } = renderPager()
     fireEvent.touchStart(strip())
-    strip().scrollLeft = WIDTH
+    strip().scrollLeft = slot(1)
     fireEvent(strip(), new Event('scrollend'))
     act(() => vi.advanceTimersByTime(200))
     expect(onSelect).not.toHaveBeenCalled()
@@ -154,10 +156,10 @@ describe('ScopePager', () => {
 
   it('a scroll the Viewer didn’t make (Back restoring it) goes back to the current page', () => {
     const { strip, onSelect } = renderPager()
-    strip().scrollLeft = WIDTH
+    strip().scrollLeft = slot(1)
     fireEvent(strip(), new Event('scrollend'))
     expect(onSelect).not.toHaveBeenCalled()
-    expect(strip().scrollLeft).toBe(0)
+    expect(strip().scrollLeft).toBe(slot(0))
   })
 
   it('keeps a page just picked while the address catches up', () => {
@@ -167,16 +169,16 @@ describe('ScopePager', () => {
     expect(onSelect).toHaveBeenCalledWith(gamePages[2])
     // Another scroll ending before the selection lands doesn't undo it.
     fireEvent(strip(), new Event('scrollend'))
-    expect(strip().scrollLeft).toBe(2 * WIDTH)
+    expect(strip().scrollLeft).toBe(slot(2))
     rerenderAt(pageKey(gamePages[2]))
-    expect(strip().scrollLeft).toBe(2 * WIDTH)
+    expect(strip().scrollLeft).toBe(slot(2))
   })
 
   it('focus moving onto another page (the keyboard) selects it', () => {
     vi.useFakeTimers()
     const { strip, onSelect } = renderPager()
     fireEvent.focusIn(strip())
-    strip().scrollLeft = WIDTH
+    strip().scrollLeft = slot(1)
     fireEvent.scroll(strip())
     act(() => vi.advanceTimersByTime(200))
     expect(onSelect).toHaveBeenCalledWith(gamePages[1])
@@ -184,24 +186,90 @@ describe('ScopePager', () => {
 
   it('coming to rest on the current page selects nothing', () => {
     const { strip, onSelect } = renderPager({ current: pageKey(gamePages[1]) })
-    expect(strip().scrollLeft).toBe(WIDTH)
+    expect(strip().scrollLeft).toBe(slot(1))
     fireEvent(strip(), new Event('scrollend'))
     expect(onSelect).not.toHaveBeenCalled()
   })
 
-  it('the arrows step to the neighbouring page, and stop at either end', () => {
+  it('the arrows step to the neighbouring page, going round the ends', () => {
     const { onSelect, rerenderAt } = renderPager()
+    const last = gamePages[gamePages.length - 1]
+    // From the first page, Previous is the last.
     const previous = screen.getByRole('button', { name: /^Previous/ })
-    const next = screen.getByRole('button', { name: /^Next/ })
-    expect(previous).toHaveProperty('disabled', true)
-    expect(next.getAttribute('aria-label')).toMatch(/^Next: /)
-    fireEvent.click(next)
-    expect(onSelect).toHaveBeenCalledWith(gamePages[1])
-    rerenderAt(pageKey(gamePages[gamePages.length - 1]))
+    expect(previous).toHaveProperty('disabled', false)
+    expect(previous.getAttribute('aria-label')).toMatch(/^Previous: /)
+    fireEvent.click(previous)
+    expect(onSelect).toHaveBeenLastCalledWith(last)
+    fireEvent.click(screen.getByRole('button', { name: /^Next/ }))
+    expect(onSelect).toHaveBeenLastCalledWith(gamePages[1])
+    // From the last page, Next is the first.
+    rerenderAt(pageKey(last))
+    fireEvent.click(screen.getByRole('button', { name: /^Next/ }))
+    expect(onSelect).toHaveBeenLastCalledWith(gamePages[0])
+  })
+
+  it('a swipe past the last page comes round to the first', () => {
+    const last = gamePages.length - 1
+    const { strip, onSelect } = renderPager({
+      current: pageKey(gamePages[last]),
+    })
+    // Onto the copy of the first page beyond the last.
+    swipeTo(strip(), last + 1)
+    fireEvent(strip(), new Event('scrollend'))
+    expect(onSelect).toHaveBeenCalledWith(gamePages[0])
+    // Swapped for the real first page, with nothing to see.
+    expect(strip().scrollLeft).toBe(slot(0))
+  })
+
+  it('a swipe back before the first page comes round to the last', () => {
+    const last = gamePages.length - 1
+    const { strip, onSelect } = renderPager()
+    swipeTo(strip(), -1)
+    fireEvent(strip(), new Event('scrollend'))
+    expect(onSelect).toHaveBeenCalledWith(gamePages[last])
+    expect(strip().scrollLeft).toBe(slot(last))
+  })
+
+  it('an arrow round the end glides on to the copy, then settles on the real page', () => {
+    const last = gamePages.length - 1
+    const scrolls: Array<number> = []
+    HTMLElement.prototype.scrollTo = function (
+      this: HTMLElement,
+      opts?: ScrollToOptions | number,
+    ) {
+      if (typeof opts === 'object' && opts.left !== undefined) {
+        scrolls.push(opts.left)
+        this.scrollLeft = opts.left
+      }
+    } as typeof HTMLElement.prototype.scrollTo
+    const { strip, rerenderAt } = renderPager({
+      current: pageKey(gamePages[last]),
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^Next/ }))
+    rerenderAt(pageKey(gamePages[0]))
+    // Not back across every page: on to the copy just past the last.
+    expect(scrolls.at(-1)).toBe(slot(last + 1))
+    fireEvent(strip(), new Event('scrollend'))
+    expect(strip().scrollLeft).toBe(slot(0))
+  })
+
+  it('one page doesn’t go round', () => {
+    renderPager({ pages: [{ kind: 'all' }] })
+    expect(document.querySelector('[data-end-copy]')).toBeNull()
     expect(screen.getByRole('button', { name: /^Next/ })).toHaveProperty(
       'disabled',
       true,
     )
+  })
+
+  it('the copies at the ends are never read out or picked', () => {
+    renderPager()
+    const copies = document.querySelectorAll('[data-end-copy]')
+    expect(copies).toHaveLength(2)
+    copies.forEach((c) => {
+      expect(c.getAttribute('aria-hidden')).toBe('true')
+      expect(c.hasAttribute('inert')).toBe(true)
+    })
   })
 
   it('tapping the page in view opens it; one off to the side is selected first', () => {
@@ -224,7 +292,12 @@ describe('ScopePager', () => {
     // Not a button when it opens nothing.
     expect(currentPage().tagName).toBe('DIV')
     cleanup()
-    const { onOpen } = renderPager({ summary: { ...summary, opens: true } })
+    const { onOpen } = renderPager({
+      summary: { ...summary, opens: 'See all the games' },
+    })
+    expect(currentPage().getAttribute('aria-label')).toMatch(
+      /\. See all the games$/,
+    )
     fireEvent.click(currentPage())
     expect(onOpen).toHaveBeenCalledWith({ kind: 'all' })
   })
@@ -264,31 +337,34 @@ describe('pagerSummary', () => {
     const s = pagerSummary({ ...base, scope: 'all' })
     expect(s.kicker).toBe('All Leagues')
     expect(s.title).toMatch(/^3 games/)
-    expect(s.opens).toBe(false)
+    expect(s.opens).toBe('See all the games')
     expect(pagerSummary({ ...base, scope: 'following' }).kicker).toBe(
       'Following',
     )
     expect(pagerSummary({ ...base, scope: 'nfl' }).kicker).toMatch(/NFL/)
-    expect(pagerSummary({ ...base, scope: 'all', games: [] }).title).toBe(
-      'No games yet',
-    )
+    const none = pagerSummary({ ...base, scope: 'all', games: [] })
+    expect(none.title).toBe('No games yet')
+    expect(none.opens).toBeNull()
   })
 
   it('sums the portfolio under Predictions, and opens it', () => {
     const s = pagerSummary({ ...base, scope: 'predictions' })
     expect(s.title).toBe('1 open · Staked $4.50')
-    expect(s.opens).toBe(true)
+    expect(s.opens).toBe('Open your portfolio')
     render(<>{s.figure}</>)
     expect(screen.getByText('$6.20')).toBeTruthy()
     expect(screen.getByText('+$1.70')).toBeTruthy()
     expect(
       pagerSummary({ ...base, scope: 'predictions', predictions: [] }).opens,
-    ).toBe(false)
+    ).toBeNull()
   })
 
   it('counts Matchups and those leading under Fantasy', () => {
-    expect(pagerSummary({ ...base, scope: 'fantasy' }).title).toBe(
-      '1 this week · leading 1',
+    const s = pagerSummary({ ...base, scope: 'fantasy' })
+    expect(s.title).toBe('1 this week · leading 1')
+    expect(s.opens).toBe('See all your matchups')
+    expect(pagerSummary({ ...base, scope: 'fantasy', leagues: [] }).opens).toBe(
+      null,
     )
   })
 
