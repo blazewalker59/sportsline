@@ -788,20 +788,25 @@ describe('TimelineScreen, narrow: the Scope bar over the tab bar', () => {
     expect(detailPane()).toBeNull()
   })
 
-  it('opens the portfolio from the first page', async () => {
-    scopeOver.current = predictionsScope({ selectedPrediction: null })
-    renderTimeline('/?scope=predictions')
+  it('opens the portfolio from the first page; a Prediction picked there opens and narrows', async () => {
+    scopeOver.current = predictionsScope({
+      selectedPrediction: null,
+      fromAddress: true,
+    })
+    const { router } = renderTimeline('/?scope=predictions')
     await waitFor(() => expect(pager()).toBeTruthy())
     fireEvent.click(pagerPage(/^Your Predictions: 1 open/))
     const sheet = await screen.findByRole('dialog', { name: 'Portfolio' })
-    // A Prediction picked there opens as its sheet.
+    // A Prediction picked there opens as its sheet, the bar jumping to it.
     fireEvent.click(within(sheet).getByText('Phillies to win'))
     expect(
       await screen.findByRole('dialog', { name: 'Prediction' }),
     ).toBeTruthy()
+    await waitFor(() => expect(search(router).prediction).toBe('pred_1'))
+    expect(pagerPage(/^Phillies to win/)).toBeTruthy()
   })
 
-  it('the first page under All lists the games; picking one jumps to it', async () => {
+  it('the first page under All lists the games; picking one jumps to it and opens its box score', async () => {
     const { router } = renderTimeline('/?scope=all')
     await waitFor(() => expect(pager()).toBeTruthy())
     fireEvent.click(pagerPage(/See all the games$/))
@@ -810,13 +815,20 @@ describe('TimelineScreen, narrow: the Scope bar over the tab bar', () => {
     expect(rows.length).toBeGreaterThanOrEqual(3)
     fireEvent.click(within(sheet).getByText('Boston Celtics'))
     await waitFor(() => expect(search(router).game).toBe('g_nba'))
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    // Straight to its detail: no second tap on the bar.
+    expect(
+      await screen.findByRole('dialog', { name: 'Box score' }),
+    ).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: 'All Leagues' })).toBeNull()
     // The bar is on that Game, and the Timeline narrowed to it.
     expect(gamePane()!.dataset.gamePane).toBe('g_nba')
     expect(pagerPage(/^BOS 108, NYK 112/)).toBeTruthy()
+    // Closed, and back on another Game and this one, it stays closed.
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
-  it('the first page under Fantasy lists the Matchups; picking one jumps to it', async () => {
+  it('the first page under Fantasy lists the Matchups; picking one jumps to it and opens it', async () => {
     scopeOver.current = fantasyScope({
       selectedMatchup: null,
       fromAddress: true,
@@ -834,8 +846,12 @@ describe('TimelineScreen, narrow: the Scope bar over the tab bar', () => {
         matchup: 'espn-1',
       }),
     )
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-    // Only narrowed: the Matchup's own sheet waits for a tap on its page.
+    // Its full sheet, not just the narrowed feed.
+    const matchup = await screen.findByRole('dialog', { name: 'The League' })
+    expect(within(matchup).getByRole('banner').textContent).toContain(
+      'Gridiron Gang',
+    )
+    expect(screen.queryByRole('dialog', { name: 'Your Matchups' })).toBeNull()
     expect(pagerPage(/^The League/)).toBeTruthy()
   })
 
