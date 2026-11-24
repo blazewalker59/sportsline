@@ -3,8 +3,8 @@ import { useSyncExternalStore } from 'react'
 /**
  * Where the navigation stops being the floating tab bar and becomes the
  * rail: Tailwind's `md` (48rem). Below it the Timeline is a phone's: what
- * the Scope covers is picked from the bar over the tab bar (ScopePager),
- * not from cards at the top. Keep this in step with the `md:` classes that
+ * the Scope covers is picked from the home board over the feed
+ * (LiveBoard), not from cards at the top. Keep this in step with the `md:` classes that
  * hide one or the other.
  */
 export const RAIL = '(min-width: 48rem)'

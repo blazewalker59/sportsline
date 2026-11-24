@@ -1,10 +1,10 @@
 /**
- * What the phone's Scope bar (ScopePager) pages through: first the Scope
- * as a whole, then each thing in it the Timeline can be narrowed to. Under
+ * What the Timeline can be narrowed to (the phone's home board, LiveBoard,
+ * shows all but the first): first the Scope as a whole, then each thing in
+ * it. Under
  * Following and All (and any League) that's the Scope's Games; under
  * Predictions the open Predictions; under Fantasy each league's Matchup.
- * With a Game open the bar pages Games whatever the Scope, as the cards
- * did. Pure: the Timeline's selection (the `game`, `prediction` and
+ * With a Game open it's Games whatever the Scope, as the cards' are. Pure: the Timeline's selection (the `game`, `prediction` and
  * `matchup` in the address) says which page is current.
  */
 

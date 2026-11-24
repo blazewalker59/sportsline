@@ -24,6 +24,7 @@ import { useTimeZone } from '@/lib/time/useTimeZone'
 import { cn } from '@/lib/utils'
 
 export function GamePane({
+  lead,
   gameId,
   game,
   box,
@@ -38,6 +39,8 @@ export function GamePane({
   feedError,
   onFeedRetry,
 }: {
+  /** On phones, over the thread: the home board (LiveBoard). */
+  lead?: React.ReactNode
   gameId: string
   /** The Game's summary, once known (from its detail or the day's Games). */
   game: GameSummary | null
@@ -82,6 +85,7 @@ export function GamePane({
         className="mb-3 lg:hidden"
         style={{ height: topHeight }}
       />
+      {lead && <div className="lg:hidden">{lead}</div>}
       {wide && (
         <div className="hidden lg:block">
           <PaneHeader game={game} />
