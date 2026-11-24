@@ -411,7 +411,19 @@ function Timeline({
   // whole Scope from the bar is Back. `pagedTo` is where the bar last took
   // the address: anywhere else since (a link, a sheet), and it starts over.
   const pagedTo = useRef<string | null>(null)
-  const pickPage = (page: ScopePage) => {
+  const pickPage = (
+    page: ScopePage,
+    {
+      transition = true,
+    }: {
+      /**
+       * Glide the feed to its new self (a View Transition). Not under a
+       * sheet opening with it: the transition freezes the screen as a
+       * picture, stalling the sheet's slide halfway, then jumps.
+       */
+      transition?: boolean
+    } = {},
+  ) => {
     const here = router.state.location.href
     if (page.kind === 'all' && pagedTo.current === here) {
       pagedTo.current = null
@@ -428,18 +440,19 @@ function Timeline({
         play: undefined,
       }),
       replace: !into,
-      viewTransition: true,
+      viewTransition: transition,
       resetScroll: false,
     }).then(() => {
       pagedTo.current = page.kind === 'all' ? null : router.state.location.href
     })
   }
   // A card tapped, or one picked from a list (the first card's sheet, or
-  // the portfolio): what you're after is its detail, so the Timeline
-  // narrows to it and it opens in full at once.
+  // the portfolio): what you're after is its detail, so it opens in full
+  // at once, and the Timeline narrows to it out of sight beneath (no
+  // transition of its own: the sheet's slide up is the one movement).
   const jumpAndOpen = (page: ScopePage) => {
-    if (pageKey(page) !== currentPage) pickPage(page)
     openPage(page)
+    if (pageKey(page) !== currentPage) pickPage(page, { transition: false })
   }
   const summary = pagerSummary({
     scope,

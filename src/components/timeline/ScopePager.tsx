@@ -255,8 +255,10 @@ export function ScopePager({
                 aria-label={action ? `${name}. ${action}` : name}
                 className={cn(
                   'flex h-16 w-34 flex-col justify-center gap-0.5 rounded-card border px-2.5 text-left text-glass-ink tabular-nums transition-colors',
+                  // The chosen card in a deeper shade, not an outline: the
+                  // text is small, and a colored edge crowds it.
                   here
-                    ? 'border-accent bg-accent-soft'
+                    ? 'border-transparent bg-accent/15'
                     : 'border-border bg-surface/60',
                   first && 'w-38',
                 )}
