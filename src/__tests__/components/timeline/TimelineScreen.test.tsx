@@ -765,6 +765,27 @@ describe('TimelineScreen, narrow: the Scope bar over the tab bar', () => {
     expect(pagerPage(/^BOS 108, NYK 112/)).toBeTruthy()
   })
 
+  it('a card’s sheet slides up on its own: the feed narrows beneath without a View Transition', async () => {
+    const startViewTransition = vi.fn((update: () => void) => {
+      update()
+      const done = Promise.resolve()
+      return { finished: done, ready: done, updateCallbackDone: done }
+    })
+    Object.assign(document, { startViewTransition })
+    try {
+      const { router } = renderTimeline('/?scope=all')
+      await waitFor(() => expect(pager()).toBeTruthy())
+      fireEvent.click(pagerCard(/^BOS 108, NYK 112/))
+      await waitFor(() => expect(search(router).game).toBe('g_nba'))
+      expect(
+        await screen.findByRole('dialog', { name: 'Box score' }),
+      ).toBeTruthy()
+      expect(startViewTransition).not.toHaveBeenCalled()
+    } finally {
+      delete (document as { startViewTransition?: unknown }).startViewTransition
+    }
+  })
+
   it('tapping a Prediction’s card narrows the feed and opens its sheet', async () => {
     scopeOver.current = predictionsScope({
       selectedPrediction: null,

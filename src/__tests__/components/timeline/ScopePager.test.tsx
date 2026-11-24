@@ -116,6 +116,10 @@ describe('ScopePager', () => {
   it('marks the current card', () => {
     const { rerenderAt } = renderPager({ current: pageKey(gamePages[2]) })
     expect(currentCard()).toBe(cards()[2])
+    // A deeper shade, not a colored outline crowding the small text.
+    expect(currentCard()!.className).toContain('bg-accent/15')
+    expect(currentCard()!.className).not.toContain('border-accent')
+    expect(cards()[1].className).not.toContain('bg-accent/15')
     rerenderAt('all')
     expect(currentCard()).toBe(cards()[0])
   })
