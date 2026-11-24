@@ -58,6 +58,7 @@ export function TimelineTop({
   onMatchup,
   onSelectPrediction,
   onSelectMatchup,
+  ticker,
 }: {
   topRef: React.Ref<HTMLDivElement>
   /** A phone's Timeline (useCompactTimeline): null until it's known. */
@@ -88,6 +89,13 @@ export function TimelineTop({
   onSelectPrediction: (id: string | null) => void
   /** Narrow the Timeline to one Matchup, or clear it. */
   onSelectMatchup: (id: string | null) => void
+  /**
+   * The home board's scores, pinned once the board scrolls away (a phone:
+   * LiveTicker). Laid over what's under the header, not added to the
+   * top's height, so showing it never moves the page; the League row
+   * tucks away behind it.
+   */
+  ticker?: React.ReactNode
 }) {
   const display = s.kalshi.data?.changeDisplay
   // Which League, under the All tab (the nav's tabs are the other Scopes).
@@ -109,7 +117,7 @@ export function TimelineTop({
             className={cn(
               'pointer-events-auto relative z-20 bg-background px-4 transition-[border-color] lg:px-0',
               'border-b',
-              panelHidden ? 'border-border' : 'border-transparent',
+              panelHidden && !ticker ? 'border-border' : 'border-transparent',
               // Nothing under it on a phone: the header ends the top.
               !leagueRow && 'max-md:border-border',
             )}
@@ -142,17 +150,22 @@ export function TimelineTop({
                 onPick={onDayClose}
               />
             </Collapse>
+            {ticker && !dayOpen && (
+              <div className="animate-in fade-in slide-in-from-top-1 absolute inset-x-0 top-full border-b border-border bg-background duration-200 md:hidden">
+                {ticker}
+              </div>
+            )}
           </div>
           {/* The League row and score cards tuck away while reading down, return on the way up. */}
           {panel && (
             <div
               className={cn(
                 'pointer-events-auto relative z-10 border-b border-border bg-background px-4 pb-2 transition-transform duration-300 ease-out lg:px-0',
-                panelHidden && '-translate-y-full',
+                (panelHidden || ticker) && '-translate-y-full',
                 !leagueRow && 'max-md:hidden',
               )}
-              inert={panelHidden}
-              aria-hidden={panelHidden}
+              inert={panelHidden || Boolean(ticker)}
+              aria-hidden={panelHidden || Boolean(ticker)}
             >
               {leagueRow && <LeagueBar scope={s.scope} items={s.rowItems} />}
               {compact !== true && (

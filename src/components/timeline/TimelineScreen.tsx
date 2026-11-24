@@ -33,6 +33,13 @@ import { followsGame, inScope } from './timelineScope'
 import { usePastDay } from './usePastDay'
 import { useTimelineScope } from './useTimelineScope'
 import { useWideTimeline } from './useWideTimeline'
+import {
+  FeedFilter,
+  LiveBoard,
+  LiveTicker,
+  YourNight,
+  useBoardLayout,
+} from './LiveBoard'
 import type { ScopePage } from './scopePages'
 import type { Typing } from '@/lib/timeline/chat'
 import type { GameSummary, TimelineItem } from '@/lib/model/timeline'
@@ -45,10 +52,14 @@ import { PredictionDetail } from '@/components/predictions/PredictionSheet'
 import { FirstRunFollows } from '@/components/follows/FirstRunFollows'
 import { neighborScope, scopeStops } from '@/lib/model/scope'
 import { useSwipe } from '@/components/layout/useSwipe'
+import { MatchupDetail } from '@/components/fantasy/FantasyParts'
+import { StakesProvider } from '@/components/chat/StakeTags'
 import {
-  FantasyTagsProvider,
-  MatchupDetail,
-} from '@/components/fantasy/FantasyParts'
+  affectsViewer,
+  boardOrder,
+  gameStakes,
+  stakeIndex,
+} from '@/lib/timeline/stakes'
 import { ReactionsProvider } from '@/components/chat/Reactions'
 import { takePlayOpened } from '@/lib/timeline/playSheet'
 import { useHideOnScroll } from '@/lib/useHideOnScroll'
@@ -174,6 +185,15 @@ function Timeline({
   // Viewer sees every League (the default Follows), off for their own Follows.
   const [highlights, setHighlights] = useState(() => !followed?.length)
   const timeline = useLiveTimeline(follows, sportsDay, today)
+  // What the Viewer has riding on the plays: their Starters (and their
+  // opponents'), and their open Predictions' Players and Games.
+  const stakes = useMemo(
+    () => stakeIndex(s.fantasyLeagues, s.openPredictions),
+    [s.fantasyLeagues, s.openPredictions],
+  )
+  // "Affects me": only the plays that move one of those stakes.
+  const [mine, setMine] = useState(false)
+  const hasStakes = stakes.starters.size > 0 || stakes.legs.size > 0
   // While a day loads, keep the previous one on screen, dimmed.
   const dimmed = timeline.loading && timeline.previousItems.length > 0
   // Beside the wide feed a Game opens in its own pane; on phones it takes
@@ -308,8 +328,19 @@ function Timeline({
   // `lg` they sit side by side (useWideTimeline).
   const scopeItems = useMemo(() => {
     const source = dimmed ? timeline.previousItems : timeline.items
-    return highlights ? onlyHighlights(source) : source
-  }, [timeline.items, timeline.previousItems, dimmed, highlights])
+    const shown = highlights ? onlyHighlights(source) : source
+    return mine && hasStakes
+      ? shown.filter((i) => affectsViewer(i, stakes))
+      : shown
+  }, [
+    timeline.items,
+    timeline.previousItems,
+    dimmed,
+    highlights,
+    mine,
+    hasStakes,
+    stakes,
+  ])
   // Until the Game's full history loads, filter what is here.
   const gameItems = useMemo(() => {
     if (!gameId) return []
@@ -454,6 +485,50 @@ function Timeline({
     openPage(page)
     if (pageKey(page) !== currentPage) pickPage(page, { transition: false })
   }
+  // The phone's home board (LiveBoard) stands in for the Scope bar over
+  // the whole Scope; narrowed, the bar is back, to go back or open it.
+  const home = compact === true && !s.setup && !gameId && currentPage === 'all'
+  // "Affects me" is the board's switch: away from the board, every play.
+  useEffect(() => {
+    if (!home) setMine(false)
+  }, [home])
+  const [boardLayout, setBoardLayout] = useBoardLayout()
+  const staked = useCallback(
+    (g: GameSummary) =>
+      gameStakes(g, stakes, (x) => followsGame(x, s.viewerFollows)),
+    [stakes, s.viewerFollows],
+  )
+  const boardGames = useMemo(
+    () => boardOrder(pagerGames, (g) => staked(g).length > 0),
+    [pagerGames, staked],
+  )
+  const followingGames = useMemo(
+    () =>
+      s.viewerFollows.length > 0
+        ? timeline.games.filter((g) => followsGame(g, s.viewerFollows))
+        : null,
+    [s.viewerFollows, timeline.games],
+  )
+  const pickGame = (g: GameSummary) =>
+    pickPage({ kind: 'game', id: g.id, game: g })
+  // Once the board scrolls up under the top, its scores pin there.
+  const [boardAway, setBoardAway] = useState(false)
+  const [board, setBoard] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    if (!board || !home) {
+      setBoardAway(false)
+      return
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) =>
+        setBoardAway(
+          !entry.isIntersecting && entry.boundingClientRect.top < topHeight,
+        ),
+      { rootMargin: `-${topHeight}px 0px 0px 0px` },
+    )
+    observer.observe(board)
+    return () => observer.disconnect()
+  }, [board, home, topHeight])
   const summary = pagerSummary({
     scope,
     gameId,
@@ -531,18 +606,15 @@ function Timeline({
         onMatchup={openMatchup}
         onSelectPrediction={selectPrediction}
         onSelectMatchup={selectMatchup}
+        ticker={
+          home && boardAway ? (
+            <LiveTicker games={boardGames} onPick={pickGame} />
+          ) : undefined
+        }
       />
 
-      {/* Tags plays by either side's Starters, in the Fantasy view. */}
-      <FantasyTagsProvider
-        leagues={
-          s.selectedMatchup
-            ? [s.selectedMatchup]
-            : scope === 'fantasy'
-              ? s.fantasyLeagues
-              : []
-        }
-      >
+      {/* Tags each play with what it did for the Viewer's stakes. */}
+      <StakesProvider index={stakes}>
         {showScope && (
           // The Scope's feed, unfiltered. With a Game open it shows only
           // beside it, from `lg` (CSS, so the server render is right too).
@@ -564,6 +636,42 @@ function Timeline({
               )
             ) : (
               <>
+                {home && (
+                  <div className="flex flex-col">
+                    <YourNight
+                      leagues={s.fantasyLeagues}
+                      predictions={s.openPredictions}
+                      display={display}
+                      following={followingGames}
+                      current={
+                        scope === 'predictions' || scope === 'following'
+                          ? scope
+                          : null
+                      }
+                      onMatchup={(l) =>
+                        pickPage({ kind: 'matchup', id: l.id, league: l })
+                      }
+                      onPortfolio={() => setPortfolioOpen(true)}
+                      onPrediction={(p) =>
+                        pickPage({
+                          kind: 'prediction',
+                          id: p.id,
+                          prediction: p,
+                        })
+                      }
+                      onFollowing={() => goToScope('following')}
+                    />
+                    <LiveBoard
+                      games={boardGames}
+                      stakesOf={staked}
+                      layout={boardLayout}
+                      onLayout={setBoardLayout}
+                      onPick={pickGame}
+                      boardRef={setBoard}
+                    />
+                    {hasStakes && <FeedFilter mine={mine} onMine={setMine} />}
+                  </div>
+                )}
                 <TimelineFeed
                   entries={scopeEntries}
                   typing={scopeTyping}
@@ -614,10 +722,10 @@ function Timeline({
         ) : (
           wide && <PanePlaceholder scope={s.setup ? null : scope} />
         )}
-      </FantasyTagsProvider>
+      </StakesProvider>
 
       {/* Null while the width isn't known: CSS shows it only below `md`. */}
-      {compact !== false && !s.setup && (
+      {compact !== false && !s.setup && !home && (
         <ScopePager
           pages={pages}
           current={currentPage}

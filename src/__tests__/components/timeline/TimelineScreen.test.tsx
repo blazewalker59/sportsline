@@ -705,11 +705,16 @@ describe('TimelineScreen, wide: Predictions and Matchups in the pane', () => {
   })
 })
 
-describe('TimelineScreen, narrow: the Scope bar over the tab bar', () => {
+describe('TimelineScreen, narrow: the home board, then the Scope bar', () => {
   beforeEach(() => setWide(false))
 
+  const board = () => screen.queryByRole('region', { name: 'Games' })
+  const night = () => screen.queryByRole('region', { name: 'Your night' })
+  const tile = (name: RegExp) => within(board()!).getByRole('button', { name })
+  const stake = (name: RegExp) => within(night()!).getByRole('button', { name })
+
   it.each(['following', 'all', 'predictions', 'fantasy'])(
-    'stands in for the cards under the %s tab',
+    'the whole Scope shows the board, not the bar (%s)',
     async (scope) => {
       scopeOver.current =
         scope === 'predictions'
@@ -718,54 +723,77 @@ describe('TimelineScreen, narrow: the Scope bar over the tab bar', () => {
             ? fantasyScope({ selectedMatchup: null })
             : {}
       renderTimeline(`/?scope=${scope}`)
-      await waitFor(() => expect(pager()).toBeTruthy())
-      // No cards at the top: the bar's row holds the same things.
+      await waitFor(() => expect(board()).toBeTruthy())
+      expect(pager()).toBeNull()
+      // No cards at the top either: the board holds the Games.
       expect(
         screen.queryByRole('list', { name: /Your Predictions|Your Matchups/ }),
       ).toBeNull()
-      expect(
-        screen.queryByRole('link', { name: /^BOS 108, NYK 112/ }),
-      ).toBeNull()
-      // The Scope as a whole first, and current.
-      const current = within(pager()!)
-        .getAllByRole('button')
-        .find((el) => el.getAttribute('aria-current') === 'true')!
-      expect(current.getAttribute('aria-label')).toMatch(
-        {
-          following: /^Following/,
-          all: /^All Leagues: 3 games/,
-          predictions: /^Your Predictions: 1 open/,
-          fantasy: /^Your Matchups: 1 this week · leading 1/,
-        }[scope]!,
-      )
+      if (scope === 'predictions') {
+        // Only the Games the Predictions depend on.
+        expect(within(board()!).getByText(/Live now · 1/)).toBeTruthy()
+        expect(within(board()!).queryByText(/BUF/)).toBeNull()
+      } else {
+        // The live Games as tiles; the finished one as a chip under them.
+        expect(within(board()!).getByText(/Live now · 2/)).toBeTruthy()
+        expect(tile(/^KC 14, BUF 10, Q3 8:12/)).toBeTruthy()
+        expect(tile(/BOS 108 · NYK 112/)).toBeTruthy()
+      }
+      if (scope === 'predictions')
+        expect(stake(/^1 open prediction, worth \$6\.20/)).toBeTruthy()
+      else if (scope === 'fantasy')
+        expect(
+          stake(/^The League: 88\.4–71\.2 against Gridiron Gang/),
+        ).toBeTruthy()
+      else expect(night()).toBeNull()
     },
   )
 
-  it('a tablet (the rail, one pane) keeps the cards and has no bar', async () => {
+  it('a tablet (the rail, one pane) keeps the cards, with no board or bar', async () => {
     setWide(false, { rail: true })
     scopeOver.current = predictionsScope({ selectedPrediction: null })
     renderTimeline('/?scope=predictions')
     await screen.findByRole('list', { name: 'Your Predictions' })
     expect(pager()).toBeNull()
+    expect(board()).toBeNull()
   })
 
-  it('tapping a Game’s card narrows the Timeline to it and opens its box score', async () => {
+  it('collapses the board to one row, and remembers it on the device', async () => {
+    renderTimeline('/?scope=all')
+    await waitFor(() => expect(board()).toBeTruthy())
+    const toggle = (name: string) =>
+      within(board()!).getByRole('button', { name })
+    expect(toggle('Grid').getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(toggle('One row'))
+    await waitFor(() =>
+      expect(toggle('One row').getAttribute('aria-pressed')).toBe('true'),
+    )
+    expect(localStorage.getItem('sportsline:board-layout')).toBe('row')
+    // Every Game as a tile in the row, the finished one too.
+    expect(tile(/^BOS 108, NYK 112, Final/)).toBeTruthy()
+    fireEvent.click(toggle('Grid'))
+    await waitFor(() =>
+      expect(localStorage.getItem('sportsline:board-layout')).toBe('grid'),
+    )
+  })
+
+  it('tapping a tile narrows the Timeline to its Game; the bar opens it in full', async () => {
     const { router } = renderTimeline('/?scope=all')
-    await waitFor(() => expect(pager()).toBeTruthy())
-    // Every Game is in view at once, not one at a time.
-    expect(within(pager()!).getAllByRole('button')).toHaveLength(4)
-    fireEvent.click(pagerCard(/^BOS 108, NYK 112/))
-    await waitFor(() => expect(gamePane()?.dataset.gamePane).toBe('g_nba'))
-    expect(search(router).game).toBe('g_nba')
+    await waitFor(() => expect(board()).toBeTruthy())
+    fireEvent.click(tile(/^KC 14, BUF 10/))
+    await waitFor(() => expect(gamePane()?.dataset.gamePane).toBe('g_nfl'))
+    expect(search(router).game).toBe('g_nfl')
     expect(scopeFeed()).toBeNull()
-    // One tap: the box score is open too.
+    // Narrowed, not opened: no sheet; the bar is back, on that Game.
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(board()).toBeNull()
+    fireEvent.click(pagerPage(/^KC 14, BUF 10/))
     expect(
       await screen.findByRole('dialog', { name: 'Box score' }),
     ).toBeTruthy()
-    expect(pagerPage(/^BOS 108, NYK 112/)).toBeTruthy()
   })
 
-  it('a card’s sheet slides up on its own: the feed narrows beneath without a View Transition', async () => {
+  it('a card’s sheet slides up on its own: no View Transition with it', async () => {
     const startViewTransition = vi.fn((update: () => void) => {
       update()
       const done = Promise.resolve()
@@ -774,7 +802,11 @@ describe('TimelineScreen, narrow: the Scope bar over the tab bar', () => {
     Object.assign(document, { startViewTransition })
     try {
       const { router } = renderTimeline('/?scope=all')
-      await waitFor(() => expect(pager()).toBeTruthy())
+      await waitFor(() => expect(board()).toBeTruthy())
+      fireEvent.click(tile(/^KC 14, BUF 10/))
+      await waitFor(() => expect(search(router).game).toBe('g_nfl'))
+      startViewTransition.mockClear()
+      // Another Game from the bar: it opens, and the feed narrows beneath.
       fireEvent.click(pagerCard(/^BOS 108, NYK 112/))
       await waitFor(() => expect(search(router).game).toBe('g_nba'))
       expect(
@@ -786,20 +818,22 @@ describe('TimelineScreen, narrow: the Scope bar over the tab bar', () => {
     }
   })
 
-  it('tapping a Prediction’s card narrows the feed and opens its sheet', async () => {
+  it('a Prediction in Your night narrows the feed; the bar opens its sheet', async () => {
     scopeOver.current = predictionsScope({
       selectedPrediction: null,
       fromAddress: true,
     })
     const { router } = renderTimeline('/?scope=predictions')
-    await waitFor(() => expect(pager()).toBeTruthy())
-    fireEvent.click(pagerCard(/^Phillies to win/))
+    await waitFor(() => expect(night()).toBeTruthy())
+    fireEvent.click(stake(/^Phillies to win, 62%/))
     await waitFor(() =>
       expect(search(router)).toMatchObject({
         scope: 'predictions',
         prediction: 'pred_1',
       }),
     )
+    expect(screen.queryByRole('dialog')).toBeNull()
+    fireEvent.click(pagerPage(/^Phillies to win/))
     const sheet = await screen.findByRole('dialog', { name: 'Prediction' })
     expect(within(sheet).getByText('Phillies to win')).toBeTruthy()
     // A phone has no pane, nor puts the sheet in the address.
@@ -807,16 +841,15 @@ describe('TimelineScreen, narrow: the Scope bar over the tab bar', () => {
     expect(search(router).detail).toBeUndefined()
   })
 
-  it('opens the portfolio from the first page; a Prediction picked there opens and narrows', async () => {
+  it('opens the portfolio from Your night; a Prediction picked there opens and narrows', async () => {
     scopeOver.current = predictionsScope({
       selectedPrediction: null,
       fromAddress: true,
     })
     const { router } = renderTimeline('/?scope=predictions')
-    await waitFor(() => expect(pager()).toBeTruthy())
-    fireEvent.click(pagerPage(/^Your Predictions: 1 open/))
+    await waitFor(() => expect(night()).toBeTruthy())
+    fireEvent.click(stake(/Open your portfolio$/))
     const sheet = await screen.findByRole('dialog', { name: 'Portfolio' })
-    // A Prediction picked there opens as its sheet, the bar jumping to it.
     fireEvent.click(within(sheet).getByText('Phillies to win'))
     expect(
       await screen.findByRole('dialog', { name: 'Prediction' }),
@@ -825,56 +858,28 @@ describe('TimelineScreen, narrow: the Scope bar over the tab bar', () => {
     expect(pagerPage(/^Phillies to win/)).toBeTruthy()
   })
 
-  it('the first page under All lists the games; picking one jumps to it and opens its box score', async () => {
-    const { router } = renderTimeline('/?scope=all')
-    await waitFor(() => expect(pager()).toBeTruthy())
-    fireEvent.click(pagerPage(/See all the games$/))
-    const sheet = await screen.findByRole('dialog', { name: 'All Leagues' })
-    const rows = within(sheet).getAllByRole('button', { name: /^(?!Done)/ })
-    expect(rows.length).toBeGreaterThanOrEqual(3)
-    fireEvent.click(within(sheet).getByText('Boston Celtics'))
-    await waitFor(() => expect(search(router).game).toBe('g_nba'))
-    // Straight to its detail: no second tap on the bar.
-    expect(
-      await screen.findByRole('dialog', { name: 'Box score' }),
-    ).toBeTruthy()
-    expect(screen.queryByRole('dialog', { name: 'All Leagues' })).toBeNull()
-    // The bar is on that Game, and the Timeline narrowed to it.
-    expect(gamePane()!.dataset.gamePane).toBe('g_nba')
-    expect(pagerPage(/^BOS 108, NYK 112/)).toBeTruthy()
-    // Closed, and back on another Game and this one, it stays closed.
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-  })
-
-  it('the first page under Fantasy lists the Matchups; picking one jumps to it and opens it', async () => {
+  it('a Matchup in Your night narrows to it; the bar opens it in full', async () => {
     scopeOver.current = fantasyScope({
       selectedMatchup: null,
       fromAddress: true,
     })
     const { router } = renderTimeline('/?scope=fantasy')
-    await waitFor(() => expect(pager()).toBeTruthy())
-    fireEvent.click(pagerPage(/See all your matchups$/))
-    const sheet = await screen.findByRole('dialog', { name: 'Your Matchups' })
-    expect(within(sheet).getByText('Gridiron Gang')).toBeTruthy()
-    expect(within(sheet).getByText('Leading')).toBeTruthy()
-    fireEvent.click(within(sheet).getByText('Sam’s Squad'))
+    await waitFor(() => expect(night()).toBeTruthy())
+    fireEvent.click(stake(/^The League/))
     await waitFor(() =>
       expect(search(router)).toMatchObject({
         scope: 'fantasy',
         matchup: 'espn-1',
       }),
     )
-    // Its full sheet, not just the narrowed feed.
+    fireEvent.click(pagerPage(/^The League/))
     const matchup = await screen.findByRole('dialog', { name: 'The League' })
     expect(within(matchup).getByRole('banner').textContent).toContain(
       'Gridiron Gang',
     )
-    expect(screen.queryByRole('dialog', { name: 'Your Matchups' })).toBeNull()
-    expect(pagerPage(/^The League/)).toBeTruthy()
   })
 
-  it('Back, or the first card, returns to the whole Scope, however many cards were tapped', async () => {
+  it('Back, or the first card, returns to the board, however many cards were tapped', async () => {
     const second = { ...pred, id: 'pred_2', title: 'Over 8.5 runs' }
     scopeOver.current = predictionsScope({
       selectedPrediction: null,
@@ -883,25 +888,22 @@ describe('TimelineScreen, narrow: the Scope bar over the tab bar', () => {
       fromAddress: true,
     })
     const { router } = renderTimeline('/?scope=predictions')
-    await waitFor(() => expect(pager()).toBeTruthy())
+    await waitFor(() => expect(night()).toBeTruthy())
     const start = router.history.length
-    const done = async () => {
-      fireEvent.click(await screen.findByRole('button', { name: 'Done' }))
-      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
-    }
-    fireEvent.click(pagerCard(/^Phillies to win/))
+    fireEvent.click(stake(/^Phillies to win/))
     await waitFor(() => expect(search(router).prediction).toBe('pred_1'))
-    await done()
     fireEvent.click(pagerCard(/^Over 8\.5 runs/))
     await waitFor(() => expect(search(router).prediction).toBe('pred_2'))
-    await done()
+    fireEvent.click(await screen.findByRole('button', { name: 'Done' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     // Into the Scope is one step; another card replaces it.
     expect(router.history.length).toBe(start + 1)
-    // The first card, now "Show everything", is Back.
+    // The first card, now "Show everything", is Back: to the board.
     fireEvent.click(pagerCard(/Show everything$/))
     await waitFor(() => expect(search(router).prediction).toBeUndefined())
     expect(router.history.canGoBack()).toBe(false)
-    expect(pagerPage(/^Your Predictions: 2 open/)).toBeTruthy()
+    await waitFor(() => expect(night()).toBeTruthy())
+    expect(pager()).toBeNull()
   })
 
   it('opens a Matchup as a sheet, which lists the league’s Matchups', async () => {
@@ -946,12 +948,13 @@ describe('TimelineScreen, narrow: the Scope bar over the tab bar', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 
-  it('isn’t there while the Scope is still to be set up', async () => {
+  it('neither is there while the Scope is still to be set up', async () => {
     scopeOver.current = { setup: 'predictions' }
     renderTimeline('/?scope=predictions')
     await waitFor(() =>
       expect(document.querySelector('[data-scope-prompt]')).toBeTruthy(),
     )
     expect(pager()).toBeNull()
+    expect(board()).toBeNull()
   })
 })
