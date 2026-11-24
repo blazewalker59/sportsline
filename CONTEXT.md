@@ -92,7 +92,7 @@ The live, reverse-chronological stream of Plays and Game Milestones in the Viewe
 _Avoid_: feed, stream, ticker
 
 **Scope**:
-Which Plays a Timeline draws from: All (every League the Viewer hasn't hidden), Following (the Viewer's Follows), Predictions (the Games their open Predictions depend on, or just one Prediction's: its Players' plays and its other Legs' Games), Fantasy (plays by both sides' Starters in their Matchups), a single League, Top 25 (college football Games with a Ranked team), or a Conference. A Viewer switches Scope from the main navigation, whose four tabs are Following, All, Predictions and Fantasy, from any screen, or by swiping across the Timeline in the same order. All stands for every League-shaped Scope (All, a single League, Top 25, a Conference): it returns to the last of those the Viewer chose, and which one is chosen on the League row at the top of the Timeline, shown only under All. Within a Scope the Timeline can be narrowed to one of its Games, open Predictions or Matchups: on a phone from the row of cards over the tab bar (the whole Scope first, then each of them; tapping one narrows to it and opens it in full, and the first card lists them all, the Predictions as the portfolio, or once narrowed shows everything again), from a tablet up by its cards at the top of the Timeline. A Scope with nothing behind it yet (no Follows, no Kalshi connection, no Fantasy connection or Matchup) still shows when chosen, with a prompt to set it up instead of plays. The Timeline opens on the Scope last chosen on the device; otherwise it starts on Following when the Viewer follows anything, otherwise All.
+Which Plays a Timeline draws from: All (every League the Viewer hasn't hidden), Following (the Viewer's Follows), Predictions (the Games their open Predictions depend on, or just one Prediction's: its Players' plays and its other Legs' Games), Fantasy (plays by both sides' Starters in their Matchups), a single League, Top 25 (college football Games with a Ranked team), or a Conference. A Viewer switches Scope from the main navigation, whose four tabs are Following, All, Predictions and Fantasy, from any screen, or by swiping across the Timeline in the same order. All stands for every League-shaped Scope (All, a single League, Top 25, a Conference): it returns to the last of those the Viewer chose, and which one is chosen on the League row at the top of the Timeline, shown only under All. Within a Scope the Timeline can be narrowed to one of its Games, open Predictions or Matchups: on a phone from the Home board over the whole Scope's feed (tapping a Game, Prediction or Matchup there narrows to it), and once narrowed from the row of cards over the tab bar (tapping one opens it in full; the first card shows everything again); from a tablet up by its cards at the top of the Timeline. A Scope with nothing behind it yet (no Follows, no Kalshi connection, no Fantasy connection or Matchup) still shows when chosen, with a prompt to set it up instead of plays. The Timeline opens on the Scope last chosen on the device; otherwise it starts on Following when the Viewer follows anything, otherwise All.
 _Avoid_: view, mode (the nav's "tabs" are Scopes; say Scope)
 
 **Team page**:
@@ -106,6 +106,14 @@ _Avoid_: division, league (a Conference is within the college football League)
 **Ranked**:
 A college football team in the AP Top 25 when a Game is played. The rank belongs to the Game, not the Team: it is the team's rank that week. Any Game with a Ranked team is covered, whatever the conferences.
 _Avoid_: top team, rated
+
+**Stakes**:
+What a Viewer has riding on the night: their Fantasy Matchups' Starters (and their opponents'), the Players and Games in their open Predictions, and their Follows. Each Play is tagged with the Stakes it moved ("★ Your starter · Brunson", a Leg's count so far), and the Timeline can show only the Plays that move the Viewer's own ("Affects me").
+_Avoid_: bets, exposure
+
+**Home board**:
+On a phone, over the whole Scope's feed: "Your night" (a card per Matchup, the Predictions as a portfolio and one by one, and the Following Games), then the Scope's Games, as a grid of live tiles or collapsed to one row, the Viewer's choice on the device. Once it scrolls away, its scores stay pinned under the header as a ticker.
+_Avoid_: dashboard, scoreboard
 
 **Highlights**:
 A Timeline filter that keeps only Scoring and Notable Plays (and Game Milestones).

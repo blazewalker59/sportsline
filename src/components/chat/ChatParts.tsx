@@ -8,10 +8,10 @@ import { Link } from '@tanstack/react-router'
 import { memo, useState } from 'react'
 import { PlayText } from './PlayText'
 import { ReactionPills, useItemReactions, useLongPress } from './Reactions'
+import { StakeTags } from './StakeTags'
 import type { Bubble } from '@/lib/timeline/chat'
 import type { TeamRef, TimelineItem } from '@/lib/model/timeline'
 import type { League } from '@/lib/model/types'
-import { FantasyTag } from '@/components/fantasy/FantasyParts'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { TimeAgo } from '@/components/timeline/format'
@@ -180,7 +180,7 @@ export function PlayBubble({
         press={press}
       />
       <ReactionPills reactions={reactions?.get(item.id)} align={align} />
-      <FantasyTag item={item} align={align} />
+      <StakeTags item={item} align={align} />
     </>
   )
 }
