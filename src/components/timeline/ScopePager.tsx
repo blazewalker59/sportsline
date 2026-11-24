@@ -1,14 +1,14 @@
 /**
- * The phone's Scope bar: one wide card of glass over the tab bar, on every
- * tab, paging sideways through what the Scope covers (scopePages): the
- * Scope as a whole, then its Games, open Predictions or Matchups. Swiping
- * to a page narrows the Timeline to it, there and then; tapping the page
- * in view opens it in full (the Game's box score, the Prediction's or
- * Matchup's sheet, or from the first page the portfolio). The selection
- * lives in the address, so the bar only follows it: a page chosen anywhere
- * else (a link, Back) scrolls into view here. It goes round: past the last
- * page is the first again, and before the first the last (a copy of each
- * sits at the far ends, swapped for the real one once the swipe stops).
+ * The phone's Scope bar: a strip of glass over the tab bar, on every tab,
+ * holding a row of small cards that scrolls freely sideways (two or three
+ * in view): what the Scope covers (scopePages), the Scope as a whole first,
+ * then its Games, open Predictions or Matchups. Tapping a card narrows the
+ * Timeline to it and opens it in full at once (the Game's box score, the
+ * Prediction's or Matchup's sheet). The first card, with nothing narrowed,
+ * opens everything as a list (the Games, the Matchups, or the portfolio);
+ * with something narrowed, it goes back to the whole Scope. The selection
+ * lives in the address, so the bar only follows it: the chosen card is
+ * marked, and one chosen anywhere else (a link, Back) scrolls into view.
  *
  * Only below `md`, where the navigation is the tab bar it sits on; from
  * `md` the cards at the top of the Timeline do this (TimelineTop).
@@ -40,12 +40,7 @@ import { SPORTS } from '@/lib/fantasy/sports'
 import { useTimeZone } from '@/lib/time/useTimeZone'
 import { cn } from '@/lib/utils'
 
-/** Up to this many pages show as dots; past it, a count ("3 / 14"). */
-const MAX_DOTS = 9
-/** A scroll that stops moving this long has come to rest (no scrollend). */
-const SETTLE_MS = 140
-
-/** The first page: the Scope as a whole. */
+/** The first card: the Scope as a whole. */
 export interface PagerSummary {
   kicker: string
   title: string
@@ -58,9 +53,25 @@ export interface PagerSummary {
   opens: string | null
 }
 
+/** A scroll this soon after a touch is still the Viewer's (a flick). */
+const MOMENTUM_MS = 1500
+
+/** Scroll the row the least that shows its chosen card whole. */
+function showCurrent(el: HTMLElement | null) {
+  const card = el?.querySelector<HTMLElement>('[aria-current="true"]')
+  if (!el || !card) return
+  const left = card.offsetLeft - el.offsetLeft
+  const right = left + card.offsetWidth
+  const pad = 12
+  if (left - pad < el.scrollLeft)
+    el.scrollTo({ left: Math.max(0, left - pad), behavior: 'instant' })
+  else if (right + pad > el.scrollLeft + el.clientWidth)
+    el.scrollTo({ left: right + pad - el.clientWidth, behavior: 'instant' })
+}
+
 const isLive = (g: GameSummary) => g.status === 'live' || g.status === 'delayed'
 
-/** The first page's words for the Scope, from what's in it. */
+/** The first card's words for the Scope, from what's in it. */
 export function pagerSummary({
   scope,
   gameId,
@@ -132,8 +143,8 @@ export function ScopePager({
   current,
   summary,
   display,
-  onSelect,
-  onOpen,
+  onPick,
+  onSummary,
   className,
 }: {
   pages: ReadonlyArray<ScopePage>
@@ -141,298 +152,130 @@ export function ScopePager({
   current: string
   summary: PagerSummary
   display?: ChangeDisplay
-  /** Narrow the Timeline to a page (the first page: to the whole Scope). */
-  onSelect: (page: ScopePage) => void
-  /** Open the page in view in full. */
-  onOpen: (page: ScopePage) => void
+  /** A card tapped: narrow the Timeline to it and open it in full. */
+  onPick: (page: ScopePage) => void
+  /**
+   * The first card tapped: back to the whole Scope, or with nothing
+   * narrowed, everything as a list.
+   */
+  onSummary: () => void
   className?: string
 }) {
-  const strip = useRef<HTMLDivElement>(null)
-  const found = pages.findIndex((p) => pageKey(p) === current)
-  const index = Math.max(found, 0)
-  const keys = pages.map(pageKey).join('|')
-  // With two pages or more it goes round: a copy of the last page before
-  // the first and of the first after the last, so every page is one swipe
-  // from the next. `slot` is where a page sits in the strip.
-  const loop = pages.length > 1
-  const offset = loop ? 1 : 0
-  // The page shown last, to tell a step round the end from a jump.
-  const shown = useRef(index)
-  // A finger on the strip: the selection waits until it lets go.
-  const touching = useRef(false)
-  // The Viewer moved the strip (a finger, a wheel, focus) since it last
-  // came to rest: where it stops is their pick. Anything else that moves
-  // it (the router restoring scroll positions on Back) is put right.
-  const byViewer = useRef(false)
-  // A page picked here that the address hasn't caught up with yet.
-  const picked = useRef<string | null>(null)
-  // The next scroll into view is a step (an arrow), not a jump.
-  const glide = useRef(false)
-  // The latest of everything the scroll listeners read.
-  const latest = useRef({ pages, index, onSelect, loop, offset })
-  latest.current = { pages, index, onSelect, loop, offset }
+  const strip = useRef<HTMLUListElement>(null)
+  const narrowed = current !== 'all'
 
-  // Keep the current page in view: on first paint, and whenever the
-  // selection changes or the pages move (a Game going live moves up).
-  useLayoutEffect(() => {
-    picked.current = null
-    const was = shown.current
-    shown.current = index
-    const el = strip.current
-    if (!el || touching.current || !el.clientWidth) return
-    const last = pages.length - 1
-    // An arrow stepping round the end glides on to the copy beyond it
-    // (then settles on the real page), rather than back across them all.
-    const slot =
-      glide.current && loop && was === last && index === 0
-        ? last + 2
-        : glide.current && loop && was === 0 && index === last
-          ? 0
-          : index + offset
-    const left = slot * el.clientWidth
-    if (Math.abs(el.scrollLeft - left) > 1)
-      el.scrollTo({ left, behavior: glide.current ? 'smooth' : 'instant' })
-    glide.current = false
-    // Only on a selection or new pages: not on every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index, keys])
+  // The chosen card in view, when the choice changes (from here or
+  // anywhere else): the least scroll that shows it whole, never a jump
+  // the Viewer didn't ask for otherwise.
+  useLayoutEffect(() => showCurrent(strip.current), [current])
 
-  // A swipe that comes to rest on another page selects it.
+  // The Viewer's own scrolling is theirs to leave anywhere. Anything else
+  // that moves the row (the router restoring an old position on Back)
+  // mustn't hide the chosen card, so it's brought back into view.
   useEffect(() => {
     const el = strip.current
     if (!el) return
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const settle = () => {
-      clearTimeout(timer)
-      if (touching.current || !el.clientWidth) return
-      const viewer = byViewer.current
-      byViewer.current = false
-      const now = latest.current
-      const width = el.clientWidth
-      let slot = Math.round(el.scrollLeft / width)
-      // Resting on a copy at either end: swap it for the real page.
-      if (now.loop && (slot === 0 || slot === now.pages.length + 1)) {
-        slot = slot === 0 ? now.pages.length : 1
-        el.scrollTo({ left: slot * width, behavior: 'instant' })
-      }
-      const at = slot - now.offset
-      if (at === now.index) {
-        picked.current = null
-        return
-      }
-      const page = now.pages[at] as ScopePage | undefined
-      if (viewer && page) {
-        picked.current = pageKey(page)
-        now.onSelect(page)
-      } else if (!picked.current) {
-        // Not theirs, and nothing on its way: back to the current page.
-        el.scrollTo({
-          left: (now.index + now.offset) * width,
-          behavior: 'instant',
-        })
-      }
+    let touching = false
+    let dragged = false
+    let lastTouch = Number.NEGATIVE_INFINITY
+    const theirs = () => {
+      lastTouch = performance.now()
     }
-    const onScroll = () => {
-      clearTimeout(timer)
-      timer = setTimeout(settle, SETTLE_MS)
-    }
-    const arm = () => {
-      byViewer.current = true
-      onScroll()
-    }
+    // A tap on a card isn't scrolling: only a finger that moves is.
     const onDown = () => {
-      touching.current = true
-      byViewer.current = true
+      touching = true
+      dragged = false
+      // A finger down stops any coasting from the last flick.
+      lastTouch = Number.NEGATIVE_INFINITY
+    }
+    const onMove = () => {
+      dragged = true
+      theirs()
     }
     const onUp = () => {
-      touching.current = false
-      onScroll()
+      touching = false
+      if (dragged) theirs()
     }
-    el.addEventListener('scroll', onScroll, { passive: true })
-    el.addEventListener('scrollend', settle)
+    const onScroll = () => {
+      // A flick keeps scrolling a while after the finger lifts.
+      if (touching || performance.now() - lastTouch < MOMENTUM_MS) return
+      showCurrent(el)
+    }
     el.addEventListener('touchstart', onDown, { passive: true })
+    el.addEventListener('touchmove', onMove, { passive: true })
     el.addEventListener('touchend', onUp, { passive: true })
     el.addEventListener('touchcancel', onUp, { passive: true })
-    el.addEventListener('wheel', arm, { passive: true })
-    el.addEventListener('focusin', arm)
+    el.addEventListener('wheel', theirs, { passive: true })
+    el.addEventListener('keydown', theirs)
+    el.addEventListener('scroll', onScroll, { passive: true })
     return () => {
-      clearTimeout(timer)
-      el.removeEventListener('scroll', onScroll)
-      el.removeEventListener('scrollend', settle)
       el.removeEventListener('touchstart', onDown)
+      el.removeEventListener('touchmove', onMove)
       el.removeEventListener('touchend', onUp)
       el.removeEventListener('touchcancel', onUp)
-      el.removeEventListener('wheel', arm)
-      el.removeEventListener('focusin', arm)
+      el.removeEventListener('wheel', theirs)
+      el.removeEventListener('keydown', theirs)
+      el.removeEventListener('scroll', onScroll)
     }
   }, [])
 
-  /** The page `by` along, going round the ends (null: no other page). */
-  const along = (by: number) =>
-    loop ? pages[(index + by + pages.length) % pages.length] : null
-  const step = (by: number) => {
-    const next = along(by)
-    if (!next) return
-    glide.current = true
-    onSelect(next)
-  }
-  const name = (p: ScopePage) => pageName(p, summary)
-
+  const summaryAction = narrowed ? 'Show everything' : summary.opens
   return (
     <section
       aria-label="Pick from this tab"
-      aria-roledescription="carousel"
-      // Not a Scope swipe (it pages its own), and its own View Transition
-      // layer: it holds still, like the tab bar, while the feed changes.
+      // Not a Scope swipe (it scrolls its own), and its own View
+      // Transition layer: it holds still, like the tab bar, while the
+      // feed changes.
       data-no-swipe
       data-scope-pager=""
       style={{ viewTransitionName: 'scope-pager' }}
       className={cn(
-        'glass-nav fixed inset-x-4 bottom-[calc(max(env(safe-area-inset-bottom),0.75rem)+4.5rem)] z-20 mx-auto h-15 max-w-md overflow-hidden rounded-sheet',
+        'glass-nav fixed inset-x-4 bottom-[calc(max(env(safe-area-inset-bottom),0.75rem)+4.5rem)] z-20 mx-auto max-w-md overflow-hidden rounded-sheet',
         className,
       )}
     >
-      <div
+      <ul
         ref={strip}
-        className="flex h-full snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none]"
+        className="flex snap-x snap-proximity scroll-px-2 gap-1.5 overflow-x-auto overscroll-x-contain p-1.5 [scrollbar-width:none]"
       >
-        {loop && (
-          <EndCopy
-            page={pages[pages.length - 1]}
-            summary={summary}
-            display={display}
-          />
-        )}
-        {pages.map((page, i) => {
-          const here = i === index
-          const opens = page.kind !== 'all' || summary.opens !== null
-          const body = (
-            <PageBody
-              page={page}
-              summary={summary}
-              display={display}
-              here={here}
-            />
-          )
-          const pageClass =
-            'flex h-full w-full shrink-0 snap-center snap-always items-center gap-3 px-10 pb-2 text-left'
-          return opens ? (
-            <button
-              key={pageKey(page)}
-              type="button"
-              // Off to the side (mid-swipe): bring it here first.
-              onClick={() => (here ? onOpen(page) : onSelect(page))}
-              aria-current={here ? 'true' : undefined}
-              aria-label={`${name(page)}${here ? `. ${openLabel(page, summary)}` : ''}`}
-              className={pageClass}
-            >
-              {body}
-            </button>
-          ) : (
-            <div
-              key={pageKey(page)}
-              aria-current={here ? 'true' : undefined}
-              aria-label={name(page)}
-              role="group"
-              className={pageClass}
-            >
-              {body}
-            </div>
+        {pages.map((page) => {
+          const key = pageKey(page)
+          const here = key === current
+          const first = page.kind === 'all'
+          const name = pageName(page, summary)
+          const action = first ? summaryAction : openLabel(page)
+          return (
+            <li key={key} className="flex shrink-0 snap-start">
+              <button
+                type="button"
+                onClick={() => (first ? onSummary() : onPick(page))}
+                // Nothing to list and nothing narrowed: nothing to do.
+                disabled={first && !action}
+                aria-current={here ? 'true' : undefined}
+                aria-label={action ? `${name}. ${action}` : name}
+                className={cn(
+                  'flex h-16 w-34 flex-col justify-center gap-0.5 rounded-card border px-2.5 text-left text-glass-ink tabular-nums transition-colors',
+                  here
+                    ? 'border-accent bg-accent-soft'
+                    : 'border-border bg-surface/60',
+                  first && 'w-38',
+                )}
+              >
+                {first ? (
+                  <SummaryCard summary={summary} narrowed={narrowed} />
+                ) : (
+                  <PageCard page={page} display={display} />
+                )}
+              </button>
+            </li>
           )
         })}
-        {loop && (
-          <EndCopy page={pages[0]} summary={summary} display={display} />
-        )}
-      </div>
-      <Arrow
-        side="left"
-        label={loop ? `Previous: ${name(along(-1)!)}` : 'Previous'}
-        disabled={!loop}
-        onClick={() => step(-1)}
-      />
-      <Arrow
-        side="right"
-        label={loop ? `Next: ${name(along(1)!)}` : 'Next'}
-        disabled={!loop}
-        onClick={() => step(1)}
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 bottom-1 flex justify-center gap-1"
-      >
-        {pages.length <= MAX_DOTS ? (
-          pages.map((p, i) => (
-            <i
-              key={pageKey(p)}
-              className={cn(
-                'block h-1 rounded-full bg-glass-ink transition-all duration-200',
-                i === index ? 'w-3 opacity-90' : 'w-1 opacity-25',
-              )}
-            />
-          ))
-        ) : (
-          <span className="text-3xs leading-none font-semibold text-glass-ink-muted tabular-nums">
-            {index + 1} / {pages.length}
-          </span>
-        )}
-      </div>
+      </ul>
     </section>
   )
 }
 
-/**
- * A copy of the page at the other end, so a swipe past either end goes
- * round: only to be seen in passing, never picked or read out.
- */
-function EndCopy({
-  page,
-  summary,
-  display,
-}: {
-  page: ScopePage
-  summary: PagerSummary
-  display?: ChangeDisplay
-}) {
-  return (
-    <div
-      aria-hidden="true"
-      inert
-      data-end-copy=""
-      className="flex h-full w-full shrink-0 snap-center snap-always items-center gap-3 px-10 pb-2 text-left"
-    >
-      <PageBody page={page} summary={summary} display={display} here={false} />
-    </div>
-  )
-}
-
-function Arrow({
-  side,
-  label,
-  disabled,
-  onClick,
-}: {
-  side: 'left' | 'right'
-  label: string
-  disabled: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      className={cn(
-        'absolute top-0 bottom-2 flex w-9 items-center justify-center text-lg text-glass-ink-muted transition-opacity disabled:opacity-20',
-        side === 'left' ? 'left-0' : 'right-0',
-      )}
-    >
-      <span aria-hidden="true">{side === 'left' ? '‹' : '›'}</span>
-    </button>
-  )
-}
-
-/** What a page is, in words (for its label and the arrows'). */
+/** What a page is, in words (for its label). */
 function pageName(page: ScopePage, summary: PagerSummary): string {
   switch (page.kind) {
     case 'all':
@@ -448,159 +291,89 @@ function pageName(page: ScopePage, summary: PagerSummary): string {
   }
 }
 
-function openLabel(page: ScopePage, summary: PagerSummary): string {
+function openLabel(page: ScopePage): string {
   switch (page.kind) {
     case 'all':
-      return summary.opens ?? ''
+      return ''
     case 'game':
-      return 'Open the box score'
+      return 'Show this game and its box score'
     case 'prediction':
-      return 'Open the prediction'
+      return 'Show this prediction in full'
     case 'matchup':
-      return 'Open the matchup'
+      return 'Show this matchup in full'
   }
 }
 
-/** A page's two lines on the left and its figure on the right. */
-function PageBody({
-  page,
-  summary,
-  display = 'dollars',
-  here,
+/** A card's small first line. */
+function Kicker({
+  children,
+  className,
 }: {
-  page: ScopePage
-  summary: PagerSummary
-  display?: ChangeDisplay
-  here: boolean
+  children: React.ReactNode
+  className?: string
 }) {
-  switch (page.kind) {
-    case 'all':
-      return (
-        <Lines
-          kicker={summary.kicker}
-          title={summary.title}
-          figure={summary.figure}
-        />
-      )
-    case 'game':
-      return <GameLines game={page.game} here={here} />
-    case 'prediction': {
-      const p = page.prediction
-      const profit = profitOf(p)
-      const game = leadGame(p)
-      return (
-        <Lines
-          kicker={
-            p.kind === 'combo' ? (
-              `Combo · ${p.legs.filter((l) => l.status === 'won').length}/${p.legs.length} hit`
-            ) : game ? (
-              <>
-                <LeagueLogo league={game.league} size={14} />
-                {game.awayTeam.abbreviation} @ {game.homeTeam.abbreviation}
-              </>
-            ) : (
-              'Prediction'
-            )
-          }
-          title={`${p.side === 'no' ? 'Not: ' : ''}${p.title}`}
-          figure={
-            <>
-              <b className="text-[19px] leading-tight">
-                {p.chance === null ? '—' : pct(p.chance)}
-              </b>
-              {profit && (
-                <span className={cn('font-semibold', toneOf(profit.dollars))}>
-                  {profitText(profit, display)}
-                </span>
-              )}
-            </>
-          }
-        />
-      )
-    }
-    case 'matchup': {
-      const m = page.league.matchup!
-      const theirs = m.opponent
-      const lead =
-        theirs && m.mine.score !== theirs.score
-          ? m.mine.score > theirs.score
-            ? 'scoring'
-            : 'live'
-          : null
-      return (
-        <Lines
-          kicker={
-            <>
-              <LeagueLogo league={SPORTS[m.sport].league} size={14} />
-              {m.leagueName}
-            </>
-          }
-          title={theirs ? `${m.mine.abbrev} vs ${theirs.abbrev}` : 'Bye week'}
-          figure={
-            theirs && (
-              <>
-                <b className="text-[17px] leading-tight">
-                  {scoreText(m, m.mine.score)}–{scoreText(m, theirs.score)}
-                </b>
-                <span
-                  className={cn(
-                    'font-semibold',
-                    lead === 'scoring'
-                      ? 'text-scoring'
-                      : lead === 'live'
-                        ? 'text-live'
-                        : 'text-muted',
-                  )}
-                >
-                  {m.categories
-                    ? 'categories'
-                    : m.mine.projected !== null
-                      ? `proj ${pts(m.mine.projected)}`
-                      : lead === 'scoring'
-                        ? 'leading'
-                        : lead === 'live'
-                          ? 'trailing'
-                          : 'level'}
-                </span>
-              </>
-            )
-          }
-        />
-      )
-    }
-  }
+  return (
+    <span
+      className={cn(
+        'flex min-w-0 items-center gap-1 truncate text-3xs leading-tight font-semibold text-glass-ink-muted',
+        className,
+      )}
+    >
+      {children}
+    </span>
+  )
 }
 
-function Lines({
-  kicker,
-  title,
-  figure,
+/** The Scope as a whole: what's in it, and the way back to it all. */
+function SummaryCard({
+  summary,
+  narrowed,
 }: {
-  kicker: React.ReactNode
-  title: string
-  figure: React.ReactNode
+  summary: PagerSummary
+  narrowed: boolean
 }) {
   return (
     <>
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="flex min-w-0 items-center gap-1.5 truncate text-2xs font-semibold text-glass-ink-muted">
-          {kicker}
-        </span>
-        <span className="truncate text-[15px] leading-snug font-semibold text-glass-ink">
-          {title}
-        </span>
+      <Kicker>{summary.kicker}</Kicker>
+      <span className="line-clamp-2 text-xs leading-tight font-semibold">
+        {summary.title}
       </span>
-      {figure && (
-        <span className="flex shrink-0 flex-col items-end text-2xs text-glass-ink tabular-nums">
-          {figure}
+      {narrowed ? (
+        <span className="text-3xs font-semibold text-accent">
+          Show everything ›
         </span>
+      ) : (
+        summary.figure && (
+          <span className="flex items-baseline gap-1.5 text-3xs [&_b]:text-xs">
+            {summary.figure}
+          </span>
+        )
       )}
     </>
   )
 }
 
-/** A Game's page: its state, and the two teams with their scores. */
-function GameLines({ game: g, here }: { game: GameSummary; here: boolean }) {
+function PageCard({
+  page,
+  display,
+}: {
+  page: ScopePage
+  display?: ChangeDisplay
+}) {
+  switch (page.kind) {
+    case 'all':
+      return null
+    case 'game':
+      return <GameCard game={page.game} />
+    case 'prediction':
+      return <PredictionCard prediction={page.prediction} display={display} />
+    case 'matchup':
+      return <MatchupCard league={page.league} />
+  }
+}
+
+/** A Game: its state, then each team with its logo and score. */
+function GameCard({ game: g }: { game: GameSummary }) {
   const timeZone = useTimeZone()
   const live = isLive(g)
   const started = live || g.status === 'final'
@@ -610,49 +383,127 @@ function GameLines({ game: g, here }: { game: GameSummary; here: boolean }) {
       : g.score.away > g.score.home
         ? 'away'
         : 'home'
-  const side = (s: 'away' | 'home') => {
-    const team = s === 'away' ? g.awayTeam : g.homeTeam
-    return (
-      <span
-        className={cn(
-          'flex items-center gap-1',
-          s === 'home' && 'flex-row-reverse',
-          started && leader !== s && 'opacity-60',
-          leader === s && 'font-bold',
-        )}
-      >
-        <TeamLogo team={team} size={18} />
-        <span className="text-[13px] font-semibold">
-          {team.rank && (
-            <span className="mr-0.5 text-3xs font-bold text-muted">
-              {team.rank}
-            </span>
-          )}
-          {team.abbreviation}
-        </span>
-        {started && <span className="text-[16px]">{g.score[s]}</span>}
-      </span>
-    )
-  }
   return (
     <>
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="flex items-center gap-1.5 text-2xs font-semibold">
-          <LeagueLogo league={g.league} size={14} />
-          <span className={live ? 'text-live' : 'text-glass-ink-muted'}>
-            {gameStatusLabel(g, timeZone)}
+      <Kicker className={live ? 'text-live' : undefined}>
+        <LeagueLogo league={g.league} size={12} />
+        {gameStatusLabel(g, timeZone)}
+      </Kicker>
+      {(['away', 'home'] as const).map((side) => {
+        const team = side === 'away' ? g.awayTeam : g.homeTeam
+        return (
+          <span
+            key={side}
+            className={cn(
+              'flex items-center gap-1.5 text-[13px] leading-tight',
+              leader === side
+                ? 'font-bold'
+                : started
+                  ? 'opacity-70'
+                  : undefined,
+            )}
+          >
+            <TeamLogo team={team} size={16} />
+            <span className="min-w-0 flex-1 truncate font-semibold">
+              {team.rank && (
+                <span className="mr-0.5 text-3xs font-bold text-glass-ink-muted">
+                  {team.rank}
+                </span>
+              )}
+              {team.abbreviation}
+            </span>
+            {started && <span>{g.score[side]}</span>}
           </span>
-        </span>
-        <span className="flex items-center gap-2 leading-snug text-glass-ink tabular-nums">
-          {side('away')}
-          <span className="text-glass-ink-muted">{started ? '–' : '@'}</span>
-          {side('home')}
-        </span>
+        )
+      })}
+    </>
+  )
+}
+
+/** A Prediction: where it's from, what it is, its Odds and money. */
+function PredictionCard({
+  prediction: p,
+  display = 'dollars',
+}: {
+  prediction: PredictionView
+  display?: ChangeDisplay
+}) {
+  const profit = profitOf(p)
+  const game = leadGame(p)
+  return (
+    <>
+      <Kicker>
+        {p.kind === 'combo' ? (
+          `Combo · ${p.legs.filter((l) => l.status === 'won').length}/${p.legs.length} hit`
+        ) : game ? (
+          <>
+            <LeagueLogo league={game.league} size={12} />
+            {game.awayTeam.abbreviation} @ {game.homeTeam.abbreviation}
+          </>
+        ) : (
+          'Prediction'
+        )}
+      </Kicker>
+      <span className="truncate text-xs leading-tight font-semibold">
+        {p.side === 'no' ? 'Not: ' : ''}
+        {p.title}
       </span>
-      {here && (
-        <span className="shrink-0 text-2xs font-semibold text-glass-ink-muted">
-          Box score ›
+      <span className="flex items-baseline gap-1.5">
+        <b className="text-[15px] leading-tight">
+          {p.chance === null ? '—' : pct(p.chance)}
+        </b>
+        {profit && (
+          <span
+            className={cn('text-3xs font-semibold', toneOf(profit.dollars))}
+          >
+            {profitText(profit, display)}
+          </span>
+        )}
+      </span>
+    </>
+  )
+}
+
+/** A Matchup: its league, then each side with its projection and score. */
+function MatchupCard({ league }: { league: FantasyLeagueView }) {
+  const m = league.matchup!
+  const theirs = m.opponent
+  const lead =
+    theirs && m.mine.score !== theirs.score
+      ? m.mine.score > theirs.score
+        ? 'mine'
+        : 'theirs'
+      : null
+  const side = (
+    s: { abbrev: string; score: number; projected: number | null },
+    who: 'mine' | 'theirs',
+  ) => (
+    <span
+      className={cn(
+        'flex items-baseline gap-1 text-[13px] leading-tight',
+        lead === who ? 'font-bold' : lead ? 'opacity-70' : undefined,
+      )}
+    >
+      <span className="min-w-0 flex-1 truncate font-semibold">{s.abbrev}</span>
+      {!m.categories && s.projected !== null && (
+        <span className="text-3xs font-normal text-glass-ink-muted">
+          {pts(s.projected)}
         </span>
+      )}
+      <span>{scoreText(m, s.score)}</span>
+    </span>
+  )
+  return (
+    <>
+      <Kicker>
+        <LeagueLogo league={SPORTS[m.sport].league} size={12} />
+        {m.leagueName}
+      </Kicker>
+      {side(m.mine, 'mine')}
+      {theirs ? (
+        side(theirs, 'theirs')
+      ) : (
+        <span className="text-xs text-glass-ink-muted">Bye week</span>
       )}
     </>
   )
