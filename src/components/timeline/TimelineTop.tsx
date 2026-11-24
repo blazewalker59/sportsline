@@ -11,9 +11,10 @@
  * pane); this top lays itself out on the same grid and stays over the
  * feed's column, since the day, Scope and Games are the feed's context.
  *
- * Below `md` (a phone, with the tab bar) the cards aren't here: the Scope
- * bar over the tab bar pages through the same things (ScopePager), so the
- * top is the header and, under All, the League row.
+ * Below `md` (a phone, with the tab bar) the cards aren't here: the home
+ * board over the feed offers the same things (LiveBoard), so the top is
+ * the header and, under All, the League row, or once the board scrolls
+ * away its pinned scores.
  */
 
 import { DayButton } from './DayButton'

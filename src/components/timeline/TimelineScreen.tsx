@@ -6,9 +6,10 @@
  * (TimelineSheets).
  *
  * On phones a selected Game takes the feed's place, filtered to it, and a
- * Prediction or Matchup opens as a bottom sheet; what the Scope covers is
- * picked from the row of cards over the tab bar (ScopePager) rather than at
- * the top (useCompactTimeline). From `lg`
+ * Prediction or Matchup opens as a bottom sheet; what the Timeline shows
+ * is picked from the home board over the feed (LiveBoard: the tab's Games,
+ * Predictions or Matchups, narrowed or not) rather than at the top's
+ * cards (useCompactTimeline). From `lg`
  * (useWideTimeline) each opens in a pane beside the Scope's feed, which
  * stays exactly as it was: one at a time, kept in the address (`game`, or
  * `detail` for a Prediction or Matchup) so reload and Back behave alike.
@@ -23,9 +24,7 @@ import { GamePane } from './GamePane'
 import { DetailPane, DetailPaneMissing } from './DetailPane'
 import { TimelineSheets } from './TimelineSheets'
 import { TimelineTop } from './TimelineTop'
-import { ScopePager, pagerSummary } from './ScopePager'
 import { currentPageKey, pageKey, pageSearch, scopePages } from './scopePages'
-import { ScopeListSheet } from './ScopeListSheet'
 import { useCompactTimeline } from './useCompactTimeline'
 import { useGoToScope, useLastLeague } from './scopeNav'
 import { ScopePrompt } from './ScopePrompt'
@@ -37,6 +36,7 @@ import {
   FeedFilter,
   LiveBoard,
   LiveTicker,
+  NarrowedBar,
   YourNight,
   useBoardLayout,
 } from './LiveBoard'
@@ -156,8 +156,6 @@ function Timeline({
     other?: LeagueMatchup
   } | null>(null)
   const [portfolioOpen, setPortfolioOpen] = useState(false)
-  // Every Game or Matchup the Scope bar pages through, as a sheet.
-  const [listOpen, setListOpen] = useState(false)
   const navigate = useNavigate()
   // The divider marks where the Viewer stopped last time, so it is fixed at
   // load while the stored marker keeps moving.
@@ -477,21 +475,22 @@ function Timeline({
       pagedTo.current = page.kind === 'all' ? null : router.state.location.href
     })
   }
-  // A card tapped, or one picked from a list (the first card's sheet, or
-  // the portfolio): what you're after is its detail, so it opens in full
-  // at once, and the Timeline narrows to it out of sight beneath (no
-  // transition of its own: the sheet's slide up is the one movement).
+  // One picked from a list (the portfolio): what you're after is its
+  // detail, so it opens in full at once, and the Timeline narrows to it
+  // out of sight beneath (no transition of its own: the sheet's slide up
+  // is the one movement).
   const jumpAndOpen = (page: ScopePage) => {
     openPage(page)
     if (pageKey(page) !== currentPage) pickPage(page, { transition: false })
   }
-  // The phone's home board (LiveBoard) stands in for the Scope bar over
-  // the whole Scope; narrowed, the bar is back, to go back or open it.
-  const home = compact === true && !s.setup && !gameId && currentPage === 'all'
-  // "Affects me" is the board's switch: away from the board, every play.
+  // A phone picks what the Timeline shows from the home board (LiveBoard)
+  // over the feed, narrowed or not: the one place, at the top.
+  const home = compact === true && !s.setup
+  // "Affects me" is the whole Scope's: narrowed, every play.
+  const filterable = home && currentPage === 'all'
   useEffect(() => {
-    if (!home) setMine(false)
-  }, [home])
+    if (!filterable) setMine(false)
+  }, [filterable])
   const [boardLayout, setBoardLayout] = useBoardLayout()
   const staked = useCallback(
     (g: GameSummary) =>
@@ -502,6 +501,20 @@ function Timeline({
     () => boardOrder(pagerGames, (g) => staked(g).length > 0),
     [pagerGames, staked],
   )
+  // What the board offers: the tab's Games, Predictions or Matchups, the
+  // same whether or not one is picked (a Game opened from the feed under
+  // Predictions doesn't turn the board into Games).
+  const boardPages = scopePages({
+    scope,
+    gameId: null,
+    selectedGame: null,
+    games: boardGames,
+    predictions: s.openPredictions,
+    leagues: s.fantasyLeagues,
+  }).filter((p) => p.kind !== 'all')
+  const narrowedTo = pages.find(
+    (p) => p.kind !== 'all' && pageKey(p) === currentPage,
+  )
   const followingGames = useMemo(
     () =>
       s.viewerFollows.length > 0
@@ -509,8 +522,11 @@ function Timeline({
         : null,
     [s.viewerFollows, timeline.games],
   )
+  // A tile tapped narrows to it; tapped again, it opens in full.
+  const pickTile = (page: ScopePage) =>
+    pageKey(page) === currentPage ? openPage(page) : pickPage(page)
   const pickGame = (g: GameSummary) =>
-    pickPage({ kind: 'game', id: g.id, game: g })
+    pickTile({ kind: 'game', id: g.id, game: g })
   // Once the board scrolls up under the top, its scores pin there.
   const [boardAway, setBoardAway] = useState(false)
   const [board, setBoard] = useState<HTMLElement | null>(null)
@@ -529,23 +545,46 @@ function Timeline({
     observer.observe(board)
     return () => observer.disconnect()
   }, [board, home, topHeight])
-  const summary = pagerSummary({
-    scope,
-    gameId,
-    games: pagerGames,
-    predictions: s.openPredictions,
-    leagues: s.fantasyLeagues,
-    display,
-  })
   const openPage = (page: ScopePage) => {
     if (page.kind === 'all') {
-      // The portfolio is Predictions' list; everything else lists its pages.
       if (pages.some((p) => p.kind === 'prediction')) setPortfolioOpen(true)
-      else setListOpen(true)
     } else if (page.kind === 'game') setBoxFor(page.id)
     else if (page.kind === 'prediction') openPrediction(page.id)
     else openMatchup(page.id)
   }
+  // The phone's board, over the Scope's feed or a narrowed Game's thread.
+  const homeTop = home && (
+    <div className="flex flex-col">
+      <YourNight
+        leagues={s.fantasyLeagues}
+        predictions={s.openPredictions}
+        display={display}
+        following={followingGames}
+        scope={scope}
+        onScope={goToScope}
+      />
+      <LiveBoard
+        pages={boardPages}
+        current={currentPage}
+        stakesOf={staked}
+        layout={boardLayout}
+        onLayout={setBoardLayout}
+        onPick={pickTile}
+        onPortfolio={() => setPortfolioOpen(true)}
+        display={display}
+        boardRef={setBoard}
+      />
+      {narrowedTo && narrowedTo.kind !== 'all' ? (
+        <NarrowedBar
+          page={narrowedTo}
+          onOpen={() => openPage(narrowedTo)}
+          onClear={() => pickPage({ kind: 'all' })}
+        />
+      ) : (
+        hasStakes && <FeedFilter mine={mine} onMine={setMine} />
+      )}
+    </div>
+  )
 
   // Escape closes the pane beside the wide feed (a Game, a Prediction or a
   // Matchup), unless a sheet is open (Escape is the sheet's then).
@@ -608,7 +647,11 @@ function Timeline({
         onSelectMatchup={selectMatchup}
         ticker={
           home && boardAway ? (
-            <LiveTicker games={boardGames} onPick={pickGame} />
+            <LiveTicker
+              games={boardGames}
+              current={currentPage}
+              onPick={pickGame}
+            />
           ) : undefined
         }
       />
@@ -636,42 +679,7 @@ function Timeline({
               )
             ) : (
               <>
-                {home && (
-                  <div className="flex flex-col">
-                    <YourNight
-                      leagues={s.fantasyLeagues}
-                      predictions={s.openPredictions}
-                      display={display}
-                      following={followingGames}
-                      current={
-                        scope === 'predictions' || scope === 'following'
-                          ? scope
-                          : null
-                      }
-                      onMatchup={(l) =>
-                        pickPage({ kind: 'matchup', id: l.id, league: l })
-                      }
-                      onPortfolio={() => setPortfolioOpen(true)}
-                      onPrediction={(p) =>
-                        pickPage({
-                          kind: 'prediction',
-                          id: p.id,
-                          prediction: p,
-                        })
-                      }
-                      onFollowing={() => goToScope('following')}
-                    />
-                    <LiveBoard
-                      games={boardGames}
-                      stakesOf={staked}
-                      layout={boardLayout}
-                      onLayout={setBoardLayout}
-                      onPick={pickGame}
-                      boardRef={setBoard}
-                    />
-                    {hasStakes && <FeedFilter mine={mine} onMine={setMine} />}
-                  </div>
-                )}
+                {homeTop}
                 <TimelineFeed
                   entries={scopeEntries}
                   typing={scopeTyping}
@@ -698,6 +706,7 @@ function Timeline({
             // starts at the top.
             key={gameId}
             gameId={gameId}
+            lead={homeTop}
             game={selectedGame}
             box={game.data?.box ?? null}
             entries={gameEntries}
@@ -723,38 +732,6 @@ function Timeline({
           wide && <PanePlaceholder scope={s.setup ? null : scope} />
         )}
       </StakesProvider>
-
-      {/* Null while the width isn't known: CSS shows it only below `md`. */}
-      {compact !== false && !s.setup && !home && (
-        <ScopePager
-          pages={pages}
-          current={currentPage}
-          summary={summary}
-          display={display}
-          onPick={jumpAndOpen}
-          // Narrowed: back to the whole Scope; else everything as a list.
-          onSummary={() =>
-            currentPage === 'all' ? openPage(pages[0]) : pickPage(pages[0])
-          }
-          className="md:hidden"
-        />
-      )}
-      {listOpen && (
-        <ScopeListSheet
-          title={
-            pages.some((p) => p.kind === 'matchup')
-              ? 'Your Matchups'
-              : summary.kicker
-          }
-          pages={pages}
-          current={currentPage}
-          onPick={(page) => {
-            setListOpen(false)
-            jumpAndOpen(page)
-          }}
-          onClose={() => setListOpen(false)}
-        />
-      )}
 
       <TimelineSheets
         playId={playId}
