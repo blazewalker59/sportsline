@@ -7,7 +7,7 @@
  *
  * On phones a selected Game takes the feed's place, filtered to it, and a
  * Prediction or Matchup opens as a bottom sheet; what the Scope covers is
- * picked from the bar over the tab bar (ScopePager) rather than cards at
+ * picked from the row of cards over the tab bar (ScopePager) rather than at
  * the top (useCompactTimeline). From `lg`
  * (useWideTimeline) each opens in a pane beside the Scope's feed, which
  * stays exactly as it was: one at a time, kept in the address (`game`, or
@@ -405,11 +405,11 @@ function Timeline({
     matchupId: s.selectedMatchup?.id ?? null,
   })
   const display = s.kalshi.data?.changeDisplay
-  // Paging from the first page into the Scope is one step in history
-  // (Back returns to the whole Scope); paging on from there replaces it,
-  // so Back doesn't retrace every page swiped past, and paging back to
-  // the first page is Back. `pagedTo` is where the bar last took the
-  // address: anywhere else since (a link, a sheet), and it starts over.
+  // Picking a card from the whole Scope is one step in history (Back
+  // returns to the whole Scope); picking another from there replaces it,
+  // so Back doesn't retrace every card tapped, and going back to the
+  // whole Scope from the bar is Back. `pagedTo` is where the bar last took
+  // the address: anywhere else since (a link, a sheet), and it starts over.
   const pagedTo = useRef<string | null>(null)
   const pickPage = (page: ScopePage) => {
     const here = router.state.location.href
@@ -434,9 +434,9 @@ function Timeline({
       pagedTo.current = page.kind === 'all' ? null : router.state.location.href
     })
   }
-  // Picked from a list (the first page's sheet, or the portfolio): what
-  // you're after is its detail, so the bar and Timeline jump to it and it
-  // opens in full at once, rather than waiting for a tap on its page.
+  // A card tapped, or one picked from a list (the first card's sheet, or
+  // the portfolio): what you're after is its detail, so the Timeline
+  // narrows to it and it opens in full at once.
   const jumpAndOpen = (page: ScopePage) => {
     if (pageKey(page) !== currentPage) pickPage(page)
     openPage(page)
@@ -610,8 +610,11 @@ function Timeline({
           current={currentPage}
           summary={summary}
           display={display}
-          onSelect={pickPage}
-          onOpen={openPage}
+          onPick={jumpAndOpen}
+          // Narrowed: back to the whole Scope; else everything as a list.
+          onSummary={() =>
+            currentPage === 'all' ? openPage(pages[0]) : pickPage(pages[0])
+          }
           className="md:hidden"
         />
       )}

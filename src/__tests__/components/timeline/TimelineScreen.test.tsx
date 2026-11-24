@@ -269,7 +269,10 @@ function renderTimeline(url: string, viewer = viewerState()) {
 
 const scopeFeed = () => document.querySelector<HTMLElement>('[data-scope-feed]')
 const pager = () => document.querySelector<HTMLElement>('[data-scope-pager]')
-/** The bar's page in view (aria-current), by its label. */
+/** One of the bar's cards, by its label. */
+const pagerCard = (name: RegExp) =>
+  within(pager()!).getByRole('button', { name })
+/** The bar's current card (aria-current), by its label. */
 const pagerPage = (name: RegExp) => {
   const page = within(pager()!)
     .getAllByRole('button', { name })
@@ -395,9 +398,9 @@ describe('TimelineScreen, narrow (one feed)', () => {
     const pane = gamePane()!
     expect(pane.textContent).toContain('Bryce Harper homers')
     expect(document.body.textContent).not.toContain('Jalen Brunson')
-    // No pane chrome: the box score opens from the Game's page on the bar.
+    // No pane chrome: the box score opens from the Game's card on the bar.
     expect(screen.queryByRole('link', { name: 'Close game' })).toBeNull()
-    expect(pagerPage(/Open the box score/)).toBeTruthy()
+    expect(pagerPage(/its box score$/)).toBeTruthy()
     // One feed, so its messages keep their names (for the filter's glide).
     const names = transitionNames()
     expect(names).toContain('m-p_mlb_3')
@@ -705,11 +708,6 @@ describe('TimelineScreen, wide: Predictions and Matchups in the pane', () => {
 describe('TimelineScreen, narrow: the Scope bar over the tab bar', () => {
   beforeEach(() => setWide(false))
 
-  const nextPage = () =>
-    fireEvent.click(within(pager()!).getByRole('button', { name: /^Next/ }))
-  const previousPage = () =>
-    fireEvent.click(within(pager()!).getByRole('button', { name: /^Previous/ }))
-
   it.each(['following', 'all', 'predictions', 'fantasy'])(
     'stands in for the cards under the %s tab',
     async (scope) => {
@@ -721,7 +719,7 @@ describe('TimelineScreen, narrow: the Scope bar over the tab bar', () => {
             : {}
       renderTimeline(`/?scope=${scope}`)
       await waitFor(() => expect(pager()).toBeTruthy())
-      // No cards at the top: the bar pages through the same things.
+      // No cards at the top: the bar's row holds the same things.
       expect(
         screen.queryByRole('list', { name: /Your Predictions|Your Matchups/ }),
       ).toBeNull()
@@ -729,7 +727,6 @@ describe('TimelineScreen, narrow: the Scope bar over the tab bar', () => {
         screen.queryByRole('link', { name: /^BOS 108, NYK 112/ }),
       ).toBeNull()
       // The Scope as a whole first, and current.
-      // Every tab's first page opens its list: a button.
       const current = within(pager()!)
         .getAllByRole('button')
         .find((el) => el.getAttribute('aria-current') === 'true')!
@@ -752,40 +749,41 @@ describe('TimelineScreen, narrow: the Scope bar over the tab bar', () => {
     expect(pager()).toBeNull()
   })
 
-  it('paging to a Game narrows the Timeline to it; tapping it opens the box score', async () => {
+  it('tapping a Game’s card narrows the Timeline to it and opens its box score', async () => {
     const { router } = renderTimeline('/?scope=all')
     await waitFor(() => expect(pager()).toBeTruthy())
-    nextPage()
-    await waitFor(() => expect(gamePane()).toBeTruthy())
-    expect(search(router).game).toBe(gamePane()!.dataset.gamePane)
+    // Every Game is in view at once, not one at a time.
+    expect(within(pager()!).getAllByRole('button')).toHaveLength(4)
+    fireEvent.click(pagerCard(/^BOS 108, NYK 112/))
+    await waitFor(() => expect(gamePane()?.dataset.gamePane).toBe('g_nba'))
+    expect(search(router).game).toBe('g_nba')
     expect(scopeFeed()).toBeNull()
-    fireEvent.click(pagerPage(/Open the box score/))
+    // One tap: the box score is open too.
     expect(
       await screen.findByRole('dialog', { name: 'Box score' }),
     ).toBeTruthy()
+    expect(pagerPage(/^BOS 108, NYK 112/)).toBeTruthy()
   })
 
-  it('paging to a Prediction only narrows the feed; tapping it opens its sheet', async () => {
+  it('tapping a Prediction’s card narrows the feed and opens its sheet', async () => {
     scopeOver.current = predictionsScope({
       selectedPrediction: null,
       fromAddress: true,
     })
     const { router } = renderTimeline('/?scope=predictions')
     await waitFor(() => expect(pager()).toBeTruthy())
-    nextPage()
+    fireEvent.click(pagerCard(/^Phillies to win/))
     await waitFor(() =>
       expect(search(router)).toMatchObject({
         scope: 'predictions',
         prediction: 'pred_1',
       }),
     )
-    // A phone has no pane: nothing opens until the page is tapped.
-    expect(search(router).detail).toBeUndefined()
-    expect(screen.queryByRole('dialog')).toBeNull()
-    fireEvent.click(pagerPage(/^Phillies to win/))
     const sheet = await screen.findByRole('dialog', { name: 'Prediction' })
     expect(within(sheet).getByText('Phillies to win')).toBeTruthy()
+    // A phone has no pane, nor puts the sheet in the address.
     expect(detailPane()).toBeNull()
+    expect(search(router).detail).toBeUndefined()
   })
 
   it('opens the portfolio from the first page; a Prediction picked there opens and narrows', async () => {
@@ -855,7 +853,7 @@ describe('TimelineScreen, narrow: the Scope bar over the tab bar', () => {
     expect(pagerPage(/^The League/)).toBeTruthy()
   })
 
-  it('Back from a page returns to the whole Scope, however many were paged past', async () => {
+  it('Back, or the first card, returns to the whole Scope, however many cards were tapped', async () => {
     const second = { ...pred, id: 'pred_2', title: 'Over 8.5 runs' }
     scopeOver.current = predictionsScope({
       selectedPrediction: null,
@@ -866,18 +864,23 @@ describe('TimelineScreen, narrow: the Scope bar over the tab bar', () => {
     const { router } = renderTimeline('/?scope=predictions')
     await waitFor(() => expect(pager()).toBeTruthy())
     const start = router.history.length
-    nextPage()
+    const done = async () => {
+      fireEvent.click(await screen.findByRole('button', { name: 'Done' }))
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    }
+    fireEvent.click(pagerCard(/^Phillies to win/))
     await waitFor(() => expect(search(router).prediction).toBe('pred_1'))
-    nextPage()
+    await done()
+    fireEvent.click(pagerCard(/^Over 8\.5 runs/))
     await waitFor(() => expect(search(router).prediction).toBe('pred_2'))
-    // Into the Scope is one step; paging on replaces it.
+    await done()
+    // Into the Scope is one step; another card replaces it.
     expect(router.history.length).toBe(start + 1)
-    previousPage()
-    await waitFor(() => expect(search(router).prediction).toBe('pred_1'))
-    // Paging back to the first page is Back.
-    previousPage()
+    // The first card, now "Show everything", is Back.
+    fireEvent.click(pagerCard(/Show everything$/))
     await waitFor(() => expect(search(router).prediction).toBeUndefined())
     expect(router.history.canGoBack()).toBe(false)
+    expect(pagerPage(/^Your Predictions: 2 open/)).toBeTruthy()
   })
 
   it('opens a Matchup as a sheet, which lists the league’s Matchups', async () => {
