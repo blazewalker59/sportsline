@@ -631,7 +631,11 @@ function Timeline({
     // the feed: it already sits where it stays.
     <div
       ref={rootRef}
-      className="mx-auto max-w-xl px-4 lg:grid lg:max-w-5xl lg:grid-cols-2 lg:items-start lg:gap-6"
+      // At least the screen's height (less the shell's room for the tab
+      // bar, so it doesn't scroll), so a swipe between Scopes lands
+      // anywhere on it, not only on plays: with few or none, the space
+      // under "No plays yet" is still the Timeline's.
+      className="mx-auto min-h-[calc(100dvh-6rem)] max-w-xl px-4 md:min-h-dvh lg:grid lg:max-w-5xl lg:grid-cols-2 lg:items-start lg:gap-6"
     >
       <TimelineTop
         topRef={topRef}

@@ -547,6 +547,16 @@ describe('TimelineScreen, Scopes (chosen from the main navigation)', () => {
     },
   )
 
+  it('swipes land on the whole screen, not only on plays', async () => {
+    // The swipe listens on the Timeline's root: with few plays it must
+    // still reach the bottom of the screen (less the tab bar's room).
+    renderTimeline('/?scope=all')
+    await waitFor(() => expect(scopeFeed()).toBeTruthy())
+    const root = scopeFeed()!.parentElement!
+    expect(root.className).toContain('min-h-[calc(100dvh-6rem)]')
+    expect(root.className).toContain('md:min-h-dvh')
+  })
+
   it('a swipe stops at either end', async () => {
     const { router } = renderTimeline('/?scope=fantasy')
     await waitFor(() => expect(scopeFeed()).toBeTruthy())
