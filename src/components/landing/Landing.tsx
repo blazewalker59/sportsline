@@ -59,10 +59,10 @@ const game = (
 /** A night of Games, as the board shows them. */
 const GAMES: ReadonlyArray<GameSummary> = [
   game(
-    'kc',
+    'den',
     'nfl',
-    team('nfl', 'BUF', 'Bills'),
     team('nfl', 'KC', 'Chiefs'),
+    team('nfl', 'DEN', 'Broncos'),
     [20, 24],
     'Q4 1:42',
   ),
@@ -105,7 +105,7 @@ const PAGES: Array<Extract<ScopePage, { kind: 'game' }>> = GAMES.map((g) => ({
   game: g,
 }))
 const STAKES: Record<string, Array<GameStake>> = {
-  kc: ['following', 'fantasy'],
+  den: ['following', 'fantasy'],
   bos: ['prediction'],
   edm: ['following'],
 }
@@ -123,12 +123,12 @@ interface Moment {
 /** The feed, as the app draws it: bubbles, scoring outlined, tagged. */
 const MOMENTS: ReadonlyArray<Moment> = [
   {
-    team: 'Chiefs',
-    logo: logo('nfl', 'kc'),
-    text: 'Mahomes to Kelce for 18 yards. Touchdown, Chiefs lead 24–20.',
+    team: 'Broncos',
+    logo: logo('nfl', 'den'),
+    text: 'Nix to Waddle for 18 yards. Touchdown, Broncos lead 24–20.',
     scoring: true,
     ago: '8s',
-    tags: [{ tone: 'fantasy', text: '★ Your starter · Kelce' }],
+    tags: [{ tone: 'fantasy', text: '★ Your starter · Waddle' }],
   },
   {
     team: 'Celtics',
@@ -155,7 +155,7 @@ const MOMENTS: ReadonlyArray<Moment> = [
 ]
 
 const TICKER = [
-  'BUF 20 · KC 24 · Q4',
+  'KC 20 · DEN 24 · Q4',
   'NY 101 · BOS 104 · Q4',
   'VAN 2 · EDM 3 · 3rd',
   'SD 3 · LAD 5 · B8',
@@ -230,7 +230,7 @@ export function Landing() {
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 -z-10"
       >
-        <span className="landing-glow top-[-10%] left-[-20%] bg-[#E31837]" />
+        <span className="landing-glow top-[-10%] left-[-20%] bg-[#FB4F14]" />
         <span className="landing-glow landing-glow-2 top-[20%] right-[-25%] bg-[#005A9C]" />
         <span className="landing-glow landing-glow-3 bottom-[-20%] left-[10%] bg-[#007A33]" />
         <span className="landing-field absolute inset-0" />
@@ -537,7 +537,7 @@ function Desktop() {
           <table className="w-full overflow-hidden rounded-card bg-surface text-xs tabular-nums">
             <thead className="text-3xs text-muted uppercase">
               <tr>
-                {['Chiefs', 'C/ATT', 'YDS', 'TD'].map((h) => (
+                {['Broncos', 'C/ATT', 'YDS', 'TD'].map((h) => (
                   <th key={h} className="px-3 py-2 text-right first:text-left">
                     {h}
                   </th>
@@ -546,9 +546,9 @@ function Desktop() {
             </thead>
             <tbody>
               {[
-                ['Patrick Mahomes', '24/33', '281', '3'],
-                ['Travis Kelce', '9 rec', '104', '1'],
-                ['Isiah Pacheco', '17 car', '86', '0'],
+                ['Bo Nix', '24/33', '281', '3'],
+                ['Jaylen Waddle', '9 rec', '104', '1'],
+                ['J.K. Dobbins', '17 car', '86', '0'],
               ].map((row) => (
                 <tr key={row[0]} className="border-t border-border">
                   {row.map((c, i) => (
@@ -580,7 +580,7 @@ function Scoreboard({ game: g }: { game: GameSummary }) {
       className="grid grid-cols-[1fr_auto_1fr] items-center rounded-sheet border border-border p-3"
       style={{
         background:
-          'linear-gradient(90deg, color-mix(in srgb, #00338D 30%, var(--surface)), var(--surface) 45%, var(--surface) 55%, color-mix(in srgb, #E31837 30%, var(--surface)))',
+          'linear-gradient(90deg, color-mix(in srgb, #E31837 30%, var(--surface)), var(--surface) 45%, var(--surface) 55%, color-mix(in srgb, #FB4F14 30%, var(--surface)))',
       }}
     >
       <span className="flex items-center gap-2 text-2xl font-bold tabular-nums">

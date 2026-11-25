@@ -27,7 +27,7 @@ describe('LazyLanding', () => {
     await loadLanding()
 
     const html = renderToString(<Landing />)
-    expect(html).toContain('Mahomes')
+    expect(html).toContain('Nix to Waddle')
     expect(html).not.toContain(FALLBACK)
     // A complete Suspense boundary, not a pending (`$?`) or client (`$!`) one.
     expect(html).toContain('<!--$-->')
