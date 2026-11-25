@@ -76,7 +76,10 @@ export async function gameFor(
   if (cached && now - Date.parse(cached.checkedAt) < RECHECK_MS) {
     return { gameId: null, league: cached.league }
   }
-  if (!cached) {
+  // Read Kalshi's milestone for a new event, and again for one remembered
+  // without a League: it may be one we've since learned (college
+  // basketball's NCAAMB was unknown until it was added).
+  if (!cached || !cached.league) {
     const ms = await milestoneFor(account, eventTicker)
     const [home, away] = await Promise.all([
       ms?.details?.home_team_id
@@ -156,7 +159,16 @@ export async function gameFor(
     .values(row)
     .onConflictDoUpdate({
       target: kalshiEvents.eventTicker,
-      set: { gameId: row.gameId, checkedAt: row.checkedAt },
+      set: {
+        gameId: row.gameId,
+        checkedAt: row.checkedAt,
+        // As read again, when it was remembered without a League.
+        milestoneId: row.milestoneId,
+        league: row.league,
+        startsAt: row.startsAt,
+        homeName: row.homeName,
+        awayName: row.awayName,
+      },
     })
   return { gameId, league }
 }
