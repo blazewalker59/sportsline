@@ -13,7 +13,8 @@ import {
   readStoredScope,
   storeScope,
 } from './timelineScope'
-import type { Scope } from '@/lib/model/scope'
+import type { OptIn, Scope } from '@/lib/model/scope'
+import { isCollege } from '@/lib/model/types'
 import { useDeviceValue } from '@/lib/useDeviceValue'
 import { useFantasy, useFantasyConnected } from '@/lib/fantasy/useFantasy'
 import {
@@ -129,6 +130,23 @@ export function useTimelineScope({
   const settings = data?.leagues ?? DEFAULT_LEAGUE_SETTINGS
   const rowItems = useMemo(() => visibleRowItems(settings), [settings])
   const leagues = useMemo(() => visibleLeagues(settings), [settings])
+  // The college Games and Teams the Viewer opted into (CONTEXT.md,
+  // "Opt-in"): an open Prediction's Games, and their followed Teams. All
+  // and a college League's Scope cover only these of college's Games.
+  const optIns = useMemo((): Array<OptIn> => {
+    const out = new Map<string, OptIn>()
+    for (const p of openPredictions)
+      for (const leg of p.legs)
+        if (leg.game && isCollege(leg.game.league))
+          out.set(leg.game.id, {
+            league: leg.game.league,
+            follow: { kind: 'game', gameId: leg.game.id },
+          })
+    for (const f of followed ?? [])
+      if (f.follow.kind === 'team' && isCollege(f.league))
+        out.set(f.follow.teamId, { league: f.league, follow: f.follow })
+    return [...out.values()]
+  }, [openPredictions, followed])
   const follows = useMemo(
     () =>
       // Nothing to read until the Scope is set up (Following would
@@ -145,6 +163,7 @@ export function useTimelineScope({
                 leagues,
                 predictionGames,
                 fantasyPlayers,
+                optIns,
               ),
     [
       setup,
@@ -155,6 +174,7 @@ export function useTimelineScope({
       leagues,
       predictionGames,
       fantasyPlayers,
+      optIns,
     ],
   )
   const navigate = useNavigate()
@@ -213,6 +233,7 @@ export function useTimelineScope({
     predictionList,
     openPredictions,
     predictionGames,
+    optIns,
     selectedPrediction,
     selectPrediction,
     fantasyLeagues,

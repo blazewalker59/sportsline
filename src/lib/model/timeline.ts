@@ -4,8 +4,7 @@
  * "Timeline"). Ids here are Sportsline ids, never Source ids.
  */
 
-import { LEAGUES } from './types'
-import { isConference } from './leagues'
+import { LEAGUES, isCollege } from './types'
 import type { TeamColors } from '@/lib/brand/teamColors'
 import type { Conference } from './leagues'
 import type {
@@ -70,13 +69,9 @@ export type Follow =
   | { kind: 'team'; teamId: string }
   | { kind: 'player'; playerId: string }
   /**
-   * College football Games with an AP Top 25 team (the Top 25 Scope).
-   * Coverage only: never stored as a Viewer's Follow.
+   * One Game, as a Prediction depends on it (the Predictions Scope, and a
+   * college Game the Viewer opted into).
    */
-  | { kind: 'top25' }
-  /** College football Games involving a major Conference's team (its Scope). */
-  | { kind: 'conference'; conference: Conference }
-  /** One Game, as a Prediction depends on it (the Predictions Scope). */
   | { kind: 'game'; gameId: string }
   /**
    * The Starters, either side, in the Viewer's Fantasy Matchups (the
@@ -88,10 +83,7 @@ export type Follow =
 /** A Follow a Viewer can save (CONTEXT.md, "Follow"). */
 export type ViewerFollow = Exclude<
   Follow,
-  | { kind: 'top25' }
-  | { kind: 'conference' }
-  | { kind: 'game' }
-  | { kind: 'fantasy' }
+  { kind: 'game' } | { kind: 'fantasy' }
 >
 
 export interface TimelineFilter {
@@ -152,13 +144,6 @@ export function matchesFilter(
           item.significance !== 'routine' ||
           Boolean(filter.includeRoutine)
         )
-      case 'top25':
-        if (item.league !== 'cfb' || !isRanked(item)) return false
-        return (
-          item.kind !== 'play' ||
-          item.significance !== 'routine' ||
-          Boolean(filter.includeRoutine)
-        )
       case 'fantasy':
         return (
           item.kind !== 'milestone' &&
@@ -171,41 +156,11 @@ export function matchesFilter(
           item.significance !== 'routine' ||
           Boolean(filter.includeRoutine)
         )
-      case 'conference':
-        if (item.league !== 'cfb' || !inConference(item, follow.conference))
-          return false
-        return (
-          item.kind !== 'play' ||
-          item.significance !== 'routine' ||
-          Boolean(filter.includeRoutine)
-        )
     }
   })
 }
 
-/** Does a Game (or one of its items) have an AP Top 25 team? */
-export function isRanked(game: {
-  awayTeam: Pick<TeamRef, 'rank'>
-  homeTeam: Pick<TeamRef, 'rank'>
-}): boolean {
-  return Boolean(game.awayTeam.rank || game.homeTeam.rank)
-}
-
-/** Does a Game (or one of its items) involve a team from this Conference? */
-export function inConference(
-  game: {
-    awayTeam: Pick<TeamRef, 'conference'>
-    homeTeam: Pick<TeamRef, 'conference'>
-  },
-  conference: Conference,
-): boolean {
-  return (
-    game.awayTeam.conference === conference ||
-    game.homeTeam.conference === conference
-  )
-}
-
-/** `league:mlb,team:tm_x,player:pl_y,top25:cfb,conference:sec` ↔ Follows (URL and socket form). */
+/** `league:mlb,team:tm_x,player:pl_y,game:gm_z` ↔ Follows (URL and socket form). */
 export function followsToParam(follows: ReadonlyArray<Follow>): string {
   return follows
     .map((f) =>
@@ -215,13 +170,9 @@ export function followsToParam(follows: ReadonlyArray<Follow>): string {
           ? `team:${f.teamId}`
           : f.kind === 'player'
             ? `player:${f.playerId}`
-            : f.kind === 'conference'
-              ? `conference:${f.conference}`
-              : f.kind === 'game'
-                ? `game:${f.gameId}`
-                : f.kind === 'fantasy'
-                  ? `fantasy:${f.playerIds.join('|')}`
-                  : 'top25:cfb',
+            : f.kind === 'game'
+              ? `game:${f.gameId}`
+              : `fantasy:${f.playerIds.join('|')}`,
     )
     .join(',')
 }
@@ -243,7 +194,6 @@ export function followsFromParam(
       return [{ kind: 'team', teamId: value }]
     if (kind === 'player' && /^pl_\w+$/.test(value))
       return [{ kind: 'player', playerId: value }]
-    if (kind === 'top25' && value === 'cfb') return [{ kind: 'top25' }]
     if (kind === 'fantasy')
       return [
         {
@@ -253,14 +203,14 @@ export function followsFromParam(
       ]
     if (kind === 'game' && /^gm_\w+$/.test(value))
       return [{ kind: 'game', gameId: value }]
-    if (kind === 'conference' && isConference(value))
-      return [{ kind: 'conference', conference: value }]
     return []
   })
 }
 
-/** Signed-out Viewers see every League (Scoring and Notable only by default). */
-export const DEFAULT_FOLLOWS: ReadonlyArray<Follow> = LEAGUES.map((league) => ({
-  kind: 'league' as const,
-  league,
-}))
+/**
+ * Every League but the college ones (Scoring and Notable only by default):
+ * a college Game is followed only when the Viewer opts into it.
+ */
+export const DEFAULT_FOLLOWS: ReadonlyArray<Follow> = LEAGUES.filter(
+  (league) => !isCollege(league),
+).map((league) => ({ kind: 'league' as const, league }))

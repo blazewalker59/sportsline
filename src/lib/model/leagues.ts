@@ -1,29 +1,24 @@
 /**
  * How a Viewer arranges the League row (CONTEXT.md, "League"): the order of
- * Leagues and college football's groups (Top 25 and the major
- * conferences), and which are hidden. A hidden League is also left out of
+ * the Leagues, and which are hidden. A hidden League is also left out of
  * All. Pure.
  */
 
 import { LEAGUES } from './types'
 import type { League } from './types'
 
-/** College football's major conferences (CONTEXT.md, "Conference"). */
+/**
+ * College football's major conferences: a Game records each team's, to
+ * show beside it. Not a Scope or a Follow (college is opt-in by Game).
+ */
 const CONFERENCES = ['sec', 'big10', 'big12', 'acc'] as const
 export type Conference = (typeof CONFERENCES)[number]
 
-/** College football groupings with their own Scope. */
-const CFB_GROUPS = ['top25', ...CONFERENCES] as const
-type CfbGroup = (typeof CFB_GROUPS)[number]
+/** Anything with a place on the League row: the Leagues. */
+export type RowItem = League
 
-/** Anything with a place on the League row. */
-export type RowItem = League | CfbGroup
-
-/** The default row: college football's groups follow its League. */
-export const ROW_ITEMS: ReadonlyArray<RowItem> = LEAGUES.flatMap(
-  (league): Array<RowItem> =>
-    league === 'cfb' ? [league, ...CFB_GROUPS] : [league],
-)
+/** The default row: every League, in the app's order. */
+export const ROW_ITEMS: ReadonlyArray<RowItem> = [...LEAGUES]
 
 export interface LeagueSettings {
   order: Array<RowItem>
@@ -45,7 +40,7 @@ export const isRowItem = (v: unknown): v is RowItem =>
 /**
  * Stored settings made whole: unknown items dropped, duplicates removed,
  * and anything added since placed after its neighbour in the default row
- * (so new college groups land beside College Football).
+ * (so a new League lands beside the one before it).
  */
 export function normalizeLeagueSettings(
   stored:

@@ -24,7 +24,7 @@ const base = {
 const keys = (pages: ReturnType<typeof scopePages>) => pages.map(pageKey)
 
 describe('scopePages', () => {
-  it.each(['following', 'all', 'nfl', 'top25'] as const)(
+  it.each(['following', 'all', 'nfl', 'cfb'] as const)(
     'pages the Scope’s Games under %s, the whole Scope first',
     (scope) => {
       expect(keys(scopePages({ ...base, scope }))).toEqual([

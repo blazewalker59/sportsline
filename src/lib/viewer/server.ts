@@ -25,7 +25,7 @@ import {
   teams,
   viewerSettings,
 } from '@/lib/db/schema'
-import { LEAGUES } from '@/lib/model/types'
+import { LEAGUES, isCollege } from '@/lib/model/types'
 import {
   DEFAULT_LEAGUE_SETTINGS,
   ROW_ITEMS,
@@ -113,7 +113,8 @@ async function followEntries(
     switch (r.kind) {
       case 'league': {
         const league = r.target as League
-        if (!LEAGUES.includes(league)) return []
+        // A college League is opted into Game by Game, never followed whole.
+        if (!LEAGUES.includes(league) || isCollege(league)) return []
         return [
           {
             follow: { kind: 'league', league },
@@ -283,6 +284,15 @@ export const setFollow = createServerFn({ method: 'POST' })
         !(LEAGUES as ReadonlyArray<string>).includes(data.target)
       ) {
         throw new UserError('Unknown League')
+      }
+      if (
+        data.following &&
+        data.kind === 'league' &&
+        isCollege(data.target as League)
+      ) {
+        throw new UserError(
+          'College is followed by Team, or by a Prediction on a Game.',
+        )
       }
       if (data.following) {
         await db

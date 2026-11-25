@@ -1,11 +1,13 @@
 /**
  * College football Source adapter: ESPN's site and core APIs, the same
- * shapes as the NFL's. Only part of FBS is covered (CONTEXT.md, "League"):
- * games involving a team from a COVERED_CONFERENCES conference, a
- * COVERED_TEAMS independent or an AP Top 25 team, whoever the opponent is.
+ * shapes as the NFL's. Every FBS Game is on the schedule, so a Prediction
+ * can be matched to any; only those someone opts into are followed live
+ * (CONTEXT.md, "Opt-in"; src/lib/live/schedule.ts). Rosters are read for
+ * the major conferences' teams and Notre Dame only: any other team's
+ * Players are named from its Games' plays.
  */
 
-import { espnRosters, fetchTeamSchedule, top25 } from '../espn/common'
+import { espnRosters, fetchTeamSchedule } from '../espn/common'
 import { parseRoster, parseScoreboard } from '../nfl/parse'
 import { footballSnapshot } from '../nfl'
 import { getJson as jsonFrom } from '../pool'
@@ -20,26 +22,13 @@ const SITE =
 const CORE =
   'https://sports.core.api.espn.com/v2/sports/football/leagues/college-football'
 
-/** ESPN group ids: ACC, Big 12, Big Ten, SEC. */
+/** ESPN group ids whose teams' rosters are read: ACC, Big 12, Big Ten, SEC. */
 const COVERED_CONFERENCES: ReadonlySet<string> = new Set(['1', '4', '5', '8'])
-/** Independents covered on their own: Notre Dame. */
+/** Independents whose roster is read: Notre Dame. */
 const COVERED_TEAMS: ReadonlySet<string> = new Set(['87'])
 /** ESPN's FBS group, for the scoreboard. */
 const FBS = '80'
 const getJson = jsonFrom('ESPN')
-
-/** Does this game involve a covered team? */
-export function isCovered(
-  event: NonNullable<EspnScoreboard['events']>[number],
-): boolean {
-  return (event.competitions?.[0]?.competitors ?? []).some(
-    (c) =>
-      top25(c) !== null ||
-      COVERED_TEAMS.has(c.team.id) ||
-      (c.team.conferenceId !== undefined &&
-        COVERED_CONFERENCES.has(c.team.conferenceId)),
-  )
-}
 
 /**
  * A season runs August to January: bowls and the playoff belong to the year
@@ -88,10 +77,7 @@ export const cfbAdapter: SourceAdapter = {
     const scoreboard = await getJson<EspnScoreboard>(
       `${SITE}/scoreboard?groups=${FBS}&limit=300&dates=${sportsDay.replaceAll('-', '')}`,
     )
-    return parseScoreboard(
-      { ...scoreboard, events: (scoreboard.events ?? []).filter(isCovered) },
-      'cfb',
-    )
+    return parseScoreboard(scoreboard, 'cfb')
   },
   async snapshot(sourceGameId) {
     return footballSnapshot(SITE, CORE, sourceGameId, 'cfb')

@@ -202,8 +202,8 @@ describe('LiveHub', () => {
     const nba = connect('/live?follows=league:nba')
     const player = connect('/live?follows=player:pl_judge')
     const prediction = connect('/live?follows=game:gm_1')
-    const top25 = connect('/live?follows=top25:cfb')
-    const sec = connect('/live?follows=conference:sec')
+    // A college Team someone opted into, by following it.
+    const georgia = connect('/live?follows=team:tm_a')
 
     hub.publish([gameEvent()])
     // The Timeline's socket asks for every League: its games strip sees all.
@@ -211,7 +211,7 @@ describe('LiveHub', () => {
     expect(nba.sent).toEqual([])
     expect(player.sent).toEqual([])
     expect(JSON.parse(prediction.sent[0] ?? '[]')).toHaveLength(1)
-    expect(top25.sent).toEqual([])
+    expect(georgia.sent).toEqual([])
 
     hub.publish([
       gameEvent({
@@ -227,8 +227,7 @@ describe('LiveHub', () => {
         },
       }),
     ])
-    expect(top25.sent).toHaveLength(1)
-    expect(sec.sent).toHaveLength(1)
+    expect(georgia.sent).toHaveLength(1)
     expect(all.sent).toHaveLength(2)
     expect(prediction.sent).toHaveLength(1)
   })

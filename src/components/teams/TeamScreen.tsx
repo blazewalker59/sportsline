@@ -19,7 +19,7 @@ import { SubjectPage } from '@/components/brand/SubjectPage'
 import { teamSubject } from '@/lib/brand/subject'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
-import { RowItemMark, rowItemLabel } from '@/components/brand/RowItemMark'
+import { ConferenceMark, conferenceName } from '@/components/brand/RowItemMark'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { FollowButton } from '@/components/follows/FollowButton'
 import { gameSearch } from '@/lib/timeline/gameLink'
@@ -136,8 +136,8 @@ function TeamHeader({
           <LeagueLogo league={team.league} size={16} />
           {team.conference && (
             <>
-              <RowItemMark item={team.conference} size={16} />
-              {rowItemLabel(team.conference)}
+              <ConferenceMark conference={team.conference} size={16} />
+              {conferenceName(team.conference)}
             </>
           )}
           {team.record && (

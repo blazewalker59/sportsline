@@ -2,6 +2,9 @@
  * The once-a-minute schedule sync (run by the Scheduler): for each
  * League with a Source, upsert today's Games and wake a LiveGame for every
  * Game that is live, about to start, or finished without being tracked.
+ * A college League's Games are all stored (a Prediction can be matched to
+ * any), but only those someone opted into are tracked (CONTEXT.md,
+ * "Opt-in"): there are far too many to follow every one live.
  */
 
 import { and, eq, inArray, notInArray, sql } from 'drizzle-orm'
@@ -18,7 +21,14 @@ import type { Conference } from '@/lib/model/leagues'
 import type { League, ScheduledGame } from '@/lib/model/types'
 import { ACTIVE_LEAGUES, sourceFor } from '@/lib/sources'
 import { sportsDayOf } from '@/lib/model/sportsDay'
-import { games, teams } from '@/lib/db/schema'
+import {
+  follows,
+  games,
+  predictionLegs,
+  predictions,
+  teams,
+} from '@/lib/db/schema'
+import { isCollege } from '@/lib/model/types'
 import { dbFromD1 } from '@/lib/db'
 import { reportError } from '@/lib/ops/errors'
 
@@ -203,10 +213,22 @@ export async function syncLeague(
   const [first, ...rest] = writes
   if (first) await db.batch([first, ...rest])
 
+  // A college Game is tracked only when someone opted into it.
+  const optedIn = isCollege(league)
+    ? await optedInGames(
+        db,
+        scheduled.map((g) => ({
+          id: gameIds.get(g.sourceGameId)!,
+          awayTeamId: teamIds.get(g.away.sourceId)!,
+          homeTeamId: teamIds.get(g.home.sourceId)!,
+        })),
+      )
+    : null
   // A past day can hold a hundred Finals to backfill: space their first
   // polls out rather than send every LiveGame to the Source at once.
   let backfills = 0
   const wakes = scheduled
+    .filter((g) => !optedIn || optedIn.has(gameIds.get(g.sourceGameId)!))
     .filter((g) =>
       needsTracking(g, stored.get(gameIds.get(g.sourceGameId)!)?.status, now),
     )
@@ -255,6 +277,50 @@ export async function syncLeague(
       { notify: !isTransient(r.reason) },
     )
   }
+}
+
+/**
+ * Which of these Games someone opted into (CONTEXT.md, "Opt-in"): an open
+ * Prediction with a Leg on the Game, or a Follow on either team, by any
+ * Viewer.
+ */
+export async function optedInGames(
+  db: Database,
+  scheduled: ReadonlyArray<{
+    id: string
+    awayTeamId: string
+    homeTeamId: string
+  }>,
+): Promise<Set<string>> {
+  const out = new Set<string>()
+  const ids = scheduled.map((g) => g.id)
+  for (const part of chunk(ids, 90)) {
+    const rows = await db
+      .selectDistinct({ gameId: predictionLegs.gameId })
+      .from(predictionLegs)
+      .innerJoin(predictions, eq(predictions.id, predictionLegs.predictionId))
+      .where(
+        and(
+          inArray(predictionLegs.gameId, part),
+          eq(predictions.status, 'open'),
+        ),
+      )
+    for (const r of rows) if (r.gameId) out.add(r.gameId)
+  }
+  const teamIds = [
+    ...new Set(scheduled.flatMap((g) => [g.awayTeamId, g.homeTeamId])),
+  ]
+  const followed = new Set<string>()
+  for (const part of chunk(teamIds, 90)) {
+    const rows = await db
+      .selectDistinct({ teamId: follows.target })
+      .from(follows)
+      .where(and(eq(follows.kind, 'team'), inArray(follows.target, part)))
+    for (const r of rows) followed.add(r.teamId)
+  }
+  for (const g of scheduled)
+    if (followed.has(g.awayTeamId) || followed.has(g.homeTeamId)) out.add(g.id)
+  return out
 }
 
 /** The schedule fields of the Games already stored, by id. */

@@ -4,15 +4,14 @@
  * on the score cards. Pure, apart from the remembered Scope's storage.
  */
 
-import type { Scope } from '@/lib/model/scope'
+import type { OptIn, Scope } from '@/lib/model/scope'
 import type { Follow, GameSummary } from '@/lib/model/timeline'
 import type { PredictionView } from '@/lib/kalshi/predictionViews'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { League } from '@/lib/model/types'
 import { parseScope } from '@/lib/model/scope'
 import { notifyDeviceValue } from '@/lib/useDeviceValue'
-import { inConference, isRanked } from '@/lib/model/timeline'
-import { isConference } from '@/lib/model/leagues'
+import { isCollege } from '@/lib/model/types'
 
 const SCOPE_KEY = 'sportsline:scope'
 
@@ -76,15 +75,22 @@ export function inScope(
   items: ReadonlyArray<{ gameId: string }>,
   leagues: ReadonlyArray<League>,
   predictionGames: ReadonlyArray<string>,
+  /** The college Games and Teams the Viewer opted into. */
+  optIns: ReadonlyArray<OptIn> = [],
 ): boolean {
-  if (scope === 'all') return leagues.includes(game.league)
+  // A college Game only when opted into (CONTEXT.md, "Opt-in").
+  const leagueGame = (league: League) =>
+    game.league === league &&
+    (!isCollege(league) ||
+      followsGame(
+        game,
+        optIns.map((o) => o.follow),
+      ))
+  if (scope === 'all') return leagues.some(leagueGame)
   if (scope === 'predictions') return predictionGames.includes(game.id)
   // Fantasy: the Games the Starters' plays came from.
   if (scope === 'fantasy') return items.some((i) => i.gameId === game.id)
-  if (scope === 'top25') return game.league === 'cfb' && isRanked(game)
-  if (isConference(scope))
-    return game.league === 'cfb' && inConference(game, scope)
-  if (scope !== 'following') return game.league === scope
+  if (scope !== 'following') return leagueGame(scope)
   // Player Follows can't be judged from the Game alone: include any Game
   // that has Plays on this Timeline.
   return (
@@ -102,12 +108,8 @@ export function followsGame(
       ? f.league === game.league
       : f.kind === 'team'
         ? f.teamId === game.awayTeam.id || f.teamId === game.homeTeam.id
-        : f.kind === 'top25'
-          ? game.league === 'cfb' && isRanked(game)
-          : f.kind === 'conference'
-            ? game.league === 'cfb' && inConference(game, f.conference)
-            : f.kind === 'game'
-              ? f.gameId === game.id
-              : false,
+        : f.kind === 'game'
+          ? f.gameId === game.id
+          : false,
   )
 }

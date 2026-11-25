@@ -8,7 +8,7 @@
  * so each id list is bound once as JSON and unpacked with json_each.
  */
 
-import { and, eq, inArray, isNotNull, ne, or, sql } from 'drizzle-orm'
+import { and, eq, inArray, ne, or, sql } from 'drizzle-orm'
 import { QueryBuilder } from 'drizzle-orm/sqlite-core'
 import type { SQL } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
@@ -16,15 +16,12 @@ import type { Follow } from '@/lib/model/timeline'
 import {
   fantasyLeagues,
   fantasyPlayers,
-  games,
   itemPlayers,
   timelineItems,
 } from '@/lib/db/schema'
 
 export interface CoverageOptions {
-  /** The Sports Day the Timeline shows (Top 25 and Conference Games are per day). */
-  sportsDay: string
-  /** Show Routine Plays even for League, Game and college groups' Follows. */
+  /** Show Routine Plays even for League and Game Follows. */
   includeRoutine?: boolean
   /** The signed-in Viewer, whose own Starters a Fantasy Follow covers. */
   viewerId?: string | null
@@ -41,7 +38,7 @@ const unique = <T>(values: Array<T>) => [...new Set(values)]
 /** The condition for items these Follows cover, or null when none can be. */
 export function coverageWhere(
   follows: ReadonlyArray<Follow>,
-  { sportsDay, includeRoutine, viewerId }: CoverageOptions,
+  { includeRoutine, viewerId }: CoverageOptions,
 ): SQL | null {
   const t = timelineItems
   const qb = new QueryBuilder()
@@ -55,52 +52,6 @@ export function coverageWhere(
   )
   if (leagues.length > 0) {
     covered.push(and(inArray(t.league, leagues), notRoutine)!)
-  }
-  if (follows.some((f) => f.kind === 'top25')) {
-    covered.push(
-      and(
-        eq(t.league, 'cfb'),
-        inArray(
-          t.gameId,
-          qb
-            .select({ id: games.id })
-            .from(games)
-            .where(
-              and(
-                eq(games.sportsDay, sportsDay),
-                or(isNotNull(games.awayRank), isNotNull(games.homeRank)),
-              ),
-            ),
-        ),
-        notRoutine,
-      )!,
-    )
-  }
-  const conferences = unique(
-    follows.flatMap((f) => (f.kind === 'conference' ? [f.conference] : [])),
-  )
-  if (conferences.length > 0) {
-    covered.push(
-      and(
-        eq(t.league, 'cfb'),
-        inArray(
-          t.gameId,
-          qb
-            .select({ id: games.id })
-            .from(games)
-            .where(
-              and(
-                eq(games.sportsDay, sportsDay),
-                or(
-                  inArray(games.awayConference, conferences),
-                  inArray(games.homeConference, conferences),
-                ),
-              ),
-            ),
-        ),
-        notRoutine,
-      )!,
-    )
   }
   const gameIds = unique(
     follows.flatMap((f) => (f.kind === 'game' ? [f.gameId] : [])),

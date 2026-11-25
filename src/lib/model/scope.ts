@@ -1,11 +1,11 @@
 /**
- * A Timeline's Scope (CONTEXT.md): All, Following, Predictions, Fantasy,
- * one League, or one of college football's groups (Top 25, a major
- * Conference), and the main navigation's four tabs over them.
+ * A Timeline's Scope (CONTEXT.md): All, Following, Predictions, Fantasy or
+ * one League, and the main navigation's four tabs over them.
  */
 
 import { DEFAULT_FOLLOWS } from './timeline'
-import { isConference, isRowItem } from './leagues'
+import { isRowItem } from './leagues'
+import { isCollege } from './types'
 import type { Follow } from './timeline'
 import type { RowItem } from './leagues'
 import type { League } from './types'
@@ -32,6 +32,26 @@ export function defaultScope(viewerFollows: ReadonlyArray<Follow>): Scope {
   return viewerFollows.length > 0 ? 'following' : 'all'
 }
 
+/**
+ * A college Game or Team the Viewer opted into (CONTEXT.md, "Opt-in"): an
+ * open Prediction's Game, or a followed Team. College Leagues are covered
+ * by these, never as a whole.
+ */
+export interface OptIn {
+  league: League
+  follow: Extract<Follow, { kind: 'game' } | { kind: 'team' }>
+}
+
+/** A League as Follows: the whole of it, or for college what's opted in. */
+function leagueFollows(
+  league: League,
+  optIns: ReadonlyArray<OptIn>,
+): Array<Follow> {
+  return isCollege(league)
+    ? optIns.filter((o) => o.league === league).map((o) => o.follow)
+    : [{ kind: 'league', league }]
+}
+
 /** The Follows a Scope's Timeline is fetched with. */
 export function scopeFollows(
   scope: Scope,
@@ -42,32 +62,32 @@ export function scopeFollows(
   predictionGames: ReadonlyArray<string> = [],
   /** The Players starting in the Viewer's Fantasy Matchups, either side. */
   fantasyPlayers: ReadonlyArray<string> = [],
+  /** The college Games and Teams the Viewer opted into. */
+  optIns: ReadonlyArray<OptIn> = [],
 ): ReadonlyArray<Follow> {
   const all = leagues
-    ? leagues.map((league) => ({ kind: 'league' as const, league }))
-    : DEFAULT_FOLLOWS
+    ? leagues.flatMap((league) => leagueFollows(league, optIns))
+    : optIns.length > 0
+      ? [...DEFAULT_FOLLOWS, ...optIns.map((o) => o.follow)]
+      : DEFAULT_FOLLOWS
   switch (scope) {
     case 'all':
       return all
     case 'following':
       return viewerFollows.length > 0 ? viewerFollows : all
-    case 'top25':
-      return [{ kind: 'top25' }]
     case 'predictions':
       return predictionGames.map((gameId) => ({ kind: 'game', gameId }))
     case 'fantasy':
       return [{ kind: 'fantasy', playerIds: [...fantasyPlayers] }]
     default:
-      return isConference(scope)
-        ? [{ kind: 'conference', conference: scope }]
-        : [{ kind: 'league', league: scope }]
+      return leagueFollows(scope, optIns)
   }
 }
 
 /**
  * The four tabs of the main navigation, each a way into the Timeline
  * (CONTEXT.md, "Scope"), in the order the nav shows them. All stands for
- * every League-shaped Scope: All, one League, Top 25 or a Conference.
+ * every League-shaped Scope: All, or one League.
  */
 export type ScopeTab = 'following' | 'all' | 'predictions' | 'fantasy'
 

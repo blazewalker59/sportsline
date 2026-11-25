@@ -50,6 +50,7 @@ import type { LeagueMatchup } from '@/lib/fantasy/matchup'
 import type { TimelineScopeState } from './useTimelineScope'
 import type { PaneDetail } from '@/lib/timeline/gameLink'
 import type { RowItem } from '@/lib/model/leagues'
+import { isCollege } from '@/lib/model/types'
 import { detailParam, parseDetail } from '@/lib/timeline/gameLink'
 import { PredictionDetail } from '@/components/predictions/PredictionSheet'
 import { FirstRunFollows } from '@/components/follows/FirstRunFollows'
@@ -402,6 +403,7 @@ function Timeline({
           timeline.items,
           s.leagues,
           s.predictionGames,
+          s.optIns,
         ),
       ),
     [
@@ -413,6 +415,7 @@ function Timeline({
       s.viewerFollows,
       s.leagues,
       s.predictionGames,
+      s.optIns,
     ],
   )
   const pages = scopePages({
@@ -617,7 +620,17 @@ function Timeline({
       onRetry={() => void timeline.reload()}
       empty={scopeItems.length === 0 && scopeTyping.length === 0}
       loading={backfill === 'loading' || timeline.loading}
-      emptyText={isToday ? 'No plays yet today.' : 'No plays on this day.'}
+      emptyText={
+        // A college League with nothing opted in: say how to fill it.
+        scope !== 'all' &&
+        heroTab === 'all' &&
+        isCollege(scope as RowItem) &&
+        !s.optIns.some((o) => o.league === scope)
+          ? 'College games show here when you follow one of their teams, or make a Prediction on one.'
+          : isToday
+            ? 'No plays yet today.'
+            : 'No plays on this day.'
+      }
       hasMore={timeline.hasMore}
       loadingMore={timeline.loadingMore}
       onMore={() => void timeline.loadMore()}

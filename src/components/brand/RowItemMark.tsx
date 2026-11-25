@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { LeagueLogo, leagueLabel } from './LeagueLogo'
 import type { Conference, RowItem } from '@/lib/model/leagues'
-import { isConference, isLeague } from '@/lib/model/leagues'
 import { cn } from '@/lib/utils'
 
 const CONFERENCE_NAMES: Record<Conference, string> = {
@@ -19,16 +18,30 @@ const CONFERENCE_LOGO_IDS: Record<Conference, number> = {
   acc: 1,
 }
 
-/** A short name: "NFL", "Top 25", "Big Ten". */
+/** A short name for the League row: "NFL", "CFB". */
 export function rowItemLabel(item: RowItem): string {
-  if (isLeague(item)) return leagueLabel(item)
-  if (isConference(item)) return CONFERENCE_NAMES[item]
-  return 'Top 25'
+  return leagueLabel(item)
 }
 
-/** A longer name for lists: "College Football", "SEC". */
+/** A longer name for lists: "College Football", "NFL". */
 export function rowItemName(item: RowItem): string {
   return item === 'cfb' ? 'College Football' : rowItemLabel(item)
+}
+
+/** A League as it appears on the League row: its logo. */
+export function RowItemMark({
+  item,
+  size = 20,
+}: {
+  item: RowItem
+  size?: number
+}) {
+  return <LeagueLogo league={item} size={size} />
+}
+
+/** A college Conference's name: "SEC", "Big Ten". */
+export function conferenceName(conference: Conference): string {
+  return CONFERENCE_NAMES[conference]
 }
 
 function conferenceLogo(conference: Conference, variant: '500' | '500-dark') {
@@ -36,46 +49,42 @@ function conferenceLogo(conference: Conference, variant: '500' | '500-dark') {
 }
 
 /**
- * A Scope-row item as it appears on the row: a League's or Conference's
- * logo (the Conference's light or dark mark to suit the theme), or "Top 25".
+ * A college Team's Conference, beside its name on its page: the
+ * Conference's logo (its light or dark mark to suit the theme), or its
+ * name when the logo won't load.
  */
-export function RowItemMark({
-  item,
+export function ConferenceMark({
+  conference,
   size = 20,
-  inverse,
 }: {
-  item: RowItem
+  conference: Conference
   size?: number
-  /** On an inverted chip (a selected Scope): use the other theme's mark. */
-  inverse?: boolean
 }) {
   const [failed, setFailed] = useState(false)
-  if (isLeague(item)) return <LeagueLogo league={item} size={size} />
-  if (isConference(item) && !failed) {
-    const img = (variant: '500' | '500-dark', className: string) => (
-      <img
-        src={conferenceLogo(item, variant)}
-        alt={CONFERENCE_NAMES[item]}
-        title={CONFERENCE_NAMES[item]}
-        width={size}
-        height={size}
-        loading="lazy"
-        decoding="async"
-        onError={() => setFailed(true)}
-        className={cn('shrink-0 object-contain', className)}
-        style={{ width: size, height: size }}
-      />
-    )
+  if (failed)
     return (
-      <>
-        {img(inverse ? '500-dark' : '500', 'dark:hidden')}
-        {img(inverse ? '500' : '500-dark', 'hidden dark:block')}
-      </>
+      <span className="text-[13px] font-semibold whitespace-nowrap">
+        {CONFERENCE_NAMES[conference]}
+      </span>
     )
-  }
+  const img = (variant: '500' | '500-dark', className: string) => (
+    <img
+      src={conferenceLogo(conference, variant)}
+      alt={CONFERENCE_NAMES[conference]}
+      title={CONFERENCE_NAMES[conference]}
+      width={size}
+      height={size}
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(true)}
+      className={cn('shrink-0 object-contain', className)}
+      style={{ width: size, height: size }}
+    />
+  )
   return (
-    <span className="text-[13px] font-semibold whitespace-nowrap">
-      {rowItemLabel(item)}
-    </span>
+    <>
+      {img('500', 'dark:hidden')}
+      {img('500-dark', 'hidden dark:block')}
+    </>
   )
 }
