@@ -715,8 +715,7 @@ describe('TimelineScreen, wide: Predictions and Matchups in the pane', () => {
 describe('TimelineScreen, narrow: the home board', () => {
   beforeEach(() => setWide(false))
 
-  const night = () => screen.queryByRole('region', { name: 'Your night' })
-  const sum = (name: RegExp) => within(night()!).getByRole('button', { name })
+  const hero = () => document.querySelector<HTMLElement>('[data-tab-hero]')
   const strip = (name: string | RegExp) =>
     within(narrowed()!).getByRole('button', { name })
 
@@ -743,17 +742,19 @@ describe('TimelineScreen, narrow: the home board', () => {
     expect(narrowed()).toBeNull()
     if (scope === 'predictions') {
       expect(tile(/^Phillies to win/)).toBeTruthy()
-      expect(sum(/^Predictions: 1 open, worth \$6\.20/)).toBeTruthy()
+      expect(hero()!.textContent).toContain('$6.20')
+      expect(hero()!.textContent).toContain('1 open')
     } else if (scope === 'fantasy') {
       expect(tile(/^The League/)).toBeTruthy()
-      expect(sum(/^Fantasy: 88\.4–71\.2 vs GG/)).toBeTruthy()
+      expect(hero()!.textContent).toContain('88.4–71.2')
+      expect(hero()!.textContent).toContain('leading GG')
     } else {
       // The live Games as tiles; the finished one as a chip under them.
       expect(within(board()!).getByText(/Live now · 2/)).toBeTruthy()
       expect(tile(/^KC 14, BUF 10, Q3 8:12/)).toBeTruthy()
       expect(tile(/BOS 108 · NYK 112/)).toBeTruthy()
-      // Nothing riding on the night: no summary.
-      expect(night()).toBeNull()
+      // The live Games are the headline.
+      expect(hero()!.textContent).toContain('2 live')
     }
   })
 
@@ -890,15 +891,28 @@ describe('TimelineScreen, narrow: the home board', () => {
     )
   })
 
-  it('Your night switches to the tab of what it sums up', async () => {
-    scopeOver.current = predictionsScope({
-      selectedPrediction: null,
-      fantasyLeagues: [league],
-    })
-    const { router } = renderTimeline('/?scope=all')
-    await waitFor(() => expect(night()).toBeTruthy())
-    fireEvent.click(sum(/^Fantasy:/))
-    await waitFor(() => expect(search(router).scope).toBe('fantasy'))
+  it.each([
+    ['following', 'Following'],
+    ['all', 'All Leagues'],
+    ['nba', 'NBA'],
+    ['predictions', 'Predictions'],
+    ['fantasy', 'Fantasy'],
+  ])('the %s tab opens on its hero, named for it', async (scope, kicker) => {
+    scopeOver.current =
+      scope === 'predictions'
+        ? predictionsScope({ selectedPrediction: null })
+        : scope === 'fantasy'
+          ? fantasyScope({ selectedMatchup: null })
+          : {}
+    renderTimeline(`/?scope=${scope}`)
+    await waitFor(() => expect(hero()).toBeTruthy())
+    expect(hero()!.getAttribute('aria-label')).toBe(kicker)
+    // Under All the League row is in the hero, and only there.
+    const leagues = screen.queryAllByRole('list', { name: 'Leagues' })
+    if (scope === 'all' || scope === 'nba') {
+      expect(leagues).toHaveLength(1)
+      expect(hero()!.contains(leagues[0])).toBe(true)
+    } else expect(leagues).toHaveLength(0)
   })
 
   it('opens a Matchup as a sheet, which lists the league’s Matchups', async () => {

@@ -2,9 +2,8 @@
  * The phone's home board (only below `md`): the one place a phone picks
  * what the Timeline shows. Over the feed, whether or not it's narrowed:
  *
- * - "Your night": at most three cards summing up the Viewer's stakes
- *   (their Matchups, their Predictions, the Games they follow), each
- *   switching to its tab.
+ * - The tab's hero (TabHero): its headline in its own color, and under
+ *   All the League row.
  * - The board: what the tab can be narrowed to (scopePages): its Games, or
  *   under Predictions the open Predictions, under Fantasy the Matchups. A
  *   grid (live Games as tiles, the rest as chips) or collapsed to one row
@@ -22,12 +21,12 @@ import { useCallback } from 'react'
 import { gameStatusLabel } from './GameStrip'
 import { pageKey } from './scopePages'
 import type { ScopePage } from './scopePages'
-import type { Scope } from '@/lib/model/scope'
 import type { GameSummary } from '@/lib/model/timeline'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { PredictionView } from '@/lib/kalshi/predictionViews'
 import type { ChangeDisplay } from '@/lib/kalshi/server'
 import type { GameStake } from '@/lib/timeline/stakes'
+import type { IconName } from '@/components/layout/NavIcon'
 import { isLiveGame } from '@/lib/timeline/stakes'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
@@ -43,6 +42,7 @@ import { pts, sideRecord } from '@/components/fantasy/format'
 import { SPORTS } from '@/lib/fantasy/sports'
 import { notifyDeviceValue, useDeviceValue } from '@/lib/useDeviceValue'
 import { useTimeZone } from '@/lib/time/useTimeZone'
+import { NavGlyph } from '@/components/layout/NavIcon'
 import { cn } from '@/lib/utils'
 
 export type BoardLayout = 'grid' | 'row'
@@ -570,212 +570,192 @@ export function NarrowedBar({
 }
 
 /**
- * "Your night": the Viewer's stakes summed up, a card each (Fantasy,
- * Predictions, Following) and only those they have. Each switches to its
- * tab, the current one marked.
+ * The top of every tab on a phone: one card in the tab's own color (its
+ * icon's, from the main navigation) with the tab's headline (live Games,
+ * the portfolio's worth, the Matchup's score) and a line or a control
+ * under it (under All, the League row). The same shape on every tab.
  */
-export function YourNight({
-  leagues,
-  predictions,
-  display = 'dollars',
-  following,
-  scope,
-  onScope,
+export function TabHero({
+  icon,
+  tone,
+  kicker,
+  figure,
+  aside,
+  children,
 }: {
-  /** Fantasy leagues with a Matchup this period. */
-  leagues: ReadonlyArray<FantasyLeagueView>
-  /** Open Predictions. */
-  predictions: ReadonlyArray<PredictionView>
-  display?: ChangeDisplay
-  /** The followed Teams' Games today; null without Follows. */
-  following: ReadonlyArray<GameSummary> | null
-  scope: Scope
-  onScope: (scope: 'fantasy' | 'predictions' | 'following') => void
+  icon: IconName
+  /** The tab's color, as a CSS value (the nav's tone). */
+  tone: string
+  kicker: string
+  /** The headline: "4 live", "$37.80", "5–3–1". */
+  figure: string
+  /** Beside the headline, smaller: "8 games", "+$22.40", "leading GG". */
+  aside?: React.ReactNode
+  /** Under it: a line, or a control (the League row). */
+  children?: React.ReactNode
 }) {
-  const showFollowing = following !== null && following.length > 0
-  const cards = Number(leagues.length > 0) + Number(predictions.length > 0)
-  // Following alone says nothing the Following tab doesn't.
-  if (cards === 0) return null
   return (
-    <section aria-label="Your night" className="mb-3 flex flex-col gap-2">
-      <h2 className="text-3xs font-bold tracking-wide text-muted uppercase">
-        Your night
-      </h2>
-      <ul className="grid auto-cols-fr grid-flow-col gap-2">
-        {leagues.length > 0 && (
-          <li className="flex min-w-0">
-            <FantasySum
-              leagues={leagues}
-              current={scope === 'fantasy'}
-              onPick={() => onScope('fantasy')}
-            />
-          </li>
+    <section
+      aria-label={kicker}
+      data-tab-hero=""
+      style={{ '--tone': tone } as React.CSSProperties}
+      className="mb-2 flex flex-col gap-2 rounded-sheet border border-[color-mix(in_srgb,var(--tone)_30%,var(--border))] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--tone)_22%,var(--surface)),var(--surface)_70%)] px-3.5 py-3"
+    >
+      <span className="flex items-center gap-1.5 text-3xs font-bold tracking-wide text-(--tone) uppercase">
+        <NavGlyph name={icon} className="size-3.5" />
+        {kicker}
+      </span>
+      <span className="flex items-baseline gap-2 tabular-nums">
+        <span className="text-3xl leading-none font-bold tracking-tight">
+          {figure}
+        </span>
+        {aside && (
+          <span className="truncate text-sm font-semibold text-muted">
+            {aside}
+          </span>
         )}
-        {predictions.length > 0 && (
-          <li className="flex min-w-0">
-            <PredictionsSum
-              predictions={predictions}
-              display={display}
-              current={scope === 'predictions'}
-              onPick={() => onScope('predictions')}
-            />
-          </li>
-        )}
-        {showFollowing && (
-          <li className="flex min-w-0">
-            <FollowingSum
-              games={following}
-              current={scope === 'following'}
-              onPick={() => onScope('following')}
-            />
-          </li>
-        )}
-      </ul>
+      </span>
+      {children}
     </section>
   )
 }
 
-function SumCard({
-  kicker,
-  tone,
-  current,
-  label,
-  onPick,
+type HeroTab = 'following' | 'all' | 'predictions' | 'fantasy'
+
+/** Each tab's icon and color, as the main navigation draws them. */
+const HERO_LOOK: Record<HeroTab, { icon: IconName; tone: string }> = {
+  following: { icon: 'follows', tone: 'var(--accent)' },
+  all: { icon: 'all', tone: 'var(--accent)' },
+  predictions: { icon: 'predictions', tone: 'var(--section-predictions)' },
+  fantasy: { icon: 'fantasy', tone: 'var(--section-fantasy)' },
+}
+
+/** A tab's headline, in words and figures, for its hero and pinned bar. */
+export function heroHeadline({
+  tab,
+  games,
+  predictions,
+  leagues,
+  display = 'dollars',
+  allKicker,
+}: {
+  tab: HeroTab
+  /** The tab's Games (the board's, under Following and All). */
+  games: ReadonlyArray<GameSummary>
+  predictions: ReadonlyArray<PredictionView>
+  leagues: ReadonlyArray<FantasyLeagueView>
+  display?: ChangeDisplay
+  /** All's kicker: "Tonight", or the League's name. */
+  allKicker: string
+}): {
+  kicker: string
+  figure: string
+  aside: string | null
+  /** The aside's color class, for money up or down. */
+  asideTone?: string
+  line: string | null
+} {
+  if (tab === 'predictions') {
+    const totals = portfolioTotals(predictions)
+    return {
+      kicker: 'Predictions',
+      figure: money(totals.profit ? totals.cashout : totals.staked),
+      aside: totals.profit ? profitText(totals.profit, display) : 'staked',
+      asideTone: totals.profit ? toneOf(totals.profit.dollars) : undefined,
+      line: `${predictions.length} open · staked ${money(totals.staked)}`,
+    }
+  }
+  if (tab === 'fantasy') {
+    const one = leagues.length === 1 ? leagues[0].matchup! : null
+    if (one) {
+      const theirs = one.opponent
+      const lead = theirs ? one.mine.score - theirs.score : 0
+      return {
+        kicker: 'Fantasy',
+        figure: one.categories
+          ? sideRecord(one, 'mine')
+          : `${pts(one.mine.score)}–${theirs ? pts(theirs.score) : '—'}`,
+        aside: theirs
+          ? `${lead > 0 ? 'leading' : lead < 0 ? 'trailing' : 'tied with'} ${theirs.abbrev}`
+          : 'bye week',
+        line: one.leagueName,
+      }
+    }
+    const leading = leagues.filter(
+      (l) => l.matchup!.mine.score > (l.matchup!.opponent?.score ?? Infinity),
+    ).length
+    return {
+      kicker: 'Fantasy',
+      figure: `${leading} of ${leagues.length}`,
+      aside: 'leading',
+      line: null,
+    }
+  }
+  const live = games.filter(isLiveGame)
+  const count = `${games.length} game${games.length === 1 ? '' : 's'}`
+  return {
+    kicker: tab === 'following' ? 'Following' : allKicker,
+    figure: live.length > 0 ? `${live.length} live` : count,
+    aside: live.length > 0 ? count : null,
+    line:
+      tab === 'following' && live.length > 0
+        ? live
+            .slice(0, 2)
+            .map(
+              (g) =>
+                `${g.awayTeam.abbreviation} ${g.score.away}–${g.score.home} ${g.homeTeam.abbreviation}`,
+            )
+            .join(' · ')
+        : null,
+  }
+}
+
+/** A tab's hero, from its headline (heroHeadline). */
+export function ScopeHero({
+  tab,
+  headline: h,
   children,
 }: {
-  kicker: string
-  tone: string
-  current: boolean
-  label: string
-  onPick: () => void
-  children: React.ReactNode
+  tab: HeroTab
+  headline: ReturnType<typeof heroHeadline>
+  /** Under the headline instead of its line: a control (the League row). */
+  children?: React.ReactNode
 }) {
   return (
-    <button
-      type="button"
-      onClick={onPick}
-      aria-label={label}
-      aria-current={current ? 'true' : undefined}
-      className={cn(
-        'flex w-full min-w-0 flex-col gap-0.5 rounded-card border p-2.5 text-left tabular-nums transition-colors',
-        current
-          ? 'border-transparent bg-accent/15'
-          : 'border-border bg-surface',
-      )}
+    <TabHero
+      {...HERO_LOOK[tab]}
+      kicker={h.kicker}
+      figure={h.figure}
+      aside={h.aside && <span className={h.asideTone}>{h.aside}</span>}
     >
-      <span
-        className={cn(
-          'truncate text-3xs font-bold tracking-wide uppercase',
-          tone,
-        )}
-      >
-        {kicker}
-      </span>
-      {children}
-    </button>
+      {children ??
+        (h.line && (
+          <span className="truncate text-xs font-semibold text-muted">
+            {h.line}
+          </span>
+        ))}
+    </TabHero>
   )
 }
 
-function FantasySum({
-  leagues,
-  current,
-  onPick,
+/** The pinned bar's first item: the tab and its headline, in its color. */
+export function HeroLead({
+  tab,
+  headline: h,
 }: {
-  leagues: ReadonlyArray<FantasyLeagueView>
-  current: boolean
-  onPick: () => void
+  tab: HeroTab
+  headline: ReturnType<typeof heroHeadline>
 }) {
-  const one = leagues.length === 1 ? leagues[0].matchup! : null
-  const leading = leagues.filter(
-    (l) => l.matchup!.mine.score > (l.matchup!.opponent?.score ?? Infinity),
-  ).length
-  const figure = one
-    ? one.categories
-      ? sideRecord(one, 'mine')
-      : `${pts(one.mine.score)}–${one.opponent ? pts(one.opponent.score) : '—'}`
-    : `${leading} of ${leagues.length}`
-  const sub = one
-    ? one.opponent
-      ? `vs ${one.opponent.abbrev}`
-      : 'Bye week'
-    : 'leading'
+  const look = HERO_LOOK[tab]
   return (
-    <SumCard
-      kicker={one ? one.leagueName : 'Fantasy'}
-      tone="text-scoring"
-      current={current}
-      label={`Fantasy: ${figure} ${sub}. Your Matchups`}
-      onPick={onPick}
+    <span
+      style={{ color: look.tone }}
+      className="flex items-center gap-1.5 text-2xs font-bold whitespace-nowrap tabular-nums"
     >
-      <span className="truncate text-base leading-tight font-bold">
-        {figure}
-      </span>
-      <span className="truncate text-3xs font-semibold text-muted">{sub}</span>
-    </SumCard>
-  )
-}
-
-function PredictionsSum({
-  predictions,
-  display,
-  current,
-  onPick,
-}: {
-  predictions: ReadonlyArray<PredictionView>
-  display: ChangeDisplay
-  current: boolean
-  onPick: () => void
-}) {
-  const totals = portfolioTotals(predictions)
-  const figure = totals.profit ? money(totals.cashout) : money(totals.staked)
-  return (
-    <SumCard
-      kicker={`Predictions · ${predictions.length}`}
-      tone="text-positive"
-      current={current}
-      label={`Predictions: ${predictions.length} open, worth ${figure}. Your Predictions`}
-      onPick={onPick}
-    >
-      <span className="truncate text-base leading-tight font-bold">
-        {figure}
-      </span>
-      <span
-        className={cn(
-          'truncate text-3xs font-semibold',
-          totals.profit ? toneOf(totals.profit.dollars) : 'text-muted',
-        )}
-      >
-        {totals.profit ? profitText(totals.profit, display) : 'staked'}
-      </span>
-    </SumCard>
-  )
-}
-
-function FollowingSum({
-  games,
-  current,
-  onPick,
-}: {
-  games: ReadonlyArray<GameSummary>
-  current: boolean
-  onPick: () => void
-}) {
-  const live = games.filter(isLiveGame).length
-  return (
-    <SumCard
-      kicker="Following"
-      tone="text-accent"
-      current={current}
-      label={`Following: ${games.length} games, ${live} live. Your Following`}
-      onPick={onPick}
-    >
-      <span className="truncate text-base leading-tight font-bold">
-        {live > 0 ? `${live} live` : `${games.length} today`}
-      </span>
-      <span className="truncate text-3xs font-semibold text-muted">
-        {games.length} game{games.length === 1 ? '' : 's'}
-      </span>
-    </SumCard>
+      <NavGlyph name={look.icon} className="size-3.5" />
+      {h.kicker}
+      <span className="text-foreground">{h.figure}</span>
+    </span>
   )
 }
 
@@ -785,10 +765,13 @@ function FollowingSum({
  * Games), the one narrowed to marked.
  */
 export function LiveTicker({
+  lead,
   games,
   current,
   onPick,
 }: {
+  /** First, the tab and its headline, so the pinned bar says where you are. */
+  lead?: React.ReactNode
   games: ReadonlyArray<GameSummary>
   /** The current page's key (currentPageKey). */
   current: string
@@ -797,13 +780,14 @@ export function LiveTicker({
   const timeZone = useTimeZone()
   const live = games.filter(isLiveGame)
   const shown = live.length > 0 ? live : games
-  if (shown.length === 0) return null
+  if (shown.length === 0 && !lead) return null
   return (
     <ul
       aria-label="Scores"
       data-no-swipe=""
-      className="flex gap-1 overflow-x-auto overscroll-x-contain px-4 py-1.5 [scrollbar-width:none]"
+      className="flex items-center gap-1 overflow-x-auto overscroll-x-contain px-4 py-1.5 [scrollbar-width:none]"
     >
+      {lead && <li className="shrink-0 pr-1">{lead}</li>}
       {shown.map((g) => (
         <li key={g.id} className="shrink-0">
           <button
