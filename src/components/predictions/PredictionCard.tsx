@@ -1,6 +1,6 @@
 /**
- * Predictions (CONTEXT.md) in the Timeline: a strip of cards with each
- * Prediction's Odds moving like a score.
+ * A Prediction (CONTEXT.md) as a small card, its Odds moving like a
+ * score (a Player's page lists them).
  */
 
 import {
@@ -19,7 +19,6 @@ import type { ChangeDisplay } from '@/lib/kalshi/server'
 import type { PredictionView } from '@/lib/kalshi/predictionViews'
 import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
-import { CornerButton } from '@/components/timeline/GameStrip'
 import { cn } from '@/lib/utils'
 
 /** A Prediction as a small card: its Odds now, how they've moved, its Legs. */
@@ -131,51 +130,5 @@ export function PredictionCard({
         )}
       </span>
     </button>
-  )
-}
-
-/**
- * Open Predictions as a strip of cards, like the score cards: tapping one
- * narrows the Timeline to it (tap again to clear), and the selected card's
- * corner badge opens its sheet.
- */
-export function PredictionStrip({
-  predictions,
-  selected,
-  onSelect,
-  onDetails,
-  display,
-}: {
-  predictions: ReadonlyArray<PredictionView>
-  selected?: string
-  onSelect: (id: string | null) => void
-  onDetails: (id: string) => void
-  display?: ChangeDisplay
-}) {
-  if (predictions.length === 0) return null
-  return (
-    <div className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none]">
-      <ul className="flex gap-2 pt-2 pb-0.5" aria-label="Your Predictions">
-        {predictions.map((p) => (
-          <li key={p.id} className="relative flex shrink-0">
-            <PredictionCard
-              prediction={p}
-              display={display}
-              selected={p.id === selected}
-              onSelect={() => onSelect(p.id === selected ? null : p.id)}
-            />
-            {p.id === selected && (
-              <CornerButton
-                label="Prediction details"
-                onClick={() => onDetails(p.id)}
-              >
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 11v5M12 8h.01" />
-              </CornerButton>
-            )}
-          </li>
-        ))}
-      </ul>
-    </div>
   )
 }

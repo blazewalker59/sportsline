@@ -5,14 +5,14 @@
  * (TimelineFeed), the selected Game (GamePane) and the sheets it opens
  * (TimelineSheets).
  *
- * On phones a selected Game takes the feed's place, filtered to it, and a
- * Prediction or Matchup opens as a bottom sheet; what the Timeline shows
- * is picked from the home board over the feed (LiveBoard: the tab's Games,
- * Predictions or Matchups, narrowed or not) rather than at the top's
- * cards (useCompactTimeline). From `lg`
- * (useWideTimeline) each opens in a pane beside the Scope's feed, which
- * stays exactly as it was: one at a time, kept in the address (`game`, or
- * `detail` for a Prediction or Matchup) so reload and Back behave alike.
+ * What it shows is picked at every width from the home board over the
+ * feed (LiveBoard): the tab's hero, then its Games, Predictions or
+ * Matchups. On phones and tablets a selected Game takes the feed's place,
+ * filtered to it, and a Prediction or Matchup opens as a bottom sheet.
+ * From `lg` (useWideTimeline) each opens in a pane beside the Scope's
+ * feed, which stays exactly as it was: one at a time, kept in the address
+ * (`game`, or `detail` for a Prediction or Matchup) so reload and Back
+ * behave alike.
  */
 
 import { useQueryClient } from '@tanstack/react-query'
@@ -25,7 +25,6 @@ import { DetailPane, DetailPaneMissing } from './DetailPane'
 import { TimelineSheets } from './TimelineSheets'
 import { TimelineTop } from './TimelineTop'
 import { currentPageKey, pageKey, pageSearch, scopePages } from './scopePages'
-import { useCompactTimeline } from './useCompactTimeline'
 import { useGoToScope, useLastLeague } from './scopeNav'
 import { ScopePrompt } from './ScopePrompt'
 import { followsGame, inScope } from './timelineScope'
@@ -67,7 +66,6 @@ import {
 } from '@/lib/timeline/stakes'
 import { ReactionsProvider } from '@/components/chat/Reactions'
 import { takePlayOpened } from '@/lib/timeline/playSheet'
-import { useHideOnScroll } from '@/lib/useHideOnScroll'
 import { useLiveGame } from '@/lib/games/useLiveGame'
 import { catchUp } from '@/lib/timeline/catchup'
 import { AppHeader } from '@/components/layout/AppHeader'
@@ -202,8 +200,6 @@ function Timeline({
   // Beside the wide feed a Game opens in its own pane; on phones it takes
   // the feed's place, and the Scope's feed isn't rendered at all.
   const wide = useWideTimeline()
-  // Below `md` the Scope bar over the tab bar stands in for the cards.
-  const compact = useCompactTimeline()
   const showScope = !gameId || wide
   // A Prediction or Matchup open in the pane (a Game takes precedence,
   // though opening either clears the other).
@@ -233,9 +229,9 @@ function Timeline({
           teamId: other?.left.teamId,
         })
       : setMatchupOpen({ id, other })
-  // Tapping a card narrows the Timeline to it; beside the wide feed it
-  // also opens in the pane (and tapping again clears both), so the space
-  // shows what the feed is narrowed to.
+  // Beside the wide feed a Prediction or Matchup tile narrows the Timeline
+  // and opens it in the pane at once, so the pane shows what the feed is
+  // narrowed to.
   const selectWide = (kind: 'prediction' | 'matchup', id: string | null) =>
     void navigate({
       to: '/',
@@ -256,10 +252,6 @@ function Timeline({
       viewTransition: true,
       resetScroll: false,
     })
-  const selectPrediction = (id: string | null) =>
-    wide ? selectWide('prediction', id) : s.selectPrediction(id)
-  const selectMatchup = (id: string | null) =>
-    wide ? selectWide('matchup', id) : s.selectMatchup(id)
   // One left in the address on a phone (a link, or a window narrowed):
   // it shows as its sheet there.
   const sheetDetail = wide ? null : paneDetail
@@ -285,8 +277,6 @@ function Timeline({
   )
   const [dayOpen, setDayOpen] = useState(false)
   useEffect(() => setDayOpen(false), [sportsDay])
-  const cardsHidden = useHideOnScroll()
-  const panelHidden = cardsHidden && !dayOpen
   // The spacer under the fixed top section follows its full height.
   const topRef = useRef<HTMLDivElement>(null)
   // Swiping across the Timeline steps through the nav's four Scopes, in
@@ -488,9 +478,9 @@ function Timeline({
     openPage(page)
     if (pageKey(page) !== currentPage) pickPage(page, { transition: false })
   }
-  // A phone picks what the Timeline shows from the home board (LiveBoard)
-  // over the feed, narrowed or not: the one place, at the top.
-  const home = compact === true && !s.setup
+  // What the Timeline shows is picked from the home board (LiveBoard)
+  // over the feed, narrowed or not, at every width: the one place.
+  const home = !s.setup
   // "Affects me" is the whole Scope's: narrowed, every play.
   const filterable = home && currentPage === 'all'
   useEffect(() => {
@@ -534,9 +524,16 @@ function Timeline({
         ? 'All Leagues'
         : rowItemName(scope as RowItem),
   })
-  // A tile tapped narrows to it; tapped again, it opens in full.
-  const pickTile = (page: ScopePage) =>
-    pageKey(page) === currentPage ? openPage(page) : pickPage(page)
+  // A tile tapped narrows to it; tapped again, it opens in full (a
+  // sheet). Beside the wide feed it narrows and opens in the pane at once,
+  // and tapped again closes both.
+  const pickTile = (page: ScopePage) => {
+    const here = pageKey(page) === currentPage
+    if (!wide) return here ? openPage(page) : pickPage(page)
+    if (here || page.kind === 'all') return pickPage({ kind: 'all' })
+    if (page.kind === 'game') return pickPage(page)
+    selectWide(page.kind, page.id)
+  }
   const pickGame = (g: GameSummary) =>
     pickTile({ kind: 'game', id: g.id, game: g })
   // Once the board scrolls up under the top, its scores pin there.
@@ -564,12 +561,13 @@ function Timeline({
     else if (page.kind === 'prediction') openPrediction(page.id)
     else openMatchup(page.id)
   }
-  // The phone's board, over the Scope's feed or a narrowed Game's thread.
+  // The home board, over the Scope's feed or (on a phone) a narrowed
+  // Game's thread.
   const homeTop = home && (
     <div className="flex flex-col">
       {heroTab === 'all' ? (
         <ScopeHero tab={heroTab} headline={headline}>
-          <LeagueBar scope={scope} items={s.rowItems} segmented />
+          <LeagueBar scope={scope} items={s.rowItems} />
         </ScopeHero>
       ) : (
         <ScopeHero tab={heroTab} headline={headline} />
@@ -581,6 +579,7 @@ function Timeline({
         layout={boardLayout}
         onLayout={setBoardLayout}
         onPick={pickTile}
+        opensOnPick={wide}
         onPortfolio={() => setPortfolioOpen(true)}
         display={display}
         boardRef={setBoard}
@@ -588,7 +587,8 @@ function Timeline({
       {narrowedTo && narrowedTo.kind !== 'all' ? (
         <NarrowedBar
           page={narrowedTo}
-          onOpen={() => openPage(narrowedTo)}
+          // Beside the wide feed it's already open, in the pane.
+          onOpen={wide ? undefined : () => openPage(narrowedTo)}
           onClear={() => pickPage({ kind: 'all' })}
         />
       ) : (
@@ -635,27 +635,14 @@ function Timeline({
     >
       <TimelineTop
         topRef={topRef}
-        compact={compact}
-        scope={s}
         sportsDay={sportsDay}
         today={today}
-        gameId={gameId}
         dayOpen={dayOpen}
         onDayToggle={() => setDayOpen((v) => !v)}
         onDayClose={() => setDayOpen(false)}
-        panelHidden={panelHidden}
         highlights={highlights}
         onHighlights={setHighlights}
         connection={timeline.connection}
-        dimmed={dimmed}
-        games={timeline.games}
-        previousGames={timeline.previousGames}
-        items={timeline.items}
-        onBox={() => setBoxFor(gameId)}
-        onPrediction={openPrediction}
-        onMatchup={openMatchup}
-        onSelectPrediction={selectPrediction}
-        onSelectMatchup={selectMatchup}
         ticker={
           home && boardAway ? (
             <LiveTicker
@@ -739,6 +726,14 @@ function Timeline({
             detail={paneDetail}
             scope={s}
             games={timeline.games}
+            // The league's other Matchups, listed in it: one opens in its place.
+            onOtherMatchup={(leagueId, other) =>
+              showDetail({
+                kind: 'matchup',
+                leagueId,
+                teamId: other?.left.teamId,
+              })
+            }
           />
         ) : (
           wide && <PanePlaceholder scope={s.setup ? null : scope} />
@@ -764,7 +759,7 @@ function Timeline({
         // No cards on a phone (nor their League Matchups): the sheet lists
         // the league's Matchups itself.
         onMatchupOther={
-          compact && sheetLeague
+          !wide && sheetLeague
             ? (other) => {
                 // One left in the address gives way to the one picked here.
                 if (!matchupOpen) showDetail(null)
@@ -853,10 +848,12 @@ function TimelineDetailPane({
   detail,
   scope: s,
   games,
+  onOtherMatchup,
 }: {
   detail: PaneDetail
   scope: TimelineScopeState
   games: Array<GameSummary>
+  onOtherMatchup: (leagueId: string, other: LeagueMatchup | undefined) => void
 }) {
   if (detail.kind === 'prediction') {
     const prediction = findPrediction(s, detail.id)
@@ -881,6 +878,7 @@ function TimelineDetailPane({
       league={league}
       other={other}
       games={games}
+      onOther={(next) => onOtherMatchup(league.id, next)}
       frame={(parts) => <DetailPane kind="matchup" {...parts} />}
     />
   )
@@ -904,7 +902,7 @@ function PanePlaceholder({ scope }: { scope: Scope | null }) {
             ? 'Pick a Prediction, or a game, to see it in full here.'
             : scope === 'fantasy'
               ? 'Pick a Matchup, or a game, to see it in full here.'
-              : 'Pick a game from the strip or the feed to follow it here.'}
+              : 'Pick a game from the board or the feed to follow it here.'}
         </p>
       )}
     </div>

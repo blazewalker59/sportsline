@@ -9,7 +9,7 @@
 import { Link } from '@tanstack/react-router'
 import { Fragment } from 'react'
 import { FeedFooter, TimelineFeed } from './TimelineFeed'
-import { gameStatusLabel } from './GameStrip'
+import { gameStatusLabel } from './gameStatus'
 import type { FeedEntry, Typing } from '@/lib/timeline/chat'
 import type { GameSummary } from '@/lib/model/timeline'
 import type { GameBox } from '@/lib/model/types'
