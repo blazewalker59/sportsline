@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { eq } from 'drizzle-orm'
+import { ne } from 'drizzle-orm'
 import { isBun, sqliteDb } from '../../helpers/sqliteDb'
 import type * as Db from '@/lib/db'
 import type { CloudflareEnv } from '@/lib/db'
@@ -14,6 +14,8 @@ import { games, teams } from '@/lib/db/schema'
 const state = vi.hoisted(() => ({
   db: null as unknown,
   scheduled: [] as Array<ScheduledGame>,
+  /** How many times the Source's schedule was read. */
+  reads: 0,
   /** Statements in each batch syncLeague sends. */
   batches: [] as Array<number>,
   reported: [] as Array<{ scope: string; context: unknown }>,
@@ -40,7 +42,10 @@ vi.mock('@/lib/sources', () => ({
   ACTIVE_LEAGUES: ['nfl'],
   sourceFor: () => ({
     source: 'espn',
-    schedule: () => Promise.resolve(state.scheduled),
+    schedule: () => {
+      state.reads++
+      return Promise.resolve(state.scheduled)
+    },
   }),
 }))
 
@@ -188,45 +193,70 @@ describe.skipIf(!isBun)('syncLeague', () => {
     expect(logos).not.toContain('https://logos/h2.png')
   })
 
-  it('tracks a college Game only when someone opted into it', async () => {
+  it('reads a college slate only for what someone opted into', async () => {
     const college = (n: number) =>
       game(n, { league: 'cfb', status: 'live', startsAt: now.toISOString() })
     state.scheduled = [college(1), college(2), college(3)]
-    await syncLeague(env, 'cfb', '2026-10-01', now)
-    // Every Game stored (a Prediction can be matched to any), none tracked.
-    expect(await db.select().from(games)).toHaveLength(3)
+    state.reads = 0
+    const syncCfb = (options = {}) =>
+      syncLeague(env, 'cfb', '2026-10-01', now, options)
+
+    // Nothing opted into: the Source isn't asked, nothing is stored.
+    await syncCfb()
+    expect(state.reads).toBe(0)
+    expect(await db.select().from(games)).toHaveLength(0)
     expect(tracked).toEqual([])
 
-    const idOf = async (n: number) => {
-      const [away] = await db
-        .select()
-        .from(teams)
-        .where(eq(teams.name, `Away ${n}`))
-      const [row] = await db
-        .select()
-        .from(games)
-        .where(eq(games.awayTeamId, away.id))
-      return { game: row.id, home: row.homeTeamId }
-    }
-    const [g1, g2, g3] = await Promise.all([idOf(1), idOf(2), idOf(3)])
+    // A followed team (known from the nightly team list): its Game only.
     sqlite.run(
       "INSERT INTO user (id,name,email,email_verified,created_at,updated_at) VALUES ('u1','V','v@example.com',1,0,0)",
     )
-    // An open Prediction on Game 1, a settled one on Game 3.
     sqlite.run(
-      "INSERT INTO predictions (id,viewer_id,market_ticker,kind,side,title,contracts,cost,status,opened_at,updated_at) VALUES ('p1','u1','M1','single','yes','One',1,1,'open','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z'),('p3','u1','M3','single','yes','Three',1,1,'settled','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z')",
+      "INSERT INTO teams (id, league, name, abbreviation) VALUES ('tm_h2', 'cfb', 'Home 2', 'H2')",
     )
     sqlite.run(
-      `INSERT INTO prediction_legs (prediction_id,position,market_ticker,event_ticker,side,title,game_id) VALUES ('p1',0,'M1','E1','yes','One','${g1.game}'),('p3',0,'M3','E3','yes','Three','${g3.game}')`,
+      "INSERT INTO source_ids (entity, source, source_id, internal_id) VALUES ('team', 'espn', 'h2', 'tm_h2')",
     )
-    // A Follow on Game 2's home team.
     sqlite.run(
-      `INSERT INTO follows (viewer_id,kind,target,created_at) VALUES ('u1','team','${g2.home}','2026-10-01T00:00:00Z')`,
+      "INSERT INTO follows (viewer_id,kind,target,created_at) VALUES ('u1','team','tm_h2','2026-10-01T00:00:00Z')",
     )
-    await syncLeague(env, 'cfb', '2026-10-01', now)
-    expect(tracked.map((t) => t.gameId).sort()).toEqual(
-      [g1.game, g2.game].sort(),
+    await syncCfb()
+    expect(state.reads).toBe(1)
+    const stored = async () =>
+      (await db.select().from(games)).map((g) => g.homeTeamId)
+    expect(await stored()).toEqual(['tm_h2'])
+    expect(tracked).toHaveLength(1)
+
+    // A Prediction being matched stores just its Game's candidates…
+    await syncCfb({ keep: (g: ScheduledGame) => g.sourceGameId === 'g1' })
+    expect(await stored()).toHaveLength(2)
+    const [g1] = await db
+      .select()
+      .from(games)
+      .where(ne(games.homeTeamId, 'tm_h2'))
+    // …tracked only once that Prediction is open.
+    expect(tracked.map((t) => t.gameId)).not.toContain(g1.id)
+    sqlite.run(
+      "INSERT INTO predictions (id,viewer_id,market_ticker,kind,side,title,contracts,cost,status,opened_at,updated_at) VALUES ('p1','u1','M1','single','yes','One',1,1,'open','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z')",
     )
+    sqlite.run(
+      `INSERT INTO prediction_legs (prediction_id,position,market_ticker,event_ticker,side,title,game_id) VALUES ('p1',0,'M1','E1','yes','One','${g1.id}')`,
+    )
+    tracked = []
+    await syncCfb()
+    expect(tracked.map((t) => t.gameId)).toContain(g1.id)
+    expect(tracked).toHaveLength(2)
+    // Game 3, which nobody opted into, was never stored.
+    expect(await db.select().from(games)).toHaveLength(2)
+
+    // Opened from its Team page: stored, and tracked, that one Game.
+    tracked = []
+    await syncCfb({
+      keep: (g: ScheduledGame) => g.sourceGameId === 'g3',
+      optIn: true,
+    })
+    expect(await db.select().from(games)).toHaveLength(3)
+    expect(tracked).toHaveLength(1)
   })
 
   it('leaves a Game its LiveGame owns alone, and keeps waking it', async () => {

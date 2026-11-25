@@ -1,32 +1,26 @@
 /**
  * College football Source adapter: ESPN's site and core APIs, the same
- * shapes as the NFL's. Every FBS Game is on the schedule, so a Prediction
- * can be matched to any; only those someone opts into are followed live
- * (CONTEXT.md, "Opt-in"; src/lib/live/schedule.ts). Rosters are read for
- * the major conferences' teams and Notre Dame only: any other team's
- * Players are named from its Games' plays.
+ * shapes as the NFL's. Only the Games someone opts into are stored or
+ * followed live (CONTEXT.md, "Opt-in"; src/lib/live/schedule.ts). The
+ * nightly roster is FBS's team list alone (two requests, so any team can
+ * be followed); a team's Players are named from its opted-in Games' plays.
  */
 
-import { espnRosters, fetchTeamSchedule } from '../espn/common'
-import { parseRoster, parseScoreboard } from '../nfl/parse'
+import { fetchTeamSchedule, teamLogo } from '../espn/common'
+import { parseScoreboard } from '../nfl/parse'
 import { footballSnapshot } from '../nfl'
 import { getJson as jsonFrom } from '../pool'
 import { seasonYear } from '../common'
 import { espnAthleteOverview } from '../espn/athlete'
-import type { NflRoster } from '../nfl/feed'
-import type { EspnScoreboard } from '../espn/common'
-import type { SourceAdapter } from '@/lib/model/types'
+import type { EspnScoreboard, EspnTeams } from '../espn/common'
+import type { SourceAdapter, SourceTeam } from '@/lib/model/types'
 
 const SITE =
   'https://site.api.espn.com/apis/site/v2/sports/football/college-football'
 const CORE =
   'https://sports.core.api.espn.com/v2/sports/football/leagues/college-football'
 
-/** ESPN group ids whose teams' rosters are read: ACC, Big 12, Big Ten, SEC. */
-const COVERED_CONFERENCES: ReadonlySet<string> = new Set(['1', '4', '5', '8'])
-/** Independents whose roster is read: Notre Dame. */
-const COVERED_TEAMS: ReadonlySet<string> = new Set(['87'])
-/** ESPN's FBS group, for the scoreboard. */
+/** ESPN's FBS group, for the scoreboard and the standings. */
 const FBS = '80'
 const getJson = jsonFrom('ESPN')
 
@@ -47,24 +41,35 @@ const STANDINGS =
   'https://site.api.espn.com/apis/v2/sports/football/college-football/standings'
 
 /**
- * The covered teams' ESPN ids, from the season's conference standings
- * (ESPN's core API, which lists conference members, refuses Workers).
+ * FBS's teams: their ids from the season's standings (every conference and
+ * the independents, in one read), their names and logos from ESPN's team
+ * list (every division's, in another). ESPN's team list ignores a group.
  */
-async function coveredTeamIds(): Promise<Array<string>> {
+async function fbsTeams(): Promise<Array<SourceTeam>> {
   const season = cfbSeason(new Date())
-  const lists = await Promise.all(
-    [...COVERED_CONFERENCES].map((group) =>
-      getJson<Standings>(`${STANDINGS}?group=${group}&season=${season}`),
-    ),
-  )
+  const [standings, list] = await Promise.all([
+    getJson<Standings>(`${STANDINGS}?group=${FBS}&season=${season}`),
+    getJson<EspnTeams>(`${SITE}/teams?limit=1000`),
+  ])
   // A conference with divisions lists its teams under each division.
-  const teamIds = (s: Standings): Array<string> => [
-    ...(s.standings?.entries ?? []).flatMap((e) =>
+  const idsOf = (st: Standings): Array<string> => [
+    ...(st.standings?.entries ?? []).flatMap((e) =>
       e.team?.id ? [e.team.id] : [],
     ),
-    ...(s.children ?? []).flatMap(teamIds),
+    ...(st.children ?? []).flatMap(idsOf),
   ]
-  return [...new Set([...lists.flatMap(teamIds), ...COVERED_TEAMS])]
+  const fbs = new Set(idsOf(standings))
+  return (list.sports?.[0]?.leagues?.[0]?.teams ?? [])
+    .filter(({ team }) => fbs.has(team.id))
+    .map(({ team }) => {
+      const abbreviation = team.abbreviation ?? team.id
+      return {
+        sourceId: team.id,
+        name: team.displayName ?? abbreviation,
+        abbreviation,
+        logoUrl: teamLogo('cfb', abbreviation, team.id),
+      }
+    })
 }
 
 export const cfbAdapter: SourceAdapter = {
@@ -83,12 +88,7 @@ export const cfbAdapter: SourceAdapter = {
     return footballSnapshot(SITE, CORE, sourceGameId, 'cfb')
   },
   async roster() {
-    const { teams, rosters } = await espnRosters<NflRoster>(
-      SITE,
-      getJson,
-      coveredTeamIds,
-    )
-    return parseRoster(teams, rosters, 'cfb')
+    return { teams: await fbsTeams(), players: [] }
   },
   teamSchedule(team) {
     return fetchTeamSchedule(SITE, team.sourceId, 'cfb', getJson)

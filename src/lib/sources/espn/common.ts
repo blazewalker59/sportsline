@@ -304,47 +304,23 @@ export async function fetchTeamSchedule(
   return [...new Map(games.map((g) => [g.sourceGameId, g])).values()]
 }
 
-/**
- * ESPN's team list and each team's roster, a few at a time. `covered`, when
- * given, is the only teams to keep (college football lists hundreds); their
- * rosters are fetched whether or not the list names them.
- */
+/** ESPN's team list and each team's roster, a few at a time. */
 export async function espnRosters<TRoster>(
   site: string,
   getJson: <T>(url: string) => Promise<T>,
-  covered?: () => Promise<Array<string>>,
 ): Promise<{
   teams: EspnTeams
   rosters: Array<{ teamId: string; roster: TRoster }>
 }> {
-  const rostersOf = (ids: ReadonlyArray<string>) =>
-    mapPool(ids, ROSTER_CONCURRENCY, async (teamId) => ({
-      teamId,
-      roster: await getJson<TRoster>(`${site}/teams/${teamId}/roster`),
-    }))
-  if (!covered) {
-    const teams = await getJson<EspnTeams>(`${site}/teams`)
-    const ids = (teams.sports?.[0]?.leagues?.[0]?.teams ?? []).map(
-      (t) => t.team.id,
-    )
-    return { teams, rosters: await rostersOf(ids) }
-  }
-  const [ids, all] = await Promise.all([
-    covered(),
-    getJson<EspnTeams>(`${site}/teams?limit=1000`),
-  ])
-  const keep = new Set(ids)
-  const league = all.sports?.[0]?.leagues?.[0]
-  const teams: EspnTeams = {
-    sports: [
-      {
-        leagues: [
-          { teams: (league?.teams ?? []).filter((t) => keep.has(t.team.id)) },
-        ],
-      },
-    ],
-  }
-  return { teams, rosters: await rostersOf(ids) }
+  const teams = await getJson<EspnTeams>(`${site}/teams`)
+  const ids = (teams.sports?.[0]?.leagues?.[0]?.teams ?? []).map(
+    (t) => t.team.id,
+  )
+  const rosters = await mapPool(ids, ROSTER_CONCURRENCY, async (teamId) => ({
+    teamId,
+    roster: await getJson<TRoster>(`${site}/teams/${teamId}/roster`),
+  }))
+  return { teams, rosters }
 }
 
 export function parseScoreboard(

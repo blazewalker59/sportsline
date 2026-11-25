@@ -7,7 +7,7 @@ A live, livestream-style timeline of play-by-play across the sports a viewer car
 ### Leagues & Sources
 
 **League**:
-One of the competitions Sportsline covers: MLB, NBA, NFL, NHL, college football (FBS) and men's college basketball (Division I). The college Leagues are covered by Opt-in: every Game is on the schedule, but only those a Viewer opts into are followed live. Other leagues are out of scope.
+One of the competitions Sportsline covers: MLB, NBA, NFL, NHL, college football (FBS) and men's college basketball (Division I). The college Leagues are covered by Opt-in: only the Games a Viewer opts into are read at all. Other leagues are out of scope.
 Each Viewer arranges the Leagues: the order they appear in, and which are hidden. A hidden League is left out of All and the League row, but its Follows still count.
 _Avoid_: sport (a sport can span several leagues)
 
@@ -100,7 +100,7 @@ Everything about one Team: its season from the Source (what's next, and results,
 _Avoid_: team profile, team hub
 
 **Opt-in**:
-How a college Game comes to be followed live: there are far too many college Games to follow every one, so one is followed only when some Viewer has an open Prediction on it or follows one of its teams. A Viewer's All, and each college League's own Scope, show only the college Games they opted into; a college League can't be followed whole.
+How a college Game comes to be read at all: there are far too many college Games to store or follow every one, so one is stored only when some Viewer follows one of its teams, a Prediction is matched to it, or it's opened from its Team page, and followed live only while one of those still holds (an open Prediction, a Follow, the opened Game). With nothing opted into, the Source isn't asked. Each college League's team list is kept, so any team can be followed. A Viewer's All, and each college League's own Scope, show only the college Games they opted into; a college League can't be followed whole.
 _Avoid_: subscribe, track (say opt into)
 
 **Conference**:

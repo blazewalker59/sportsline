@@ -2,17 +2,23 @@
  * Men's college basketball Source adapter: ESPN's site API, the same
  * shapes as the NBA's with two halves for four quarters. Every Division I
  * Game is on the schedule, so a Prediction can be matched to any; only
- * those someone opts into are followed live (CONTEXT.md, "Opt-in";
- * src/lib/live/schedule.ts). No rosters are read (there are some 360
- * teams): a team's Players are named from its Games' plays and box scores.
+ * those someone opts into are stored or followed live (CONTEXT.md,
+ * "Opt-in"; src/lib/live/schedule.ts). The nightly roster is the team list
+ * alone (one request for some 360 teams, so any can be followed); a team's
+ * Players are named from its opted-in Games' plays and box scores.
  */
 
-import { HALVES, fetchTeamSchedule, parseScoreboard } from '../espn/common'
+import {
+  HALVES,
+  fetchTeamSchedule,
+  parseScoreboard,
+  teamLogo,
+} from '../espn/common'
 import { LIVE_POLL, getJson as jsonFrom } from '../pool'
 import { espnAthleteOverview } from '../espn/athlete'
 import { parseGame } from '../nba/parse'
 import type { NbaSummary } from '../nba/feed'
-import type { EspnScoreboard } from '../espn/common'
+import type { EspnScoreboard, EspnTeams } from '../espn/common'
 import type { SourceAdapter } from '@/lib/model/types'
 
 const SITE =
@@ -42,8 +48,22 @@ export const cbbAdapter: SourceAdapter = {
       HALVES,
     )
   },
-  roster() {
-    return Promise.resolve({ teams: [], players: [] })
+  async roster() {
+    const list = await getJson<EspnTeams>(
+      `${SITE}/teams?groups=${DIVISION_I}&limit=500`,
+    )
+    const teams = (list.sports?.[0]?.leagues?.[0]?.teams ?? []).map(
+      ({ team }) => {
+        const abbreviation = team.abbreviation ?? team.id
+        return {
+          sourceId: team.id,
+          name: team.displayName ?? abbreviation,
+          abbreviation,
+          logoUrl: teamLogo('cbb', abbreviation, team.id),
+        }
+      },
+    )
+    return { teams, players: [] }
   },
   teamSchedule(team) {
     return fetchTeamSchedule(SITE, team.sourceId, 'cbb', getJson)
