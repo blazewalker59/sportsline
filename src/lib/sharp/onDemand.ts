@@ -65,6 +65,7 @@ const LEAGUE_NAMES: Record<League, string> = {
   mlb: 'MLB',
   nhl: 'NHL',
   cfb: 'college football',
+  cbb: 'college basketball',
 }
 
 /** Show nothing priced this far against us, even as a least-bad pick. */

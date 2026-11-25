@@ -18,7 +18,7 @@ import type {
 import type { Conference } from '@/lib/model/leagues'
 import { sportsDayOf } from '@/lib/model/sportsDay'
 
-export type EspnLeague = Extract<League, 'nfl' | 'cfb' | 'nba'>
+export type EspnLeague = Extract<League, 'nfl' | 'cfb' | 'nba' | 'cbb'>
 
 export interface EspnStatus {
   period?: number
@@ -111,6 +111,29 @@ export function quarterLabel(period: number): string {
   return period <= 4 ? `Q${period}` : period === 5 ? 'OT' : `${period - 4}OT`
 }
 
+/** How a League's periods run: four quarters, or college basketball's halves. */
+export interface PeriodFormat {
+  /** Periods in regulation; any after are overtime. */
+  regulation: number
+  /** The period's short name: "Q3", "H2", "OT", "2OT". */
+  label: (period: number) => string
+  /** The period that ends at halftime. */
+  halftimeAfter: number
+}
+
+export const QUARTERS: PeriodFormat = {
+  regulation: 4,
+  label: quarterLabel,
+  halftimeAfter: 2,
+}
+
+/** College basketball: two 20-minute halves, then overtimes. */
+export const HALVES: PeriodFormat = {
+  regulation: 2,
+  label: (p) => (p <= 2 ? `H${p}` : p === 3 ? 'OT' : `${p - 2}OT`),
+  halftimeAfter: 1,
+}
+
 /**
  * ESPN's end-of-period row as a Game Milestone: the end of a quarter
  * ("End of Q1", or "Halftime"), or for the game's end, the Final.
@@ -125,20 +148,21 @@ export function periodEndMilestone(
     occurredAt: string
     score: Score
   },
+  format: PeriodFormat = QUARTERS,
 ): SourceMilestone {
   const { period, score, occurredAt } = end
   if (end.final) {
-    const label = period > 4 ? 'Final/OT' : 'Final'
+    const label = period > format.regulation ? 'Final/OT' : 'Final'
     return finalMilestone(teams, { label, occurredAt, score })
   }
-  const label = end.halftime ? 'Halftime' : `End of ${quarterLabel(period)}`
+  const label = end.halftime ? 'Halftime' : `End of ${format.label(period)}`
   return {
     kind: 'milestone',
     milestone: 'segment_end',
     key: `end:${period}`,
     sequence: end.sequence,
     occurredAt,
-    segmentLabel: quarterLabel(period),
+    segmentLabel: format.label(period),
     score,
     description: `${label}: ${scoreLine(teams, score)}`,
   }
@@ -162,7 +186,8 @@ export function teamLogo(
   abbreviation: string,
   teamId: string,
 ): string {
-  if (league === 'cfb')
+  // College teams' logos go by ESPN's school id, shared across sports.
+  if (league === 'cfb' || league === 'cbb')
     return espnLogo(`/i/teamlogos/ncaa/500-dark/${teamId}.png`)
   return espnLogo(
     `/i/teamlogos/${league}/500-dark/${abbreviation.toLowerCase()}.png`,
@@ -179,9 +204,13 @@ export function competitorTeam(
     name: c.team.displayName ?? c.team.name ?? c.team.id,
     abbreviation,
     logoUrl: teamLogo(league, abbreviation, c.team.id),
+    // Basketball's conference ids aren't football's (its 8 is the Big 12),
+    // so a college basketball team takes only its rank.
     ...(league === 'cfb'
       ? { rank: top25(c), conference: conferenceOf(c) }
-      : {}),
+      : league === 'cbb'
+        ? { rank: top25(c) }
+        : {}),
   }
 }
 

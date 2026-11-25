@@ -27,7 +27,7 @@ import {
 } from '@/lib/viewer/useViewer'
 import { cn } from '@/lib/utils'
 
-/** Past this many Teams (college football), a filter box helps. */
+/** Past this many Teams (college), a filter box helps. */
 const FILTER_FROM = 40
 
 /**

@@ -25,6 +25,12 @@ const FOOTBALL: ReadonlyArray<Group> = [
   { label: 'Special teams', positions: ['K', 'PK', 'P', 'LS', 'PR', 'KR'] },
 ]
 
+const BASKETBALL: ReadonlyArray<Group> = [
+  { label: 'Guards', positions: ['G', 'PG', 'SG'] },
+  { label: 'Forwards', positions: ['F', 'SF', 'PF'] },
+  { label: 'Centers', positions: ['C'] },
+]
+
 const GROUPS: Record<League, ReadonlyArray<Group>> = {
   nfl: FOOTBALL,
   cfb: FOOTBALL,
@@ -35,11 +41,8 @@ const GROUPS: Record<League, ReadonlyArray<Group>> = {
     { label: 'Outfielders', positions: ['LF', 'CF', 'RF', 'OF'] },
     { label: 'Designated hitters', positions: ['DH'] },
   ],
-  nba: [
-    { label: 'Guards', positions: ['G', 'PG', 'SG'] },
-    { label: 'Forwards', positions: ['F', 'SF', 'PF'] },
-    { label: 'Centers', positions: ['C'] },
-  ],
+  nba: BASKETBALL,
+  cbb: BASKETBALL,
   nhl: [
     { label: 'Centers', positions: ['C'] },
     { label: 'Left wings', positions: ['L', 'LW'] },

@@ -223,6 +223,7 @@ const POLY_SERIES: Record<League, string | undefined> = {
   mlb: '3',
   nhl: '10346',
   cfb: undefined,
+  cbb: undefined,
 }
 
 /** A Polymarket book wider than this isn't a price worth reading. */

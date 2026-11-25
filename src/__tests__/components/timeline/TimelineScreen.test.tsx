@@ -159,6 +159,7 @@ vi.mock('@/components/timeline/useTimelineScope', async () => {
         predictionList: { data: [] },
         openPredictions: [],
         predictionGames: [],
+        optIns: [],
         selectedPrediction: null,
         selectPrediction: () => {},
         fantasyLeagues: [],

@@ -14,7 +14,7 @@ import {
 } from '@/lib/model/timeline'
 import { conferenceOf } from '@/lib/sources/espn/common'
 
-const DEFAULT_ROW = ['mlb', 'nba', 'nfl', 'cfb', 'nhl']
+const DEFAULT_ROW = ['mlb', 'nba', 'nfl', 'cfb', 'cbb', 'nhl']
 
 describe('normalizeLeagueSettings', () => {
   it('defaults to the Leagues, college ones among them', () => {
@@ -32,7 +32,7 @@ describe('normalizeLeagueSettings', () => {
         hidden: ['mlb', 'xfl', 'big10'],
       }),
     ).toEqual({
-      order: ['mlb', 'nba', 'nhl', 'cfb', 'nfl'],
+      order: ['mlb', 'nba', 'nhl', 'cfb', 'cbb', 'nfl'],
       hidden: ['mlb'],
     })
   })
@@ -62,9 +62,11 @@ describe('arranging the row', () => {
       order: ['nfl', 'cfb', 'nba', 'mlb', 'nhl'],
       hidden: ['mlb', 'nhl'],
     })
-    expect(visibleRowItems(settings)).toEqual(['nfl', 'cfb', 'nba'])
+    // College Basketball, new since this order was saved, lands by its
+    // neighbour College Football.
+    expect(visibleRowItems(settings)).toEqual(['nfl', 'cfb', 'cbb', 'nba'])
     const leagues = visibleLeagues(settings)
-    expect(leagues).toEqual(['nfl', 'cfb', 'nba'])
+    expect(leagues).toEqual(['nfl', 'cfb', 'cbb', 'nba'])
     // College covers only what the Viewer opted into: here, nothing.
     expect(scopeFollows('all', [], leagues)).toEqual([
       { kind: 'league', league: 'nfl' },

@@ -72,6 +72,7 @@ const LEAGUE_LABELS: Record<League, string> = {
   nba: 'NBA',
   nfl: 'NFL',
   cfb: 'College Football',
+  cbb: 'College Basketball',
   nhl: 'NHL',
 }
 

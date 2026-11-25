@@ -26,6 +26,7 @@ const MARGIN_SD: Record<League, number> = {
   mlb: 4.2,
   nhl: 2.4,
   cfb: 16,
+  cbb: 11,
 }
 /** How much one Game's total varies around what's expected. */
 const TOTAL_SD: Record<League, number> = {
@@ -34,6 +35,7 @@ const TOTAL_SD: Record<League, number> = {
   mlb: 4.4,
   nhl: 2.3,
   cfb: 16,
+  cbb: 16,
 }
 /** What playing at home is worth on the scoreboard. */
 const HOME_EDGE: Record<League, number> = {
@@ -42,6 +44,7 @@ const HOME_EDGE: Record<League, number> = {
   mlb: 0.2,
   nhl: 0.15,
   cfb: 2.5,
+  cbb: 3.5,
 }
 /** A typical Game's total, when too few finals are stored to measure it. */
 const TYPICAL_TOTAL: Record<League, number> = {
@@ -50,6 +53,7 @@ const TYPICAL_TOTAL: Record<League, number> = {
   mlb: 8.8,
   nhl: 6.1,
   cfb: 55,
+  cbb: 143,
 }
 
 export interface TrendGame extends FormGame {

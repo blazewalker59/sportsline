@@ -23,9 +23,14 @@ export function rowItemLabel(item: RowItem): string {
   return leagueLabel(item)
 }
 
+const NAMES: Partial<Record<RowItem, string>> = {
+  cfb: 'College Football',
+  cbb: 'College Basketball',
+}
+
 /** A longer name for lists: "College Football", "NFL". */
 export function rowItemName(item: RowItem): string {
-  return item === 'cfb' ? 'College Football' : rowItemLabel(item)
+  return NAMES[item] ?? rowItemLabel(item)
 }
 
 /** A League as it appears on the League row: its logo. */
