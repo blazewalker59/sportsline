@@ -24,6 +24,7 @@ import {
 } from '@/lib/db/schema'
 import { shiftSportsDay, sportsDayOf } from '@/lib/model/sportsDay'
 import { syncLeague } from '@/lib/live/schedule'
+import { isCollege } from '@/lib/model/types'
 import { reportError } from '@/lib/ops/errors'
 
 /** Look again for a Game we couldn't match after this long. */
@@ -129,14 +130,22 @@ export async function gameFor(
     const ahead = Date.parse(startsAt) - now
     if (!gameId && ahead < LOOKAHEAD_DAYS * 86_400_000) {
       // Not stored yet (a future day, or one never browsed): store that
-      // day's schedule for the League, then look again.
-      await syncLeague(env, league, day, new Date(now)).catch(
-        (error: unknown) =>
-          reportError(env, 'kalshi', error, {
-            step: 'schedule',
-            league,
-            sportsDay: day,
-          }),
+      // day's schedule for the League, then look again. A college League
+      // stores only this Game's candidates, not its whole slate (CONTEXT.md,
+      // "Opt-in").
+      const ours = (g: { home: { name: string }; away: { name: string } }) =>
+        (teamMatches(homeName, g.home.name) &&
+          teamMatches(awayName, g.away.name)) ||
+        (teamMatches(homeName, g.away.name) &&
+          teamMatches(awayName, g.home.name))
+      await syncLeague(env, league, day, new Date(now), {
+        keep: isCollege(league) ? ours : undefined,
+      }).catch((error: unknown) =>
+        reportError(env, 'kalshi', error, {
+          step: 'schedule',
+          league,
+          sportsDay: day,
+        }),
       )
       gameId = await find()
     }

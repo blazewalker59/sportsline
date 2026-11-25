@@ -14,47 +14,25 @@ import {
 } from '@/lib/model/timeline'
 import { conferenceOf } from '@/lib/sources/espn/common'
 
-const DEFAULT_ROW = [
-  'mlb',
-  'nba',
-  'nfl',
-  'cfb',
-  'top25',
-  'sec',
-  'big10',
-  'big12',
-  'acc',
-  'nhl',
-]
+const DEFAULT_ROW = ['mlb', 'nba', 'nfl', 'cfb', 'cbb', 'nhl']
 
 describe('normalizeLeagueSettings', () => {
-  it('defaults to the Leagues with college groups after College Football', () => {
+  it('defaults to the Leagues, college ones among them', () => {
     expect(normalizeLeagueSettings(null)).toEqual({
       order: DEFAULT_ROW,
       hidden: [],
     })
   })
 
-  it('places items new to a saved order beside their neighbours', () => {
-    // Saved before the conference groups existed.
+  it('drops what’s no longer on the row, and places new Leagues by their neighbours', () => {
+    // Saved with the old college groups (Top 25, the Conferences).
     expect(
       normalizeLeagueSettings({
-        order: ['nhl', 'cfb', 'top25', 'nfl', 'xfl', 'nhl'],
-        hidden: ['mlb', 'xfl'],
+        order: ['nhl', 'cfb', 'top25', 'sec', 'nfl', 'xfl', 'nhl'],
+        hidden: ['mlb', 'xfl', 'big10'],
       }),
     ).toEqual({
-      order: [
-        'mlb',
-        'nba',
-        'nhl',
-        'cfb',
-        'top25',
-        'sec',
-        'big10',
-        'big12',
-        'acc',
-        'nfl',
-      ],
+      order: ['mlb', 'nba', 'nhl', 'cfb', 'cbb', 'nfl'],
       hidden: ['mlb'],
     })
   })
@@ -81,60 +59,29 @@ describe('arranging the row', () => {
 
   it('shows items in order without hidden ones; All follows visible Leagues', () => {
     const settings = normalizeLeagueSettings({
-      order: ['sec', 'nfl', 'cfb', 'nba', 'mlb', 'nhl'],
-      hidden: ['mlb', 'nhl', 'top25', 'big10', 'big12', 'acc'],
+      order: ['nfl', 'cfb', 'nba', 'mlb', 'nhl'],
+      hidden: ['mlb', 'nhl'],
     })
-    expect(visibleRowItems(settings)).toEqual(['sec', 'nfl', 'cfb', 'nba'])
+    // College Basketball, new since this order was saved, lands by its
+    // neighbour College Football.
+    expect(visibleRowItems(settings)).toEqual(['nfl', 'cfb', 'cbb', 'nba'])
     const leagues = visibleLeagues(settings)
-    expect(leagues).toEqual(['nfl', 'cfb', 'nba'])
+    expect(leagues).toEqual(['nfl', 'cfb', 'cbb', 'nba'])
+    // College covers only what the Viewer opted into: here, nothing.
     expect(scopeFollows('all', [], leagues)).toEqual([
       { kind: 'league', league: 'nfl' },
-      { kind: 'league', league: 'cfb' },
       { kind: 'league', league: 'nba' },
     ])
   })
 })
 
-describe('Conference Scopes', () => {
-  it('parse, cover their Games, and round-trip through the URL form', () => {
-    expect(parseScope('sec')).toBe('sec')
-    expect(scopeFollows('sec', [])).toEqual([
-      { kind: 'conference', conference: 'sec' },
+describe('college Conferences', () => {
+  it('are no Scope (college is opt-in by Game), nor a Follow in the URL form', () => {
+    expect(parseScope('sec')).toBeUndefined()
+    expect(parseScope('top25')).toBeUndefined()
+    expect(followsFromParam('conference:big10,league:nhl')).toEqual([
+      { kind: 'league', league: 'nhl' },
     ])
-    expect(followsToParam([{ kind: 'conference', conference: 'big10' }])).toBe(
-      'conference:big10',
-    )
-    expect(followsFromParam('conference:big10,conference:pac12')).toEqual([
-      { kind: 'conference', conference: 'big10' },
-    ])
-  })
-
-  it('match college plays from a game with that Conference’s team', () => {
-    const play = {
-      league: 'cfb',
-      kind: 'play',
-      significance: 'scoring',
-      awayTeam: {
-        id: 'a',
-        abbreviation: 'TEX',
-        logoUrl: null,
-        conference: 'sec',
-      },
-      homeTeam: {
-        id: 'h',
-        abbreviation: 'UTEP',
-        logoUrl: null,
-        conference: null,
-      },
-    } as unknown as TimelineItem
-    const sec = {
-      follows: [{ kind: 'conference' as const, conference: 'sec' as const }],
-    }
-    const acc = {
-      follows: [{ kind: 'conference' as const, conference: 'acc' as const }],
-    }
-    expect(matchesFilter(play, sec)).toBe(true)
-    expect(matchesFilter(play, acc)).toBe(false)
   })
 
   it('reads ESPN conference ids from the scoreboard or the summary', () => {

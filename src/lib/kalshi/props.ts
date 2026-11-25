@@ -37,19 +37,22 @@ const FOOTBALL: Array<[RegExp, Stat]> = [
   [/^TOTAL$/, { score: 'total', label: 'pts' }],
 ]
 
+const BASKETBALL: Array<[RegExp, Stat]> = [
+  [/^PTS$/, { table: 'Players', columns: ['PTS'], label: 'pts' }],
+  [/^REB$/, { table: 'Players', columns: ['REB'], label: 'reb' }],
+  [/^AST$/, { table: 'Players', columns: ['AST'], label: 'ast' }],
+  [/^3PT$/, { table: 'Players', columns: ['3PT'], label: '3PM' }],
+  [/^BLK$/, { table: 'Players', columns: ['BLK'], label: 'blk' }],
+  [/^STL$/, { table: 'Players', columns: ['STL'], label: 'stl' }],
+  [/TEAMTOTAL$/, { score: 'team', label: 'pts' }],
+  [/^TOTAL$/, { score: 'total', label: 'pts' }],
+]
+
 const STATS: Record<League, Array<[RegExp, Stat]>> = {
   nfl: FOOTBALL,
   cfb: FOOTBALL,
-  nba: [
-    [/^PTS$/, { table: 'Players', columns: ['PTS'], label: 'pts' }],
-    [/^REB$/, { table: 'Players', columns: ['REB'], label: 'reb' }],
-    [/^AST$/, { table: 'Players', columns: ['AST'], label: 'ast' }],
-    [/^3PT$/, { table: 'Players', columns: ['3PT'], label: '3PM' }],
-    [/^BLK$/, { table: 'Players', columns: ['BLK'], label: 'blk' }],
-    [/^STL$/, { table: 'Players', columns: ['STL'], label: 'stl' }],
-    [/TEAMTOTAL$/, { score: 'team', label: 'pts' }],
-    [/^TOTAL$/, { score: 'total', label: 'pts' }],
-  ],
+  nba: BASKETBALL,
+  cbb: BASKETBALL,
   mlb: [
     [/^HITS?$/, { table: 'Batting', columns: ['H'], label: 'hits' }],
     [
@@ -73,6 +76,8 @@ const STATS: Record<League, Array<[RegExp, Stat]>> = {
 const SERIES_PREFIX: Record<League, RegExp> = {
   nfl: /^KXNFL/,
   cfb: /^KXNCAAF/,
+  // Men's college basketball: KXNCAAMB…, and the older KXNCAAB….
+  cbb: /^KXNCAAM?B/,
   nba: /^KXNBA/,
   mlb: /^KXMLB/,
   nhl: /^KXNHL/,

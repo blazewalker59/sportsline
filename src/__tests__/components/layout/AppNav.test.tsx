@@ -137,7 +137,7 @@ describe('AppNav: the Timeline’s Scopes', () => {
     expect(lozenge.style.getPropertyValue('--i')).toBe(String(index))
   })
 
-  it.each(['nfl', 'top25', 'sec', 'cfb'])(
+  it.each(['nfl', 'cfb'])(
     'marks All as current for the League-shaped Scope %s',
     async (scope) => {
       await renderAt(`/?scope=${scope}`, signedIn)
@@ -198,14 +198,14 @@ describe('AppNav: the Timeline’s Scopes', () => {
   })
 
   it('All returns to the League choice last made under it', async () => {
-    const { router } = await renderAt('/?scope=top25', signedIn)
+    const { router } = await renderAt('/?scope=cfb', signedIn)
     fireEvent.click(tab('fantasy'))
     await waitFor(() => expect(current()).toEqual(['fantasy']))
     // Its address already points back there.
-    expect(tab('all').getAttribute('href')).toContain('scope=top25')
+    expect(tab('all').getAttribute('href')).toContain('scope=cfb')
     fireEvent.click(tab('all'))
     await waitFor(() =>
-      expect(router.state.location.search).toMatchObject({ scope: 'top25' }),
+      expect(router.state.location.search).toMatchObject({ scope: 'cfb' }),
     )
     expect(current()).toEqual(['all'])
   })
@@ -287,8 +287,7 @@ describe('activeTab', () => {
     ['following', 0],
     ['all', 1],
     ['nhl', 1],
-    ['top25', 1],
-    ['big12', 1],
+    ['cfb', 1],
     ['predictions', 2],
     ['fantasy', 3],
   ] as const)('finds %s at %i', (scope, index) => {

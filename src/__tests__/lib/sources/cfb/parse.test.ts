@@ -4,7 +4,6 @@ import playsFixture from '../../../fixtures/cfb/final-401856704-plays.json'
 import type { NflCorePlays, NflSummary } from '@/lib/sources/nfl/feed'
 import type { SourceMilestone, SourcePlay } from '@/lib/model/types'
 import type { TimelineItem } from '@/lib/model/timeline'
-import { isCovered } from '@/lib/sources/cfb'
 import { top25 } from '@/lib/sources/espn/common'
 import { scoringSummary } from '@/lib/timeline/sides'
 import { collegeDescription, parseGame } from '@/lib/sources/nfl/parse'
@@ -97,56 +96,6 @@ describe('collegeDescription', () => {
         '(12:13) #16 A.Manning pass intercepted by #14 K.Lee at TENN04. The previous play is under automatic review - "Interception". CALL UPHELD',
       ),
     ).toBe('A.Manning pass intercepted by K.Lee at TENN 4. Call upheld.')
-  })
-})
-
-describe('isCovered', () => {
-  const event = (...teams: Array<{ id: string; conferenceId?: string }>) => ({
-    id: 'e',
-    date: '2026-09-26T16:00:00Z',
-    competitions: [
-      {
-        competitors: teams.map((team, i) => ({
-          id: team.id,
-          homeAway: i === 0 ? ('away' as const) : ('home' as const),
-          team,
-        })),
-      },
-    ],
-  })
-
-  it('covers Power 4 and Notre Dame games, whoever the opponent', () => {
-    expect(
-      isCovered(
-        event(
-          { id: '2633', conferenceId: '8' },
-          { id: '1', conferenceId: '48' },
-        ),
-      ),
-    ).toBe(true)
-    expect(
-      isCovered(event({ id: '87', conferenceId: '18' }, { id: '2' })),
-    ).toBe(true)
-    expect(
-      isCovered(
-        event(
-          { id: '2', conferenceId: '151' },
-          { id: '3', conferenceId: '37' },
-        ),
-      ),
-    ).toBe(false)
-  })
-
-  it('also covers any game with an AP Top 25 team', () => {
-    const g5 = event(
-      { id: '2', conferenceId: '151' },
-      { id: '3', conferenceId: '37' },
-    )
-    g5.competitions[0].competitors[1] = {
-      ...g5.competitions[0].competitors[1],
-      curatedRank: { current: 22 },
-    } as (typeof g5.competitions)[0]['competitors'][1]
-    expect(isCovered(g5)).toBe(true)
   })
 })
 

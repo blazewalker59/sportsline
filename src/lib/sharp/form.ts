@@ -80,6 +80,7 @@ const MARGIN_SCALE: Record<League, number> = {
   mlb: 3.5,
   nhl: 2.2,
   cfb: 16,
+  cbb: 11,
 }
 const TOTAL_SCALE: Record<League, number> = {
   nfl: 10,
@@ -87,6 +88,7 @@ const TOTAL_SCALE: Record<League, number> = {
   mlb: 3,
   nhl: 1.6,
   cfb: 12,
+  cbb: 14,
 }
 const UNIT: Record<League, string> = {
   nfl: 'pts',
@@ -94,6 +96,7 @@ const UNIT: Record<League, string> = {
   mlb: 'runs',
   nhl: 'goals',
   cfb: 'pts',
+  cbb: 'pts',
 }
 
 /** Too few Games to call it form. */

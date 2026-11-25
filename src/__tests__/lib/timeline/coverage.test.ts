@@ -31,7 +31,7 @@ describe('the coverage condition', () => {
   it('binds each id list once, however long', () => {
     const where = coverageWhere(
       [...teamsFollowed(500), ...playersFollowed(500), ...gamesFollowed(500)],
-      { sportsDay: DAY },
+      {},
     )!
     const { sql, params } = render(where)
     expect(sql).toContain('json_each')
@@ -48,24 +48,21 @@ describe('the coverage condition', () => {
         kind: 'league' as const,
         league: 'mlb' as const,
       })),
-      { sportsDay: DAY, includeRoutine: true },
+      { includeRoutine: true },
     )!
     expect(render(where).params).toEqual(['mlb'])
   })
 
   it('covers nothing without a Follow it can match', () => {
-    expect(coverageWhere([], { sportsDay: DAY })).toBeNull()
+    expect(coverageWhere([], {})).toBeNull()
     // Fantasy reads the signed-in Viewer's own Starters: no Viewer, nothing.
     expect(
-      coverageWhere([{ kind: 'fantasy', playerIds: ['pl_a'] }], {
-        sportsDay: DAY,
-      }),
+      coverageWhere([{ kind: 'fantasy', playerIds: ['pl_a'] }], {}),
     ).toBeNull()
   })
 
   it("reads a Fantasy Follow's Starters by Viewer, not the sent ids", () => {
     const where = coverageWhere([{ kind: 'fantasy', playerIds: ['pl_sent'] }], {
-      sportsDay: DAY,
       viewerId: 'u1',
     })!
     const { sql, params } = render(where)
@@ -118,7 +115,7 @@ describe.skipIf(!isBun)('the coverage condition on SQLite', () => {
     follows: Array<Follow>,
     includeRoutine = false,
   ): Promise<Array<string>> => {
-    const where = coverageWhere(follows, { sportsDay: DAY, includeRoutine })
+    const where = coverageWhere(follows, { includeRoutine })
     if (!where) return []
     const rows = await db
       .select({ id: timelineItems.id })

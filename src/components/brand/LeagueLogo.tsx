@@ -7,16 +7,22 @@ const LABELS: Record<League, string> = {
   nba: 'NBA',
   nfl: 'NFL',
   cfb: 'CFB',
+  cbb: 'CBB',
   nhl: 'NHL',
 }
+
+// ESPN has no college league marks; the NCAA's reads on dark (the label tells
+// football from basketball).
+const NCAA =
+  'https://a.espncdn.com/combiner/i?img=/i/espn/misc_logos/500/ncaa.png&w=80&h=80'
 
 // ESPN's dark-background league marks, resized (the originals are up to ~100 KB).
 const LOGOS: Record<League, string> = {
   mlb: espn('mlb'),
   nba: espn('nba'),
   nfl: espn('nfl'),
-  // ESPN has no college football league mark; the NCAA's reads on dark.
-  cfb: 'https://a.espncdn.com/combiner/i?img=/i/espn/misc_logos/500/ncaa.png&w=80&h=80',
+  cfb: NCAA,
+  cbb: NCAA,
   nhl: espn('nhl'),
 }
 

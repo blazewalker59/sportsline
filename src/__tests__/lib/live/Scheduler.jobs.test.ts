@@ -188,6 +188,7 @@ describe.skipIf(!isBun)('Scheduler jobs', () => {
       'roster:nba',
       'roster:nfl',
       'roster:cfb',
+      'roster:cbb',
       'roster:nhl',
       'retention',
       'prune',
@@ -201,6 +202,7 @@ describe.skipIf(!isBun)('Scheduler jobs', () => {
       'roster:nba',
       'roster:nfl',
       'roster:cfb',
+      'roster:cbb',
       'roster:nhl',
       'retention',
       'sharp-slate',
@@ -225,6 +227,7 @@ describe.skipIf(!isBun)('Scheduler jobs', () => {
     expect(state.order).not.toContain('prune')
     expect(state.errors.map((error) => error.scope)).toEqual([
       'job:schedules',
+      'job:roster',
       'job:roster',
       'job:roster',
       'job:roster',

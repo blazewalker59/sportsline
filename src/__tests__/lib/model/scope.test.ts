@@ -36,10 +36,32 @@ describe('Scope', () => {
   })
 })
 
-describe('Top 25 Scope', () => {
-  it('parses and covers ranked college games', () => {
-    expect(parseScope('top25')).toBe('top25')
-    expect(scopeFollows('top25', [])).toEqual([{ kind: 'top25' }])
+describe('college Scopes (opt-in)', () => {
+  const optIns = [
+    {
+      league: 'cfb' as const,
+      follow: { kind: 'game' as const, gameId: 'gm_uga' },
+    },
+    {
+      league: 'cfb' as const,
+      follow: { kind: 'team' as const, teamId: 'tm_bama' },
+    },
+  ]
+
+  it('cover only what the Viewer opted into, never the whole League', () => {
+    expect(scopeFollows('cfb', [], undefined, [], [], optIns)).toEqual([
+      { kind: 'game', gameId: 'gm_uga' },
+      { kind: 'team', teamId: 'tm_bama' },
+    ])
+    expect(scopeFollows('cfb', [])).toEqual([])
+  })
+
+  it('put the opt-ins in All, beside the other Leagues as a whole', () => {
+    expect(scopeFollows('all', [], ['nfl', 'cfb'], [], [], optIns)).toEqual([
+      { kind: 'league', league: 'nfl' },
+      { kind: 'game', gameId: 'gm_uga' },
+      { kind: 'team', teamId: 'tm_bama' },
+    ])
   })
 })
 
@@ -54,8 +76,7 @@ describe('the nav’s Scope tabs', () => {
     ['fantasy', 'fantasy'],
     ['all', 'all'],
     ['nfl', 'all'],
-    ['top25', 'all'],
-    ['sec', 'all'],
+    ['cfb', 'all'],
   ] as const)('puts %s under the %s tab', (scope, tab) => {
     expect(scopeTab(scope)).toBe(tab)
   })
@@ -119,7 +140,7 @@ describe('swiping between Scopes', () => {
 
   it('treats any League choice as the All tab', () => {
     const stops = scopeStops('nfl')
-    expect(neighborScope(stops, 'top25', 1)).toBe('predictions')
-    expect(neighborScope(stops, 'sec', -1)).toBe('following')
+    expect(neighborScope(stops, 'cfb', 1)).toBe('predictions')
+    expect(neighborScope(stops, 'mlb', -1)).toBe('following')
   })
 })

@@ -14,6 +14,7 @@ import { FollowButton } from './FollowButton'
 import type { ReactNode } from 'react'
 import type { League } from '@/lib/model/types'
 import type { FollowEntry } from '@/lib/viewer/server'
+import { isCollege } from '@/lib/model/types'
 import { RowItemMark, rowItemName } from '@/components/brand/RowItemMark'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { DEFAULT_LEAGUE_SETTINGS, visibleLeagues } from '@/lib/model/leagues'
@@ -26,7 +27,7 @@ import {
 } from '@/lib/viewer/useViewer'
 import { cn } from '@/lib/utils'
 
-/** Past this many Teams (college football), a filter box helps. */
+/** Past this many Teams (college), a filter box helps. */
 const FILTER_FROM = 40
 
 /**
@@ -234,8 +235,13 @@ function TeamStep({ leagues }: { leagues: Array<League> }) {
                 <h3 className="min-w-0 flex-1 truncate text-sm font-semibold">
                   {rowItemName(league)}
                 </h3>
-                <span className="text-2xs text-muted">Every Game</span>
-                <FollowButton follow={{ kind: 'league', league }} />
+                {/* A college League is followed by Team (opt-in). */}
+                {!isCollege(league) && (
+                  <>
+                    <span className="text-2xs text-muted">Every Game</span>
+                    <FollowButton follow={{ kind: 'league', league }} />
+                  </>
+                )}
               </div>
               {inLeague.length === 0 ? (
                 <p className="pb-2 text-2xs text-muted">

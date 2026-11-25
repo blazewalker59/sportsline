@@ -13,6 +13,8 @@ const LEAGUES: Record<string, League> = {
   NCAAFB: 'cfb',
   NCAAF: 'cfb',
   CFB: 'cfb',
+  NCAAMB: 'cbb',
+  NCAAB: 'cbb',
   NBA: 'nba',
   MLB: 'mlb',
   NHL: 'nhl',

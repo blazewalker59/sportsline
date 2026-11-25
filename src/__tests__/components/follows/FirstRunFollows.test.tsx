@@ -107,7 +107,14 @@ describe('FirstRunFollows', () => {
     const leagues = within(getByRole('list', { name: 'Leagues' }))
       .getAllByRole('button')
       .map((b) => b.textContent)
-    expect(leagues).toEqual(['MLB', 'NBA', 'NFL', 'College Football', 'NHL'])
+    expect(leagues).toEqual([
+      'MLB',
+      'NBA',
+      'NFL',
+      'College Football',
+      'College Basketball',
+      'NHL',
+    ])
     // Nothing picked yet: there's no next step to take.
     expect(getByRole('button', { name: 'Next' })).toHaveProperty(
       'disabled',
@@ -124,7 +131,12 @@ describe('FirstRunFollows', () => {
     const leagues = within(getByRole('list', { name: 'Leagues' }))
       .getAllByRole('button')
       .map((b) => b.textContent)
-    expect(leagues).toEqual(['NBA', 'NFL', 'College Football'])
+    expect(leagues).toEqual([
+      'NBA',
+      'NFL',
+      'College Football',
+      'College Basketball',
+    ])
   })
 
   it('isn’t shown once the Viewer follows anything', () => {

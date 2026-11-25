@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ne } from 'drizzle-orm'
 import { isBun, sqliteDb } from '../../helpers/sqliteDb'
 import type * as Db from '@/lib/db'
 import type { CloudflareEnv } from '@/lib/db'
@@ -13,6 +14,8 @@ import { games, teams } from '@/lib/db/schema'
 const state = vi.hoisted(() => ({
   db: null as unknown,
   scheduled: [] as Array<ScheduledGame>,
+  /** How many times the Source's schedule was read. */
+  reads: 0,
   /** Statements in each batch syncLeague sends. */
   batches: [] as Array<number>,
   reported: [] as Array<{ scope: string; context: unknown }>,
@@ -39,7 +42,10 @@ vi.mock('@/lib/sources', () => ({
   ACTIVE_LEAGUES: ['nfl'],
   sourceFor: () => ({
     source: 'espn',
-    schedule: () => Promise.resolve(state.scheduled),
+    schedule: () => {
+      state.reads++
+      return Promise.resolve(state.scheduled)
+    },
   }),
 }))
 
@@ -116,11 +122,12 @@ describe.skipIf(!isBun)('syncLeague', () => {
   let tracked: Array<{ gameId: string; delayMs: number | undefined }>
   let env: CloudflareEnv
   let db: Awaited<ReturnType<typeof sqliteDb>>['db']
+  let sqlite: Awaited<ReturnType<typeof sqliteDb>>['sqlite']
   /** Games whose LiveGame fails to wake. */
   let failing: Set<string>
 
   beforeEach(async () => {
-    db = (await sqliteDb()).db
+    ;({ db, sqlite } = await sqliteDb())
     const batch = db.batch
     db.batch = (queries) => {
       state.batches.push(queries.length)
@@ -184,6 +191,72 @@ describe.skipIf(!isBun)('syncLeague', () => {
     const logos = (await db.select().from(teams)).map((t) => t.logoUrl)
     expect(logos).toContain('https://logos/new.png')
     expect(logos).not.toContain('https://logos/h2.png')
+  })
+
+  it('reads a college slate only for what someone opted into', async () => {
+    const college = (n: number) =>
+      game(n, { league: 'cfb', status: 'live', startsAt: now.toISOString() })
+    state.scheduled = [college(1), college(2), college(3)]
+    state.reads = 0
+    const syncCfb = (options = {}) =>
+      syncLeague(env, 'cfb', '2026-10-01', now, options)
+
+    // Nothing opted into: the Source isn't asked, nothing is stored.
+    await syncCfb()
+    expect(state.reads).toBe(0)
+    expect(await db.select().from(games)).toHaveLength(0)
+    expect(tracked).toEqual([])
+
+    // A followed team (known from the nightly team list): its Game only.
+    sqlite.run(
+      "INSERT INTO user (id,name,email,email_verified,created_at,updated_at) VALUES ('u1','V','v@example.com',1,0,0)",
+    )
+    sqlite.run(
+      "INSERT INTO teams (id, league, name, abbreviation) VALUES ('tm_h2', 'cfb', 'Home 2', 'H2')",
+    )
+    sqlite.run(
+      "INSERT INTO source_ids (entity, source, source_id, internal_id) VALUES ('team', 'espn', 'h2', 'tm_h2')",
+    )
+    sqlite.run(
+      "INSERT INTO follows (viewer_id,kind,target,created_at) VALUES ('u1','team','tm_h2','2026-10-01T00:00:00Z')",
+    )
+    await syncCfb()
+    expect(state.reads).toBe(1)
+    const stored = async () =>
+      (await db.select().from(games)).map((g) => g.homeTeamId)
+    expect(await stored()).toEqual(['tm_h2'])
+    expect(tracked).toHaveLength(1)
+
+    // A Prediction being matched stores just its Game's candidates…
+    await syncCfb({ keep: (g: ScheduledGame) => g.sourceGameId === 'g1' })
+    expect(await stored()).toHaveLength(2)
+    const [g1] = await db
+      .select()
+      .from(games)
+      .where(ne(games.homeTeamId, 'tm_h2'))
+    // …tracked only once that Prediction is open.
+    expect(tracked.map((t) => t.gameId)).not.toContain(g1.id)
+    sqlite.run(
+      "INSERT INTO predictions (id,viewer_id,market_ticker,kind,side,title,contracts,cost,status,opened_at,updated_at) VALUES ('p1','u1','M1','single','yes','One',1,1,'open','2026-10-01T00:00:00Z','2026-10-01T00:00:00Z')",
+    )
+    sqlite.run(
+      `INSERT INTO prediction_legs (prediction_id,position,market_ticker,event_ticker,side,title,game_id) VALUES ('p1',0,'M1','E1','yes','One','${g1.id}')`,
+    )
+    tracked = []
+    await syncCfb()
+    expect(tracked.map((t) => t.gameId)).toContain(g1.id)
+    expect(tracked).toHaveLength(2)
+    // Game 3, which nobody opted into, was never stored.
+    expect(await db.select().from(games)).toHaveLength(2)
+
+    // Opened from its Team page: stored, and tracked, that one Game.
+    tracked = []
+    await syncCfb({
+      keep: (g: ScheduledGame) => g.sourceGameId === 'g3',
+      optIn: true,
+    })
+    expect(await db.select().from(games)).toHaveLength(3)
+    expect(tracked).toHaveLength(1)
   })
 
   it('leaves a Game its LiveGame owns alone, and keeps waking it', async () => {

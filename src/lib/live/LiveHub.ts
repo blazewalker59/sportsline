@@ -14,12 +14,7 @@ import type {
   TimelineEvent,
   TimelineFilter,
 } from '@/lib/model/timeline'
-import {
-  followsFromParam,
-  inConference,
-  isRanked,
-  matchesFilter,
-} from '@/lib/model/timeline'
+import { followsFromParam, matchesFilter } from '@/lib/model/timeline'
 
 export const LIVE_PATH = '/live'
 
@@ -92,7 +87,7 @@ function covers(event: TimelineEvent, filter: TimelineFilter): boolean {
 
 /**
  * Does a socket's filter cover this Game's scoreboard? The Games its Team,
- * League, Top 25, Conference and Game Follows cover (the Timeline's socket
+ * League and Game Follows cover (the Timeline's socket
  * asks for every League, so its games strip sees every Game). Player and
  * Fantasy Follows name no Game: they get the Plays, not the scoreboards.
  */
@@ -107,10 +102,6 @@ function gameCovered(game: GameSummary, filter: TimelineFilter): boolean {
         )
       case 'league':
         return game.league === follow.league
-      case 'top25':
-        return game.league === 'cfb' && isRanked(game)
-      case 'conference':
-        return game.league === 'cfb' && inConference(game, follow.conference)
       case 'game':
         return game.id === follow.gameId
       case 'player':

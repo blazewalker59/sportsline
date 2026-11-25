@@ -11,8 +11,8 @@ import { cn } from '@/lib/utils'
 
 /**
  * The League row, in the All tab's hero (LiveBoard's ScopeHero): All
- * Leagues, then the Viewer's Leagues and college groups (Top 25, the
- * Conferences) in the order they arranged, as one segmented control (the
+ * Leagues, then the Viewer's Leagues in the order they arranged (college
+ * ones covering only what the Viewer opted into), as one segmented control (the
  * same control as the board's others) scrolling sideways. Choosing one is
  * a View Transition to that Scope. Following, Predictions and Fantasy are
  * the main navigation's other tabs, so they aren't offered here.
@@ -66,8 +66,6 @@ export function LeagueBar({
               >
                 {item === 'all' ? (
                   'All leagues'
-                ) : item === 'top25' ? (
-                  'Top 25'
                 ) : (
                   <>
                     <RowItemMark item={item} size={16} />

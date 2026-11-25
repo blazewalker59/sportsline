@@ -44,7 +44,8 @@ export function GameFlow({ game }: { game: GameSummary }) {
   )
   const away = game.awayTeam.abbreviation
   const home = game.homeTeam.abbreviation
-  const dots = game.league !== 'nba'
+  // Basketball scores too often for a dot each.
+  const dots = game.league !== 'nba' && game.league !== 'cbb'
   // Every scoring play in order, both sides', for the panel to step through.
   const scores = useMemo(
     () => (dots && flow ? [...flow.scores].sort((a, b) => a.x - b.x) : []),

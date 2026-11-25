@@ -11,17 +11,17 @@
  */
 
 import {
+  QUARTERS,
   competitorTeam,
   espnHeadshot,
   espnPause,
   mapStatus,
   periodEndMilestone,
-  quarterLabel,
   teamLogo,
 } from '../espn/common'
 import { gameMilestones, takesLead } from '../common'
 import type { NbaRoster, NbaSummary } from './feed'
-import type { EspnTeams } from '../espn/common'
+import type { EspnTeams, PeriodFormat } from '../espn/common'
 import type { BasketballStats } from '@/lib/fantasy/basketballMilestones'
 import type {
   GameSnapshot,
@@ -84,7 +84,14 @@ export function roleOf(
   return 'player'
 }
 
-export function parseGame(summary: NbaSummary): GameSnapshot {
+/**
+ * A Game's snapshot from ESPN's summary. College basketball reads the same
+ * shapes with halves for quarters (`format`).
+ */
+export function parseGame(
+  summary: NbaSummary,
+  format: PeriodFormat = QUARTERS,
+): GameSnapshot {
   const competition = summary.header.competitions[0]
   const status = mapStatus(competition.status)
   const awayC = competition.competitors.find((c) => c.homeAway === 'away')!
@@ -132,11 +139,12 @@ export function parseGame(summary: NbaSummary): GameSnapshot {
           {
             period,
             final,
-            halftime: period === 2,
+            halftime: period === format.halftimeAfter,
             sequence,
             occurredAt,
             score,
           },
+          format,
         ),
       )
       previous = score
@@ -186,7 +194,7 @@ export function parseGame(summary: NbaSummary): GameSnapshot {
       sequence,
       occurredAt,
       segmentLabel:
-        `${quarterLabel(period)} ${row.clock?.displayValue ?? ''}`.trim(),
+        `${format.label(period)} ${row.clock?.displayValue ?? ''}`.trim(),
       score,
       description: text,
       playType: type,
@@ -239,12 +247,12 @@ export function parseGame(summary: NbaSummary): GameSnapshot {
       ? {
           segmentLabel: halftime
             ? 'Halftime'
-            : `${quarterLabel(period)} ${competition.status.displayClock ?? ''}`.trim(),
+            : `${format.label(period)} ${competition.status.displayClock ?? ''}`.trim(),
           detail: halftime ? {} : { onCourt: onCourt(summary) },
         }
       : null,
     items,
-    box: box(summary, awayC, homeC),
+    box: box(summary, awayC, homeC, format),
     pause: espnPause(competition.status),
   }
 }
@@ -276,6 +284,7 @@ function box(
   summary: NbaSummary,
   awayC: NbaSummary['header']['competitions'][0]['competitors'][0],
   homeC: typeof awayC,
+  format: PeriodFormat,
 ): SourceBox | null {
   const quarters = Math.max(
     awayC.linescores?.length ?? 0,
@@ -317,7 +326,7 @@ function box(
   return {
     linescore: {
       segments: Array.from({ length: quarters }, (_, i) =>
-        i < 4 ? String(i + 1) : quarterLabel(i + 1),
+        i < format.regulation ? String(i + 1) : format.label(i + 1),
       ),
       away: line(awayC),
       home: line(homeC),

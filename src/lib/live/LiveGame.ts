@@ -37,6 +37,7 @@ import type {
   SourceItem,
 } from '@/lib/model/types'
 import { sourceFor } from '@/lib/sources'
+import { isCollege } from '@/lib/model/types'
 import { games, itemPlayers, players, timelineItems } from '@/lib/db/schema'
 import { teamColors } from '@/lib/brand/teamColors'
 import { dbFromD1 } from '@/lib/db'
@@ -304,6 +305,43 @@ export class LiveGame extends DurableObject<CloudflareEnv> {
         ...boxPlayers.filter((p) => !this.knownPlayers.has(p.sourceId)),
       ],
     )
+    // College Leagues read few or no rosters (college basketball none):
+    // a Player first met in a Game gets a row of their own here, with the
+    // box score's team, so their page and Follows work. A roster's row is
+    // never overwritten.
+    if (isCollege(game.league)) {
+      const teamOf = new Map<string, string>()
+      for (const t of snapshot.box?.tables ?? [])
+        for (const r of t.rows)
+          teamOf.set(
+            r.player.sourceId,
+            t.side === 'away' ? game.awayTeam.id : game.homeTeam.id,
+          )
+      const named = new Map<string, string>()
+      for (const p of [
+        ...boxPlayers,
+        ...touched.flatMap((i) =>
+          i.kind === 'play' ? [...i.involved, ...i.credits] : [],
+        ),
+      ])
+        if (!p.name.startsWith('#')) named.set(p.sourceId, p.name)
+      const fresh = [...playerIds].filter(
+        ([sourceId]) => !this.knownPlayers.has(sourceId) && named.has(sourceId),
+      )
+      // Five columns a row: 16 rows stay under D1's 100 bound parameters.
+      for (const part of chunk(fresh, 16))
+        await db
+          .insert(players)
+          .values(
+            part.map(([sourceId, id]) => ({
+              id,
+              league: game.league,
+              name: named.get(sourceId)!,
+              teamId: teamOf.get(sourceId) ?? null,
+            })),
+          )
+          .onConflictDoNothing()
+    }
     for (const [sourceId, id] of playerIds) this.knownPlayers.set(sourceId, id)
     // Sources sometimes give only an id (`#123`); the roster sync knows the name.
     const unnamed = touched.flatMap((i) =>

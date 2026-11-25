@@ -18,6 +18,7 @@ const OPPONENT_ROLES: Record<
   // is the opponent (see playerSide).
   nhl: new Set(['goalie', 'loser', 'hittee', 'drew penalty']),
   nba: new Set(['blocker', 'steal']),
+  cbb: new Set(['blocker', 'steal']),
 }
 
 /** NFL roles played by the team that snapped (or kicked) the ball. */
@@ -153,7 +154,8 @@ export function scoringSummary(item: TimelineItem): string | null {
       const assists = byRole(item, 'assist').map((p) => lastName(p.name))
       return `${lastName(scorer.name)}${count ? ` (${count})` : ''}${assists.length ? ` · ${assists.join(', ')}` : ' · unassisted'}`
     }
-    case 'nba': {
+    case 'nba':
+    case 'cbb': {
       const shooter = first('shooter', 'player')
       if (!shooter) return null
       const feet = text.match(/(\d+)-foot/)?.[1]

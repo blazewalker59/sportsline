@@ -4,6 +4,7 @@
  * `sourceFor(league)` and sees only the shared model.
  */
 
+import { cbbAdapter } from './cbb'
 import { cfbAdapter } from './cfb'
 import { mlbAdapter } from './mlb'
 import { nbaAdapter } from './nba'
@@ -16,6 +17,7 @@ const ADAPTERS: Partial<Record<League, SourceAdapter>> = {
   nba: nbaAdapter,
   nfl: nflAdapter,
   cfb: cfbAdapter,
+  cbb: cbbAdapter,
   nhl: nhlAdapter,
 }
 

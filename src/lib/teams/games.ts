@@ -7,9 +7,9 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 import type { Database } from '@/lib/db'
 import type { League } from '@/lib/model/types'
+import { LEAGUES, isCollege } from '@/lib/model/types'
 import { getCloudflareEnv, getDb } from '@/lib/db'
 import { sourceIds } from '@/lib/db/schema'
-import { LEAGUES } from '@/lib/model/types'
 import { syncLeague } from '@/lib/live/schedule'
 import { shiftSportsDay, sportsDayOf } from '@/lib/model/sportsDay'
 import { sourceFor } from '@/lib/sources'
@@ -56,13 +56,32 @@ export const RESYNC_AFTER_MS = 60_000
  */
 const recentSyncs = new Map<string, { at: number; done: Promise<void> }>()
 
-function syncOnce(league: League, sportsDay: string, now: Date): Promise<void> {
-  const key = `${league}:${sportsDay}`
+function syncOnce(
+  league: League,
+  sportsDay: string,
+  now: Date,
+  /** A college Game: only it is stored, and counted as opted into. */
+  sourceGameId: string,
+): Promise<void> {
+  const college = isCollege(league)
+  const key = college
+    ? `${league}:${sportsDay}:${sourceGameId}`
+    : `${league}:${sportsDay}`
   const recent = recentSyncs.get(key)
   if (recent && now.getTime() - recent.at < RESYNC_AFTER_MS) return recent.done
   for (const [k, v] of recentSyncs)
     if (now.getTime() - v.at >= RESYNC_AFTER_MS) recentSyncs.delete(k)
-  const done = syncLeague(getCloudflareEnv(), league, sportsDay, now)
+  // A college League's whole slate isn't read for one Game (CONTEXT.md,
+  // "Opt-in"): just this one, which the Viewer asked for.
+  const done = syncLeague(
+    getCloudflareEnv(),
+    league,
+    sportsDay,
+    now,
+    college
+      ? { keep: (g) => g.sourceGameId === sourceGameId, optIn: true }
+      : {},
+  )
   // A failed sync is still a recent one: the next open within the minute
   // finds nothing rather than trying the Source again.
   recentSyncs.set(key, { at: now.getTime(), done: done.catch(() => {}) })
@@ -102,7 +121,7 @@ export async function openGame(
   ) {
     return null
   }
-  await syncOnce(data.league, data.sportsDay, now)
+  await syncOnce(data.league, data.sportsDay, now, data.sourceGameId)
   gameId = await find()
   return gameId ? { gameId } : null
 }

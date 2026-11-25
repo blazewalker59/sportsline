@@ -159,6 +159,7 @@ vi.mock('@/components/timeline/useTimelineScope', async () => {
         predictionList: { data: [] },
         openPredictions: [],
         predictionGames: [],
+        optIns: [],
         selectedPrediction: null,
         selectPrediction: () => {},
         fantasyLeagues: [],
@@ -456,7 +457,7 @@ describe('TimelineScreen, Scopes (chosen from the main navigation)', () => {
   const prompt = () =>
     document.querySelector<HTMLElement>('[data-scope-prompt]')
 
-  it.each(['all', 'nfl', 'top25', 'sec'])(
+  it.each(['all', 'nfl', 'cfb'])(
     'offers the League row under the All tab (%s)',
     async (scope) => {
       renderTimeline(`/?scope=${scope}`)
@@ -489,10 +490,10 @@ describe('TimelineScreen, Scopes (chosen from the main navigation)', () => {
     const { router } = renderTimeline('/?scope=all')
     await waitFor(() => expect(leagueRow()).toBeTruthy())
     fireEvent.click(
-      within(leagueRow()!).getByRole('button', { name: 'Top 25' }),
+      within(leagueRow()!).getByRole('button', { name: 'College Football' }),
     )
     await waitFor(() =>
-      expect(router.state.location.search).toMatchObject({ scope: 'top25' }),
+      expect(router.state.location.search).toMatchObject({ scope: 'cfb' }),
     )
   })
 
@@ -532,7 +533,7 @@ describe('TimelineScreen, Scopes (chosen from the main navigation)', () => {
     ['predictions', 'left', 'fantasy'],
     ['fantasy', 'right', 'predictions'],
     ['predictions', 'right', 'nfl'],
-    ['top25', 'right', 'following'],
+    ['cfb', 'right', 'following'],
   ] as const)(
     'a swipe from %s (%s) steps to %s, in the nav’s order',
     async (from, direction, to) => {

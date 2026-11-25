@@ -8,6 +8,7 @@
 import { useRef, useState } from 'react'
 import { FollowButton } from './FollowButton'
 import type { RowItem } from '@/lib/model/leagues'
+import { isCollege } from '@/lib/model/types'
 import { RowItemMark, rowItemName } from '@/components/brand/RowItemMark'
 import {
   DEFAULT_LEAGUE_SETTINGS,
@@ -151,9 +152,9 @@ export function LeagueList() {
                 <span className="truncate font-medium">
                   {rowItemName(league)}
                 </span>
-                {!isLeague(league) && (
+                {isCollege(league) && (
                   <span className="truncate text-xs text-muted">
-                    College Football
+                    Your teams’ and Predictions’ games
                   </span>
                 )}
               </span>
@@ -172,7 +173,8 @@ export function LeagueList() {
             >
               {hidden ? 'Show' : 'Hide'}
             </button>
-            {isLeague(league) && (
+            {/* A college League is followed by Team, not whole (opt-in). */}
+            {isLeague(league) && !isCollege(league) && (
               <FollowButton follow={{ kind: 'league', league }} />
             )}
           </li>

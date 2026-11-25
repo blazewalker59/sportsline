@@ -48,7 +48,6 @@ export const getTimeline = createServerFn({ method: 'GET' })
     async ({ data, context: { db, viewerId } }): Promise<TimelinePage> => {
       const sportsDay = data.sportsDay ?? sportsDayOf(new Date())
       const covered = coverageWhere(followsFromParam(data.follows), {
-        sportsDay,
         includeRoutine: data.includeRoutine,
         viewerId,
       })

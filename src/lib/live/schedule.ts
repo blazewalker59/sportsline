@@ -2,6 +2,10 @@
  * The once-a-minute schedule sync (run by the Scheduler): for each
  * League with a Source, upsert today's Games and wake a LiveGame for every
  * Game that is live, about to start, or finished without being tracked.
+ * A college League has far too many Games to read them all (CONTEXT.md,
+ * "Opt-in"): only those someone opted into are stored and tracked, a
+ * followed team's or one a Prediction was matched to, and with none the
+ * Source isn't even asked.
  */
 
 import { and, eq, inArray, notInArray, sql } from 'drizzle-orm'
@@ -18,7 +22,15 @@ import type { Conference } from '@/lib/model/leagues'
 import type { League, ScheduledGame } from '@/lib/model/types'
 import { ACTIVE_LEAGUES, sourceFor } from '@/lib/sources'
 import { sportsDayOf } from '@/lib/model/sportsDay'
-import { games, teams } from '@/lib/db/schema'
+import {
+  follows,
+  games,
+  predictionLegs,
+  predictions,
+  sourceIds,
+  teams,
+} from '@/lib/db/schema'
+import { isCollege } from '@/lib/model/types'
 import { dbFromD1 } from '@/lib/db'
 import { reportError } from '@/lib/ops/errors'
 
@@ -93,19 +105,37 @@ export const BACKFILL_SPACING_MS = 3_000
  */
 const failingSince = new Map<League, number>()
 
-/** One League's schedule for one Sports Day (a Team page opening an old Game). */
+/**
+ * One League's schedule for one Sports Day (a Team page opening an old
+ * Game, a Prediction's Game being matched). `keep` narrows what's stored:
+ * a Prediction stores only its own Game's candidates. Without one, a
+ * college League keeps only what's opted into (collegeKeep). `optIn`
+ * counts what's kept as opted into: a Viewer opening a college Game from
+ * its Team page asked for that one.
+ */
 export async function syncLeague(
   env: CloudflareEnv,
   league: League,
   sportsDay: string,
   now: Date,
+  {
+    keep,
+    optIn = false,
+  }: { keep?: (g: ScheduledGame) => boolean; optIn?: boolean } = {},
 ): Promise<void> {
   const adapter = sourceFor(league)
+  const db = dbFromD1(env.DB)
+  const narrow =
+    keep ??
+    (isCollege(league)
+      ? await collegeKeep(db, league, adapter.source, sportsDay)
+      : undefined)
+  // Nothing opted into: don't ask the Source at all.
+  if (narrow === null) return
   const scheduled = (await adapter.schedule(sportsDay)).filter(
-    (g) => g.sportsDay === sportsDay,
+    (g) => g.sportsDay === sportsDay && (!narrow || narrow(g)),
   )
   if (scheduled.length === 0) return
-  const db = dbFromD1(env.DB)
 
   const teamIds = await resolve(
     db,
@@ -203,10 +233,24 @@ export async function syncLeague(
   const [first, ...rest] = writes
   if (first) await db.batch([first, ...rest])
 
+  // A college Game is tracked only when someone opted into it.
+  const optedIn = !isCollege(league)
+    ? null
+    : optIn
+      ? new Set(scheduled.map((g) => gameIds.get(g.sourceGameId)!))
+      : await optedInGames(
+          db,
+          scheduled.map((g) => ({
+            id: gameIds.get(g.sourceGameId)!,
+            awayTeamId: teamIds.get(g.away.sourceId)!,
+            homeTeamId: teamIds.get(g.home.sourceId)!,
+          })),
+        )
   // A past day can hold a hundred Finals to backfill: space their first
   // polls out rather than send every LiveGame to the Source at once.
   let backfills = 0
   const wakes = scheduled
+    .filter((g) => !optedIn || optedIn.has(gameIds.get(g.sourceGameId)!))
     .filter((g) =>
       needsTracking(g, stored.get(gameIds.get(g.sourceGameId)!)?.status, now),
     )
@@ -255,6 +299,98 @@ export async function syncLeague(
       { notify: !isTransient(r.reason) },
     )
   }
+}
+
+/**
+ * Which of a college League's Games to store and track (CONTEXT.md,
+ * "Opt-in"): one with a followed team, or one already stored for the day
+ * (a Prediction matched it). Null with neither: nothing to ask the Source
+ * for. Reads only.
+ */
+export async function collegeKeep(
+  db: Database,
+  league: League,
+  source: string,
+  sportsDay: string,
+): Promise<((g: ScheduledGame) => boolean) | null> {
+  const [followed, stored] = await Promise.all([
+    db
+      .selectDistinct({ sourceId: sourceIds.sourceId })
+      .from(follows)
+      .innerJoin(teams, eq(teams.id, follows.target))
+      .innerJoin(
+        sourceIds,
+        and(
+          eq(sourceIds.internalId, teams.id),
+          eq(sourceIds.entity, 'team'),
+          eq(sourceIds.source, source),
+        ),
+      )
+      .where(and(eq(follows.kind, 'team'), eq(teams.league, league))),
+    db
+      .select({ sourceId: sourceIds.sourceId })
+      .from(games)
+      .innerJoin(
+        sourceIds,
+        and(
+          eq(sourceIds.internalId, games.id),
+          eq(sourceIds.entity, 'game'),
+          eq(sourceIds.source, source),
+        ),
+      )
+      .where(and(eq(games.league, league), eq(games.sportsDay, sportsDay))),
+  ])
+  if (followed.length === 0 && stored.length === 0) return null
+  const teamIds = new Set(followed.map((r) => r.sourceId))
+  const gameIds = new Set(stored.map((r) => r.sourceId))
+  return (g) =>
+    gameIds.has(g.sourceGameId) ||
+    teamIds.has(g.away.sourceId) ||
+    teamIds.has(g.home.sourceId)
+}
+
+/**
+ * Which of these Games someone opted into (CONTEXT.md, "Opt-in"): an open
+ * Prediction with a Leg on the Game, or a Follow on either team, by any
+ * Viewer.
+ */
+export async function optedInGames(
+  db: Database,
+  scheduled: ReadonlyArray<{
+    id: string
+    awayTeamId: string
+    homeTeamId: string
+  }>,
+): Promise<Set<string>> {
+  const out = new Set<string>()
+  const ids = scheduled.map((g) => g.id)
+  for (const part of chunk(ids, 90)) {
+    const rows = await db
+      .selectDistinct({ gameId: predictionLegs.gameId })
+      .from(predictionLegs)
+      .innerJoin(predictions, eq(predictions.id, predictionLegs.predictionId))
+      .where(
+        and(
+          inArray(predictionLegs.gameId, part),
+          eq(predictions.status, 'open'),
+        ),
+      )
+    for (const r of rows) if (r.gameId) out.add(r.gameId)
+  }
+  const teamIds = [
+    ...new Set(scheduled.flatMap((g) => [g.awayTeamId, g.homeTeamId])),
+  ]
+  const followed = new Set<string>()
+  for (const part of chunk(teamIds, 90)) {
+    const rows = await db
+      .selectDistinct({ teamId: follows.target })
+      .from(follows)
+      .where(and(eq(follows.kind, 'team'), inArray(follows.target, part)))
+    for (const r of rows) followed.add(r.teamId)
+  }
+  for (const g of scheduled)
+    if (followed.has(g.awayTeamId) || followed.has(g.homeTeamId)) out.add(g.id)
+  return out
 }
 
 /** The schedule fields of the Games already stored, by id. */

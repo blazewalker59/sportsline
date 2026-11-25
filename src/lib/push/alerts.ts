@@ -59,10 +59,13 @@ const fresh = (item: TimelineItem, now: number) =>
 const activePlay = (item: TimelineItem, now: number) =>
   item.kind === 'play' && item.status === 'active' && fresh(item, now)
 
-/** NBA lead changes only interrupt in a close fourth quarter or overtime. */
+/**
+ * Basketball lead changes only interrupt when it's close and late: the
+ * NBA's fourth quarter, college's second half, or overtime.
+ */
 function nbaClutch(item: TimelineItem): boolean {
-  if (item.league !== 'nba') return true
-  const late = /^(?:Q4|(?:\d+)?OT)\b/.test(item.segmentLabel)
+  if (item.league !== 'nba' && item.league !== 'cbb') return true
+  const late = /^(?:Q4|H2|(?:\d+)?OT)\b/.test(item.segmentLabel)
   return late && Math.abs(item.score.away - item.score.home) <= 5
 }
 

@@ -7,8 +7,18 @@
 
 import type { Conference } from './leagues'
 
-export const LEAGUES = ['mlb', 'nba', 'nfl', 'cfb', 'nhl'] as const
+export const LEAGUES = ['mlb', 'nba', 'nfl', 'cfb', 'cbb', 'nhl'] as const
 export type League = (typeof LEAGUES)[number]
+
+/**
+ * College Leagues (CONTEXT.md, "Opt-in"): far too many Games to follow
+ * every one live, so only those a Viewer opts into are, by an open
+ * Prediction on the Game or a Follow on one of its teams.
+ */
+export const COLLEGE_LEAGUES: ReadonlyArray<League> = ['cfb', 'cbb']
+
+export const isCollege = (league: League): boolean =>
+  COLLEGE_LEAGUES.includes(league)
 
 const SIGNIFICANCES = ['scoring', 'notable', 'routine'] as const
 export type Significance = (typeof SIGNIFICANCES)[number]

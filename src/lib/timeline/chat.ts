@@ -142,7 +142,8 @@ export function scoringHeadline(item: TimelineItem): string {
       if (strength === 'empty net') return 'Empty-net goal'
       return 'Goal'
     }
-    case 'nba': {
+    case 'nba':
+    case 'cbb': {
       const points = (detailOf(item) as { points?: number }).points ?? 0
       if (/Free Throw/i.test(type)) return 'Free throw'
       if (points === 3) return 'Three-pointer'
@@ -186,7 +187,8 @@ export function notableLead(item: TimelineItem): string | null {
       if (type === 'fight') return 'Fight'
       if (type === 'penalty') return 'Penalty'
       return null
-    case 'nba': {
+    case 'nba':
+    case 'cbb': {
       const text = item.description
       if (/\bblocks\b/.test(text)) return 'Block'
       if (/\bsteals\)/.test(text)) return 'Steal'
@@ -270,6 +272,7 @@ export function typingFor(game: GameSummary): Typing | null {
         text: [label, detail.strength].filter(Boolean).join(' · '),
       }
     case 'nba':
+    case 'cbb':
       return { gameId: game.id, side: null, text: label }
   }
 }

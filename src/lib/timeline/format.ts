@@ -25,7 +25,7 @@ export interface Segment {
   side?: Side | null
 }
 
-const RESULTS: Record<League, Array<RegExp>> = {
+const RESULTS_BY: Omit<Record<League, Array<RegExp>>, 'cbb'> = {
   nfl: [
     /\bfor (?:-?\d+ yards?|no gain)\b/g,
     /\bTOUCHDOWN\b/g,
@@ -81,6 +81,11 @@ const RESULTS: Record<League, Array<RegExp>> = {
     /\benters the game for\b/g,
   ],
 }
+/** College basketball reads like the NBA. */
+const RESULTS: Record<League, Array<RegExp>> = {
+  ...RESULTS_BY,
+  cbb: RESULTS_BY.nba,
+}
 
 const FLAGS: Array<RegExp> = [
   /\bPENALTY on [A-Z]{2,3}\b/g,
@@ -95,7 +100,7 @@ const FLAGS: Array<RegExp> = [
   /\b(?:defensive )?goaltending\b/g,
 ]
 
-const PLACES: Record<League, Array<RegExp>> = {
+const PLACES_BY: Omit<Record<League, Array<RegExp>>, 'cbb'> = {
   nfl: [
     /\b(?:ob at|pushed ob at|ran ob at|to|at)\s+(?:[A-Z]{2,3} \d{1,2}|50)\b/g,
   ],
@@ -109,6 +114,11 @@ const PLACES: Record<League, Array<RegExp>> = {
   ],
   nhl: [],
   nba: [],
+}
+/** College basketball reads like the NBA. */
+const PLACES: Record<League, Array<RegExp>> = {
+  ...PLACES_BY,
+  cbb: PLACES_BY.nba,
 }
 
 /** Formation tags and crew credits that add nothing to a chat message. */

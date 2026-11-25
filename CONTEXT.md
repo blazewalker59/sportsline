@@ -7,7 +7,7 @@ A live, livestream-style timeline of play-by-play across the sports a viewer car
 ### Leagues & Sources
 
 **League**:
-One of the competitions Sportsline covers: MLB, NBA, NFL, NHL and college football. College football is covered only in part: games involving a team from the ACC, Big 12, Big Ten or SEC, Notre Dame, or a Ranked team, whoever the opponent is. Other leagues are out of scope.
+One of the competitions Sportsline covers: MLB, NBA, NFL, NHL, college football (FBS) and men's college basketball (Division I). The college Leagues are covered by Opt-in: only the Games a Viewer opts into are read at all. Other leagues are out of scope.
 Each Viewer arranges the Leagues: the order they appear in, and which are hidden. A hidden League is left out of All and the League row, but its Follows still count.
 _Avoid_: sport (a sport can span several leagues)
 
@@ -92,19 +92,23 @@ The live, reverse-chronological stream of Plays and Game Milestones in the Viewe
 _Avoid_: feed, stream, ticker
 
 **Scope**:
-Which Plays a Timeline draws from: All (every League the Viewer hasn't hidden), Following (the Viewer's Follows), Predictions (the Games their open Predictions depend on, or just one Prediction's: its Players' plays and its other Legs' Games), Fantasy (plays by both sides' Starters in their Matchups), a single League, Top 25 (college football Games with a Ranked team), or a Conference. A Viewer switches Scope from the main navigation, whose four tabs are Following, All, Predictions and Fantasy, from any screen, or by swiping across the Timeline in the same order. All stands for every League-shaped Scope (All, a single League, Top 25, a Conference): it returns to the last of those the Viewer chose, and which one is chosen on the League row at the top of the Timeline, shown only under All. Within a Scope the Timeline can be narrowed to one of its Games, open Predictions or Matchups: from the Home board over the feed, at every width. On a phone or tablet tapping a Game, Prediction or Matchup narrows to it, tapping it again opens it in full, and a strip over the narrowed feed opens it or shows everything again; on a wide screen one click narrows to it and opens it in the pane beside the feed, and clicking it again closes both. A Scope with nothing behind it yet (no Follows, no Kalshi connection, no Fantasy connection or Matchup) still shows when chosen, with a prompt to set it up instead of plays. The Timeline opens on the Scope last chosen on the device; otherwise it starts on Following when the Viewer follows anything, otherwise All.
+Which Plays a Timeline draws from: All (every League the Viewer hasn't hidden), Following (the Viewer's Follows), Predictions (the Games their open Predictions depend on, or just one Prediction's: its Players' plays and its other Legs' Games), Fantasy (plays by both sides' Starters in their Matchups), or a single League (for a college League, only the Games the Viewer opted into). A Viewer switches Scope from the main navigation, whose four tabs are Following, All, Predictions and Fantasy, from any screen, or by swiping across the Timeline in the same order. All stands for every League-shaped Scope (All, or a single League): it returns to the last of those the Viewer chose, and which one is chosen on the League row in the All tab's hero. Within a Scope the Timeline can be narrowed to one of its Games, open Predictions or Matchups: from the Home board over the feed, at every width. On a phone or tablet tapping a Game, Prediction or Matchup narrows to it, tapping it again opens it in full, and a strip over the narrowed feed opens it or shows everything again; on a wide screen one click narrows to it and opens it in the pane beside the feed, and clicking it again closes both. A Scope with nothing behind it yet (no Follows, no Kalshi connection, no Fantasy connection or Matchup) still shows when chosen, with a prompt to set it up instead of plays. The Timeline opens on the Scope last chosen on the device; otherwise it starts on Following when the Viewer follows anything, otherwise All.
 _Avoid_: view, mode (the nav's "tabs" are Scopes; say Scope)
 
 **Team page**:
 Everything about one Team: its season from the Source (what's next, and results, each opening that Game's thread; an older Game is fetched when opened), its record from those results, and its roster (each opening the Player). Opened from a Team's avatar anywhere.
 _Avoid_: team profile, team hub
 
+**Opt-in**:
+How a college Game comes to be read at all: there are far too many college Games to store or follow every one, so one is stored only when some Viewer follows one of its teams, a Prediction is matched to it, or it's opened from its Team page, and followed live only while one of those still holds (an open Prediction, a Follow, the opened Game). With nothing opted into, the Source isn't asked. Each college League's team list is kept, so any team can be followed. A Viewer's All, and each college League's own Scope, show only the college Games they opted into; a college League can't be followed whole.
+_Avoid_: subscribe, track (say opt into)
+
 **Conference**:
-One of college football's major conferences Sportsline groups by: the SEC, Big Ten, Big 12 and ACC. Like a Ranked team's rank, a team's Conference is recorded per Game. Each Conference, and Top 25, has its own Scope, and sits on the League row a Viewer arranges alongside the Leagues.
+One of college football's major conferences: the SEC, Big Ten, Big 12 and ACC. Like a Ranked team's rank, a team's Conference is recorded per Game and shown beside it; it isn't a Scope or a Follow.
 _Avoid_: division, league (a Conference is within the college football League)
 
 **Ranked**:
-A college football team in the AP Top 25 when a Game is played. The rank belongs to the Game, not the Team: it is the team's rank that week. Any Game with a Ranked team is covered, whatever the conferences.
+A college team in the AP Top 25 when a Game is played. The rank belongs to the Game, not the Team: it is the team's rank that week, shown beside its name.
 _Avoid_: top team, rated
 
 **Stakes**:
