@@ -112,7 +112,7 @@ What a Viewer has riding on the night: their Fantasy Matchups' Starters (and the
 _Avoid_: bets, exposure
 
 **Home board**:
-On a phone, over the feed, narrowed or not, and the one place a phone picks what the Timeline shows: "Your night" (a card each summing up the Viewer's Matchups and Predictions, and with either of those their Following Games, each switching to its tab), then what the tab can be narrowed to (its Games, or under Predictions the open Predictions, under Fantasy the Matchups), as a grid or collapsed to one row, the Viewer's choice on the device. Once it scrolls away, its scores stay pinned under the header as a ticker.
+On a phone, over the feed, narrowed or not, and the one place a phone picks what the Timeline shows. Every tab opens on the same shape: its hero (one card in the tab's own color with its headline: live Games, the portfolio's worth, the Matchup's score; under All, the League row in it), then what the tab can be narrowed to (its Games, or under Predictions the open Predictions, under Fantasy the Matchups) as a grid or collapsed to one row, the Viewer's choice on the device. Once it scrolls away, the tab's headline and its scores stay pinned under the header. The main navigation's tabs stay the only way between tabs.
 _Avoid_: dashboard, scoreboard
 
 **Highlights**:

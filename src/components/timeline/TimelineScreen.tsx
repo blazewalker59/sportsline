@@ -34,12 +34,15 @@ import { useTimelineScope } from './useTimelineScope'
 import { useWideTimeline } from './useWideTimeline'
 import {
   FeedFilter,
+  HeroLead,
   LiveBoard,
   LiveTicker,
   NarrowedBar,
-  YourNight,
+  ScopeHero,
+  heroHeadline,
   useBoardLayout,
 } from './LiveBoard'
+import { LeagueBar } from './LeagueBar'
 import type { ScopePage } from './scopePages'
 import type { Typing } from '@/lib/timeline/chat'
 import type { GameSummary, TimelineItem } from '@/lib/model/timeline'
@@ -47,10 +50,12 @@ import type { Scope } from '@/lib/model/scope'
 import type { LeagueMatchup } from '@/lib/fantasy/matchup'
 import type { TimelineScopeState } from './useTimelineScope'
 import type { PaneDetail } from '@/lib/timeline/gameLink'
+import type { RowItem } from '@/lib/model/leagues'
 import { detailParam, parseDetail } from '@/lib/timeline/gameLink'
 import { PredictionDetail } from '@/components/predictions/PredictionSheet'
 import { FirstRunFollows } from '@/components/follows/FirstRunFollows'
-import { neighborScope, scopeStops } from '@/lib/model/scope'
+import { neighborScope, scopeStops, scopeTab } from '@/lib/model/scope'
+import { rowItemName } from '@/components/brand/RowItemMark'
 import { useSwipe } from '@/components/layout/useSwipe'
 import { MatchupDetail } from '@/components/fantasy/FantasyParts'
 import { StakesProvider } from '@/components/chat/StakeTags'
@@ -515,13 +520,20 @@ function Timeline({
   const narrowedTo = pages.find(
     (p) => p.kind !== 'all' && pageKey(p) === currentPage,
   )
-  const followingGames = useMemo(
-    () =>
-      s.viewerFollows.length > 0
-        ? timeline.games.filter((g) => followsGame(g, s.viewerFollows))
-        : null,
-    [s.viewerFollows, timeline.games],
-  )
+  // The tab's hero: its headline in its own color (All's with the League
+  // row in it), the same shape on every tab.
+  const heroTab = scopeTab(scope)
+  const headline = heroHeadline({
+    tab: heroTab,
+    games: boardGames,
+    predictions: s.openPredictions,
+    leagues: s.fantasyLeagues,
+    display,
+    allKicker:
+      scope === 'all' || heroTab !== 'all'
+        ? 'All Leagues'
+        : rowItemName(scope as RowItem),
+  })
   // A tile tapped narrows to it; tapped again, it opens in full.
   const pickTile = (page: ScopePage) =>
     pageKey(page) === currentPage ? openPage(page) : pickPage(page)
@@ -555,14 +567,13 @@ function Timeline({
   // The phone's board, over the Scope's feed or a narrowed Game's thread.
   const homeTop = home && (
     <div className="flex flex-col">
-      <YourNight
-        leagues={s.fantasyLeagues}
-        predictions={s.openPredictions}
-        display={display}
-        following={followingGames}
-        scope={scope}
-        onScope={goToScope}
-      />
+      {heroTab === 'all' ? (
+        <ScopeHero tab={heroTab} headline={headline}>
+          <LeagueBar scope={scope} items={s.rowItems} segmented />
+        </ScopeHero>
+      ) : (
+        <ScopeHero tab={heroTab} headline={headline} />
+      )}
       <LiveBoard
         pages={boardPages}
         current={currentPage}
@@ -648,6 +659,7 @@ function Timeline({
         ticker={
           home && boardAway ? (
             <LiveTicker
+              lead={<HeroLead tab={heroTab} headline={headline} />}
               games={boardGames}
               current={currentPage}
               onPick={pickGame}
