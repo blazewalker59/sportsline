@@ -79,4 +79,34 @@ describe.skipIf(!isBun)('matching a Kalshi event', () => {
       league: 'mlb',
     })
   })
+
+  it('reads the League again for an event remembered without one', async () => {
+    // Remembered before its League was known (as college basketball's
+    // NCAAMB was): no League, and checked over half an hour ago.
+    const { gameFor } = await import('@/lib/kalshi/matching')
+    const { kalshiEvents } = await import('@/lib/db/schema')
+    const db = state.db as Db.Database
+    state.syncError = null
+    await db.insert(kalshiEvents).values({
+      eventTicker: 'KXMLBGAME-26OCT11NYYBOS',
+      milestoneId: null,
+      league: null,
+      startsAt: null,
+      homeName: null,
+      awayName: null,
+      gameId: null,
+      checkedAt: new Date(Date.now() - 3_600_000).toISOString(),
+    })
+    const result = await gameFor(env, account, db, 'KXMLBGAME-26OCT11NYYBOS')
+    expect(result.league).toBe('mlb')
+    // It looked for the Game (its day's schedule), and remembers the League.
+    expect(state.syncs).toBe(1)
+    const [row] = await db.select().from(kalshiEvents)
+    expect(row).toMatchObject({
+      league: 'mlb',
+      milestoneId: 'ms1',
+      homeName: 'New York|NY Yankees',
+      awayName: 'Boston|BOS Red Sox',
+    })
+  })
 })
