@@ -18,7 +18,7 @@
  */
 
 import { useCallback } from 'react'
-import { gameStatusLabel } from './GameStrip'
+import { gameStatusLabel } from './gameStatus'
 import { pageKey } from './scopePages'
 import type { ScopePage } from './scopePages'
 import type { GameSummary } from '@/lib/model/timeline'
@@ -114,6 +114,7 @@ export function LiveBoard({
   onPick,
   onPortfolio,
   display = 'dollars',
+  opensOnPick = false,
   boardRef,
 }: {
   /** What the tab narrows to, in the board's order (no 'all'). */
@@ -127,6 +128,11 @@ export function LiveBoard({
   onPick: (page: Tiled) => void
   /** Every open Prediction at once (the portfolio). */
   onPortfolio?: () => void
+  /**
+   * A tile opens what it narrows to at once (the wide Timeline's pane),
+   * and tapped again closes it, rather than opening on a second tap.
+   */
+  opensOnPick?: boolean
   display?: ChangeDisplay
   /** The board, watched for when it scrolls away (the ticker's cue). */
   boardRef?: React.Ref<HTMLElement>
@@ -160,6 +166,7 @@ export function LiveBoard({
       stakes={page.kind === 'game' ? stakesOf(page.game) : []}
       narrow={layout === 'row'}
       display={display}
+      opensOnPick={opensOnPick}
       onPick={onPick}
     />
   )
@@ -287,10 +294,12 @@ function Tile({
   stakes,
   narrow,
   display,
+  opensOnPick,
   onPick,
 }: {
   page: Tiled
   here: boolean
+  opensOnPick: boolean
   stakes: Array<GameStake>
   /** In the one row: stakes as dots, not labels. */
   narrow: boolean
@@ -307,7 +316,15 @@ function Tile({
       type="button"
       onClick={() => onPick(page)}
       aria-current={here ? 'true' : undefined}
-      aria-label={`${label}. ${here ? `Open the ${openLabel(page).toLowerCase()}` : 'Show only this'}`}
+      aria-label={`${label}. ${
+        opensOnPick
+          ? here
+            ? 'Close it'
+            : 'Show it in full'
+          : here
+            ? `Open the ${openLabel(page).toLowerCase()}`
+            : 'Show only this'
+      }`}
       className={cn(
         'flex w-full flex-col gap-1.5 rounded-card border p-2.5 text-left tabular-nums transition-[transform,background-color] active:scale-[0.98]',
         // The chosen tile a shade deeper, as the cards are, not outlined.
@@ -537,7 +554,8 @@ export function NarrowedBar({
   onClear,
 }: {
   page: Tiled
-  onOpen: () => void
+  /** Open it in full; none when it's already open (the wide pane). */
+  onOpen?: () => void
   onClear: () => void
 }) {
   return (
@@ -550,13 +568,15 @@ export function NarrowedBar({
         <span className="text-muted">Showing </span>
         {pageName(page)}
       </span>
-      <button
-        type="button"
-        onClick={onOpen}
-        className="min-h-9 shrink-0 rounded-full px-2.5 text-2xs font-semibold text-accent"
-      >
-        {openLabel(page)} ›
-      </button>
+      {onOpen && (
+        <button
+          type="button"
+          onClick={onOpen}
+          className="min-h-9 shrink-0 rounded-full px-2.5 text-2xs font-semibold text-accent"
+        >
+          {openLabel(page)} ›
+        </button>
+      )}
       <button
         type="button"
         onClick={onClear}
@@ -606,7 +626,7 @@ export function TabHero({
         {kicker}
       </span>
       <span className="flex items-baseline gap-2 tabular-nums">
-        <span className="text-3xl leading-none font-bold tracking-tight">
+        <span className="text-3xl leading-none font-bold tracking-tight whitespace-nowrap">
           {figure}
         </span>
         {aside && (
