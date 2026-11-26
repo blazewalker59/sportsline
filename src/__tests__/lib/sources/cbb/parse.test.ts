@@ -29,6 +29,10 @@ describe('men’s college basketball (ESPN, the NBA’s shapes in halves)', () =
     const milestones = snapshot.items.flatMap((i) =>
       i.kind === 'milestone' ? [i] : [],
     )
+    // Tip-off opens the first half, not a first quarter.
+    expect(milestones.find((m) => m.milestone === 'start')?.segmentLabel).toBe(
+      'H1',
+    )
     const halftime = milestones.find((m) => m.key === 'end:1')
     expect(halftime?.description).toMatch(/^Halftime: /)
     expect(milestones.some((m) => m.milestone === 'final')).toBe(true)

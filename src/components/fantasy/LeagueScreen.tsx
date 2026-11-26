@@ -3,8 +3,9 @@
  * Overview (every Matchup this scoring period, the Viewer's first, each
  * opening in full, the league's Scoring leaders, and its Who Has?
  * switch) and its Standings,
- * kept with each sync, and its Players (who's available) and Activity,
- * read from its provider while that tab is open.
+ * kept with each sync, its Players (who's available) and Activity,
+ * read from its provider while that tab is open, and its History, its
+ * past seasons kept once read.
  */
 
 import { useQuery } from '@tanstack/react-query'
@@ -18,6 +19,7 @@ import { LeadersView } from './LeadersView'
 import { Picker, SectionHead } from './Picker'
 import { WhatIfTable } from './WhatIfTable'
 import { WhoHasSwitch } from './WhoHasSwitch'
+import { HistoryView } from './HistoryView'
 import { scoreText } from './format'
 import type { MoveIntent } from './MoveSheet'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
@@ -39,6 +41,7 @@ import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import {
   availablePlayersQuery,
   leagueActivityQuery,
+  leagueHistoryQuery,
   moveOptionsQuery,
   whatIfQuery,
 } from '@/lib/fantasy/queries'
@@ -52,13 +55,14 @@ import { useTimeZone } from '@/lib/time/useTimeZone'
 import { useViewer } from '@/lib/viewer/useViewer'
 import { cn } from '@/lib/utils'
 
-type Tab = 'overview' | 'standings' | 'players' | 'activity'
+type Tab = 'overview' | 'standings' | 'players' | 'activity' | 'history'
 
 const TABS: ReadonlyArray<{ key: Tab; label: string }> = [
   { key: 'overview', label: 'Overview' },
   { key: 'standings', label: 'Standings' },
   { key: 'players', label: 'Players' },
   { key: 'activity', label: 'Activity' },
+  { key: 'history', label: 'History' },
 ]
 
 export function LeagueScreen({ leagueId }: { leagueId: string }) {
@@ -156,6 +160,8 @@ export function LeagueScreen({ leagueId }: { leagueId: string }) {
             </>
           ) : tab === 'activity' ? (
             <ActivityTab league={league} />
+          ) : tab === 'history' ? (
+            <HistoryTab league={league} />
           ) : tab === 'players' ? (
             <PlayersTab league={league} />
           ) : (
@@ -427,6 +433,27 @@ function ActivityTab({ league }: { league: FantasyLeagueView }) {
       timeZone={timeZone}
     />
   )
+}
+
+/**
+ * The league's History: the first look reads every past season from the
+ * provider (a few seconds); later ones read only the season being played.
+ */
+function HistoryTab({ league }: { league: FantasyLeagueView }) {
+  const history = useQuery(leagueHistoryQuery(league.id))
+  if (history.isPending)
+    return <RowsSkeleton rows={5} label="Reading past seasons" />
+  if (history.isError && history.data === undefined)
+    return (
+      <InlineError
+        what="the league’s history"
+        error={history.error}
+        onRetry={() => history.refetch()}
+      />
+    )
+  if (!history.data)
+    return <p className="text-sm text-muted">League not found.</p>
+  return <HistoryView sport={league.sport} history={history.data} />
 }
 
 /**

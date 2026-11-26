@@ -10,6 +10,7 @@ import {
   getEspnConnection,
   getFantasy,
   getLeagueActivity,
+  getLeagueHistory,
   getLeagueMatchup,
   getMatchupDay,
   getMatchupRace,
@@ -144,6 +145,18 @@ export function whatIfQuery(leagueId: string) {
   return queryOptions({
     queryKey: ['what-if', leagueId] as const,
     queryFn: () => getWhatIf({ data: { leagueId } }),
+    staleTime: 30 * 60_000,
+  })
+}
+
+/**
+ * A league's History: past seasons are kept on the server, so a look
+ * after the first is cheap; the season being played refreshes hourly.
+ */
+export function leagueHistoryQuery(leagueId: string) {
+  return queryOptions({
+    queryKey: ['league-history', leagueId] as const,
+    queryFn: () => getLeagueHistory({ data: { leagueId } }),
     staleTime: 30 * 60_000,
   })
 }

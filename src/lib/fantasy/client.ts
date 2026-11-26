@@ -276,6 +276,40 @@ export function leagueViews(
 }
 
 /**
+ * One season of a league for its History (fantasy/history.ts): its
+ * teams and managers, every matchup's result with its playoff tier
+ * (mMatchupScore carries it; mMatchup doesn't), its settings and the
+ * seasons before it. ESPN keeps seasons before 2018 at leagueHistory,
+ * answered as a one-league array; each address is tried if the other
+ * refuses.
+ */
+export async function seasonLeague(
+  session: EspnSession | null,
+  sport: FantasySport,
+  season: number,
+  leagueId: string,
+): Promise<WireLeague> {
+  const views = 'view=mTeam&view=mMatchupScore&view=mSettings'
+  const current = `${leagueUrl(sport, season, leagueId)}?${views}`
+  const older = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/${SPORTS[sport].code}/leagueHistory/${encodeURIComponent(leagueId)}?seasonId=${season}&${views}`
+  const [first, second] =
+    season < HISTORY_ADDRESS_FROM ? [older, current] : [current, older]
+  const one = (res: WireLeague | Array<WireLeague>) =>
+    (Array.isArray(res) ? res[0] : res) ?? {}
+  try {
+    return one(await get<WireLeague | Array<WireLeague>>(first, session))
+  } catch (error) {
+    if (!(error instanceof EspnError && [401, 404].includes(error.status))) {
+      throw error
+    }
+    return one(await get<WireLeague | Array<WireLeague>>(second, session))
+  }
+}
+
+/** The first season ESPN serves at its current league address. */
+export const HISTORY_ADDRESS_FROM = 2018
+
+/**
  * A league's teams, rosters and settings (waiver budgets) as they are now:
  * the check before a move, lighter than the whole of leagueViews.
  */

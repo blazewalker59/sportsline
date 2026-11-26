@@ -79,11 +79,21 @@ interface WireSide {
 export interface WireLeague {
   id?: number
   scoringPeriodId?: number
+  seasonId?: number
   status?: {
     currentMatchupPeriod?: number
     latestScoringPeriod?: number
     finalScoringPeriod?: number
+    /** The league's earlier seasons on ESPN (fantasy/history.ts). */
+    previousSeasons?: Array<number>
   }
+  /** The league's managers: `id` is their braced SWID, as `owners` lists. */
+  members?: Array<{
+    id: string
+    displayName?: string
+    firstName?: string
+    lastName?: string
+  }>
   settings?: {
     name?: string
     /**
@@ -94,6 +104,8 @@ export interface WireLeague {
     scheduleSettings?: {
       matchupPeriods?: Record<string, Array<number>>
       playoffTeamCount?: number
+      /** Regular-season matchup periods. */
+      matchupPeriodCount?: number
     }
     /** How many of each lineup slot the league starts, by slot id. */
     rosterSettings?: { lineupSlotCounts?: Record<string, number> }
@@ -143,6 +155,12 @@ export interface WireLeague {
     home?: WireSide
     away?: WireSide
     winner?: string
+    /**
+     * With mMatchupScore: NONE (regular season), WINNERS_BRACKET, or a
+     * consolation ladder (WINNERS_CONSOLATION_LADDER for places among the
+     * playoff teams, LOSERS_CONSOLATION_LADDER for the rest).
+     */
+    playoffTierType?: string
   }>
 }
 

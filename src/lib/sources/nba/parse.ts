@@ -224,7 +224,7 @@ export function parseGame(
         plays,
         startsAt: competition.date,
         score: finalScore,
-        start: { segmentLabel: 'Q1', verb: 'Tip-off' },
+        start: { segmentLabel: format.label(1), verb: 'Tip-off' },
         finalLabel: sawGameEnd ? null : 'Final',
       },
     ),
