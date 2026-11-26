@@ -30,6 +30,7 @@ import {
 } from './sleeper/sync'
 import { WHO_HAS_FOR_MS } from './whoHas'
 import { readWhatIf } from './whatIfRead'
+import { readHistory } from './historyRead'
 import { currentLeaders } from './leaders'
 import { moveOptions, sendMove } from './rosterMoves'
 import type { MatchupDay, MatchupView } from './matchup'
@@ -40,6 +41,7 @@ import type { AvailablePlayers } from './freeAgents'
 import type { FantasyMove } from './moves'
 import type { MoveOptions } from './rosterMoves'
 import type { LeagueWhatIf } from './whatIfRead'
+import type { LeagueHistory } from './history'
 import type { ScoringLeaders } from './leaders'
 import type { Standings } from './standings'
 import type { WhoHasOption, WhoHasPlayer } from './whoHas'
@@ -956,6 +958,47 @@ export const getWhatIf = createServerFn({ method: 'GET' })
         })
         const provider = row.provider === 'sleeper' ? 'Sleeper' : 'ESPN'
         throw new UserError(`Couldn’t read past weeks from ${provider}.`)
+      }
+    },
+  )
+
+/**
+ * A league's History: every season its provider keeps, those complete
+ * read once and kept, the one being played at most hourly.
+ */
+export const getLeagueHistory = createServerFn({ method: 'GET' })
+  .middleware([viewerMiddleware])
+  .validator((data: { leagueId: string }) =>
+    z.object({ leagueId: z.string().max(300) }).parse(data),
+  )
+  .handler(
+    async ({
+      data,
+      context: { db, viewerId },
+    }): Promise<LeagueHistory | null> => {
+      const env = getCloudflareEnv()
+      const row = await db
+        .select()
+        .from(fantasyLeagues)
+        .where(
+          and(
+            eq(fantasyLeagues.id, data.leagueId),
+            eq(fantasyLeagues.viewerId, viewerId),
+          ),
+        )
+        .get()
+      if (!row) return null
+      try {
+        return await readHistory(env, viewerId, row)
+      } catch (error) {
+        await reportError(env, row.provider, error, {
+          viewerId,
+          step: 'league-history',
+        })
+        const provider = row.provider === 'sleeper' ? 'Sleeper' : 'ESPN'
+        throw new UserError(
+          `Couldn’t read the league’s history from ${provider}.`,
+        )
       }
     },
   )

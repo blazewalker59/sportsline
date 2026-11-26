@@ -8,7 +8,10 @@ import { UserError } from '@/lib/userError'
 
 // Server functions are Start RPC stubs a test can't serve, so the module
 // is replaced: each fn answers like the server would.
-const server = vi.hoisted(() => ({ getFantasyLeague: vi.fn() }))
+const server = vi.hoisted(() => ({
+  getFantasyLeague: vi.fn(),
+  getLeagueHistory: vi.fn(),
+}))
 vi.mock('@/lib/fantasy/server', () => server)
 vi.mock('@/lib/ops/useClientErrors', () => ({ sendClientError: vi.fn() }))
 vi.mock('@/components/layout/AppHeader', () => ({
@@ -46,5 +49,49 @@ describe('LeagueScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
     expect(await screen.findByText('No such fantasy league')).toBeTruthy()
     expect(server.getFantasyLeague).toHaveBeenCalledTimes(2)
+  })
+
+  it('reads the league’s History only when its tab is opened', async () => {
+    server.getFantasyLeague.mockResolvedValue({
+      league: {
+        id: 'lg1',
+        sport: 'football',
+        provider: 'espn',
+        name: 'Dynasty',
+        teamName: 'Aces',
+        enabled: true,
+        whoHasEnabled: false,
+        lastError: null,
+        updatedAt: '2026-11-01T00:00:00Z',
+        matchup: null,
+      },
+      standings: null,
+      leaders: null,
+    })
+    server.getLeagueHistory.mockResolvedValue({
+      seasons: [2025],
+      champions: [
+        {
+          season: 2025,
+          complete: true,
+          champion: { team: 'Aces', manager: 'Ann' },
+          runnerUp: null,
+          mine: true,
+        },
+      ],
+      managers: [],
+      rivals: [],
+      records: null,
+      missing: [],
+    })
+    show()
+    const tab = await screen.findByRole('tab', { name: 'History' })
+    expect(server.getLeagueHistory).not.toHaveBeenCalled()
+    fireEvent.click(tab)
+    expect(await screen.findByText('Champions')).toBeTruthy()
+    expect(screen.getByText('Ann')).toBeTruthy()
+    expect(server.getLeagueHistory).toHaveBeenCalledWith({
+      data: { leagueId: 'lg1' },
+    })
   })
 })

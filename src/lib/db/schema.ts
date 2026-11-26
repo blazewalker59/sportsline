@@ -21,6 +21,7 @@ import type { FantasySport } from '@/lib/fantasy/sports'
 import type { MatchupView } from '@/lib/fantasy/matchup'
 import type { ScoringLeaders } from '@/lib/fantasy/leaders'
 import type { WhatIfMatchup } from '@/lib/fantasy/whatIf'
+import type { HistorySeason } from '@/lib/fantasy/history'
 import type { Standings } from '@/lib/fantasy/standings'
 import type { MoveKind, MovePlayer, MoveStatus } from '@/lib/fantasy/moves'
 import type {
@@ -617,6 +618,25 @@ export const fantasyWhatIf = sqliteTable(
   (table) => [
     primaryKey({ columns: [table.leagueRowId, table.season, table.week] }),
   ],
+)
+
+/**
+ * A season of a Viewer's league, for its History (fantasy/history.ts):
+ * read once it's complete and never again; the season being played is
+ * read again once it's an hour old.
+ */
+export const fantasyHistory = sqliteTable(
+  'fantasy_history',
+  {
+    leagueRowId: text('league_row_id')
+      .notNull()
+      .references(() => fantasyLeagues.id, { onDelete: 'cascade' }),
+    season: integer('season').notNull(),
+    data: text('data', { mode: 'json' }).$type<HistorySeason>().notNull(),
+    complete: integer('complete', { mode: 'boolean' }).notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.leagueRowId, table.season] })],
 )
 
 /**

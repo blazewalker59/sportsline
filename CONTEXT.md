@@ -207,6 +207,10 @@ _Avoid_: scoreboard, other games
 Every Fantasy team in a Viewer’s Fantasy league first to last: its record, Fantasy points for and against (points leagues only) and streak, with how many make the playoffs. Kept with each sync, read from the same league data as the Matchup; ESPN’s own order, Sleeper’s placed by record, then points for. Shown on the league’s page.
 _Avoid_: table, rankings
 
+**League history**:
+A Viewer’s Fantasy league across every season its provider keeps: who won each season (from the playoff bracket’s final), each manager’s all-time record (regular season, playoff appearances and record, titles and lost finals), the Viewer’s head-to-head against every manager they’ve played, and in points seasons the league’s records (highest and lowest score, biggest and closest win). Managers, not teams, carry it across seasons, and co-managers each share their team’s results; consolation games count toward none of it. The seasons are the ones the provider names (ESPN lists a league’s earlier seasons; Sleeper links each season’s league to the one before). A complete season is read once and kept, the one being played at most hourly. Shown on the league’s page.
+_Avoid_: archive, past seasons (say League history)
+
 **Scoring leaders**:
 A Viewer’s Fantasy league’s best this scoring period, read with each sync from every team’s Lineup: in a points league its top Players by Fantasy points, overall or at each position (a bench Player counts, marked), and every team’s score this Matchup; in a category league each Category’s top ten, today or over the whole Matchup, and on ESPN every Fantasy team ranked in it by its own total: a rate (FG%, ERA) ranks only Players with the volume behind it, lowest first where lower wins, and a count where lower wins (turnovers) ranks most first, as who’s costing their side. Shown on the league’s page.
 _Avoid_: leaderboard, top performers

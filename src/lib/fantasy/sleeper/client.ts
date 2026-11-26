@@ -42,7 +42,31 @@ export interface SleeperLeague {
   sport?: string
   roster_positions?: Array<string>
   scoring_settings?: Record<string, number>
-  settings?: { playoff_teams?: number } | null
+  settings?: {
+    playoff_teams?: number
+    /** The first playoff week (0 or absent: no playoffs). */
+    playoff_week_start?: number
+    /** The last week with scores. */
+    last_scored_leg?: number
+  } | null
+  /** Last season's league: Sleeper makes a new one each season. */
+  previous_league_id?: string | null
+}
+
+/**
+ * A game in a league's playoff bracket: round `r`, game `m`, between
+ * rosters `t1` and `t2` (null until known), won by `w`. `p` is the place
+ * it decides: 1 the final, 3 third place, and so on; none for a round
+ * that only advances.
+ */
+export interface SleeperBracketGame {
+  r: number
+  m: number
+  t1?: number | null
+  t2?: number | null
+  w?: number | null
+  l?: number | null
+  p?: number | null
 }
 
 export interface SleeperRoster {
@@ -130,6 +154,11 @@ export const rosters = (id: string) =>
   get<Array<SleeperRoster>>(`${API}/league/${encodeURIComponent(id)}/rosters`)
 export const leagueUsers = (id: string) =>
   get<Array<SleeperUser>>(`${API}/league/${encodeURIComponent(id)}/users`)
+/** A league's playoff bracket: its winners' side. */
+export const winnersBracket = (id: string) =>
+  get<Array<SleeperBracketGame>>(
+    `${API}/league/${encodeURIComponent(id)}/winners_bracket`,
+  )
 export const matchups = (id: string, week: number) =>
   get<Array<SleeperMatchup>>(
     `${API}/league/${encodeURIComponent(id)}/matchups/${week}`,
