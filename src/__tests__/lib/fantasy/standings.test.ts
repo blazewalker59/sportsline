@@ -56,6 +56,24 @@ describe('readStandings', () => {
     expect(s.rows[1]).toMatchObject({ teamId: 2, streak: 'L1', mine: true })
   })
 
+  it('reads a most-categories league without points too', () => {
+    const league = basketball as unknown as WireLeague
+    const s = readStandings(
+      {
+        ...league,
+        settings: {
+          ...league.settings,
+          scoringSettings: {
+            ...league.settings?.scoringSettings,
+            scoringType: 'H2H_MOST_CATEGORIES',
+          },
+        },
+      },
+      2,
+    )!
+    expect(s.rows.every((r) => r.pointsFor === null)).toBe(true)
+  })
+
   it('places a points league by its seed before any game is played', () => {
     const s = readStandings(football as unknown as WireLeague, 6)!
     expect(s.rows.map((r) => [r.abbrev, r.rank])).toEqual([

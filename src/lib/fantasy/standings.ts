@@ -69,7 +69,8 @@ export function readStandings(
 ): Standings | null {
   const teams = league.teams ?? []
   if (teams.length === 0) return null
-  const points = !/CATEGORY|ROTO/.test(
+  // H2H_CATEGORY, H2H_MOST_CATEGORIES, ROTO…
+  const points = !/CATEGOR|ROTO/.test(
     league.settings?.scoringSettings?.scoringType ?? '',
   )
   const rows = teams.map((t) => {
