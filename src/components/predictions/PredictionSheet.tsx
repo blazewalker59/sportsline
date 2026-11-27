@@ -263,6 +263,7 @@ export function PredictionDetail({
             </span>
           )}
         </header>
+        <KalshiActions prediction={p} />
         <OddsChart predictionId={p.id} />
         <dl className="grid grid-cols-3 gap-2 rounded-card bg-surface p-4 text-3xs text-muted uppercase">
           <div>
@@ -330,7 +331,6 @@ export function PredictionDetail({
           </ul>
         </section>
         <PredictionGames prediction={p} onNavigate={onNavigate} />
-        <KalshiActions prediction={p} />
         <p className="text-2xs text-muted">
           Read from your Kalshi account. Odds are Kalshi’s market prices.
         </p>
