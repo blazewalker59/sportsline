@@ -132,6 +132,27 @@ interface Box<TPlayer> {
     homeTotals: Array<number>
   }
   tables: Array<BoxTable<TPlayer>>
+  /**
+   * The teams' totals side by side (Total yards, Rebounds, Hits), as the
+   * Source counts them. Absent from boxes stored before the Source gave
+   * them; lib/games/teamStats derives what it can from the tables then.
+   */
+  teamStats?: Array<TeamStat>
+}
+
+/** One team total for both sides, as shown ("9-18", "31:20", "463"). */
+export interface TeamStat {
+  label: string
+  away: string
+  home: string
+  /**
+   * How the two compare: as numbers (the default), as made of attempted
+   * ("9-18" → 50%), by the first figure ("8-78" penalties → 8), or as a
+   * clock ("31:20" possession).
+   */
+  compare?: 'rate' | 'first' | 'clock'
+  /** Fewer is better (turnovers, penalties). */
+  lower?: boolean
 }
 
 interface BoxTable<TPlayer> {

@@ -36,6 +36,7 @@ import type {
   SourcePlay,
   SourceRoster,
   SourceTeam,
+  TeamStat,
 } from '@/lib/model/types'
 
 const PLAY_TYPES = new Set([
@@ -550,7 +551,56 @@ function boxscore(
       ],
     },
     tables,
+    teamStats: nhlTeamStats(box),
   }
+}
+
+type NhlLine = NonNullable<
+  NonNullable<NhlBoxscore['playerByGameStats']>['awayTeam']
+>
+/** NHL's team totals, summed from its skaters (and goalies' saves). */
+const NHL_TEAM_STATS: Array<
+  [
+    label: string,
+    key:
+      | 'sog'
+      | 'hits'
+      | 'blockedShots'
+      | 'powerPlayGoals'
+      | 'pim'
+      | 'giveaways'
+      | 'takeaways'
+      | 'saves',
+    lower?: boolean,
+  ]
+> = [
+  ['Shots on goal', 'sog'],
+  ['Power-play goals', 'powerPlayGoals'],
+  ['Saves', 'saves'],
+  ['Hits', 'hits'],
+  ['Blocked shots', 'blockedShots'],
+  ['Takeaways', 'takeaways'],
+  ['Giveaways', 'giveaways', true],
+  ['Penalty minutes', 'pim', true],
+]
+
+function nhlTeamStats(box: NhlBoxscore | null): Array<TeamStat> | undefined {
+  const away = box?.playerByGameStats?.awayTeam
+  const home = box?.playerByGameStats?.homeTeam
+  if (!away || !home) return undefined
+  const total = (t: NhlLine, key: (typeof NHL_TEAM_STATS)[number][1]) =>
+    key === 'saves'
+      ? (t.goalies ?? []).reduce((n, g) => n + (g.saves ?? 0), 0)
+      : [...(t.forwards ?? []), ...(t.defense ?? [])].reduce(
+          (n, s) => n + (s[key] ?? 0),
+          0,
+        )
+  return NHL_TEAM_STATS.map(([label, key, lower]) => ({
+    label,
+    away: String(total(away, key)),
+    home: String(total(home, key)),
+    ...(lower ? { lower } : {}),
+  }))
 }
 
 function periodIndex(segmentLabel: string): number {

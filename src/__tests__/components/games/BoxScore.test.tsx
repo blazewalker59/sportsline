@@ -58,38 +58,72 @@ const FULL = box([
 
 afterEach(cleanup)
 
+const TOTALS: GameBox['teamStats'] = [
+  { label: 'Total yards', away: '378', home: '345' },
+  { label: 'Turnovers', away: '2', home: '0', lower: true },
+  { label: 'Possession', away: '31:20', home: '28:40', compare: 'clock' },
+]
+
 describe('BoxScore', () => {
-  it('shows one team’s one table, in one card', () => {
+  it('starts on the teams’ totals, each leaning to whoever is ahead', () => {
+    const { getAllByRole, getByRole, container } = render(
+      <BoxScore box={{ ...FULL, teamStats: TOTALS }} game={game} />,
+    )
+    expect(getAllByRole('tab').map((t) => t.textContent)).toEqual([
+      'KC',
+      'Team stats',
+      'LV',
+    ])
+    expect(
+      getByRole('tab', { name: 'Team stats' }).getAttribute('aria-selected'),
+    ).toBe('true')
+    const rows = [...getByRole('list', { name: 'Team stats' }).children]
+    expect(rows.map((r) => r.textContent)).toEqual([
+      'KC 378Total yardsLV 345',
+      'KC 2Turnovers (fewer is better)LV 0',
+      'KC 31:20PossessionLV 28:40',
+    ])
+    const leans = [...container.querySelectorAll('[data-lean]')].map((m) =>
+      Number(m.getAttribute('data-lean')),
+    )
+    // KC by yards and the clock; LV by turnovers, all the way.
+    expect(leans[0]).toBeGreaterThan(0)
+    expect(leans[1]).toBe(-1)
+    expect(leans[2]).toBeGreaterThan(0)
+    expect(container.textContent).not.toContain('Added up')
+  })
+
+  it('adds up the players’ lines for a box without the totals', () => {
+    const { getByRole, container } = render(<BoxScore box={FULL} game={game} />)
+    const rows = [...getByRole('list', { name: 'Team stats' }).children]
+    expect(rows.map((r) => r.textContent)).toEqual([
+      'KC 24/33Passing C/ATTLV 21/30',
+      'KC 291Passing YDSLV 244',
+      'KC 18Rushing CARLV 20',
+      'KC 87Rushing YDSLV 101',
+    ])
+    expect(container.textContent).toContain('Added up from the players’ lines.')
+  })
+
+  it('shows a team’s every table, a section each, in one view', () => {
     const { getByRole, getAllByRole, container } = render(
       <BoxScore box={FULL} game={game} />,
     )
-    const tabs = getAllByRole('tab')
-    expect(tabs.map((t) => t.textContent)).toEqual(['KC', 'LV'])
-    expect(getByRole('tab', { name: 'KC' }).getAttribute('aria-selected')).toBe(
-      'true',
-    )
-    // A chip per table, named for what it counts.
+    fireEvent.click(getByRole('tab', { name: 'KC' }))
     expect(
-      [...container.querySelectorAll('[aria-pressed]')].map(
-        (c) => c.textContent,
-      ),
+      getAllByRole('heading', { level: 3 }).map((h) => h.textContent),
     ).toEqual(['Passing', 'Rushing'])
-    expect(container.querySelectorAll('table')).toHaveLength(1)
+    expect(container.querySelectorAll('table')).toHaveLength(2)
     expect(container.textContent).toContain('Patrick Mahomes')
-    expect(container.textContent).not.toContain('Geno Smith')
-    expect(container.textContent).not.toContain('Isiah Pacheco')
-  })
-
-  it('switches tables by chip, and keeps the table across teams', () => {
-    const { getByRole, container } = render(<BoxScore box={FULL} game={game} />)
-    fireEvent.click(getByRole('button', { name: 'Rushing' }))
     expect(container.textContent).toContain('Isiah Pacheco')
+    expect(container.textContent).not.toContain('Geno Smith')
+    // No chips: the team is the only filter.
+    expect(container.querySelectorAll('[aria-pressed]')).toHaveLength(0)
 
     fireEvent.click(getByRole('tab', { name: 'LV' }))
+    expect(container.textContent).toContain('Geno Smith')
     expect(container.textContent).toContain('Ashton Jeanty')
-    expect(
-      getByRole('button', { name: 'Rushing' }).getAttribute('aria-pressed'),
-    ).toBe('true')
+    expect(container.textContent).not.toContain('Patrick Mahomes')
   })
 
   it('wears the chosen team: the home team’s color on its tab', () => {
@@ -101,8 +135,8 @@ describe('BoxScore', () => {
     expect(card.className).toContain('subject-b')
   })
 
-  it('has no chips for a lone table, and says when a team has none', () => {
-    const { getByRole, container } = render(
+  it('has no Team stats with one team’s tables, and says when a team has none', () => {
+    const { getByRole, queryByRole, container } = render(
       <BoxScore
         box={box([
           {
@@ -115,7 +149,10 @@ describe('BoxScore', () => {
         game={game}
       />,
     )
-    expect(container.querySelectorAll('[aria-pressed]')).toHaveLength(0)
+    expect(queryByRole('tab', { name: 'Team stats' })).toBeNull()
+    expect(getByRole('tab', { name: 'KC' }).getAttribute('aria-selected')).toBe(
+      'true',
+    )
     fireEvent.click(getByRole('tab', { name: 'LV' }))
     expect(container.textContent).toContain('No stats for LV yet.')
   })

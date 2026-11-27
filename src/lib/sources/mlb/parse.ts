@@ -41,6 +41,7 @@ import type {
   SourcePlay,
   SourceRoster,
   SourceTeam,
+  TeamStat,
 } from '@/lib/model/types'
 
 /** In-PA actions that become their own Play; everything else is noise. */
@@ -700,7 +701,47 @@ function box(
       homeTotals: totals('home'),
     },
     tables,
+    teamStats: mlbTeamStats(teams?.away, teams?.home),
   }
+}
+
+type MlbTotals = NonNullable<MlbBoxTeam['teamStats']>
+/** MLB's team totals to compare: where to read each, and which way is better. */
+const MLB_TEAM_STATS: Array<
+  [label: string, read: (t: MlbTotals) => number | undefined, lower?: boolean]
+> = [
+  ['Hits', (t) => t.batting?.hits],
+  ['Doubles', (t) => t.batting?.doubles],
+  ['Home runs', (t) => t.batting?.homeRuns],
+  ['Walks', (t) => t.batting?.baseOnBalls],
+  ['Struck out', (t) => t.batting?.strikeOuts, true],
+  ['Left on base', (t) => t.batting?.leftOnBase, true],
+  ['Stolen bases', (t) => t.batting?.stolenBases],
+  ['Strikeouts pitched', (t) => t.pitching?.strikeOuts],
+  ['Pitches', (t) => t.pitching?.numberOfPitches, true],
+  ['Errors', (t) => t.fielding?.errors, true],
+]
+
+function mlbTeamStats(
+  away: MlbBoxTeam | undefined,
+  home: MlbBoxTeam | undefined,
+): Array<TeamStat> | undefined {
+  const a = away?.teamStats
+  const h = home?.teamStats
+  if (!a || !h) return undefined
+  const stats: Array<TeamStat> = []
+  for (const [label, read, lower] of MLB_TEAM_STATS) {
+    const av = read(a)
+    const hv = read(h)
+    if (av == null || hv == null) continue
+    stats.push({
+      label,
+      away: String(av),
+      home: String(hv),
+      ...(lower ? { lower } : {}),
+    })
+  }
+  return stats.length > 0 ? stats : undefined
 }
 
 const HITTING: Array<[string, string]> = [

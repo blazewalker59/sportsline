@@ -16,49 +16,9 @@ import type { CategoryResult } from '@/lib/fantasy/categories'
 import type { MatchupView } from '@/lib/fantasy/matchup'
 import { CHART_COLORS, ChartCard } from '@/components/charts/ChartCard'
 import { categoryLean } from '@/lib/fantasy/categories'
+import { LeanMeter } from '@/components/charts/LeanMeter'
 import { SectionLabel } from '@/components/signal/Section'
 import { cn } from '@/lib/utils'
-
-/** Segments each side of a category's lean meter. */
-const SEGMENTS = 10
-
-/**
- * A category's lean as a segmented meter from the middle: unlit wells,
- * filled outward toward whoever leads, in their manager's color.
- */
-function LeanMeter({ lean }: { lean: number }) {
-  const filled = Math.round(Math.min(1, Math.abs(lean)) * SEGMENTS)
-  const half = (side: 'mine' | 'opponent') => {
-    const on = lean > 0 === (side === 'mine') && lean !== 0
-    const color = side === 'mine' ? CHART_COLORS.mine : CHART_COLORS.opponent
-    return Array.from({ length: SEGMENTS }, (_, i) => {
-      // Counted from the middle out.
-      const out = side === 'mine' ? SEGMENTS - 1 - i : i
-      const lit = on && out < filled
-      return (
-        <span
-          key={`${side}${i}`}
-          className="meter-seg h-1.5"
-          style={lit ? { background: color, boxShadow: 'none' } : undefined}
-        />
-      )
-    })
-  }
-  return (
-    <span
-      aria-hidden="true"
-      data-lean={lean}
-      className="grid w-full items-center gap-[3px]"
-      style={{
-        gridTemplateColumns: `repeat(${SEGMENTS}, minmax(0, 1fr)) 1px repeat(${SEGMENTS}, minmax(0, 1fr))`,
-      }}
-    >
-      {half('mine')}
-      <span className="h-2.5 w-px bg-border" />
-      {half('opponent')}
-    </span>
-  )
-}
 
 /** The day the toggle can show: its name, and its categories once read. */
 export interface CategoryDay {
@@ -174,7 +134,11 @@ export function CategoryBars({
                     {figure('opponent')}
                   </span>
                 </span>
-                <LeanMeter lean={lean} />
+                <LeanMeter
+                  lean={lean}
+                  left={CHART_COLORS.mine}
+                  right={CHART_COLORS.opponent}
+                />
               </li>
             )
           })}

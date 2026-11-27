@@ -44,6 +44,11 @@ export interface NflSummary {
       team: { id: string; abbreviation?: string }
       statistics?: Array<EspnBoxStatistics>
     }>
+    /** Each team's totals (`totalYards`, `thirdDownEff`…). */
+    teams?: Array<{
+      team: { id: string }
+      statistics?: Array<{ name: string; displayValue?: string }>
+    }>
   }
 }
 
