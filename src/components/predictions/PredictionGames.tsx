@@ -18,6 +18,7 @@ import { Skeleton, SkeletonStatus } from '@/components/layout/Skeleton'
 import { useLiveGame } from '@/lib/games/useLiveGame'
 import { typingFor } from '@/lib/timeline/chat'
 import { gameSearch } from '@/lib/timeline/gameLink'
+import { SectionLabel } from '@/components/signal/Section'
 import { cn } from '@/lib/utils'
 import { PlayerButton } from '@/components/players/playerSheet'
 import { weekdayTime } from '@/lib/time/format'
@@ -56,23 +57,21 @@ export function PredictionGames({
   if (games.length === 0) return null
   return (
     <section>
-      <h3 className="subject-ink mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-        {games.length === 1 ? 'The game' : `${games.length} games`}
-      </h3>
+      <SectionLabel
+        as="h3"
+        title={games.length === 1 ? 'The game' : `${games.length} games`}
+      />
       <ul className="flex flex-col gap-2">
         {games.map((g) => {
           const expanded = g.id === open
           const live = g.status === 'live' || g.status === 'delayed'
           return (
-            <li
-              key={g.id}
-              className="overflow-hidden rounded-card border border-border bg-surface"
-            >
+            <li key={g.id} className="overflow-hidden rounded-card bg-surface">
               <button
                 type="button"
                 onClick={() => setOpen(expanded ? null : g.id)}
                 aria-expanded={expanded}
-                className="flex w-full items-center gap-2 px-3 py-2.5 text-left"
+                className="flex w-full items-center gap-2 px-4 py-3 text-left"
               >
                 <LeagueLogo league={g.league} size={16} />
                 <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-semibold tabular-nums">
@@ -86,10 +85,13 @@ export function PredictionGames({
                 </span>
                 <span
                   className={cn(
-                    'text-xs font-semibold',
-                    live ? 'text-live' : 'text-muted',
+                    'flex items-center gap-1.5 text-3xs uppercase',
+                    live ? 'font-bold text-live' : 'text-muted',
                   )}
                 >
+                  {live && (
+                    <span className="led led-pulse" aria-hidden="true" />
+                  )}
                   {statusLabel(g, timeZone)}
                 </span>
                 <span
@@ -168,7 +170,7 @@ function GamePanel({
     return (
       <SkeletonStatus
         label="Loading the game"
-        className="flex flex-col gap-3 border-t border-border px-3 py-3"
+        className="flex flex-col gap-3 border-t border-border px-4 py-3"
       >
         <Skeleton className="h-4 w-2/5" />
         <Skeleton className="h-14 w-full" />
@@ -186,14 +188,14 @@ function GamePanel({
     ...new Set(legs.flatMap((l) => (l.playerId ? [l.playerId] : []))),
   ].flatMap((id) => playerLines(data.box, id))
   return (
-    <div className="flex flex-col gap-3 border-t border-border px-3 py-3">
+    <div className="flex flex-col gap-3 border-t border-border px-4 py-3">
       {situation && (
         <p className="text-sm font-semibold text-live">{situation}</p>
       )}
       {data.box && <Linescore box={data.box} game={data.game} />}
       {players.length > 0 && (
         <div>
-          <h4 className="subject-ink mb-1 text-2xs font-bold tracking-wide text-muted uppercase">
+          <h4 className="subject-ink mb-1 text-3xs font-bold text-muted uppercase">
             Your players
           </h4>
           <ul className="flex flex-col gap-1 text-xs">
@@ -210,13 +212,13 @@ function GamePanel({
       )}
       {plays.length > 0 && (
         <div>
-          <h4 className="subject-ink mb-1 text-2xs font-bold tracking-wide text-muted uppercase">
+          <h4 className="subject-ink mb-1 text-3xs font-bold text-muted uppercase">
             Latest
           </h4>
           <ul className="flex flex-col gap-1.5">
             {plays.map((item) => (
               <li key={item.id} className="text-[13px] leading-snug">
-                <span className="mr-1.5 text-2xs font-semibold text-muted tabular-nums">
+                <span className="mr-1.5 font-label text-3xs text-muted tabular-nums">
                   {item.segmentLabel}
                 </span>
                 <PlayText item={item} />
@@ -229,7 +231,7 @@ function GamePanel({
         to="/"
         search={gameSearch(data.game.id, data.game.sportsDay)}
         onClick={onNavigate}
-        className="self-start text-sm font-semibold text-accent"
+        className="key inline-flex h-9 items-center self-start rounded-control px-3 text-3xs font-bold uppercase"
       >
         Open the game thread ›
       </Link>

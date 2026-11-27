@@ -76,4 +76,52 @@ describe('AgentsScreen', () => {
     expect(await screen.findByText('Grok')).toBeTruthy()
     expect(server.getApiTokens).toHaveBeenCalledTimes(2)
   })
+
+  it('a proposal shows its window as a dial, Reject beside an inked Approve', async () => {
+    const now = Date.now()
+    server.getTrading.mockResolvedValue({
+      key: null,
+      spentToday: 0,
+      trades: [
+        {
+          id: 'tp1',
+          viewerId: 'v1',
+          tokenId: 't1',
+          agentName: 'Claude',
+          marketTicker: 'KXNFL-KC',
+          marketTitle: 'Chiefs to win',
+          side: 'yes',
+          action: 'buy',
+          count: 40,
+          limitCents: 66,
+          maxCostDollars: 26.4,
+          note: null,
+          status: 'pending',
+          createdAt: new Date(now - 3 * 60_000).toISOString(),
+          expiresAt: new Date(now + 7 * 60_000).toISOString(),
+          decidedAt: null,
+          approvedDay: null,
+          orderId: null,
+          filledCount: null,
+          avgPriceDollars: null,
+          feesDollars: null,
+          error: null,
+        },
+      ],
+    } satisfies TradingState)
+    renderScreen(AgentsScreen)
+    const dial = await screen.findByRole('img', { name: /min left to decide/ })
+    // 30 segments, the time left lit, the last lit one orange.
+    const segments = dial.querySelectorAll('rect')
+    expect(segments.length).toBe(30)
+    expect(dial.querySelectorAll('rect.fill-signal').length).toBe(1)
+    expect(
+      dial.querySelectorAll('rect.fill-foreground').length,
+    ).toBeGreaterThan(15)
+    const approve = screen.getByRole('button', { name: 'Approve' })
+    expect(approve.className).toContain('key-ink')
+    expect(
+      screen.getByRole('button', { name: 'Reject' }).className,
+    ).not.toContain('key-ink')
+  })
 })

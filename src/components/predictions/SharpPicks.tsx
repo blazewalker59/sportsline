@@ -23,6 +23,7 @@ import { usePriceDisplay } from '@/lib/viewer/useViewer'
 import { useStoredValue } from '@/lib/useStoredValue'
 import { StatGrid, StatTile } from '@/components/layout/StatTile'
 import { InlineError } from '@/components/layout/RouteStates'
+import { SectionLabel } from '@/components/signal/Section'
 import { cn } from '@/lib/utils'
 import { clockTime, shortDay } from '@/lib/time/format'
 import { useTimeZone } from '@/lib/time/useTimeZone'
@@ -42,14 +43,20 @@ const SOURCE_NAMES: Record<string, string> = {
 
 const KIND_NAMES = { moneyline: 'Winner', spread: 'Spread', total: 'Total' }
 
+/** Grades as key caps: Strong is the inked one, Thin reads faint. */
 const GRADES = {
-  strong: {
-    label: 'Strong',
-    className: 'bg-positive/15 text-positive',
-  },
-  edge: { label: 'Edge', className: 'bg-accent/15 text-accent' },
-  thin: { label: 'Thin', className: 'bg-notice text-muted' },
+  strong: { label: 'Strong', className: 'key-ink' },
+  edge: { label: 'Edge', className: '' },
+  thin: { label: 'Thin', className: 'text-muted' },
 } as const
+
+/** A key cap that is a label, not a control (a grade). */
+const CAP =
+  'key inline-flex shrink-0 items-center rounded-[7px] px-1.5 font-bold uppercase tabular-nums'
+
+/** A key (Signal): a raised cap, its label in the manual's face. */
+const KEY =
+  'key inline-flex items-center justify-center rounded-control px-3 text-3xs font-bold uppercase'
 
 const DISMISSED_KEY = 'sportsline:sharp-banner-dismissed'
 
@@ -68,7 +75,7 @@ export function SharpPicksBanner() {
   const summary = slateSummary(data.picks)
   const dismiss = () => setDismissed(data.day)
   return (
-    <section className="overflow-hidden rounded-card border border-accent/40 bg-surface">
+    <section className="overflow-hidden rounded-card bg-surface">
       <div className="flex items-center">
         <button
           type="button"
@@ -76,7 +83,7 @@ export function SharpPicksBanner() {
           aria-expanded={open}
           className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left"
         >
-          <span className="size-2 shrink-0 rounded-full bg-accent" />
+          <span className="led led-ink" aria-hidden="true" />
           <span className="min-w-0 flex-1">
             <span className="block text-[13px] font-bold">
               Sharp picks available
@@ -113,7 +120,7 @@ export function SharpPicksBanner() {
           <SharpPicksList picks={data.picks} flush />
           <Link
             to="/predictions"
-            className="block border-t border-border px-3 py-2 text-center text-xs font-semibold text-accent"
+            className="block border-t border-border px-3 py-2.5 text-center text-3xs font-bold uppercase underline underline-offset-2"
           >
             Record and how picks work ›
           </Link>
@@ -138,8 +145,7 @@ function SharpPicksList({
     <ol
       className={cn(
         'divide-y divide-border',
-        !flush &&
-          'overflow-hidden rounded-card border border-border bg-surface',
+        !flush && 'overflow-hidden rounded-card bg-surface',
       )}
     >
       {singles.map((p) => (
@@ -163,24 +169,17 @@ export function SharpPicksSection() {
   const data = slate.data
   return (
     <section className="flex flex-col gap-2">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-xs font-bold tracking-wide text-muted uppercase">
-          Sharp picks
-          {data && (
-            <span className="ml-1 font-normal normal-case">
-              · {shortDay(data.day)}
-            </span>
-          )}
-        </h2>
+      <SectionLabel title="Sharp picks" index="E2" className="mb-0">
+        {data && <span className="mr-2 uppercase">{shortDay(data.day)}</span>}
         <button
           type="button"
           onClick={() => setExplain((e) => !e)}
           aria-expanded={explain}
-          className="text-xs font-semibold text-accent"
+          className="text-3xs font-bold text-foreground uppercase underline underline-offset-2"
         >
           {explain ? 'Hide' : 'How picks work'}
         </button>
-      </div>
+      </SectionLabel>
       {explain && <Explainer />}
       {!data && slate.isError ? (
         <InlineError
@@ -189,7 +188,7 @@ export function SharpPicksSection() {
           onRetry={() => slate.refetch()}
         />
       ) : !data ? (
-        <p className="rounded-card border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
+        <p className="well rounded-card px-4 py-5 text-center text-sm text-muted">
           The first slate comes out at 10am Eastern.
         </p>
       ) : (
@@ -242,10 +241,10 @@ function Step({
   children: ReactNode
 }) {
   return (
-    <li className="flex flex-col gap-2 rounded-card border border-border bg-surface px-3 py-2.5">
+    <li className="flex flex-col gap-2 rounded-card bg-surface px-3 py-3">
       <div className="min-h-16">{children}</div>
       <p className="flex gap-1.5 text-[12px] leading-snug text-muted">
-        <span className="font-bold text-foreground">{n}</span>
+        <span className="font-label text-foreground">0{n}</span>
         {caption}
       </p>
     </li>
@@ -265,20 +264,17 @@ function EdgeBar() {
         >
           Kalshi 44¢
         </span>
-        <span
-          className="absolute pl-1.5 text-scoring"
-          style={{ left: at(0.48) }}
-        >
+        <span className="absolute pl-1.5" style={{ left: at(0.48) }}>
           Fair 48%
         </span>
       </div>
-      <div className="relative mt-1 h-2.5 rounded-full bg-notice">
+      <div className="well relative mt-1 h-2.5 rounded-full">
         <span
           className="absolute inset-y-0 bg-muted/50"
           style={{ left: at(0.44), width: span(0.02) }}
         />
         <span
-          className="absolute inset-y-0 bg-scoring"
+          className="absolute inset-y-0 bg-foreground"
           style={{ left: at(0.46), width: span(0.02) }}
         />
         {[0.44, 0.48].map((p) => (
@@ -294,8 +290,8 @@ function EdgeBar() {
           <span className="h-2 w-3 rounded-sm bg-muted/50" />
           2¢ fee
         </span>
-        <span className="flex items-center gap-1 font-semibold text-scoring">
-          <span className="h-2 w-3 rounded-sm bg-scoring" />
+        <span className="flex items-center gap-1 font-semibold text-foreground">
+          <span className="h-2 w-3 rounded-sm bg-foreground" />
           +2 pts edge
         </span>
       </div>
@@ -306,11 +302,11 @@ function EdgeBar() {
 function Funnel() {
   const rows = [
     { label: '~600 prices', width: '100%', className: 'bg-notice' },
-    { label: 'priced vs fair', width: '72%', className: 'bg-accent/20' },
+    { label: 'priced vs fair', width: '72%', className: 'bg-foreground/15' },
     {
       label: '5 picks + combo',
       width: '44%',
-      className: 'bg-accent text-white',
+      className: 'bg-foreground text-background',
     },
   ]
   return (
@@ -340,8 +336,8 @@ function Funnel() {
 function GradeScale() {
   const bands = [
     { grade: 'thin' as const, range: 'under 1 pt', bar: 'bg-muted/40' },
-    { grade: 'edge' as const, range: '1–3 pts', bar: 'bg-accent' },
-    { grade: 'strong' as const, range: '3+ pts', bar: 'bg-positive' },
+    { grade: 'edge' as const, range: '1–3 pts', bar: 'bg-foreground/55' },
+    { grade: 'strong' as const, range: '3+ pts', bar: 'bg-foreground' },
   ]
   return (
     <div className="grid grid-cols-3 gap-1 pt-2">
@@ -381,7 +377,7 @@ function CloseLine() {
       <polyline
         points={path.map((c, i) => `${x(i)},${y(c)}`).join(' ')}
         fill="none"
-        className="stroke-scoring"
+        className="stroke-foreground"
         strokeWidth={2}
         strokeLinejoin="round"
       />
@@ -390,7 +386,7 @@ function CloseLine() {
         cx={x(path.length - 1)}
         cy={y(47)}
         r={3.5}
-        className="fill-scoring"
+        className="fill-foreground"
       />
       <text x={x(0)} y={y(44) + 12} className="fill-muted">
         pick 44¢
@@ -399,7 +395,7 @@ function CloseLine() {
         x={x(path.length - 1)}
         y={y(47) - 7}
         textAnchor="end"
-        className="fill-scoring font-semibold"
+        className="fill-foreground font-semibold"
       >
         close 47¢ · +3
       </text>
@@ -412,12 +408,7 @@ function CloseLine() {
 
 function GradeChip({ grade }: { grade: SharpPick['grade'] }) {
   return (
-    <span
-      className={cn(
-        'rounded-control px-1.5 py-0.5 text-3xs font-bold tracking-wide uppercase',
-        GRADES[grade].className,
-      )}
-    >
+    <span className={cn(CAP, 'h-6 text-3xs', GRADES[grade].className)}>
       {GRADES[grade].label}
     </span>
   )
@@ -439,11 +430,18 @@ function StatusText({ pick }: { pick: SharpPick }) {
   return (
     <span
       className={cn(
-        'shrink-0',
-        s.tone === 'good' && 'font-semibold text-positive',
-        s.tone === 'bad' && 'font-semibold text-live',
+        'flex shrink-0 items-center gap-1.5 text-3xs uppercase',
+        s.tone === 'good'
+          ? 'font-bold text-positive'
+          : s.tone === 'bad'
+            ? 'font-bold text-negative'
+            : 'text-muted',
       )}
     >
+      {s.text === 'Live' && (
+        <span className="led led-pulse" aria-hidden="true" />
+      )}
+      {s.tone === 'good' ? '● ' : s.tone === 'bad' ? '○ ' : ''}
       {s.text}
     </span>
   )
@@ -453,13 +451,11 @@ function StatusText({ pick }: { pick: SharpPick }) {
 function EdgeChip({ pick: p }: { pick: SharpPick }) {
   return (
     <span
-      className={cn(
-        'shrink-0 rounded-control px-1.5 py-0.5 text-2xs font-bold tabular-nums',
-        GRADES[p.grade].className,
-      )}
+      data-grade={p.grade}
+      className={cn(CAP, 'h-7 gap-1 text-3xs', GRADES[p.grade].className)}
     >
-      {GRADES[p.grade].label}{' '}
-      {(p.edge >= 0 ? '+' : '−') + Math.abs(p.edge * 100).toFixed(1)}
+      {(p.edge >= 0 ? '+' : '−') + Math.abs(p.edge * 100).toFixed(1)}{' '}
+      {GRADES[p.grade].label}
     </span>
   )
 }
@@ -477,7 +473,7 @@ function KalshiLink({
       target="_blank"
       rel="noreferrer"
       onClick={(e) => e.stopPropagation()}
-      className="rounded-control bg-accent px-3 py-1.5 text-xs font-bold text-white"
+      className={cn(KEY, 'h-8')}
     >
       Open in Kalshi
     </a>
@@ -494,12 +490,14 @@ function PickRow({ pick: p }: { pick: SharpPick }) {
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="flex w-full flex-col gap-0.5 px-3 py-2 text-left"
+        className="flex w-full flex-col gap-1 px-4 py-3 text-left"
       >
         <span className="flex items-center gap-2">
           {p.league && <LeagueLogo league={p.league} size={14} />}
           <span className="truncate text-sm font-bold">{p.title}</span>
-          <span className="truncate text-2xs text-muted">{p.gameLabel}</span>
+          <span className="truncate text-3xs text-muted uppercase">
+            {p.gameLabel}
+          </span>
           <span className="ml-auto">
             <EdgeChip pick={p} />
           </span>
@@ -514,7 +512,7 @@ function PickRow({ pick: p }: { pick: SharpPick }) {
         </span>
       </button>
       {open && (
-        <div className="flex flex-col gap-2 px-3 pb-2.5 text-[12px] text-muted tabular-nums">
+        <div className="flex flex-col gap-2 px-4 pb-3 text-[12px] text-muted tabular-nums">
           <p>
             {display === 'multiplier'
               ? `Pays ${formatPrice(p.price, display)} after the fee (${cents(p.price)} + ${cents(p.fee)})`
@@ -526,15 +524,8 @@ function PickRow({ pick: p }: { pick: SharpPick }) {
           </p>
           {p.form && (
             <p>
-              <b
-                className={cn(
-                  p.form.lean > 0.05
-                    ? 'text-scoring'
-                    : p.form.lean < -0.05
-                      ? 'text-live'
-                      : 'text-foreground',
-                )}
-              >
+              <b className="text-foreground">
+                {p.form.lean > 0.05 ? '▲ ' : p.form.lean < -0.05 ? '▼ ' : '· '}
                 {p.form.lean > 0.05
                   ? 'Form backs it'
                   : p.form.lean < -0.05
@@ -546,10 +537,7 @@ function PickRow({ pick: p }: { pick: SharpPick }) {
           )}
           <div className="flex flex-wrap items-center gap-1.5 text-2xs">
             {p.sources.map((s) => (
-              <span
-                key={s.source}
-                className="rounded-control bg-notice px-1.5 py-0.5"
-              >
+              <span key={s.source} className="well rounded-[6px] px-1.5 py-0.5">
                 {SOURCE_NAMES[s.source] ?? s.source}{' '}
                 {pct1(p.side === 'no' ? 1 - s.prob : s.prob)}
               </span>
@@ -572,16 +560,16 @@ function ComboRow({ pick: p }: { pick: SharpPick }) {
   const worth = formatPrice(p.worthItUnder ?? 0, display)
   const legs = p.legs ?? []
   return (
-    <div className="bg-accent/5">
+    <div>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="flex w-full flex-col gap-0.5 px-3 py-2 text-left"
+        className="flex w-full flex-col gap-1 px-4 py-3 text-left"
       >
         <span className="flex items-center gap-2">
           <span className="text-sm font-bold">Combo</span>
-          <span className="min-w-0 flex-1 truncate text-2xs text-muted">
+          <span className="min-w-0 flex-1 truncate text-3xs text-muted uppercase">
             {legs.map((l) => l.title).join(' + ')}
           </span>
           <EdgeChip pick={p} />
@@ -597,7 +585,7 @@ function ComboRow({ pick: p }: { pick: SharpPick }) {
         </span>
       </button>
       {open && (
-        <div className="px-3 pb-2.5 text-[12px] text-muted tabular-nums">
+        <div className="px-4 pb-3 text-[12px] text-muted tabular-nums">
           <ul className="flex flex-col gap-1">
             {legs.map((l) => (
               <li
@@ -609,7 +597,7 @@ function ComboRow({ pick: p }: { pick: SharpPick }) {
                   <b className="text-foreground">{l.title}</b> {l.gameLabel}
                 </span>
                 <span>
-                  {l.result === 'won' ? '✓ ' : l.result === 'lost' ? '✕ ' : ''}
+                  {l.result === 'won' ? '● ' : l.result === 'lost' ? '○ ' : ''}
                   {formatPrice(l.price, display)} · {pct1(l.fair)}
                 </span>
                 <a
@@ -617,7 +605,7 @@ function ComboRow({ pick: p }: { pick: SharpPick }) {
                   target="_blank"
                   rel="noreferrer"
                   aria-label={`Open ${l.gameLabel} in Kalshi`}
-                  className="shrink-0 font-bold text-accent"
+                  className="shrink-0 font-bold text-foreground underline underline-offset-2"
                 >
                   Kalshi
                 </a>
@@ -689,21 +677,21 @@ function PicksRecord() {
   ]
   return (
     <div className="flex flex-col gap-2">
-      <h3 className="text-xs font-bold tracking-wide text-muted uppercase">
-        Picks record · {s.picks} picks
-      </h3>
+      <SectionLabel title="Picks record" as="h3" className="mb-0">
+        {s.picks} picks
+      </SectionLabel>
       <StatGrid>
         {tiles.map((t) => (
           <StatTile key={t.label} label={t.label} value={t.value} sub={t.sub} />
         ))}
       </StatGrid>
-      <div className="rounded-card border border-border bg-surface px-3 py-2.5">
-        <div className="grid grid-cols-[minmax(0,1fr)_2.5rem_3.5rem_3.5rem_3.5rem] gap-x-2 gap-y-1 text-[12px] tabular-nums">
+      <div className="rounded-card bg-surface px-4 py-3">
+        <div className="grid grid-cols-[minmax(0,1fr)_2.5rem_3.5rem_3.5rem_3.5rem] gap-x-2 gap-y-2 text-[12px] tabular-nums">
           {['Grade', '#', 'Close', 'W–L', 'Return'].map((h, i) => (
             <span
               key={h}
               className={cn(
-                'text-3xs font-semibold tracking-wide text-muted uppercase',
+                'text-3xs text-muted uppercase',
                 i > 0 && 'text-right',
               )}
             >

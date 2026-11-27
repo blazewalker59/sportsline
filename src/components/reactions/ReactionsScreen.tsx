@@ -21,6 +21,7 @@ import { useMyReactions } from '@/lib/reactions/useReactions'
 import { useToday } from '@/lib/timeline/useToday'
 import { takePlayOpened } from '@/lib/timeline/playSheet'
 import { useViewer } from '@/lib/viewer/useViewer'
+import { SectionLabel } from '@/components/signal/Section'
 
 export function ReactionsScreen({ playId }: { playId: string | null }) {
   const { data: viewerState, isPending } = useViewer()
@@ -60,7 +61,7 @@ export function ReactionsScreen({ playId }: { playId: string | null }) {
       ) : query.isError && query.data === undefined ? (
         <ScreenError error={query.error} onRetry={() => query.refetch()} />
       ) : reactions.length === 0 ? (
-        <p className="mt-16 text-center text-sm text-muted">
+        <p className="well mt-8 rounded-card px-4 py-6 text-center text-sm text-muted">
           Long-press any Play on the Timeline to react. Your Reactions collect
           here.
         </p>
@@ -68,9 +69,9 @@ export function ReactionsScreen({ playId }: { playId: string | null }) {
         <div className="flex flex-col gap-6">
           {days.map(({ sportsDay, entries }) => (
             <section key={sportsDay} className="flex flex-col gap-4">
-              <h2 className="text-xs font-bold tracking-wide text-muted uppercase">
-                {dayLabel(sportsDay, today)}
-              </h2>
+              <SectionLabel title={dayLabel(sportsDay, today)} className="mb-0">
+                {entries.length}
+              </SectionLabel>
               {entries.map((r) => (
                 <ReactionEntry key={r.item.id} reaction={r} now={now} />
               ))}
@@ -81,7 +82,7 @@ export function ReactionsScreen({ playId }: { playId: string | null }) {
               type="button"
               onClick={() => void query.fetchNextPage()}
               disabled={query.isFetchingNextPage}
-              className="mx-auto block min-h-11 rounded-full bg-accent-soft px-5 text-sm font-semibold text-accent"
+              className="key mx-auto inline-flex h-11 items-center justify-center rounded-control px-5 text-3xs font-bold uppercase"
             >
               {query.isFetchingNextPage ? 'Loading…' : 'Older Reactions'}
             </button>
@@ -109,8 +110,8 @@ function ReactionEntry({
         <LeagueAvatar league={item.league} />
       )}
       <div className="flex min-w-0 flex-col gap-1">
-        <span className="truncate px-1 text-2xs text-muted">
-          <span className="font-semibold text-foreground/80">
+        <span className="truncate px-1 text-3xs text-muted uppercase">
+          <span className="font-bold text-foreground/80 tabular-nums">
             {item.awayTeam.abbreviation} {item.score.away} – {item.score.home}{' '}
             {item.homeTeam.abbreviation}
           </span>{' '}
@@ -125,7 +126,7 @@ function ReactionEntry({
           />
           <span
             aria-label={`You reacted ${emoji}`}
-            className="absolute -right-2 -bottom-3 flex size-8 items-center justify-center rounded-full border border-border bg-surface text-lg shadow"
+            className="key absolute -right-2 -bottom-3 flex size-8 items-center justify-center rounded-full text-lg"
           >
             {emoji}
           </span>

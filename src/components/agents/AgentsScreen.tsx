@@ -18,6 +18,7 @@ import { timeAgo, useNow } from '@/components/timeline/format'
 import { formatPrice } from '@/lib/model/price'
 import { useBetRecord, useTrading } from '@/lib/agents/queries'
 import { usePriceDisplay, useViewer } from '@/lib/viewer/useViewer'
+import { SectionLabel } from '@/components/signal/Section'
 import { cn } from '@/lib/utils'
 
 export function AgentsScreen() {
@@ -90,9 +91,7 @@ function BetRecord() {
   )
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-xs font-bold tracking-wide text-muted uppercase">
-        Trend picks asked for
-      </h2>
+      <SectionLabel title="Trend picks asked for" index="J4" className="mb-0" />
       <p className="text-sm text-muted">
         Every time an agent asks find_bet for a trend pick, and what came of its
         picks: placed on Kalshi after they were suggested (by you or an approved
@@ -107,30 +106,37 @@ function BetRecord() {
           'win rate',
           s.winRate === null ? '—' : `${Math.round(s.winRate * 100)}%`,
         )}
-        {tile('profit', `${s.pnl < 0 ? '−' : ''}${money(Math.abs(s.pnl))}`)}
+        <StatTile
+          label="profit"
+          value={`${s.pnl < 0 ? '−' : ''}${money(Math.abs(s.pnl))}`}
+          className={
+            s.pnl > 0.004
+              ? 'text-positive'
+              : s.pnl < -0.004
+                ? 'text-negative'
+                : undefined
+          }
+        />
       </StatGrid>
-      <p className="text-xs text-muted">
+      <p className="text-3xs text-muted uppercase">
         {s.pending} placed still open · skipped picks went {s.skipped.won}–
         {s.skipped.lost}
         {s.skipped.pending ? ` (${s.skipped.pending} open)` : ''}
       </p>
-      <ul className="flex flex-col gap-2">
+      <ul className="divide-y divide-border rounded-card bg-surface">
         {data.recent.map((p) => (
-          <li
-            key={p.id}
-            className="flex flex-col gap-0.5 rounded-card border border-border bg-surface px-3 py-2.5 text-sm"
-          >
+          <li key={p.id} className="flex flex-col gap-0.5 px-4 py-3 text-sm">
             <span className="flex items-baseline justify-between gap-2">
               <span className="truncate font-semibold">
                 {p.title} · {p.gameLabel}
               </span>
               <span
                 className={cn(
-                  'shrink-0 text-xs font-semibold',
+                  'shrink-0 text-3xs uppercase',
                   p.result === 'won'
-                    ? 'text-positive'
+                    ? 'font-bold text-positive'
                     : p.result === 'lost'
-                      ? 'text-live'
+                      ? 'font-bold text-negative'
                       : 'text-muted',
                 )}
               >
@@ -143,7 +149,7 @@ function BetRecord() {
                       : 'Open'}
               </span>
             </span>
-            <span className="text-xs text-muted">
+            <span className="text-xs text-muted tabular-nums">
               {formatPrice(p.price, display)} · suggested{' '}
               {timeAgo(p.createdAt, now)} ·{' '}
               {p.placedAt

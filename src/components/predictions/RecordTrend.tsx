@@ -36,7 +36,8 @@ export function RecordTrend({ days }: { days: PredictionRecord['days'] }) {
     }))
   }, [days])
   const end = rows.at(-1)?.running ?? 0
-  const lineColor = end >= 0 ? CHART_COLORS.good : CHART_COLORS.bad
+  // Money's tones, never the live orange.
+  const lineColor = end >= 0 ? 'var(--color-positive)' : 'var(--color-negative)'
 
   const definition = useMemo(
     () =>
@@ -47,7 +48,7 @@ export function RecordTrend({ days }: { days: PredictionRecord['days'] }) {
             x: 'label',
             y: 'staked',
             fill: CHART_COLORS.accent,
-            fillOpacity: 0.35,
+            fillOpacity: 0.8,
             radius: 2,
           }),
           ruleY([0], {
@@ -111,7 +112,7 @@ export function RecordTrend({ days }: { days: PredictionRecord['days'] }) {
         <span
           className={cn(
             'font-semibold',
-            end > 0.004 ? 'text-scoring' : end < -0.004 ? 'text-live' : '',
+            end > 0.004 ? 'text-positive' : end < -0.004 ? 'text-negative' : '',
           )}
         >
           {signedUsd(end)}

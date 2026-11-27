@@ -71,6 +71,7 @@ Radii: `rounded-control` 10px (keys, chips), `rounded-card` 18px (panels),
 | `<Num>` | `components/signal/Num.tsx` | Dot numerals |
 | `<Meter value label segments?>` | `components/signal/Meter.tsx` | Win chance, projection pace, Progress, Odds |
 | `<SectionLabel title index?>` | `components/signal/Section.tsx` | Section heads |
+| `<Segmented label value options onChange>` | `components/signal/Segmented.tsx` | A choice of a few: keys in a well, the current one pressed (a radio group) |
 | `<Mark>`, `<Wordmark>` | `components/signal/Logo.tsx` | Brand |
 | `.key`, `.key-on`, `.key-ink` | styles.css | Buttons. `.key-ink` is the one primary action on a screen (Approve, Cash out) |
 | `.led`, `.led-pulse`, `.led-off`, `.led-ink` | styles.css | Status lights. Pulse only for live |

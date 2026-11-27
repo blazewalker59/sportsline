@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, screen } from '@testing-library/react'
+import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { forever, renderScreen } from '../screenHarness'
 import { AlertsScreen } from '@/components/alerts/AlertsScreen'
@@ -55,5 +55,26 @@ describe('AlertsScreen', () => {
       await screen.findByRole('radiogroup', { name: 'Following Alerts' }),
     ).toBeTruthy()
     expect(push.getAlertLevels).toHaveBeenCalledTimes(2)
+  })
+
+  it('each Alert level is a switch of keys, named in full, the current one pressed', async () => {
+    push.setAlertLevels.mockResolvedValue(undefined)
+    renderScreen(AlertsScreen)
+    const group = await screen.findByRole('radiogroup', {
+      name: 'Following Alerts',
+    })
+    expect(group.className).toContain('well')
+    const scores = within(group).getByRole('radio', { name: 'Scores & finals' })
+    expect(scores.getAttribute('aria-checked')).toBe('true')
+    expect(scores.className).toContain('key-pressed')
+    expect(scores.textContent).toBe('Scores')
+    const finals = within(group).getByRole('radio', { name: 'Finals only' })
+    expect(finals.getAttribute('aria-checked')).toBe('false')
+    fireEvent.click(finals)
+    await vi.waitFor(() =>
+      expect(push.setAlertLevels).toHaveBeenCalledWith({
+        data: { ...LEVELS, following: 'finals' },
+      }),
+    )
   })
 })
