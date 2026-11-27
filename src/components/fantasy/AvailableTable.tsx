@@ -223,7 +223,7 @@ export function AvailableTable({
       <table className="w-max min-w-full border-separate border-spacing-0 text-xs tabular-nums">
         <thead>
           <tr>
-            <th className="sticky left-0 z-20 min-w-[9rem] border-r sm:min-w-[12rem] border-b border-border bg-surface px-2 py-1.5 text-left text-3xs font-semibold tracking-wide text-muted uppercase">
+            <th className="sticky left-0 z-20 min-w-[9rem] border-r border-b border-border bg-surface px-2 py-1.5 text-left text-3xs font-normal text-muted uppercase sm:min-w-[12rem]">
               {title ?? 'Player'}
             </th>
             {columns.map((c) => {
@@ -250,8 +250,8 @@ export function AvailableTable({
                       )
                     }
                     className={cn(
-                      'w-full px-1 py-1.5 text-3xs font-semibold tracking-wide uppercase',
-                      on ? 'text-foreground' : 'text-muted',
+                      'w-full px-1 py-1.5 text-3xs uppercase',
+                      on ? 'font-bold text-foreground' : 'text-muted',
                     )}
                   >
                     {c.label}
@@ -321,14 +321,17 @@ function NextGamePill({ game }: { game: NextGame }) {
   return (
     <span
       className={cn(
-        'inline-flex max-w-full items-center gap-1 self-start truncate rounded-full px-1.5 py-px text-3xs leading-tight font-semibold whitespace-nowrap',
+        'inline-flex max-w-full items-center gap-1 self-start truncate rounded-[6px] px-1.5 py-px text-3xs leading-tight font-semibold whitespace-nowrap',
         label.soon === 'now'
-          ? 'bg-live/15 text-live'
+          ? 'bg-notice text-live'
           : label.soon === 'today'
-            ? 'bg-accent-soft text-accent'
-            : 'bg-notice text-foreground/80',
+            ? 'bg-notice text-foreground'
+            : 'bg-notice text-muted',
       )}
     >
+      {label.soon === 'now' && (
+        <span aria-hidden="true" className="led led-pulse size-1.5" />
+      )}
       {/* Short on a phone ("7:30p"), in full from sm up ("Today 7:30 PM"). */}
       <span className="sm:hidden">{label.short}</span>
       <span className="hidden sm:inline">{label.when}</span>
@@ -413,9 +416,9 @@ function PlayerCell({
           onClick={() => onMove(p)}
           aria-label={`${p.waivers ? 'Claim' : 'Add'} ${p.name}`}
           className={cn(
-            'min-h-6 shrink-0 rounded-full px-1.5 text-3xs font-semibold hover:bg-accent hover:text-background sm:min-h-7 sm:px-2 sm:text-2xs',
-            // A claim a shade deeper than an add.
-            p.waivers ? 'bg-foreground/15' : 'bg-notice',
+            'inline-flex h-7 shrink-0 items-center rounded-[8px] px-2 text-3xs font-bold uppercase',
+            // A claim a shade deeper than an add: recessed, not raised.
+            p.waivers ? 'well' : 'key',
           )}
         >
           {p.waivers ? 'Claim' : 'Add'}

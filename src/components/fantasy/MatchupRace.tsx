@@ -7,9 +7,10 @@
  * days, flat between), with the whole week in an overview underneath.
  */
 
-import { defineChart, lineY, ruleY } from '@tanstack/charts'
+import { defineChart, dot, lineY, ruleY } from '@tanstack/charts'
 import { Chart } from '@tanstack/charts/react'
 import { scaleLinear } from '@tanstack/charts/scales/linear'
+import { decorative } from '@tanstack/charts/mark/decorative'
 import { tooltip } from '@tanstack/charts/tooltip'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
@@ -27,6 +28,7 @@ import { leadChanges, raceSteps } from '@/lib/fantasy/race'
 import { matchupRaceQuery } from '@/lib/fantasy/queries'
 import { clockTime, weekdayTime } from '@/lib/time/format'
 import { useTimeZone } from '@/lib/time/useTimeZone'
+import { SectionLabel } from '@/components/signal/Section'
 
 const HOUR = 3_600_000
 
@@ -149,6 +151,18 @@ export function MatchupRace({
           stroke: CHART_COLORS.mine,
           strokeWidth: 2.5,
         }),
+        // The Viewer's score now: the one lit point.
+        decorative(
+          dot(steps.mine.slice(-1), {
+            id: 'now',
+            x: 't',
+            y: 'score',
+            r: 4,
+            fill: CHART_COLORS.now,
+            stroke: 'var(--color-surface)',
+            strokeWidth: 1.5,
+          }),
+        ),
       ],
       scales: {
         x: {
@@ -194,9 +208,7 @@ export function MatchupRace({
   const changes = leadChanges(points)
   return (
     <section>
-      <h3 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-        The race
-      </h3>
+      <SectionLabel as="h3" title="The race" />
       <ChartCard
         legend={[
           { label: m.mine.abbrev, color: CHART_COLORS.mine, shape: 'line' },
@@ -205,6 +217,9 @@ export function MatchupRace({
             color: CHART_COLORS.opponent,
             shape: 'line',
           },
+          ...(points.length >= 2
+            ? [{ label: 'Now', color: CHART_COLORS.now, shape: 'dot' as const }]
+            : []),
           ...(m.mine.projected !== null || opponent.projected !== null
             ? [
                 {

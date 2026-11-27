@@ -8,6 +8,9 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 import { MatchupSheet } from './FantasyParts'
+import { MatchupHero } from './MatchupHero'
+import { SectionHead, SwitchWell } from './Picker'
+import { scoreText } from './format'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import { gamesQuery } from '@/lib/timeline/queries'
 import { useToday } from '@/lib/timeline/useToday'
@@ -74,8 +77,8 @@ export function FantasyScreen() {
               score as it moves. Connect ESPN, Sleeper, or both.
             </p>
           )}
-          <Connections />
           {connected && <Leagues />}
+          <Connections />
         </div>
       )}
     </div>
@@ -136,31 +139,31 @@ function Connections() {
   ]
   return (
     <section>
-      <h2 className="mb-2 flex items-center justify-between text-xs font-bold tracking-wide text-muted uppercase">
-        <span>Connections</span>
+      <SectionHead title="Connections" index="G2">
         {(espn.data || sleeper.data) && (
           <button
             type="button"
             onClick={() => sync.mutate()}
             disabled={sync.isPending}
-            className="rounded-full bg-notice px-3 py-1 text-[12px] font-semibold tracking-normal normal-case"
+            className="key inline-flex h-8 items-center rounded-control px-2.5 text-3xs font-bold uppercase"
           >
             {sync.isPending ? 'Syncing…' : 'Sync now'}
           </button>
         )}
-      </h2>
+      </SectionHead>
       <ul className="divide-y divide-border rounded-card border border-border bg-surface">
         {rows.map((r) => (
           <li key={r.key}>
             <div className="flex items-center gap-3 px-3 py-2.5 text-sm">
               <span
+                aria-hidden="true"
                 className={cn(
-                  'size-2 shrink-0 rounded-full',
+                  'led',
                   !r.data
-                    ? 'bg-muted/40'
+                    ? 'led-off'
                     : r.data.status === 'ok'
-                      ? 'bg-scoring'
-                      : 'bg-live',
+                      ? 'led-ink'
+                      : 'bg-negative shadow-none',
                 )}
               />
               <span className="min-w-0 flex-1">
@@ -173,7 +176,7 @@ function Connections() {
                 <button
                   type="button"
                   onClick={r.disconnect}
-                  className="min-h-9 rounded-full px-2 text-[13px] font-semibold text-muted hover:text-live"
+                  className="min-h-9 rounded-control px-2 text-3xs text-muted uppercase hover:text-foreground"
                 >
                   Disconnect
                 </button>
@@ -182,12 +185,7 @@ function Connections() {
                   type="button"
                   onClick={() => setOpen(open === r.key ? null : r.key)}
                   aria-expanded={open === r.key}
-                  className={cn(
-                    'min-h-9 rounded-full px-3 text-[13px] font-semibold',
-                    open === r.key
-                      ? 'bg-notice text-foreground'
-                      : 'bg-accent text-background',
-                  )}
+                  className="key inline-flex h-9 items-center rounded-control px-3 text-3xs font-bold uppercase"
                 >
                   {open === r.key ? 'Cancel' : 'Connect'}
                 </button>
@@ -224,32 +222,21 @@ function MovesSwitch({ on }: { on: boolean }) {
       className="flex w-full items-center gap-3 border-t border-border px-3 py-2.5 text-left disabled:opacity-60"
     >
       <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold">Roster moves</span>
+        <span className="block text-3xs font-bold text-foreground/80 uppercase">
+          Roster moves
+        </span>
         <span className="block text-xs text-muted">
           {on
             ? 'On. Add, drop and claim players from a league’s Players tab; nothing goes to ESPN until you confirm it.'
             : 'Off. Turn on to add, drop and claim players from Sportsline with your ESPN session, each one confirmed first.'}
         </span>
         {set.error && (
-          <span role="alert" className="block text-xs text-live">
+          <span role="alert" className="block text-xs text-negative">
             {set.error.message}
           </span>
         )}
       </span>
-      <span
-        aria-hidden="true"
-        className={cn(
-          'relative h-7 w-12 shrink-0 rounded-full transition-colors',
-          on ? 'bg-accent' : 'bg-notice',
-        )}
-      >
-        <span
-          className={cn(
-            'absolute top-0.5 size-6 rounded-full bg-white shadow transition-transform',
-            on ? 'translate-x-[22px]' : 'translate-x-0.5',
-          )}
-        />
-      </span>
+      <SwitchWell on={on} />
     </button>
   )
 }
@@ -266,7 +253,10 @@ function SleeperForm() {
         connect.mutate(username.trim())
       }}
     >
-      <label className="text-sm font-semibold" htmlFor="sleeper-username">
+      <label
+        className="text-3xs font-bold text-muted uppercase"
+        htmlFor="sleeper-username"
+      >
         Your Sleeper username
       </label>
       <span className="flex gap-2">
@@ -278,18 +268,18 @@ function SleeperForm() {
           autoCapitalize="none"
           spellCheck={false}
           placeholder="username"
-          className="min-w-0 flex-1 rounded-card border border-border bg-background px-3 py-2 text-sm"
+          className="well min-w-0 flex-1 rounded-control px-3 py-2 text-sm"
         />
         <button
           type="submit"
           disabled={!username.trim() || connect.isPending}
-          className="min-h-10 rounded-full bg-accent px-4 text-[13px] font-semibold text-background disabled:opacity-50"
+          className="key key-ink inline-flex h-10 items-center rounded-control px-4 text-3xs font-bold uppercase"
         >
           {connect.isPending ? 'Finding…' : 'Connect'}
         </button>
       </span>
       {connect.error && (
-        <p role="alert" className="text-sm text-live">
+        <p role="alert" className="text-sm text-negative">
           {connect.error.message}
         </p>
       )}
@@ -336,15 +326,17 @@ function ConnectForm() {
   }, [origin])
   return (
     <div className="flex flex-col gap-5">
-      <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">
-        <h2 className="text-sm font-semibold">The easy way</h2>
+      <section className="well flex flex-col gap-2 rounded-card p-3">
+        <h2 className="text-3xs font-bold text-foreground/80 uppercase">
+          The easy way
+        </h2>
         <ol className="list-decimal space-y-1 pl-5 text-sm text-muted">
           <li>Drag this button to your bookmarks bar:</li>
         </ol>
         <a
           ref={link}
           onClick={(e) => e.preventDefault()}
-          className="self-start rounded-full bg-accent px-4 py-2 text-sm font-semibold text-background"
+          className="key key-ink inline-flex h-10 items-center self-start rounded-control px-4 text-3xs font-bold uppercase"
         >
           Sportsline ← ESPN
         </a>
@@ -363,23 +355,25 @@ function ConnectForm() {
           connect.mutate({ swid: swid.trim(), espnS2: espnS2.trim() })
         }}
       >
-        <h2 className="text-sm font-semibold">Or paste your cookies</h2>
+        <h2 className="text-3xs font-bold text-foreground/80 uppercase">
+          Or paste your cookies
+        </h2>
         <p className="text-xs text-muted">
           On espn.com, signed in: your browser’s developer tools → Application
           (Storage) → Cookies → espn.com. Copy SWID and espn_s2.
         </p>
-        <label className="flex flex-col gap-1 text-sm font-semibold">
+        <label className="flex flex-col gap-1 text-3xs font-bold text-muted uppercase">
           SWID
           <input
             value={swid}
             onChange={(e) => setSwid(e.target.value)}
             autoComplete="off"
             spellCheck={false}
-            className="rounded-card border border-border bg-surface px-3 py-2 font-mono text-sm font-normal"
+            className="well rounded-control px-3 py-2 font-mono text-sm font-normal tracking-normal text-foreground normal-case"
             placeholder="{8A1C…-…}"
           />
         </label>
-        <label className="flex flex-col gap-1 text-sm font-semibold">
+        <label className="flex flex-col gap-1 text-3xs font-bold text-muted uppercase">
           espn_s2
           <textarea
             value={espnS2}
@@ -387,19 +381,19 @@ function ConnectForm() {
             autoComplete="off"
             spellCheck={false}
             rows={4}
-            className="rounded-card border border-border bg-surface px-3 py-2 font-mono text-xs font-normal"
+            className="well rounded-control px-3 py-2 font-mono text-xs font-normal tracking-normal text-foreground normal-case"
             placeholder="AEB…"
           />
         </label>
         {connect.error && (
-          <p role="alert" className="text-sm text-live">
+          <p role="alert" className="text-sm text-negative">
             {connect.error.message}
           </p>
         )}
         <button
           type="submit"
           disabled={!swid.trim() || !espnS2.trim() || connect.isPending}
-          className="min-h-11 rounded-full bg-accent px-5 text-sm font-semibold text-background disabled:opacity-50"
+          className="key key-ink inline-flex h-11 items-center justify-center rounded-control px-5 text-3xs font-bold uppercase"
         >
           {connect.isPending ? 'Checking with ESPN…' : 'Connect ESPN'}
         </button>
@@ -422,19 +416,29 @@ function Leagues() {
   const [open, setOpen] = useState<string | null>(null)
   const leagues = fantasy.data ?? []
   const selected = leagues.find((l) => l.id === open && l.matchup)
-  // Today's Games, for each Player's game state in the Matchup sheet.
+  // The first league with a Matchup on: the screen's hero.
+  const hero = leagues.find((l) => l.enabled && l.matchup)
+  // Today's Games, for each Player's game state in the Matchup sheet and
+  // the hero's Starters in play.
   const today = useToday()
   const games = useQuery({
     ...gamesQuery(today),
-    enabled: Boolean(selected),
-    refetchInterval: 30_000,
+    enabled: Boolean(selected ?? hero),
+    refetchInterval: selected ? 30_000 : 60_000,
   })
   return (
     <div className="flex flex-col gap-6">
+      {hero && (
+        <MatchupHero
+          league={hero}
+          games={games.data ?? []}
+          onOpen={() => setOpen(hero.id)}
+        />
+      )}
       <section>
-        <h2 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-          Your leagues
-        </h2>
+        <SectionHead title="Your leagues" index="G1">
+          {leagues.length > 0 && <span>{leagues.length}</span>}
+        </SectionHead>
         {fantasy.isPending ? (
           <div className="flex flex-col gap-2">
             <CardSkeleton label="Loading your leagues" />
@@ -462,7 +466,7 @@ function Leagues() {
       </section>
 
       <details className="group">
-        <summary className="cursor-pointer list-none text-sm font-semibold text-accent [&::-webkit-details-marker]:hidden">
+        <summary className="cursor-pointer list-none text-3xs font-bold text-foreground/80 uppercase underline-offset-4 hover:underline [&::-webkit-details-marker]:hidden">
           <span className="group-open:hidden">+ Add a league by its URL</span>
           <span className="hidden group-open:inline">Add a league</span>
         </summary>
@@ -478,18 +482,18 @@ function Leagues() {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="ESPN or Sleeper league URL"
-              className="min-w-0 flex-1 rounded-card border border-border bg-surface px-3 py-2 text-sm"
+              className="well min-w-0 flex-1 rounded-control px-3 py-2 text-sm"
             />
             <button
               type="submit"
               disabled={!url.trim() || add.isPending}
-              className="min-h-10 rounded-full bg-notice px-4 text-[13px] font-semibold disabled:opacity-50"
+              className="key inline-flex h-10 items-center rounded-control px-4 text-3xs font-bold uppercase"
             >
               {add.isPending ? 'Adding…' : 'Add'}
             </button>
           </span>
           {add.error && (
-            <p role="alert" className="text-sm text-live">
+            <p role="alert" className="text-sm text-negative">
               {add.error.message}
             </p>
           )}
@@ -535,9 +539,9 @@ function LeagueList({
         <li
           key={l.id}
           className={cn(
-            'relative flex min-h-14 items-center gap-2 bg-surface py-1.5 pr-2 pl-0.5',
+            'relative flex min-h-14 items-center gap-2 bg-surface py-1.5 pr-2 pl-0.5 first:rounded-t-card last:rounded-b-card',
             dragging === l.id
-              ? 'z-10 rounded-card shadow-lg ring-1 ring-border'
+              ? 'panel z-10 rounded-card ring-1 ring-border'
               : active && 'transition-transform duration-150',
           )}
           style={
@@ -577,8 +581,8 @@ function LeagueList({
               </span>
               <span
                 className={cn(
-                  'block truncate text-xs',
-                  l.lastError ? 'text-live' : 'text-muted',
+                  'block truncate text-3xs uppercase',
+                  l.lastError ? 'text-negative' : 'text-muted',
                 )}
               >
                 {l.lastError ??
@@ -597,7 +601,7 @@ function LeagueList({
               type="button"
               onClick={() => onOpen(l.id)}
               aria-label={`${l.name} matchup`}
-              className="flex shrink-0 flex-col items-end rounded-control px-1.5 py-0.5 tabular-nums hover:bg-notice"
+              className="flex shrink-0 items-center gap-2 rounded-control px-1.5 py-0.5 tabular-nums hover:bg-notice"
             >
               <MatchupScore league={l} />
             </button>
@@ -607,10 +611,8 @@ function LeagueList({
             onClick={() => onToggle(l)}
             aria-pressed={l.enabled}
             className={cn(
-              'min-h-8 shrink-0 rounded-full px-2.5 text-xs font-semibold',
-              l.enabled
-                ? 'border border-border text-foreground/80'
-                : 'bg-notice text-muted',
+              'key inline-flex h-8 shrink-0 items-center rounded-control px-2.5 text-3xs font-bold uppercase',
+              !l.enabled && 'text-muted',
             )}
           >
             {l.enabled ? 'Hide' : 'Show'}
@@ -621,11 +623,12 @@ function LeagueList({
   )
 }
 
-/** "98.4 – 87.2" (or categories "6–3–1"), the leader's side bold. */
+/**
+ * "98.4 – 87.2" (or categories "6–3"), the leader's side bold (the
+ * Viewer's lit when it leads), with ● ahead, ◐ level, ○ behind.
+ */
 function MatchupScore({ league }: { league: FantasyLeagueView }) {
   const m = league.matchup!
-  const cats = Boolean(m.categories)
-  const fmt = (n: number) => (cats ? String(n) : n.toFixed(1))
   const theirs = m.opponent?.score
   const lead =
     theirs === undefined || m.mine.score === theirs
@@ -635,32 +638,40 @@ function MatchupScore({ league }: { league: FantasyLeagueView }) {
         : 'opponent'
   return (
     <>
-      <span className="text-sm leading-tight">
-        <span
-          className={cn(
-            lead === 'mine' ? 'font-bold text-scoring' : 'text-foreground/75',
+      <span className="flex flex-col items-end">
+        <span className="text-sm leading-tight">
+          <span
+            className={cn(
+              lead === 'mine' ? 'font-bold text-scoring' : 'text-foreground/75',
+            )}
+          >
+            {scoreText(m, m.mine.score)}
+          </span>
+          {theirs !== undefined && (
+            <>
+              <span className="text-muted"> – </span>
+              <span
+                className={cn(
+                  lead === 'opponent' ? 'font-bold' : 'text-foreground/75',
+                )}
+              >
+                {scoreText(m, theirs)}
+              </span>
+            </>
           )}
-        >
-          {fmt(m.mine.score)}
         </span>
-        {theirs !== undefined && (
-          <>
-            <span className="text-muted"> – </span>
-            <span
-              className={cn(
-                lead === 'opponent'
-                  ? 'font-bold text-live'
-                  : 'text-foreground/75',
-              )}
-            >
-              {fmt(theirs)}
-            </span>
-          </>
-        )}
+        <span className="text-3xs leading-tight text-muted uppercase">
+          {m.opponent ? `vs ${m.opponent.abbrev}` : 'Bye'}
+        </span>
       </span>
-      <span className="text-3xs leading-tight text-muted">
-        {m.opponent ? `vs ${m.opponent.abbrev}` : 'Bye'}
-      </span>
+      {theirs !== undefined && (
+        <span
+          aria-hidden="true"
+          className={cn('w-3 text-center text-xs', !lead && 'text-muted')}
+        >
+          {lead === 'mine' ? '●' : lead === 'opponent' ? '○' : '◐'}
+        </span>
+      )}
     </>
   )
 }

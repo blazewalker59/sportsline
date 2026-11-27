@@ -87,7 +87,7 @@ describe('HistoryView', () => {
     expect(html).toContain('In progress')
     expect(html).toContain('Aces · beat Bob')
     expect(html).toContain('20-8')
-    expect(html).toContain('+1 final')
+    expect(html).toContain('1 lost final')
     expect(html).toContain('Your head-to-head')
     expect(html).toContain('Last: W 120.5–99.0 · 2024 · Week 16 · Playoffs')
     expect(html).toContain('1-0 playoffs')

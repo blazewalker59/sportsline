@@ -88,7 +88,7 @@ export function MoveSheet({
       {intent.kind !== 'drop' && (
         <PlayerButton
           playerId={intent.player.playerId}
-          className="flex items-center gap-2.5 rounded-card border border-border bg-surface px-3 py-2"
+          className="flex items-center gap-2.5 rounded-card border border-border bg-surface px-3 py-2.5"
         >
           <PlayerAvatar
             name={intent.player.name}
@@ -99,7 +99,7 @@ export function MoveSheet({
             <span className="block truncate font-semibold">
               {intent.player.name}
             </span>
-            <span className="block truncate text-xs text-muted">
+            <span className="mt-0.5 block truncate text-3xs text-muted uppercase">
               {[
                 intent.player.teamAbbrev,
                 intent.player.positionId === null
@@ -117,19 +117,22 @@ export function MoveSheet({
       {result ? (
         <p
           role="status"
-          className={cn(
-            'rounded-card px-3 py-3 text-sm',
-            result.status === 'done' || result.status === 'pending'
-              ? 'bg-scoring/10'
-              : 'bg-notice',
-          )}
+          data-status={result.status}
+          className="well flex gap-2.5 rounded-card px-3 py-3 text-sm"
         >
+          <span aria-hidden="true" className="shrink-0">
+            {result.status === 'done'
+              ? '●'
+              : result.status === 'pending'
+                ? '◐'
+                : '○'}
+          </span>
           {outcomeText(result)}
         </p>
       ) : (
         <>
           <fieldset className="flex flex-col gap-1">
-            <legend className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
+            <legend className="mb-2 text-3xs font-bold text-foreground/80 uppercase">
               {intent.kind === 'drop' ? 'Who to drop' : 'Drop someone?'}
             </legend>
             <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
@@ -160,7 +163,7 @@ export function MoveSheet({
             </ul>
           </fieldset>
           {budget && (
-            <label className="flex flex-col gap-1 text-sm font-semibold">
+            <label className="flex flex-col gap-1 text-3xs font-bold text-foreground/80 uppercase">
               Bid
               <span className="flex items-center gap-2">
                 <span className="text-muted">$</span>
@@ -172,16 +175,16 @@ export function MoveSheet({
                   step={1}
                   value={bid}
                   onChange={(e) => setBid(e.target.value)}
-                  className="min-h-10 w-24 rounded-card border border-border bg-surface px-3 font-normal tabular-nums"
+                  className="well min-h-10 w-24 rounded-control px-3 font-sans text-sm font-normal tracking-normal tabular-nums"
                 />
-                <span className="text-xs font-normal text-muted">
+                <span className="font-normal text-muted">
                   ${budget.left} of ${budget.total} left
                 </span>
               </span>
             </label>
           )}
           {make.error && (
-            <p role="alert" className="text-sm text-live">
+            <p role="alert" className="text-sm text-negative">
               {make.error.message}
             </p>
           )}
@@ -197,7 +200,7 @@ export function MoveSheet({
         <button
           type="button"
           onClick={onClose}
-          className="min-h-11 rounded-full bg-notice text-sm font-semibold"
+          className="key inline-flex h-11 items-center justify-center rounded-control text-3xs font-bold uppercase"
         >
           Close
         </button>
@@ -214,7 +217,7 @@ export function MoveSheet({
               bid: amount,
             })
           }
-          className="min-h-11 rounded-full bg-accent text-sm font-semibold text-background disabled:opacity-50"
+          className="key key-ink inline-flex min-h-11 items-center justify-center rounded-control px-4 text-3xs font-bold uppercase"
         >
           {make.isPending ? 'Sending to ESPN…' : `Confirm: ${summary}`}
         </button>
@@ -249,7 +252,7 @@ function DropChoice({
           name="drop"
           checked={checked}
           onChange={onChange}
-          className="size-4 shrink-0"
+          className="size-4 shrink-0 accent-foreground"
         />
         {avatar !== undefined && (
           <PlayerAvatar name={label} headshotUrl={avatar} size={28} />

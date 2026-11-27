@@ -101,7 +101,7 @@ export function WhoHasCard({
         />
         <span>
           <span className="block text-lg font-bold">{e.player.name}</span>
-          <span className="block text-sm font-semibold text-live">
+          <span className="mt-0.5 block text-3xs text-negative uppercase">
             {injuryNews(e.status)}
           </span>
         </span>
@@ -109,7 +109,7 @@ export function WhoHasCard({
           Which team in {e.leagueName} has {e.player.name}?
         </p>
       </header>
-      <ul className="grid grid-cols-2 gap-2">
+      <ul className="grid grid-cols-2 gap-2.5">
         {e.options.map((o) => {
           const isOwner = result?.ownerTeamId === o.teamId
           const wrongPick = result?.pick === o.teamId && !isOwner
@@ -119,17 +119,18 @@ export function WhoHasCard({
                 type="button"
                 disabled={result !== null || pending}
                 onClick={() => onPick(o.teamId)}
+                data-owner={isOwner ? '' : undefined}
                 className={cn(
-                  'min-h-14 w-full rounded-card border px-3 py-2 text-sm font-semibold transition-colors',
+                  'key flex min-h-14 w-full items-center justify-center gap-2 rounded-control px-3 py-2 text-sm font-semibold',
                   isOwner
-                    ? 'border-scoring bg-scoring/15 text-scoring'
+                    ? 'key-ink disabled:opacity-100'
                     : wrongPick
-                      ? 'border-live bg-live/10 text-live'
-                      : result
-                        ? 'border-border text-muted'
-                        : 'border-border bg-surface hover:bg-notice',
+                      ? 'key-pressed text-muted line-through disabled:opacity-100'
+                      : result && 'text-muted',
                 )}
               >
+                {isOwner && <span aria-hidden="true">●</span>}
+                {wrongPick && <span aria-hidden="true">○</span>}
                 {o.name}
               </button>
             </li>
@@ -140,10 +141,10 @@ export function WhoHasCard({
         <div className="flex flex-col items-center gap-3 text-center">
           <p className="text-sm">
             {right ? (
-              <span className="font-semibold text-scoring">Right!</span>
+              <span className="font-bold">Right!</span>
             ) : (
               <>
-                <span className="font-semibold text-live">Not quite.</span>{' '}
+                <span className="font-bold">Not quite.</span>{' '}
                 {owner?.name ?? 'Another team'} has them.
               </>
             )}{' '}
@@ -154,7 +155,7 @@ export function WhoHasCard({
           <button
             type="button"
             onClick={onDone}
-            className="min-h-11 rounded-full bg-accent px-6 text-sm font-semibold text-background"
+            className="key key-ink inline-flex h-11 items-center rounded-control px-6 text-3xs font-bold uppercase"
           >
             Done
           </button>

@@ -63,23 +63,11 @@ function PointsTable({
   const cell = 'text-right tabular-nums'
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_3.5rem_3.5rem] gap-x-3 gap-y-1">
-      <span className="text-3xs font-semibold tracking-wide text-muted uppercase">
-        Stat
-      </span>
-      <span
-        className={cn(
-          cell,
-          'text-3xs font-semibold tracking-wide text-muted uppercase',
-        )}
-      >
+      <span className="text-3xs font-normal text-muted uppercase">Stat</span>
+      <span className={cn(cell, 'text-3xs font-normal text-muted uppercase')}>
         Value
       </span>
-      <span
-        className={cn(
-          cell,
-          'text-3xs font-semibold tracking-wide text-muted uppercase',
-        )}
-      >
+      <span className={cn(cell, 'text-3xs font-normal text-muted uppercase')}>
         Pts
       </span>
       {player.breakdown.map((b) => (
@@ -126,7 +114,7 @@ function DayLine({ line }: { line: NonNullable<LineupPlayer['dayLine']> }) {
       {line.map((l) => (
         <span key={l.label} className="flex flex-col items-center">
           <span className="text-sm font-bold tabular-nums">{l.value}</span>
-          <span className="text-3xs font-semibold tracking-wide text-muted uppercase">
+          <span className="text-3xs font-normal text-muted uppercase">
             {l.label}
           </span>
         </span>

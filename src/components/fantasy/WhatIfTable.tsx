@@ -21,22 +21,22 @@ export function WhatIfTable({
 }) {
   if (whatIf.rows.length === 0)
     return (
-      <p className="text-sm text-muted">
+      <p className="well rounded-card px-4 py-6 text-center text-3xs text-muted uppercase">
         What-if standings show once a week of the season is finished.
       </p>
     )
   return (
     <div className="flex flex-col gap-2">
-      <div className="overflow-x-auto rounded-card border border-border bg-surface">
-        <table className="w-full text-sm whitespace-nowrap tabular-nums">
-          <thead className="text-2xs text-muted uppercase">
-            <tr className="border-b border-border">
-              <th className="py-2 pr-1 pl-3 text-left font-semibold">#</th>
-              <th className="px-1 text-left font-semibold">Team</th>
-              <th className="px-1 text-right font-semibold">What if</th>
-              <th className="px-1 text-right font-semibold">Actual</th>
-              <th className="px-1 text-right font-semibold">Bench</th>
-              <th className="pr-3 pl-1 text-right font-semibold">Flips</th>
+      <div className="overflow-x-auto rounded-card border border-border bg-surface px-3 py-2">
+        <table className="w-full text-[13px] whitespace-nowrap tabular-nums">
+          <thead>
+            <tr className="border-b border-border text-3xs text-muted uppercase">
+              <th className="py-1.5 pr-1 text-left font-normal">#</th>
+              <th className="px-1 text-left font-normal">Team</th>
+              <th className="px-1 text-right font-normal">What if</th>
+              <th className="px-1 text-right font-normal">Actual</th>
+              <th className="px-1 text-right font-normal">Bench</th>
+              <th className="pl-1 text-right font-normal">Flips</th>
             </tr>
           </thead>
           <tbody>
@@ -48,15 +48,15 @@ export function WhatIfTable({
                   aria-current={r.teamId === mine || undefined}
                   className={cn(
                     'border-b border-border last:border-b-0',
-                    r.teamId === mine && 'bg-notice font-semibold',
+                    r.teamId === mine && 'font-bold',
                   )}
                 >
-                  <td className="py-2 pr-1 pl-3 text-muted">{i + 1}</td>
+                  <td className="py-2 pr-1 text-muted">{i + 1}</td>
                   <td className="max-w-36 truncate px-1">{r.name}</td>
                   <td className="px-1 text-right font-semibold">
                     {record(r.whatIfWins, r.whatIfLosses, r.whatIfTies)}
                     {gained > 0 && (
-                      <span className="ml-1 text-2xs text-scoring">
+                      <span className="ml-1 text-2xs text-muted">
                         +{gained}
                       </span>
                     )}
@@ -65,7 +65,7 @@ export function WhatIfTable({
                     {record(r.wins, r.losses, r.ties)}
                   </td>
                   <td className="px-1 text-right">{r.benchLeft.toFixed(1)}</td>
-                  <td className="pr-3 pl-1 text-right">
+                  <td className="pl-1 text-right">
                     {r.flips}
                     {r.oneMoveFlips > 0 && (
                       <span className="text-2xs text-muted">
@@ -80,7 +80,7 @@ export function WhatIfTable({
           </tbody>
         </table>
       </div>
-      <p className="text-2xs text-muted">
+      <p className="text-3xs text-muted">
         Over {whatIf.weeks} finished {whatIf.weeks === 1 ? 'week' : 'weeks'}:
         each team’s record had it started its best lineup every week, against
         its opponents’ real scores. Bench: points its best lineups would have

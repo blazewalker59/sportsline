@@ -17,7 +17,8 @@ import { CategoryBars } from './CategoryBars'
 import { CategoryLineup } from './CategoryLineup'
 import { LineupRows } from './Lineup'
 import { MatchupDays } from './MatchupDays'
-import { dayLabel, daySportsDay, pts, scoreText, sideRecord } from './format'
+import { dayLabel, daySportsDay, scoreText } from './format'
+import { MatchupScoreboard, periodLabel, startersInPlay } from './MatchupHero'
 import type { MatchupPart } from './MatchupDays'
 import type { CategoryDay } from './CategoryBars'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
@@ -41,6 +42,8 @@ import {
 } from '@/lib/fantasy/queries'
 import { matchupColors, matchupSubject } from '@/lib/brand/subject'
 import { SPORTS } from '@/lib/fantasy/sports'
+import { SectionLabel } from '@/components/signal/Section'
+import { useTimeZone } from '@/lib/time/useTimeZone'
 import { cn } from '@/lib/utils'
 
 /**
@@ -185,36 +188,18 @@ export function MatchupDetail({
     m.opponent?.teamId ?? null,
     other === undefined,
   )
-  const side = (s: MatchupSide, align: 'left' | 'right') => (
-    <span
-      className={cn(
-        'flex min-w-0 flex-1 flex-col',
-        align === 'right' && 'subject-b items-end text-right',
-      )}
-    >
-      <span className="subject-ink truncate text-sm font-semibold">
-        {s.name}
-      </span>
-      {s.record && <span className="text-2xs text-muted">{s.record}</span>}
-      <span className="text-3xl leading-tight font-bold tabular-nums">
-        {m.categories
-          ? sideRecord(m, align === 'left' ? 'mine' : 'opponent')
-          : scoreText(m, s.score)}
-      </span>
-      {s.projected !== null && (
-        <span className="text-xs text-muted tabular-nums">
-          proj {pts(s.projected)}
-        </span>
-      )}
-    </span>
-  )
+  const timeZone = useTimeZone()
+  const own = other === undefined
+  // The Viewer's Starters in play (their own Matchup, today).
+  const inPlay =
+    own && today ? startersInPlay(m, allGames, timeZone) : undefined
   return frame({
     title: m.leagueName,
     action: leagueLink && (
       <Link
         to="/fantasy/$leagueId"
         params={{ leagueId: league.id }}
-        className="shrink-0 text-[13px] font-semibold text-muted hover:text-foreground"
+        className="shrink-0 text-3xs font-bold text-muted uppercase hover:text-foreground"
       >
         League ›
       </Link>
@@ -222,16 +207,30 @@ export function MatchupDetail({
     subject: matchupSubject(colors),
     // The score stays in view however far down the Lineups go.
     pinned: (
-      <header className="flex items-start gap-3">
-        {side(m.mine, 'left')}
-        <span className="pt-6 text-sm text-muted">vs</span>
-        {m.opponent ? (
-          side(m.opponent, 'right')
-        ) : (
-          <span className="flex-1 pt-6 text-right text-sm text-muted">
-            Bye week
+      <header className="flex flex-col gap-2">
+        <span className="flex items-center justify-between gap-2 text-3xs text-muted uppercase">
+          <span className="flex min-w-0 items-center gap-2">
+            {(inPlay?.live ?? 0) > 0 && (
+              <span className="led led-pulse" aria-hidden="true" />
+            )}
+            <span className="truncate">{source}</span>
           </span>
-        )}
+          <span className="shrink-0">{periodLabel(m)}</span>
+        </span>
+        <MatchupScoreboard
+          m={m}
+          own={own}
+          inPlay={inPlay}
+          compact
+          names={{
+            mine: <span className="subject-ink">{m.mine.name}</span>,
+            opponent: (
+              <span className="subject-b">
+                <span className="subject-ink">{m.opponent?.name}</span>
+              </span>
+            ),
+          }}
+        />
       </header>
     ),
     children: (
@@ -267,7 +266,7 @@ export function MatchupDetail({
               onRetry={() => read.refetch()}
             />
           ) : read.isSuccess ? (
-            <p className="rounded-card border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
+            <p className="well rounded-card px-3 py-4 text-center text-3xs text-muted uppercase">
               This matchup isn’t in the league’s schedule any more.
             </p>
           ) : (
@@ -300,9 +299,7 @@ export function MatchupDetail({
         ) : (
           <>
             <section>
-              <h3 className="subject-ink mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-                Starters
-              </h3>
+              <SectionLabel as="h3" title="Starters" />
               <LineupRows
                 sport={m.sport}
                 mine={starters(lineups.mine)}
@@ -312,9 +309,7 @@ export function MatchupDetail({
               />
             </section>
             <section>
-              <h3 className="subject-ink mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-                Bench
-              </h3>
+              <SectionLabel as="h3" title="Bench" />
               <LineupRows
                 sport={m.sport}
                 mine={bench(lineups.mine)}
@@ -332,7 +327,7 @@ export function MatchupDetail({
             onOpen={onOther}
           />
         )}
-        <p className="text-2xs text-muted">
+        <p className="text-3xs text-muted">
           {m.categories
             ? `Read from ${source}: categories through yesterday plus today’s starters, refreshed every couple of minutes; toggle above the categories between the whole matchup and the day. Step through the matchup’s days with ‹ ›, or tap the day for any day or the whole matchup’s summary; switch sides above the lineup, and scroll it sideways for every category.`
             : `Read from ${source}. Points refresh every couple of minutes; tap a player’s points for the breakdown.`}
@@ -382,10 +377,8 @@ function LeagueMatchupList({
               : `${left.name}, bye week`
           }
           className={cn(
-            'flex w-full items-center gap-2 rounded-card border px-3 py-2 text-sm tabular-nums',
-            here
-              ? 'border-accent bg-accent-soft'
-              : 'border-border bg-surface hover:bg-notice',
+            'flex w-full items-center gap-2 px-3 py-2.5 text-sm tabular-nums',
+            here ? 'bg-notice' : 'hover:bg-notice',
           )}
         >
           <span
@@ -423,10 +416,8 @@ function LeagueMatchupList({
   }
   return (
     <section>
-      <h3 className="subject-ink mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-        League matchups
-      </h3>
-      <ul className="flex flex-col gap-1.5">
+      <SectionLabel as="h3" title="League matchups" />
+      <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
         {row('mine', current === undefined, own.mine, own.opponent, () =>
           onOpen(undefined),
         )}

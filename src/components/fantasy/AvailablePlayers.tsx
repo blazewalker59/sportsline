@@ -78,10 +78,10 @@ export function AvailablePlayers({
           }}
           placeholder="Search players or teams"
           aria-label="Search available players"
-          className="min-h-10 rounded-card border border-border bg-surface px-3 text-sm placeholder:text-muted"
+          className="well min-h-10 rounded-control px-3 text-sm placeholder:text-muted"
         />
-        <div className="flex items-center gap-1">
-          <span className="mr-auto pl-1 text-xs text-muted tabular-nums">
+        <div className="flex items-center gap-1.5 pt-1">
+          <span className="mr-auto pl-1 text-3xs text-muted tabular-nums uppercase">
             {found.length} {found.length === 1 ? 'player' : 'players'}
           </span>
           {groups.length > 1 && (
@@ -112,7 +112,7 @@ export function AvailablePlayers({
         </div>
       </div>
       {found.length === 0 ? (
-        <p className="text-sm text-muted">
+        <p className="well rounded-card px-4 py-6 text-center text-3xs text-muted uppercase">
           {available.players.length === 0
             ? 'No available players right now.'
             : 'No available player matches that.'}
@@ -136,12 +136,12 @@ export function AvailablePlayers({
         <button
           type="button"
           onClick={() => setShown((n) => n + SHOWN)}
-          className="min-h-10 rounded-card bg-notice text-sm font-semibold"
+          className="key inline-flex h-10 items-center justify-center rounded-control text-3xs font-bold uppercase"
         >
           Show more ({more})
         </button>
       )}
-      <p className="text-2xs text-muted">
+      <p className="text-3xs text-muted">
         {available.order === 'owned'
           ? `Read from ${source} now: the ${available.players.length} most rostered free agents and waiver players, with their stats${available.perGame ? ' per game' : ''}, the share of ${source} leagues that roster each (Rost%) and how it moved this week (+/−). Tap a header to sort by it, a player for their page; scroll the table sideways for every column.`
           : `Read from ${source} now: the ${available.players.length} players no team has, most projected this week first, with their season’s points under the league’s scoring. Tap a header to sort by it, a player for their page.`}

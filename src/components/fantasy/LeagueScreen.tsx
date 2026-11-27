@@ -20,12 +20,14 @@ import { Picker, SectionHead } from './Picker'
 import { WhatIfTable } from './WhatIfTable'
 import { WhoHasSwitch } from './WhoHasSwitch'
 import { HistoryView } from './HistoryView'
+import { MatchupHero } from './MatchupHero'
 import { scoreText } from './format'
 import type { MoveIntent } from './MoveSheet'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { LeagueMatchup, LeagueMatchupSide } from '@/lib/fantasy/matchup'
 import type { FantasyMove } from '@/lib/fantasy/moves'
 import type { Standings } from '@/lib/fantasy/standings'
+import type { GameSummary } from '@/lib/model/timeline'
 import { AppHeader } from '@/components/layout/AppHeader'
 import {
   InlineError,
@@ -84,7 +86,7 @@ export function LeagueScreen({ leagueId }: { leagueId: string }) {
       <AppHeader />
       <Link
         to="/fantasy"
-        className="mb-3 inline-block text-sm font-semibold text-accent"
+        className="mb-3 inline-flex min-h-8 items-center text-3xs font-bold text-foreground/80 uppercase hover:text-foreground"
       >
         ← Fantasy
       </Link>
@@ -109,14 +111,14 @@ export function LeagueScreen({ leagueId }: { leagueId: string }) {
               </h1>
               <span
                 className={cn(
-                  'block truncate text-xs',
-                  league.lastError ? 'text-live' : 'text-muted',
+                  'mt-0.5 block truncate text-3xs uppercase',
+                  league.lastError ? 'text-negative' : 'text-muted',
                 )}
               >
                 {league.lastError ??
                   [
-                    league.teamName,
                     league.provider === 'sleeper' ? 'Sleeper' : 'ESPN',
+                    league.teamName,
                   ]
                     .filter(Boolean)
                     .join(' · ')}
@@ -126,7 +128,7 @@ export function LeagueScreen({ leagueId }: { leagueId: string }) {
           <div
             role="tablist"
             aria-label="League"
-            className="-mt-2 flex gap-5 overflow-x-auto border-b border-border [scrollbar-width:none]"
+            className="well -mt-2 flex gap-1 overflow-x-auto rounded-[13px] p-[3px] [scrollbar-width:none]"
           >
             {TABS.map((t) => (
               <button
@@ -136,10 +138,10 @@ export function LeagueScreen({ leagueId }: { leagueId: string }) {
                 aria-selected={tab === t.key}
                 onClick={() => setTab(t.key)}
                 className={cn(
-                  '-mb-px min-h-10 shrink-0 border-b-2 text-sm font-semibold transition-colors',
+                  'min-h-9 flex-[1_0_auto] rounded-[10px] px-2 text-3xs whitespace-nowrap uppercase transition-colors',
                   tab === t.key
-                    ? 'border-foreground text-foreground'
-                    : 'border-transparent text-muted hover:text-foreground',
+                    ? 'panel bg-surface font-bold text-foreground'
+                    : 'text-muted hover:text-foreground',
                 )}
               >
                 {t.label}
@@ -148,7 +150,9 @@ export function LeagueScreen({ leagueId }: { leagueId: string }) {
           </div>
           {tab === 'overview' ? (
             <>
-              {league.matchup && <Slate league={league} onOpen={setOpen} />}
+              {league.matchup && (
+                <Slate league={league} games={games.data} onOpen={setOpen} />
+              )}
               {page.data?.leaders ? (
                 <LeadersView sport={league.sport} leaders={page.data.leaders} />
               ) : (
@@ -198,9 +202,9 @@ function LeagueSkeleton() {
           <Skeleton className="h-3 w-2/5" />
         </div>
       </div>
-      <div className="-mt-2 flex gap-5 border-b border-border pb-3">
+      <div className="well -mt-2 flex gap-1 rounded-[13px] p-[3px]">
         {TABS.map((t) => (
-          <Skeleton key={t.key} className="h-4 w-16" />
+          <Skeleton key={t.key} className="h-9 flex-1 rounded-[10px]" />
         ))}
       </div>
       <div className="flex flex-col gap-2">
@@ -237,6 +241,7 @@ function StandingsTab({
     <section>
       <SectionHead
         title={view === 'whatIf' ? 'What-if standings' : 'Standings'}
+        index="H1"
       >
         {whatIfs && (
           <Picker
@@ -293,7 +298,10 @@ function PlayersTab({ league }: { league: FantasyLeagueView }) {
       {espn && options.data && !options.data.enabled && (
         <p className="text-xs text-muted">
           Turn on roster moves for ESPN on the{' '}
-          <Link to="/fantasy" className="font-semibold text-accent">
+          <Link
+            to="/fantasy"
+            className="font-semibold text-foreground underline underline-offset-2"
+          >
             Fantasy page
           </Link>{' '}
           to add, drop and claim players here.
@@ -355,12 +363,12 @@ function YourMoves({
   const now = useNow()
   return (
     <section>
-      <SectionHead title="Your moves">
+      <SectionHead title="Your moves" index="H1">
         {canDrop && (
           <button
             type="button"
             onClick={onDrop}
-            className="min-h-8 px-1.5 text-xs font-semibold text-accent"
+            className="key inline-flex h-8 items-center rounded-control px-2.5 text-3xs font-bold text-foreground uppercase"
           >
             Drop a player
           </button>
@@ -387,16 +395,16 @@ function YourMoves({
                   className={cn(
                     'block font-semibold',
                     m.status === 'done'
-                      ? 'text-scoring'
+                      ? 'text-foreground'
                       : m.status === 'refused' || m.status === 'lost'
-                        ? 'text-live'
+                        ? 'text-negative'
                         : 'text-muted',
                   )}
                 >
                   {MOVE_STATUS[m.status]}
                 </span>
                 {now !== null && (
-                  <span className="block text-muted">
+                  <span className="block text-3xs text-muted uppercase">
                     {timeAgo(m.createdAt, now)}
                   </span>
                 )}
@@ -457,87 +465,91 @@ function HistoryTab({ league }: { league: FantasyLeagueView }) {
 }
 
 /**
- * Every Matchup in the league this scoring period, the Viewer's first:
- * each a two-row scoreboard, the leader bold, opening in full.
+ * Every Matchup in the league this scoring period: the Viewer's as the
+ * hero (two dot numerals and the projection meter), the rest as compact
+ * panels, each a two-row scoreboard with the leader bold, opening in full.
  */
 function Slate({
   league,
+  games,
   onOpen,
 }: {
   league: FantasyLeagueView
+  games?: ReadonlyArray<GameSummary>
   onOpen: (matchup: 'mine' | LeagueMatchup) => void
 }) {
   const m = league.matchup!
-  const own: LeagueMatchup = {
-    left: m.mine,
-    right: m.opponent,
-    ...(m.ties ? { ties: m.ties } : {}),
-  }
-  const all = [own, ...(m.others ?? [])]
+  const others = m.others ?? []
   return (
-    <section>
-      <SectionHead title={all.length > 1 ? 'Matchups' : 'This matchup'} />
-      <ul className="grid grid-cols-2 gap-2">
-        {all.map((o, i) => {
-          const mine = i === 0
-          const { left, right } = o
-          const lead =
-            !right || left.score === right.score
-              ? null
-              : left.score > right.score
-                ? 'left'
-                : 'right'
-          const row = (s: LeagueMatchupSide, leading: boolean) => (
-            <span
-              className={cn(
-                'flex items-baseline justify-between gap-2 tabular-nums',
-                leading ? 'font-bold' : 'text-foreground/75',
-              )}
-            >
-              <span className="min-w-0 truncate text-[13px] font-semibold">
-                {s.name}
-              </span>
-              <span className="shrink-0 text-[15px]">
-                {scoreText(m, s.score)}
-              </span>
-            </span>
-          )
-          return (
-            <li key={left.teamId} className="flex">
-              <button
-                type="button"
-                onClick={() => onOpen(mine ? 'mine' : o)}
-                aria-current={mine || undefined}
-                aria-label={
-                  right
-                    ? `${left.name} ${scoreText(m, left.score)}, ${right.name} ${scoreText(m, right.score)}`
-                    : `${left.name}, bye week`
-                }
+    <section className="flex flex-col gap-2">
+      <SectionHead
+        title={others.length > 0 ? 'Matchups' : 'This matchup'}
+        index="H1"
+      >
+        {others.length > 0 && <span>{others.length + 1}</span>}
+      </SectionHead>
+      <MatchupHero
+        league={league}
+        games={games}
+        showLeague={false}
+        onOpen={() => onOpen('mine')}
+      />
+      {others.length > 0 && (
+        <ul className="grid grid-cols-2 gap-2">
+          {others.map((o) => {
+            const { left, right } = o
+            const lead =
+              !right || left.score === right.score
+                ? null
+                : left.score > right.score
+                  ? 'left'
+                  : 'right'
+            const row = (s: LeagueMatchupSide, leading: boolean) => (
+              <span
                 className={cn(
-                  'flex min-w-0 flex-1 flex-col gap-0.5 rounded-card border px-2.5 py-2 text-left hover:bg-notice',
-                  mine
-                    ? 'border-accent bg-accent-soft'
-                    : 'border-border bg-surface',
+                  'flex items-baseline justify-between gap-2 tabular-nums',
+                  leading ? 'font-bold' : 'text-muted',
                 )}
               >
-                {row(left, lead === 'left')}
-                {right ? (
-                  row(right, lead === 'right')
-                ) : (
-                  <span className="text-[13px] text-muted">Bye week</span>
-                )}
-                {(mine || (o.ties ?? 0) > 0) && (
-                  <span className="text-2xs text-muted">
-                    {[mine && 'Your matchup', o.ties && `${o.ties} tied`]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </span>
-                )}
-              </button>
-            </li>
-          )
-        })}
-      </ul>
+                <span className="min-w-0 truncate text-[13px] font-semibold">
+                  {s.name}
+                </span>
+                <span className="shrink-0 text-[15px]">
+                  {scoreText(m, s.score)}
+                </span>
+              </span>
+            )
+            return (
+              <li key={left.teamId} className="flex">
+                <button
+                  type="button"
+                  onClick={() => onOpen(o)}
+                  aria-label={
+                    right
+                      ? `${left.name} ${scoreText(m, left.score)}, ${right.name} ${scoreText(m, right.score)}`
+                      : `${left.name}, bye week`
+                  }
+                  className="flex min-w-0 flex-1 flex-col gap-1 rounded-card border border-border bg-surface px-3 py-2.5 text-left hover:bg-notice"
+                >
+                  {row(left, lead === 'left')}
+                  {right ? (
+                    row(right, lead === 'right')
+                  ) : (
+                    <span className="text-3xs text-muted uppercase">
+                      Bye week
+                    </span>
+                  )}
+                  {(o.ties ?? 0) > 0 && (
+                    <span className="text-3xs text-muted uppercase">
+                      {o.ties} tied
+                    </span>
+                  )}
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </section>
   )
 }
@@ -552,22 +564,22 @@ export function StandingsTable({ standings }: { standings: Standings }) {
   const ties = standings.rows.some((r) => r.ties > 0)
   const cut = standings.playoffTeams
   return (
-    <div className="overflow-x-auto rounded-card border border-border bg-surface">
-      <table className="w-full text-sm whitespace-nowrap tabular-nums">
-        <thead className="text-2xs text-muted uppercase">
-          <tr className="border-b border-border">
-            <th className="py-2 pr-1 pl-3 text-left font-semibold">#</th>
-            <th className="px-1 text-left font-semibold">Team</th>
-            <th className="px-1 text-right font-semibold">
+    <div className="overflow-x-auto rounded-card border border-border bg-surface px-3 py-2">
+      <table className="w-full text-[13px] whitespace-nowrap tabular-nums">
+        <thead>
+          <tr className="border-b border-border text-3xs text-muted uppercase">
+            <th className="py-1.5 pr-1 text-left font-normal">#</th>
+            <th className="px-1 text-left font-normal">Team</th>
+            <th className="px-1 text-right font-normal">
               {ties ? 'W-L-T' : 'W-L'}
             </th>
             {points && (
               <>
-                <th className="px-1 text-right font-semibold">PF</th>
-                <th className="px-1 text-right font-semibold">PA</th>
+                <th className="px-1 text-right font-normal">PF</th>
+                <th className="px-1 text-right font-normal">PA</th>
               </>
             )}
-            <th className="pr-3 pl-1 text-right font-semibold">Strk</th>
+            <th className="pl-1 text-right font-normal">Strk</th>
           </tr>
         </thead>
         <tbody>
@@ -575,16 +587,21 @@ export function StandingsTable({ standings }: { standings: Standings }) {
             <tr
               key={r.teamId}
               aria-current={r.mine || undefined}
+              data-playoff-cut={
+                cut !== null && r.rank === cut && r.rank < standings.rows.length
+                  ? ''
+                  : undefined
+              }
               className={cn(
                 'border-b border-border last:border-b-0',
-                r.mine && 'bg-notice font-semibold',
+                r.mine && 'font-bold',
                 cut !== null &&
                   r.rank === cut &&
                   r.rank < standings.rows.length &&
-                  'border-b-2 border-b-muted/50',
+                  'border-b-[1.5px] border-dashed border-b-muted',
               )}
             >
-              <td className="py-2 pr-1 pl-3 text-muted">{r.rank}</td>
+              <td className="py-2 pr-1 text-muted">{r.rank}</td>
               <td className="max-w-40 truncate px-1">{r.name}</td>
               <td className="px-1 text-right">
                 {r.wins}-{r.losses}
@@ -602,12 +619,8 @@ export function StandingsTable({ standings }: { standings: Standings }) {
               )}
               <td
                 className={cn(
-                  'pr-3 pl-1 text-right',
-                  r.streak?.startsWith('W')
-                    ? 'text-scoring'
-                    : r.streak?.startsWith('L')
-                      ? 'text-live'
-                      : 'text-muted',
+                  'pl-1 text-right',
+                  !r.streak?.startsWith('W') && 'text-muted',
                 )}
               >
                 {r.streak ?? '—'}
@@ -617,7 +630,7 @@ export function StandingsTable({ standings }: { standings: Standings }) {
         </tbody>
       </table>
       {cut !== null && cut < standings.rows.length && (
-        <p className="border-t border-border px-3 py-1.5 text-2xs text-muted">
+        <p className="mt-1.5 text-3xs text-muted uppercase">
           Top {cut} make the playoffs.
         </p>
       )}
