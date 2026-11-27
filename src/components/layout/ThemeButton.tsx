@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Theme } from '@/lib/theme'
 import { currentTheme, setTheme } from '@/lib/theme'
 
-/** Light ↔ dark; remembered in this browser. */
+/** Light ↔ dark, as a round key; remembered in this browser. */
 export function ThemeButton() {
   const [theme, setThemeState] = useState<Theme>('light')
   useEffect(() => setThemeState(currentTheme()), [])
@@ -16,11 +16,11 @@ export function ThemeButton() {
       }}
       aria-label={`Switch to ${next} mode`}
       title={`Switch to ${next} mode`}
-      className="flex size-11 items-center justify-center rounded-full text-muted hover:text-foreground"
+      className="key flex size-10 shrink-0 items-center justify-center rounded-full"
     >
       <svg
-        width="20"
-        height="20"
+        width="18"
+        height="18"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"

@@ -1,6 +1,7 @@
 /**
  * The app's section icons, shared by the main navigation (AppNav) and the
- * account menu (AppHeader), each in its section's color.
+ * account menu (AppHeader). Signal draws them in ink, like the legends on
+ * a device's keys: a section is told by its glyph, not a color.
  */
 
 import { cn } from '@/lib/utils'
@@ -16,17 +17,21 @@ export type IconName =
   | 'health'
   | 'signOut'
 
-/** Each section's color, so items read apart at a glance. */
+/**
+ * An icon's seat where it stands alone (a menu row, a prompt): a recessed
+ * well with the glyph in ink. One for every section, so they sit as a set.
+ */
+const ICON_SEAT = 'well text-foreground'
 export const ICON_TONES: Record<IconName, string> = {
-  all: 'bg-accent/15 text-accent',
-  follows: 'bg-accent/15 text-accent',
-  reactions: 'bg-section-reactions/15 text-section-reactions',
-  predictions: 'bg-section-predictions/15 text-section-predictions',
-  fantasy: 'bg-section-fantasy/15 text-section-fantasy',
-  alerts: 'bg-section-alerts/15 text-section-alerts',
-  agents: 'bg-section-agents/15 text-section-agents',
-  health: 'bg-section-health/15 text-section-health',
-  signOut: 'bg-live/10 text-live',
+  all: ICON_SEAT,
+  follows: ICON_SEAT,
+  reactions: ICON_SEAT,
+  predictions: ICON_SEAT,
+  fantasy: ICON_SEAT,
+  alerts: ICON_SEAT,
+  agents: ICON_SEAT,
+  health: ICON_SEAT,
+  signOut: ICON_SEAT,
 }
 
 const ICON_PATHS: Record<IconName, React.ReactNode> = {
@@ -65,7 +70,10 @@ const ICON_PATHS: Record<IconName, React.ReactNode> = {
   signOut: <path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10" />,
 }
 
-/** The bare icon, in the current text color. */
+/**
+ * The bare icon, in the current text color: a 1.75 line on a 24 grid,
+ * drawn with geometric precision so it stays crisp at any key size.
+ */
 export function NavGlyph({
   name,
   className,
@@ -77,8 +85,9 @@ export function NavGlyph({
     <svg
       viewBox="0 0 24 24"
       aria-hidden="true"
+      shapeRendering="geometricPrecision"
       className={cn(
-        'size-4 fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round]',
+        'size-4 shrink-0 fill-none stroke-current stroke-[1.75] [stroke-linecap:round] [stroke-linejoin:round]',
         className,
       )}
     >

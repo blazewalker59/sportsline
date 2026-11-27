@@ -29,20 +29,35 @@ function Frame({ children }: { children: React.ReactNode }) {
   )
 }
 
+/** The primary key: the one thing to do next (Signal's `.key-ink`). */
+const KEY_INK =
+  'key key-ink inline-flex min-h-11 items-center justify-center rounded-control px-5 text-3xs font-bold uppercase'
+
+/**
+ * A screen in place of the screen: a well recessed into the page, labelled
+ * like a manual ("Error", "Not found") with an unlit light, then what
+ * happened and one key.
+ */
 function Panel({
+  label,
   title,
   body,
   children,
 }: {
+  label: string
   title: string
   body: string
   children?: React.ReactNode
 }) {
   return (
-    <div className="mt-16 flex flex-col items-center gap-3 text-center">
-      <h1 className="text-lg font-bold tracking-tight">{title}</h1>
+    <div className="well mt-10 flex flex-col items-center gap-3 rounded-card px-5 py-10 text-center">
+      <span className="flex items-center gap-2 text-3xs text-muted uppercase">
+        <span aria-hidden="true" className="led led-ink" />
+        {label}
+      </span>
+      <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
       <p className="max-w-sm text-sm text-muted">{body}</p>
-      <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+      <div className="mt-2 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
         {children}
       </div>
     </div>
@@ -58,8 +73,8 @@ function TimelineLink({ primary }: { primary?: boolean }) {
       to="/"
       className={
         primary
-          ? 'flex min-h-11 items-center rounded-full bg-foreground px-5 text-sm font-semibold text-background'
-          : 'flex min-h-11 items-center rounded-full bg-accent-soft px-5 text-sm font-semibold text-accent'
+          ? KEY_INK
+          : 'flex min-h-11 items-center text-sm font-medium text-accent underline underline-offset-4'
       }
     >
       Back to the Timeline
@@ -111,12 +126,16 @@ export function RouteErrorPanel({ error, reset }: ErrorComponentProps) {
   return (
     <Frame>
       <div role="alert">
-        <Panel title="Couldn’t load this" body={messageFor(error)}>
+        <Panel
+          label="Error"
+          title="Couldn’t load this"
+          body={messageFor(error)}
+        >
           <button
             type="button"
             onClick={() => void retry()}
             disabled={retrying}
-            className="min-h-11 rounded-full bg-foreground px-5 text-sm font-semibold text-background disabled:opacity-60"
+            className={KEY_INK}
           >
             {retrying ? 'Trying…' : 'Try again'}
           </button>
@@ -152,6 +171,7 @@ export function NotFoundPanel({
 export function NotFoundState({ what = 'page' }: { what?: string }) {
   return (
     <Panel
+      label="Not found"
       title={`No such ${what}`}
       body={`This ${what} doesn’t exist, or the link to it is out of date.`}
     >
@@ -225,12 +245,12 @@ export function ScreenError({
   const { retrying, retry } = useRetry(onRetry)
   return (
     <div role="alert">
-      <Panel title="Couldn’t load this" body={messageFor(error)}>
+      <Panel label="Error" title="Couldn’t load this" body={messageFor(error)}>
         <button
           type="button"
           onClick={retry}
           disabled={retrying}
-          className="min-h-11 rounded-full bg-foreground px-5 text-sm font-semibold text-background disabled:opacity-60"
+          className={KEY_INK}
         >
           {retrying ? 'Trying…' : 'Try again'}
         </button>
@@ -263,14 +283,16 @@ export function InlineError({
     <div
       role="alert"
       className={cn(
-        'flex items-center gap-3 rounded-card border border-border bg-surface px-3 py-2.5 text-sm',
+        'well flex items-center gap-3 rounded-card px-3.5 py-3 text-sm',
         className,
       )}
     >
       <span className="min-w-0 flex-1">
-        <span className="block font-semibold text-negative">
-          {`Couldn’t load ${what}.`}
+        <span className="mb-0.5 flex items-center gap-1.5 text-3xs text-muted uppercase">
+          <span aria-hidden="true" className="led led-ink size-1.5" />
+          Error
         </span>
+        <span className="block font-semibold">{`Couldn’t load ${what}.`}</span>
         <span className="block text-xs text-muted">
           {userMessage(error) ?? 'Trying again usually works.'}
         </span>
@@ -279,7 +301,7 @@ export function InlineError({
         type="button"
         onClick={retry}
         disabled={retrying}
-        className="min-h-9 shrink-0 rounded-full bg-notice px-3 text-sm font-semibold disabled:opacity-60"
+        className="key inline-flex h-9 shrink-0 items-center rounded-control px-3 text-3xs font-bold uppercase"
       >
         {retrying ? 'Trying…' : 'Try again'}
       </button>

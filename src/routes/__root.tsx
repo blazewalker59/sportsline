@@ -17,6 +17,7 @@ import { THEME_BOOT, THEME_COLOR_BOOT } from '../lib/theme'
 import type { QueryClient } from '@tanstack/react-query'
 import { PlayerSheetProvider } from '@/components/players/PlayerSheetProvider'
 import { AppShell } from '@/components/layout/AppNav'
+import { Mark } from '@/components/signal/Logo'
 import { Landing } from '@/components/landing/LazyLanding'
 import { WhoHasPopup } from '@/components/fantasy/LazyWhoHas'
 import { useViewer } from '@/lib/viewer/useViewer'
@@ -128,6 +129,10 @@ function Crashed({ error }: { error: unknown }) {
   }, [error])
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-background px-6 text-center">
+      <span className="flex items-center gap-2 text-3xs text-muted uppercase">
+        <span className="led led-off" aria-hidden="true" />
+        Fault
+      </span>
       <p className="text-lg font-bold">Something went wrong</p>
       <p className="max-w-sm text-sm text-muted">
         It’s been reported. Reloading usually gets you going again.
@@ -135,7 +140,7 @@ function Crashed({ error }: { error: unknown }) {
       <button
         type="button"
         onClick={() => window.location.reload()}
-        className="min-h-11 rounded-full bg-foreground px-5 text-sm font-semibold text-background"
+        className="key key-ink mt-1 min-h-11 rounded-control px-5 text-3xs font-bold uppercase"
       >
         Reload
       </button>
@@ -147,13 +152,7 @@ function Crashed({ error }: { error: unknown }) {
 function Splash() {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-background">
-      <img
-        src="/favicon.svg"
-        alt="Sportsline"
-        width={44}
-        height={44}
-        className="animate-pulse"
-      />
+      <Mark title="Sportsline" className="h-11 motion-safe:animate-pulse" />
     </div>
   )
 }
