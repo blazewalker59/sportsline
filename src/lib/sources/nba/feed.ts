@@ -48,6 +48,11 @@ export interface NbaSummary {
         athletes?: Array<NbaBoxAthlete>
       }>
     }>
+    /** Each team's totals (`totalRebounds`, `fieldGoalPct`…). */
+    teams?: Array<{
+      team: { id: string }
+      statistics?: Array<{ name: string; displayValue?: string }>
+    }>
   }
 }
 

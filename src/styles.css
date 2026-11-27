@@ -863,6 +863,23 @@ body:has(.subject-page) {
     var(--s-ink) var(--subject-ink-amount)
   );
 }
+/*
+  Both teams' lines at once, for a head-to-head that shows the two side by
+  side (the box score's team totals). Resolved here, so a part of the
+  second team's inside doesn't swap them.
+*/
+.subject {
+  --subject-line-a: color-mix(
+    in srgb,
+    var(--subject-ink-base),
+    var(--s-ink) var(--subject-ink-amount)
+  );
+  --subject-line-b: color-mix(
+    in srgb,
+    var(--subject-ink-base),
+    var(--s2-ink) var(--subject-ink-amount)
+  );
+}
 /* Two teams: a shared chart isn't either's; it keeps its own color. */
 .subject.subject-crown--split {
   --subject-line: initial;

@@ -42,6 +42,7 @@ import type {
   SourceRoster,
   SourceTeam,
 } from '@/lib/model/types'
+import { FOOTBALL_TEAM_STATS, espnTeamStats } from '@/lib/games/teamStats'
 import { sportsDayOf } from '@/lib/model/sportsDay'
 
 export { quarterLabel }
@@ -404,6 +405,12 @@ function box(
       homeTotals: [Number(homeC.score ?? 0)],
     },
     tables,
+    teamStats: espnTeamStats(
+      summary.boxscore?.teams,
+      awayC.team.id,
+      homeC.team.id,
+      FOOTBALL_TEAM_STATS,
+    ),
   }
 }
 

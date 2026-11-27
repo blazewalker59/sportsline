@@ -685,6 +685,7 @@ function storedBox(
         player: { id: ids.get(r.player.sourceId) ?? null, name: r.player.name },
       })),
     })),
+    ...(box.teamStats ? { teamStats: box.teamStats } : {}),
   }
 }
 

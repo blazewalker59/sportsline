@@ -95,6 +95,10 @@ interface NhlSkaterLine {
   hits?: number
   sog?: number
   toi?: string
+  powerPlayGoals?: number
+  blockedShots?: number
+  giveaways?: number
+  takeaways?: number
 }
 
 interface NhlGoalieLine {
@@ -105,6 +109,7 @@ interface NhlGoalieLine {
   savePctg?: number
   toi?: string
   starter?: boolean
+  saves?: number
 }
 
 interface NhlTeamStats {

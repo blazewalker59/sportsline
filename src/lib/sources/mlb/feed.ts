@@ -207,6 +207,23 @@ export interface MlbBoxTeam {
   batters?: Array<number>
   pitchers?: Array<number>
   players?: Record<string, MlbBoxPlayer | undefined>
+  /** The team's totals for the Game. */
+  teamStats?: {
+    batting?: Partial<
+      Record<
+        | 'hits'
+        | 'doubles'
+        | 'homeRuns'
+        | 'baseOnBalls'
+        | 'strikeOuts'
+        | 'leftOnBase'
+        | 'stolenBases',
+        number
+      >
+    >
+    pitching?: Partial<Record<'strikeOuts' | 'numberOfPitches', number>>
+    fielding?: Partial<Record<'errors', number>>
+  }
 }
 
 /** A player with season and game-log stats (`/people/{id}?hydrate=stats(…)`). */

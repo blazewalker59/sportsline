@@ -35,6 +35,7 @@ import type {
   SourcePlay,
   SourceRoster,
 } from '@/lib/model/types'
+import { BASKETBALL_TEAM_STATS, espnTeamStats } from '@/lib/games/teamStats'
 import {
   BASKETBALL_MILESTONE_CREDIT,
   basketballMilestones,
@@ -335,6 +336,12 @@ function box(
       homeTotals: [Number(homeC.score ?? 0)],
     },
     tables,
+    teamStats: espnTeamStats(
+      summary.boxscore?.teams,
+      awayC.team.id,
+      homeC.team.id,
+      BASKETBALL_TEAM_STATS,
+    ),
   }
 }
 
