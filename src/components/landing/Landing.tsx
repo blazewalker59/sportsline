@@ -585,16 +585,16 @@ function Device() {
           )}
         />
       ))}
-      {/* The display: always dark glass, dots lit. */}
+      {/* The display: always dark glass, lit in the label face. */}
       <div className="flex flex-col justify-between overflow-hidden rounded-card bg-black p-4 text-[#f2f1ec] shadow-[inset_0_0_0_2px_#000,inset_0_6px_20px_rgb(0_0_0/0.6)]">
         <span className="flex items-center justify-between font-label text-[10px] tracking-widest text-[#8f8e88] uppercase">
           KC @ DEN
           <span className="led led-pulse" />
         </span>
-        <span className="font-dots text-2xl leading-none font-black text-signal">
+        <span className="font-label text-2xl leading-none font-bold text-signal">
           WADDLE TD
         </span>
-        <span className="font-dots text-base leading-none font-bold text-[#bdbcb5]">
+        <span className="font-label text-base leading-none font-bold text-[#bdbcb5]">
           18 YDS FROM NIX
         </span>
         <Num className="text-[2.75rem]">

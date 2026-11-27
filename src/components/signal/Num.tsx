@@ -1,9 +1,9 @@
 /**
- * A number set in dots (Signal's Doto): the figure a screen is about, such
- * as a score, a portfolio's worth or a Matchup's points. Doto's punctuation
- * is redrawn as plain dots (scripts/fonts/doto-punctuation.py), so a value
- * like "3:41" or "$412.80" reads as written. A unit (%, ¢, pts) is set
- * small beside it, in the label face, since Doto's are hard to read.
+ * The figure a screen is about (Signal): a score, a clock, a portfolio's
+ * worth, a Matchup's points. Inter at its heaviest, tightly set, with
+ * tabular figures so a changing score doesn't shift. Never the dot matrix:
+ * numbers and scores are always read in Inter. A unit (%, ¢, pts) is set
+ * small beside it, in the label face.
  */
 
 import { cn } from '@/lib/utils'
@@ -23,7 +23,7 @@ export function Num({
     <span
       title={title}
       className={cn(
-        'font-dots leading-[0.85] font-black tracking-[-0.02em] tabular-nums',
+        'font-sans leading-[0.9] font-extrabold tracking-[-0.035em] tabular-nums',
         className,
       )}
     >

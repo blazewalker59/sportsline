@@ -6,8 +6,8 @@
 
 /*
   Signal's three faces, served from the app (OFL, see fonts/OFL.txt): Inter
-  for words, Space Mono for labels, Doto (dot matrix) for the numbers that
-  matter. Latin is preloaded from the head (__root.tsx); latin-ext loads
+  for words and every number, Space Mono for labels, Doto (dot matrix) for
+  the wordmark only. Latin is preloaded from the head (__root.tsx); latin-ext loads
   only when a name needs it. Swap, so text never waits.
 */
 @font-face {
@@ -105,8 +105,10 @@
   Pair a tone's text with its own wash: `bg-positive/15 text-positive`.
 
   Type: Inter for words; Space Mono for labels (every uppercase run, see
-  below); Doto (`font-dots`, or <Num>) for the numbers that are the point
-  of a screen. text-3xs (11px) is the floor.
+  below); <Num> sets the number a screen is about in heavy Inter. Doto
+  (`font-dots`) is the wordmark's alone: never numbers or scores. Dots
+  otherwise only draw progress (meters, the countdown ring).
+  text-3xs (11px) is the floor.
   Radius: rounded-control (keys, chips), rounded-card (panels),
   rounded-sheet (sheets); rounded-full for pills and lights.
 */
@@ -432,7 +434,7 @@ textarea,
     box-shadow: 0 0 6px var(--signal);
   }
 
-  /* A unit beside a dot numeral (%, ¢): Doto's are hard to read. */
+  /* A unit beside a <Num> (%, ¢, pts): small, in the label face. */
   .num-unit {
     font-family: var(--font-label);
     font-weight: 700;

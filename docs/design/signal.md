@@ -1,7 +1,8 @@
 # Signal: Sportsline's design language
 
-Sportsline as a piece of hardware: aluminum and ink, numbers in dots,
-labels like a manual, and one orange light that means **live**. The
+Sportsline as a piece of hardware: aluminum and ink, labels like a manual,
+and one orange light that means **live**. Dots draw the mark and progress,
+never numbers. The
 interactive prototype is `docs/design/signal.html` (open it in a browser):
 every screen below has a reference there.
 
@@ -13,11 +14,12 @@ every screen below has a reference there.
    Leg). Nothing else is orange: not buttons, not links, not headings, not
    decoration. `text-live` / `text-scoring` / `text-in-play` are the same
    orange, deepened for text contrast.
-2. **Numbers in dots, words in plain text.** The figure a screen is about
+2. **Numbers in heavy Inter, never in dots.** The figure a screen is about
    (a score, a clock, a portfolio's worth, a Matchup's points, a win chance)
-   is set in Doto with `<Num>`. Tables, stat lines and running text stay in
-   Inter with `tabular-nums`. One or two dot numerals per screen; more
-   becomes noise.
+   is set with `<Num>`: Inter at its heaviest, tightly set, tabular. Tables,
+   stat lines and running text are Inter too, at their usual weights. The
+   dot matrix is for the mark and wordmark, and for progress (segmented
+   meters, the countdown ring): never a number or a score.
 3. **Label everything the way a manual would.** Small uppercase labels are
    Space Mono automatically (`.uppercase` in styles.css sets the face):
    `text-3xs text-muted uppercase`. Section heads use `<SectionLabel>`, with
@@ -59,16 +61,17 @@ Radii: `rounded-control` 10px (keys, chips), `rounded-card` 18px (panels),
 - **Inter** (`font-sans`, the default): everything you read.
 - **Space Mono** (`font-label` / `font-mono`): labels, captions, clocks in
   running text, the nav. Every `uppercase` run gets it automatically.
-- **Doto** (`font-dots`, via `<Num>`): hero numbers and the wordmark only.
-  Its punctuation is redrawn (scripts/fonts/doto-punctuation.py), so
-  "3:41" and "$412.80" read right. Units go in `unit`:
-  `<Num unit="%">64</Num>`, `<Num unit="¢">64</Num>`.
+- **Doto** (`font-dots`): the wordmark only. Never numbers or scores.
+  (Its punctuation is redrawn, scripts/fonts/doto-punctuation.py, in case a
+  future mark needs it.)
+- **Numbers:** `<Num>` sets heavy Inter with tabular figures. Units go in
+  `unit`: `<Num unit="%">64</Num>`, `<Num unit="¢">64</Num>`.
 
 ## Parts
 
 | Part | Where | Use |
 |---|---|---|
-| `<Num>` | `components/signal/Num.tsx` | Dot numerals |
+| `<Num>` | `components/signal/Num.tsx` | The figure a screen is about, in heavy Inter |
 | `<Meter value label segments?>` | `components/signal/Meter.tsx` | Win chance, projection pace, Progress, Odds |
 | `<SectionLabel title index?>` | `components/signal/Section.tsx` | Section heads |
 | `<Segmented label value options onChange>` | `components/signal/Segmented.tsx` | A choice of a few: keys in a well, the current one pressed (a radio group) |
@@ -90,10 +93,10 @@ routine / lost-unlit. Up and down: `▲` `▼` with `text-positive` /
 
 - **Home board / hero** (Timeline, Predictions, Fantasy): a panel with a
   label row (a pulsing `.led` when live, the context in the label face), the
-  one dot numeral (or two, side by side for a score), and a `<Meter>` under
+  one `<Num>` figure (or two, side by side for a score), and a `<Meter>` under
   it with a label row beneath (BOS · Knicks win chance 64% · NYK).
 - **Game tiles**: panel, label row (light + League, clock), two rows team
-  chip + abbreviation + dot score; the losing side muted.
+  chip + abbreviation + `<Num>` score; the losing side muted.
 - **Feed (Timeline)**: the chat bubbles stay (they are the product), drawn
   as panels: hairline, the lit top edge, team-tint wash kept faint. A Scoring
   Play's card is ink-inverted (foreground fill, background text) with an

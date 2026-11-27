@@ -373,12 +373,18 @@
         text-transform: uppercase;
         color: var(--mut);
       }
+      /* Numbers: heavy Inter, never dots (the dots are the mark's). */
       .dn {
+        font-family: 'Inter', sans-serif;
+        font-weight: 800;
+        letter-spacing: -0.035em;
+        line-height: 0.9;
+        font-variant-numeric: tabular-nums;
+      }
+      .wm {
         font-family: 'Doto', monospace;
         font-weight: 900;
         letter-spacing: -0.02em;
-        line-height: 0.85;
-        font-variant-numeric: tabular-nums;
       }
       .o {
         color: var(--o);
@@ -819,8 +825,8 @@
         background: #1c1c1c;
       }
       .dock .scope {
-        font-family: 'Doto';
-        font-weight: 900;
+        font-family: 'Space Mono';
+        font-weight: 700;
         font-size: 25px;
         line-height: 1;
         margin-top: 3px;
@@ -995,8 +1001,9 @@
       }
       .lock .clock {
         text-align: center;
-        font-family: 'Doto';
-        font-weight: 900;
+        font-family: 'Inter';
+        font-weight: 800;
+        letter-spacing: -0.04em;
         font-size: 92px;
         line-height: 1;
         margin-top: 18px;
@@ -1408,7 +1415,7 @@
         return `<svg width="${5 * pitch - gap}" height="${7 * pitch - gap}" viewBox="0 0 ${5 * pitch - gap} ${7 * pitch - gap}">${o}</svg>`
       }
       const wordmark = (size = 20) =>
-        `<span class="mark">${markSvg(size / 6.3, size / 16)}<span class="dn" style="font-size:${size}px;line-height:1">sportsline<span class="dp" style="color:#ff4f00"></span></span></span>`
+        `<span class="mark">${markSvg(size / 6.3, size / 16)}<span class="wm" style="font-size:${size}px;line-height:1">sportsline<span class="dp" style="color:#ff4f00"></span></span></span>`
       const meter = (n, of = 24, cls = '') =>
         `<div class="meter ${cls}" style="grid-template-columns:repeat(${of},1fr)">${Array.from({ length: of }, (_, i) => `<i class="${i < n ? (i === n - 1 ? 'edge' : 'on') : ''}"></i>`).join('')}</div>`
       const sec = (no, nm, mt = '') =>
@@ -2042,23 +2049,12 @@
               ? viewPhone()
               : viewDesktop()
         $('main').innerHTML =
-          `<div class="sig ${st.dark ? 'dark' : ''}" style="min-height:100%">${dotPunct(html)}</div>`
+          `<div class="sig ${st.dark ? 'dark' : ''}" style="min-height:100%">${html}</div>`
         document.querySelectorAll('.content, .desk .col').forEach((n, i) => {
           if (scroll[i] !== undefined) n.scrollTop = scroll[i]
         })
         $('main').scrollTop = mainScroll
         st.newId = null
-      }
-      /** Doto draws . and : as crosses: give its numerals real dots. */
-      function dotPunct(html) {
-        return html.replace(
-          /(class="(?:dn|scope|clock)[^"]*"[^>]*>)([^<]*)/g,
-          (_, open, text) =>
-            open +
-            text
-              .replace(/\./g, '<span class="dp"></span>')
-              .replace(/:/g, '<span class="dc"></span>'),
-        )
       }
       const go = (id) => {
         st.view = st.view === 'flow' ? 'phone' : st.view
