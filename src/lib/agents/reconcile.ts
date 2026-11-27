@@ -24,7 +24,7 @@ import { signedGet } from '@/lib/kalshi/client'
  */
 export const SETTLE_AFTER_MS = 3 * 60_000
 
-interface KalshiOrder {
+export interface KalshiOrder {
   order_id: string
   client_order_id?: string
   status?: string
@@ -63,10 +63,20 @@ export function unsettledTrades(
     )
 }
 
+/** What finding an order by its client order id needs (a proposal, a cash out). */
+export interface SentOrder {
+  /** The client order id. */
+  id: string
+  marketTicker: string
+  /** When it was sent (else created). */
+  decidedAt: string | null
+  createdAt: string
+}
+
 /** Our order on Kalshi, by its client order id; null if Kalshi has none. */
-async function findOrder(
+export async function findOrder(
   account: KalshiAccount,
-  p: TradeProposal,
+  p: SentOrder,
 ): Promise<KalshiOrder | null> {
   // From a minute before it was approved, in seconds.
   const since = Math.floor(Date.parse(p.decidedAt ?? p.createdAt) / 1000) - 60
@@ -85,9 +95,9 @@ async function findOrder(
 }
 
 /** What filled of an order: contracts, average price for our side, fees. */
-async function fillsOf(
+export async function fillsOf(
   account: KalshiAccount,
-  p: TradeProposal,
+  p: Pick<TradeProposal, 'side'>,
   orderId: string,
 ): Promise<{ filled: number; avgPrice: number | null; fees: number }> {
   const r = await signedGet<{ fills?: Array<KalshiFill> }>(

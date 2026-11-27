@@ -72,40 +72,67 @@ export async function signedGet<T>(
 }
 
 /**
- * A signed write (docs/adr/0008: only placing an approved order). Never
- * retried: a lost reply could mean the order went through.
+ * A signed write: placing an order (an Agent's approved one, docs/adr/0008,
+ * or a Viewer's cash out, docs/adr/0012), or a cash out's quote request.
+ * Never retried: a lost reply could mean it went through.
  */
-export async function signedPost<T>(
+async function signedWrite<T>(
   account: KalshiAccount,
+  method: 'POST' | 'PUT' | 'DELETE',
   path: string,
-  body: unknown,
+  body?: unknown,
 ): Promise<T> {
   await pace()
   const timestamp = String(Date.now())
+  // Kalshi signs timestamp + method + path, without the query string.
   const signature = await signMessage(
     account.signer,
-    `${timestamp}POST${PREFIX}${path}`,
+    `${timestamp}${method}${PREFIX}${path.split('?')[0]}`,
   )
   const res = await fetch(`${KALSHI_HOST}${PREFIX}${path}`, {
-    method: 'POST',
+    method,
     headers: {
       accept: 'application/json',
-      'content-type': 'application/json',
+      ...(body === undefined ? {} : { 'content-type': 'application/json' }),
       'KALSHI-ACCESS-KEY': account.keyId,
       'KALSHI-ACCESS-TIMESTAMP': timestamp,
       'KALSHI-ACCESS-SIGNATURE': signature,
     },
-    body: JSON.stringify(body),
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })
   if (!res.ok) {
-    // Kalshi explains a rejected order in its body (e.g. insufficient balance).
+    // Kalshi explains a refusal in its body (e.g. insufficient balance).
     const detail = await res.text().catch(() => '')
     throw new KalshiError(
       res.status,
       `Kalshi ${res.status} for ${path}${detail ? `: ${detail.slice(0, 300)}` : ''}`,
     )
   }
-  return (await res.json()) as T
+  const text = await res.text()
+  return (text ? JSON.parse(text) : {}) as T
+}
+
+export function signedPost<T>(
+  account: KalshiAccount,
+  path: string,
+  body: unknown,
+): Promise<T> {
+  return signedWrite<T>(account, 'POST', path, body)
+}
+
+export function signedPut<T>(
+  account: KalshiAccount,
+  path: string,
+  body: unknown,
+): Promise<T> {
+  return signedWrite<T>(account, 'PUT', path, body)
+}
+
+export function signedDelete<T>(
+  account: KalshiAccount,
+  path: string,
+): Promise<T> {
+  return signedWrite<T>(account, 'DELETE', path)
 }
 
 // ─── Shapes (loose: every field may be absent) ─────────────────────────────
@@ -291,6 +318,37 @@ export async function recentSettlements(
     if (!cursor) break
   }
   return out
+}
+
+/** An event, for its series (the page it's on at Kalshi). */
+export async function event(
+  account: KalshiAccount,
+  eventTicker: string,
+): Promise<{ event_ticker: string; series_ticker?: string } | null> {
+  try {
+    const r = await signedGet<{
+      event?: { event_ticker: string; series_ticker?: string }
+    }>(account, `/events/${encodeURIComponent(eventTicker)}`)
+    return r.event ?? null
+  } catch (error) {
+    if (error instanceof KalshiError && error.status === 404) return null
+    throw error
+  }
+}
+
+/**
+ * The Viewer's position in one market now, in contracts: positive YES,
+ * negative NO, 0 for none.
+ */
+export async function positionIn(
+  account: KalshiAccount,
+  ticker: string,
+): Promise<number> {
+  const r = await signedGet<{
+    market_positions?: Array<KalshiMarketPosition>
+  }>(account, `/portfolio/positions?ticker=${encodeURIComponent(ticker)}`)
+  const p = r.market_positions?.find((m) => m.ticker === ticker)
+  return Number(p?.position_fp ?? 0) || 0
 }
 
 export async function market(

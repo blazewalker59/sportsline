@@ -3,6 +3,7 @@
  * sheet, or beside the wide Timeline its pane (same content, another frame).
  */
 
+import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import {
   PropProgress,
@@ -16,6 +17,7 @@ import {
   toneOf,
 } from './PredictionParts'
 import { PredictionGames } from './PredictionGames'
+import { KalshiActions, kalshiLinksQuery } from './CashOut'
 import type { LegView, PredictionView } from '@/lib/kalshi/predictionViews'
 import type { SheetFrame } from '@/components/chat/Sheet'
 import { OddsChart } from '@/components/charts/lazy'
@@ -43,6 +45,7 @@ function LegRow({
   leg,
   index,
   pip,
+  predictionId,
   onNavigate,
 }: {
   leg: LegView
@@ -50,8 +53,14 @@ function LegRow({
   index: number | null
   /** Its own team's pip (when the sheet isn't one team's). */
   pip: boolean
+  predictionId: string
   onNavigate: () => void
 }) {
+  const links = useQuery({
+    ...kalshiLinksQuery(predictionId),
+    enabled: index !== null,
+  })
+  const kalshi = leg.eventTicker ? links.data?.legs[leg.eventTicker] : undefined
   const g = leg.game
   const timeZone = useTimeZone()
   const live = g !== null && isLiveGame(g)
@@ -67,14 +76,27 @@ function LegRow({
             </span>
           )}
         </span>
-        <span
-          aria-label={leg.status}
-          className={cn(
-            'text-xs',
-            leg.status === 'lost' ? 'text-muted' : 'text-foreground',
+        <span className="flex shrink-0 items-center gap-2">
+          {kalshi && (
+            <a
+              href={kalshi}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Leg ${index} on Kalshi`}
+              className="underline-offset-2 hover:text-foreground hover:underline"
+            >
+              Kalshi ↗
+            </a>
           )}
-        >
-          {legGlyph(leg.status)}
+          <span
+            aria-label={leg.status}
+            className={cn(
+              'text-xs',
+              leg.status === 'lost' ? 'text-muted' : 'text-foreground',
+            )}
+          >
+            {legGlyph(leg.status)}
+          </span>
         </span>
       </span>
       <span className="flex items-start gap-2">
@@ -301,12 +323,14 @@ export function PredictionDetail({
                 leg={leg}
                 index={combo ? i + 1 : null}
                 pip={pips}
+                predictionId={p.id}
                 onNavigate={onNavigate}
               />
             ))}
           </ul>
         </section>
         <PredictionGames prediction={p} onNavigate={onNavigate} />
+        <KalshiActions prediction={p} />
         <p className="text-2xs text-muted">
           Read from your Kalshi account. Odds are Kalshi’s market prices.
         </p>
