@@ -90,11 +90,12 @@ describe('Signal parts for Predictions', () => {
     expect(html).toContain('Cash out $61.00')
   })
 
-  it('sets a stat in dots over its label', () => {
+  it('sets a stat in heavy Inter, never dots, over its label', () => {
     const html = renderToStaticMarkup(
       <StatTile label="Win rate" value="57%" sub="4–3" />,
     )
-    expect(html).toContain('font-dots')
+    expect(html).toContain('font-extrabold')
+    expect(html).not.toContain('font-dots')
     expect(html).toContain('57%')
     expect(html).toMatch(/uppercase[^>]*>Win rate/)
   })

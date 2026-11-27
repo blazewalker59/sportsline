@@ -17,10 +17,11 @@ const view = (): MatchupView => {
 }
 
 describe('MatchupScoreboard', () => {
-  it('sets both scores in dots over the projection meter', () => {
+  it('sets both scores in heavy Inter, never dots, over the projection meter', () => {
     const m = view()
     const html = renderToStaticMarkup(<MatchupScoreboard m={m} own />)
-    expect(html.match(/font-dots/g)).toHaveLength(2)
+    expect(html.match(/font-extrabold/g)?.length).toBeGreaterThanOrEqual(2)
+    expect(html).not.toContain('font-dots')
     expect(html).toContain(m.mine.score.toFixed(1))
     expect(html).toContain('role="meter"')
     if (m.mine.projected !== null)
