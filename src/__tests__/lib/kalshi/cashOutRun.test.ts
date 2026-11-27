@@ -29,12 +29,13 @@ const state = vi.hoisted(() => ({
   rfqError: null as Error | null,
   ownRfqs: [] as Array<Record<string, unknown>>,
   quotes: [] as Array<Record<string, unknown>>,
-  /** The accepted quote as Kalshi reports it afterwards. */
-  quote: null as Record<string, unknown> | null,
+  /** Every quote on the request as Kalshi lists them after the accept. */
+  after: null as Array<Record<string, unknown>> | null,
   orders: [] as Array<Record<string, unknown>>,
   fills: [] as Array<Record<string, unknown>>,
   events: {} as Record<string, string>,
   eventReads: [] as Array<string>,
+  gets: [] as Array<string>,
 }))
 vi.mock('@/lib/db', async (original) => ({
   ...(await original<typeof Db>()),
@@ -77,12 +78,15 @@ vi.mock('@/lib/kalshi/client', async (original) => {
       )
     },
     signedGet: (_a: unknown, path: string) => {
+      state.gets.push(path)
       if (path.startsWith('/communications/rfqs?'))
         return Promise.resolve({ rfqs: state.ownRfqs })
       if (path.startsWith('/communications/quotes?'))
-        return Promise.resolve({ quotes: state.quotes })
-      if (path.startsWith('/communications/rfqs/'))
-        return Promise.resolve({ quote: state.quote })
+        return Promise.resolve({
+          quotes: path.endsWith('&status=open')
+            ? state.quotes
+            : (state.after ?? state.quotes),
+        })
       if (path.startsWith('/portfolio/orders'))
         return Promise.resolve({ orders: state.orders })
       return Promise.resolve({ fills: state.fills })
@@ -155,11 +159,12 @@ describe.skipIf(!isBun)('cash out', () => {
       rfqError: null,
       ownRfqs: [],
       quotes: [],
-      quote: null,
+      after: null,
       orders: [],
       fills: [],
       events: {},
       eventReads: [],
+      gets: [],
     })
     sqlite.run(
       "INSERT INTO user (id,name,email,email_verified,created_at,updated_at) VALUES ('u1','Viewer','v@example.com',1,0,0)",
@@ -359,6 +364,10 @@ describe.skipIf(!isBun)('cash out', () => {
         },
       ]
       const v = await run.readCashOut(env, 'u1', id(1), NOW)
+      // Asked as the request's creator: Kalshi refuses a trade key otherwise.
+      expect(state.gets.at(-1)).toBe(
+        '/communications/quotes?rfq_id=rfq-1&rfq_user_filter=self&status=open',
+      )
       expect(v.quote).toEqual({
         id: 'q2',
         price: 0.312,
@@ -383,11 +392,9 @@ describe.skipIf(!isBun)('cash out', () => {
           status: 'open',
         },
       ]
-      state.quote = {
-        id: 'q2',
-        status: 'executed',
-        rfq_creator_order_id: 'ord-9',
-      }
+      state.after = [
+        { id: 'q2', status: 'executed', rfq_creator_order_id: 'ord-9' },
+      ]
       state.fills = [
         {
           order_id: 'ord-9',
@@ -452,7 +459,7 @@ describe.skipIf(!isBun)('cash out', () => {
         NOW,
       )
       state.quotes = [{ id: 'q2', yes_bid_dollars: '0.312', status: 'open' }]
-      state.quote = { id: 'q2', status: 'cancelled' }
+      state.after = [{ id: 'q2', status: 'cancelled' }]
       const v = await run.acceptQuote(
         env,
         'u1',
@@ -460,6 +467,64 @@ describe.skipIf(!isBun)('cash out', () => {
         NOW,
       )
       expect(v.status).toBe('unfilled')
+    })
+
+    it('records the sale when Kalshi fills another maker’s quote at that price', async () => {
+      await run.requestQuote(
+        env,
+        'u1',
+        { predictionId: 'p2', id: id(1), count: 20 },
+        NOW,
+      )
+      state.quotes = [{ id: 'q2', yes_bid_dollars: '0.312', status: 'open' }]
+      // The one named closes with the request; q3, first in line, executed.
+      state.after = [
+        { id: 'q2', status: 'cancelled' },
+        { id: 'q3', status: 'executed', rfq_creator_order_id: 'ord-7' },
+      ]
+      state.fills = [
+        {
+          order_id: 'ord-7',
+          count_fp: '20.00',
+          yes_price_dollars: '0.3120',
+          fee_cost: '0.31',
+        },
+      ]
+      const v = await run.acceptQuote(
+        env,
+        'u1',
+        { id: id(1), quoteId: 'q2', price: 0.312 },
+        NOW,
+      )
+      expect(v).toMatchObject({ status: 'filled', filledCount: 20 })
+      expect(rows()[0]).toMatchObject({ quote_id: 'q3', order_id: 'ord-7' })
+    })
+
+    it('waits while a quote is still being confirmed', async () => {
+      await run.requestQuote(
+        env,
+        'u1',
+        { predictionId: 'p2', id: id(1), count: 20 },
+        NOW,
+      )
+      state.quotes = [{ id: 'q2', yes_bid_dollars: '0.312', status: 'open' }]
+      state.after = [
+        { id: 'q2', status: 'cancelled' },
+        { id: 'q3', status: 'confirmed' },
+      ]
+      // The 8 s it gives the maker, on a fake clock.
+      vi.useFakeTimers({ toFake: ['setTimeout', 'Date'] })
+      const pending = run.acceptQuote(
+        env,
+        'u1',
+        { id: id(1), quoteId: 'q2', price: 0.312 },
+        NOW,
+      )
+      await vi.advanceTimersByTimeAsync(10_000)
+      const v = await pending
+      vi.useRealTimers()
+      // Not called unfilled: it's settled later, from Kalshi's record.
+      expect(v.status).toBe('accepted')
     })
 
     it('closes the request when the Viewer leaves', async () => {
