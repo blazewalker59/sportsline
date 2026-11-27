@@ -483,10 +483,15 @@ async function ownCashOut(db: Database, viewerId: string, id: string) {
   return row
 }
 
+/**
+ * The open quotes on our own request. `rfq_user_filter=self` asks as its
+ * requester: without it Kalshi treats the listing as a maker's and refuses
+ * a trade key (403 `permission_denied`).
+ */
 async function quotesFor(account: KalshiAccount, rfqId: string) {
   const r = await signedGet<{ quotes?: Array<KalshiQuote> }>(
     account,
-    `/communications/quotes?rfq_id=${encodeURIComponent(rfqId)}&status=open`,
+    `/communications/quotes?rfq_id=${encodeURIComponent(rfqId)}&rfq_user_filter=self&status=open`,
   )
   return r.quotes ?? []
 }
@@ -607,7 +612,14 @@ export async function acceptQuote(
   return view(await ownCashOut(db, viewerId, row.id))
 }
 
-/** Settle an accepted quote from Kalshi's record; undefined if not yet. */
+/**
+ * Settle an accepted quote from Kalshi's record; undefined if not yet.
+ * Every quote on our request is read, not only the one accepted: Kalshi
+ * may fill another maker's at the same price (docs: RFQ flow), and the
+ * one named is then cancelled with the request though the sale went
+ * through. So it's settled by whichever quote executed, and unfilled only
+ * once none is accepted, confirmed or executed and the one named is gone.
+ */
 async function settleQuote(
   db: Database,
   account: KalshiAccount,
@@ -615,46 +627,57 @@ async function settleQuote(
   now: Date,
 ): Promise<CashOutRow | undefined> {
   if (!row.rfqId || !row.quoteId) return undefined
-  let q: KalshiQuote
+  let quotes: Array<KalshiQuote>
   try {
-    const r = await signedGet<{ quote?: KalshiQuote }>(
+    const r = await signedGet<{ quotes?: Array<KalshiQuote> }>(
       account,
-      `/communications/rfqs/${encodeURIComponent(row.rfqId)}/quotes/${encodeURIComponent(row.quoteId)}`,
+      `/communications/quotes?rfq_id=${encodeURIComponent(row.rfqId)}&rfq_user_filter=self`,
     )
-    if (!r.quote) return undefined
-    q = r.quote
+    quotes = r.quotes ?? []
   } catch {
     return undefined
   }
-  if (q.status === 'cancelled' || q.cancelled_ts) {
+  const executed = quotes.find(
+    (q) => q.status === 'executed' || Boolean(q.executed_ts),
+  )
+  if (executed) {
+    const orderId = executed.rfq_creator_order_id
+    const fills = orderId
+      ? await fillsOf(account, { side: row.side }, orderId)
+      : null
+    // Executed, but its fills aren't listed yet: look again.
+    if (!fills || fills.filled === 0) return undefined
     return update(
       db,
       row.id,
       {
-        status: 'unfilled',
-        error: 'The market maker didn’t confirm, so nothing was sold.',
+        status: fillStatus(fills.filled, row.count),
+        quoteId: executed.id,
+        orderId,
+        filledCount: fills.filled,
+        avgPriceDollars: fills.avgPrice,
+        feesDollars: fills.fees,
+        error: null,
       },
       now,
       ['accepted', 'unknown'],
     )
   }
-  if (q.status !== 'executed' && !q.executed_ts) return undefined
-  const orderId = q.rfq_creator_order_id
-  const fills = orderId
-    ? await fillsOf(account, { side: row.side }, orderId)
-    : null
-  // Executed, but its fills aren't listed yet: look again.
-  if (!fills || fills.filled === 0) return undefined
+  const inFlight = quotes.some(
+    (q) => q.status === 'accepted' || q.status === 'confirmed',
+  )
+  const named = quotes.find((q) => q.id === row.quoteId)
+  // Not listed at all says nothing: leave it to be looked up again.
+  const gone = named
+    ? named.status === 'cancelled' || Boolean(named.cancelled_ts)
+    : false
+  if (inFlight || !gone) return undefined
   return update(
     db,
     row.id,
     {
-      status: fillStatus(fills.filled, row.count),
-      orderId,
-      filledCount: fills.filled,
-      avgPriceDollars: fills.avgPrice,
-      feesDollars: fills.fees,
-      error: null,
+      status: 'unfilled',
+      error: 'The market maker didn’t confirm, so nothing was sold.',
     },
     now,
     ['accepted', 'unknown'],

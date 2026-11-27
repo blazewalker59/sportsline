@@ -202,6 +202,39 @@ describe('CashOutSheet', () => {
   })
 })
 
+describe('a Combo’s quotes that can’t be read', () => {
+  it('says so, instead of waiting it out as if no one quoted', async () => {
+    server.getCashOutPreview.mockResolvedValue(
+      preview({ kind: 'combo', held: 20, single: null }),
+    )
+    server.requestCashOutQuote.mockResolvedValue({
+      id: 'x',
+      status: 'quoting',
+      kind: 'combo',
+      side: 'yes',
+      count: 20,
+      filledCount: null,
+      avgPriceDollars: null,
+      feesDollars: null,
+      quote: null,
+      error: null,
+    })
+    server.getCashOut.mockRejectedValue(new Error('Kalshi didn’t answer.'))
+    renderScreen(() => (
+      <CashOutSheet
+        prediction={prediction({ kind: 'combo', contracts: 20, value: 6.6 })}
+        onClose={() => {}}
+      />
+    ))
+    fireEvent.click(await screen.findByRole('button', { name: 'Get a price' }))
+    expect(
+      await screen.findByText('Couldn’t read prices', {}, { timeout: 5000 }),
+    ).toBeTruthy()
+    expect(screen.queryByText('No price came in')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Ask again' })).toBeTruthy()
+  })
+})
+
 describe('HoldKey', () => {
   it('confirms after a hold, and not on a short press', () => {
     vi.useFakeTimers()

@@ -32,7 +32,12 @@ export class KalshiError extends Error {
 
 async function read<T>(res: Response, path: string): Promise<T> {
   if (!res.ok) {
-    throw new KalshiError(res.status, `Kalshi ${res.status} for ${path}`)
+    // Kalshi says why in its body (`permission_denied`, a missing filter).
+    const detail = await res.text().catch(() => '')
+    throw new KalshiError(
+      res.status,
+      `Kalshi ${res.status} for ${path}${detail ? `: ${detail.slice(0, 300)}` : ''}`,
+    )
   }
   return (await res.json()) as T
 }

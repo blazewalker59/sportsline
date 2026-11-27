@@ -416,6 +416,8 @@ function ComboCashOut({
     queryFn: () => getCashOut({ data: { id } }),
     enabled: quoting && !timedOut,
     refetchInterval: QUOTE_POLL_MS,
+    // One more try, then say it (above) instead of retrying for seconds.
+    retry: 1,
   })
   const accept = useMutation({
     mutationFn: (q: { quoteId: string; price: number }) =>
@@ -494,6 +496,23 @@ function ComboCashOut({
           {request.isPending ? 'Asking…' : 'Get a price'}
         </button>
       </>
+    )
+  }
+  if (!quote && live.isError) {
+    // Kalshi refused or didn't answer the check for prices: say so rather
+    // than wait it out as if no one had quoted.
+    return (
+      <div className="well flex flex-col gap-2 rounded-card p-4">
+        <span className={LABEL}>Couldn’t read prices</span>
+        <p className="text-sm">
+          Sportsline couldn’t read the quotes from Kalshi, so it can’t tell
+          whether anyone quoted. Nothing was sold. Try again, or sell it in
+          Kalshi.
+        </p>
+        <button type="button" className={cn(KEY, 'self-start')} onClick={again}>
+          Ask again
+        </button>
+      </div>
     )
   }
   if (!quote) {
