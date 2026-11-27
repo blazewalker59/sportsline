@@ -31,7 +31,8 @@ export function SectionLabel({
           {index}
         </span>
       )}
-      <Heading className="shrink-0 text-3xs font-bold text-foreground/80 uppercase">
+      {/* The name gives way (cut short) before the controls at the end do. */}
+      <Heading className="min-w-0 truncate text-3xs font-bold text-foreground/80 uppercase">
         {title}
       </Heading>
       <span aria-hidden="true" className="h-px min-w-4 flex-1 bg-border" />

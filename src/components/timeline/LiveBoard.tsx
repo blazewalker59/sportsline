@@ -176,9 +176,10 @@ export function LiveBoard({
   const chips = layout === 'row' ? [] : pages.filter((p) => !tiles.includes(p))
   const title =
     kind === 'prediction'
-      ? `Your Predictions · ${pages.length} open`
+      ? // The count is on the Predictions card above; Portfolio needs the room.
+        'Predictions'
       : kind === 'matchup'
-        ? `Your Matchups · ${pages.length}`
+        ? `Matchups · ${pages.length}`
         : live.length > 0
           ? `Live now · ${live.length}`
           : `Games · ${pages.length}`
@@ -196,7 +197,13 @@ export function LiveBoard({
   return (
     <section
       ref={boardRef}
-      aria-label={kind === 'game' ? 'Games' : title.split(' · ')[0]}
+      aria-label={
+        kind === 'game'
+          ? 'Games'
+          : kind === 'prediction'
+            ? 'Your Predictions'
+            : 'Your Matchups'
+      }
       className="mb-3 flex flex-col gap-2"
     >
       <SectionLabel
