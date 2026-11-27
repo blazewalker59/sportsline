@@ -295,7 +295,7 @@ describe('activeTab', () => {
   })
 })
 
-describe('the glass stylesheet', () => {
+describe('the dock stylesheet', () => {
   const css = readFileSync(join(process.cwd(), 'src/styles.css'), 'utf8')
   /** The rules inside the block opened by `head` (to its matching brace). */
   const block = (head: string) => {
@@ -309,24 +309,22 @@ describe('the glass stylesheet', () => {
     return ''
   }
 
-  it('blurs with and without the -webkit- prefix', () => {
+  it('is solid material: an opaque tray, no backdrop blur', () => {
     const rule = block('.glass-nav {')
-    expect(rule).toContain('-webkit-backdrop-filter: var(--glass-backdrop)')
-    expect(rule).toContain('backdrop-filter: var(--glass-backdrop)')
+    expect(rule).toContain('var(--glass-fill)')
+    expect(rule).not.toContain('backdrop-filter')
   })
 
-  it.each([
-    '@media (prefers-reduced-transparency: reduce)',
-    '@media (prefers-contrast: more)',
-  ])('turns solid under %s', (query) => {
-    const rules = block(query)
+  it('draws a ruled dock and cap for more contrast', () => {
+    const rules = block('@media (prefers-contrast: more)')
     expect(rules).toContain('.glass-nav {')
-    expect(rules).toContain('backdrop-filter: none')
-    expect(rules).toContain('background: var(--surface)')
+    expect(rules).toContain('var(--foreground)')
   })
 
-  it('falls back to a near-solid fill without backdrop-filter', () => {
-    expect(block('@supports not (')).toContain('var(--glass-solid)')
+  it('lights the current key', () => {
+    expect(
+      block(".glass-nav-tab[aria-current='page'] .glass-nav-icon::after"),
+    ).toContain('var(--signal)')
   })
 
   it('holds the lozenge and the press still for reduced motion', () => {

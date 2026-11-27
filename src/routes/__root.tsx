@@ -9,7 +9,9 @@ import {
 import { useEffect, useState } from 'react'
 
 import appCss from '../styles.css?url'
-import fontLatin from '../fonts/bricolage-grotesque-latin.woff2?url'
+import interLatin from '../fonts/inter-latin.woff2?url'
+import monoLatin from '../fonts/space-mono-400-latin.woff2?url'
+import dotsLatin from '../fonts/doto-latin.woff2?url'
 import { THEME_BOOT, THEME_COLOR_BOOT } from '../lib/theme'
 
 import type { QueryClient } from '@tanstack/react-query'
@@ -44,7 +46,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         content: 'width=device-width, initial-scale=1, viewport-fit=cover',
       },
       { title: 'Sportsline' },
-      { name: 'theme-color', content: '#f3f4f8' },
+      { name: 'theme-color', content: '#e9e8e3' },
       { name: 'apple-mobile-web-app-capable', content: 'yes' },
       {
         name: 'apple-mobile-web-app-status-bar-style',
@@ -61,13 +63,14 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       },
     ],
     links: [
-      {
+      // Signal's three faces: words, labels and the dot numerals.
+      ...[interLatin, monoLatin, dotsLatin].map((href) => ({
         rel: 'preload',
-        href: fontLatin,
+        href,
         as: 'font',
         type: 'font/woff2',
-        crossOrigin: 'anonymous',
-      },
+        crossOrigin: 'anonymous' as const,
+      })),
       { rel: 'stylesheet', href: appCss },
       { rel: 'manifest', href: '/manifest.json' },
       { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },

@@ -298,7 +298,7 @@ export function contrast(a: string, b: string): number {
 }
 
 /** The page backgrounds a filled bubble sits on (styles.css --background). */
-const BACKGROUNDS = { light: '#f3f4f8', dark: '#0e1015' } as const
+const BACKGROUNDS = { light: '#e9e8e3', dark: '#111111' } as const
 /** Below this, a fill melts into the page. */
 const MIN_EDGE_CONTRAST = 1.6
 

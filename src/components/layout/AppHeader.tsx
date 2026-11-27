@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { ThemeButton } from './ThemeButton'
 import { ICON_TONES, NavGlyph } from './NavIcon'
 import type { IconName } from './NavIcon'
+import { Wordmark } from '@/components/signal/Logo'
 import { signIn, signOutClient } from '@/lib/auth/client'
 import { VIEWER_KEY, useViewer } from '@/lib/viewer/useViewer'
 import { cn } from '@/lib/utils'
@@ -32,8 +33,9 @@ export function AppHeader({
     >
       <div className="flex items-center gap-2">
         {title ?? (
-          <Link to="/" className="text-lg font-bold tracking-tight">
-            Sportsline
+          <Link to="/" className="text-[1.375rem]">
+            <span className="sr-only">Sportsline</span>
+            <Wordmark aria-hidden />
           </Link>
         )}
         {children}

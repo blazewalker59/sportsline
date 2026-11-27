@@ -5,155 +5,215 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
-  Bricolage Grotesque, served from the app (OFL, see fonts/OFL.txt): one
-  variable file per subset covering opsz 12-96 and wght 200-800, which Vite
-  fingerprints into /assets. Latin is preloaded from the head (__root.tsx);
-  latin-ext loads only when a name needs it. Swap, so text never waits.
+  Signal's three faces, served from the app (OFL, see fonts/OFL.txt): Inter
+  for words, Space Mono for labels, Doto (dot matrix) for the numbers that
+  matter. Latin is preloaded from the head (__root.tsx); latin-ext loads
+  only when a name needs it. Swap, so text never waits.
 */
 @font-face {
-  font-family: 'Bricolage Grotesque';
+  font-family: 'Inter';
   font-style: normal;
-  font-weight: 200 800;
+  font-weight: 100 900;
   font-display: swap;
-  src: url('./fonts/bricolage-grotesque-latin.woff2') format('woff2');
+  src: url('./fonts/inter-latin.woff2') format('woff2');
   unicode-range:
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
     U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
     U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: 'Bricolage Grotesque';
+  font-family: 'Inter';
   font-style: normal;
-  font-weight: 200 800;
+  font-weight: 100 900;
   font-display: swap;
-  src: url('./fonts/bricolage-grotesque-latin-ext.woff2') format('woff2');
+  src: url('./fonts/inter-latin-ext.woff2') format('woff2');
   unicode-range:
     U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
     U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
     U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
+@font-face {
+  font-family: 'Space Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/space-mono-400-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Space Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./fonts/space-mono-700-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Space Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/space-mono-400-latin-ext.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Space Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./fonts/space-mono-700-latin-ext.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Doto';
+  font-style: normal;
+  /* One weight, 900, with real punctuation (scripts/fonts/doto-punctuation.py). */
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./fonts/doto-latin.woff2') format('woff2');
+}
 
 /*
-  Watch Party design language. Light is the base; `.dark` on <html> (set
-  before paint from the Viewer's choice or the device) switches every
-  token. Team colors come from data, never from here.
+  Signal design language (docs/design/signal.md). Aluminum is the base;
+  `.dark` on <html> (set before paint from the Viewer's choice or the
+  device) switches every token to graphite. Team colors come from data,
+  never from here.
 
-  Color carries meaning, never a raw palette class:
-  - accent / notable: the app's own blue; live: on now (and a lost pick).
-  - scoring: a Scoring Play's gold (not "good": see positive).
-  - positive: won, filled, healthy, a strong grade.
-  - negative: points lost, out injured, a stale job, errors counted.
-  - warning: needs a look (stale scores, questionable injury, a failing
-    job, a penalty flag).
-  - in-play: a Fantasy Starter's Game under way.
-  - section-*: each menu section's icon, so items read apart at a glance.
-  - slot-1..8: Fantasy position groups, Sleeper-style (fantasy/format.ts).
+  One color means live: orange is for what is happening now, and for what
+  is the Viewer's own (their starters, their Legs). Nothing else is orange.
+  `--signal` is the lit orange for lights, meters and keys; `--live` is the
+  same orange deepened for text. Everything else is ink and aluminum:
+  - accent: ink. Interactive things are keys and underlined links, not blue.
+  - scoring / in-play: the live orange (a Scoring Play is the brightest now).
+  - notable: secondary ink.
+  - positive / negative / warning: restrained functional tones for money
+    and health (won, lost, stale), never decoration.
+  - section-*: all ink; the menu's icons are monochrome.
+  - slot-1..8, manager-*: data colors, like teams'.
   Pair a tone's text with its own wash: `bg-positive/15 text-positive`.
 
-  Type: text-3xs (11px) is the floor, for caps labels, badges and chart
-  marks; text-2xs (12px, text-xs without its line-height) is small running text.
-  Radius: rounded-control (buttons, chips, tags), rounded-card (cards,
-  lists, popovers, full-width fields), rounded-sheet (sheets and chat
-  bubbles); rounded-full for pills and avatars.
+  Type: Inter for words; Space Mono for labels (every uppercase run, see
+  below); Doto (`font-dots`, or <Num>) for the numbers that are the point
+  of a screen. text-3xs (11px) is the floor.
+  Radius: rounded-control (keys, chips), rounded-card (panels),
+  rounded-sheet (sheets); rounded-full for pills and lights.
 */
 :root {
-  --background: #f3f4f8;
-  --surface: #ffffff;
-  --bubble: #ffffff;
-  --bubble-border: #e3e5ec;
-  --notice: #e7e9f1;
-  --border: #e3e5ec;
-  --foreground: #15171d;
-  --muted: #5d6170;
-  --accent: #2d3cff;
-  --accent-soft: #eef0ff;
-  --live: #e5372a;
-  --scoring: #c24a00;
-  --notable: #2d3cff;
-  --positive: #047857;
-  --negative: #dc2626;
-  --warning: #b45309;
-  --in-play: #b45309;
-  --section-reactions: #db2777;
-  --section-predictions: #059669;
-  --section-fantasy: #d97706;
-  --section-alerts: #0284c7;
-  --section-agents: #7c3aed;
-  --section-health: #dc2626;
+  --background: #e9e8e3;
+  --surface: #f5f4ef;
+  --bubble: #f5f4ef;
+  --bubble-border: #d6d5ce;
+  --notice: #dcdbd4;
+  --border: #d6d5ce;
+  --foreground: #121212;
+  --muted: #64635d;
+  --accent: #121212;
+  --accent-soft: #dcdbd4;
+  --signal: #ff4f00;
+  --live: #b33600;
+  --scoring: #b33600;
+  --notable: #3b3b38;
+  --positive: #1d6e43;
+  --negative: #a3182f;
+  --warning: #80600a;
+  --in-play: #b33600;
+  --section-reactions: #3b3b38;
+  --section-predictions: #3b3b38;
+  --section-fantasy: #3b3b38;
+  --section-alerts: #3b3b38;
+  --section-agents: #3b3b38;
+  --section-health: #3b3b38;
   /* Fantasy position groups (fantasy/format.ts SLOT_TONES). */
-  --slot-1: #e11d48; /* QB, pitchers */
-  --slot-2: #047857; /* RB, outfield, forwards */
-  --slot-3: #0369a1; /* WR, infield, guards */
-  --slot-4: #b45309; /* TE */
-  --slot-5: #6d28d9; /* flex and utility */
-  --slot-6: #334155; /* D/ST */
-  --slot-7: #a16207; /* K */
-  --slot-8: #c2410c; /* catchers, bigs */
+  --slot-1: #c2264b; /* QB, pitchers */
+  --slot-2: #1d6e43; /* RB, outfield, forwards */
+  --slot-3: #1f5f8b; /* WR, infield, guards */
+  --slot-4: #8a5a00; /* TE */
+  --slot-5: #5b3d9a; /* flex and utility */
+  --slot-6: #3b3b38; /* D/ST */
+  --slot-7: #7a6400; /* K */
+  --slot-8: #a34a14; /* catchers, bigs */
   /* Fantasy managers' colors (lib/brand/subject.ts managerColor). */
-  --manager-1: #0f8f7e;
-  --manager-2: #c2410c;
-  --manager-3: #7c3aed;
-  --manager-4: #be185d;
-  --manager-5: #0369a1;
-  --manager-6: #a16207;
-  --manager-7: #15803d;
-  --manager-8: #4f46e5;
+  --manager-1: #0f7d6e;
+  --manager-2: #a8461a;
+  --manager-3: #6a3fc0;
+  --manager-4: #a8235a;
+  --manager-5: #1f5f8b;
+  --manager-6: #866400;
+  --manager-7: #1d6e43;
+  --manager-8: #4446c2;
   /*
-    Glass, for the floating navigation (.glass-nav). The fill is opaque
-    enough that glass-ink-muted keeps 4.5:1 even over solid black (this
-    fill over #000 is #b4b4b6: 4.7:1), so labels read over any team color.
+    The dock (layout/AppNav.tsx), still named glass: an aluminum tray
+    recessed into the page, its current key pressed in.
   */
-  --glass-fill: rgb(250 251 253 / 0.72);
-  --glass-sheen: rgb(255 255 255 / 0.5);
-  --glass-backdrop: blur(14px) saturate(190%) brightness(1.06);
-  --glass-solid: rgb(250 251 253 / 0.96);
-  --glass-highlight: rgb(255 255 255 / 0.95);
-  --glass-lowlight: rgb(255 255 255 / 0.45);
-  --glass-border: rgb(21 23 29 / 0.12);
+  --glass-fill: #dcdbd4;
+  --glass-sheen: rgb(255 255 255 / 0.55);
+  --glass-backdrop: none;
+  --glass-solid: #dcdbd4;
+  --glass-highlight: rgb(255 255 255 / 0.8);
+  --glass-lowlight: rgb(0 0 0 / 0.06);
+  --glass-border: rgb(0 0 0 / 0.1);
   --glass-shadow:
-    0 10px 30px -8px rgb(21 23 29 / 0.28), 0 2px 8px -2px rgb(21 23 29 / 0.1);
-  --glass-ink: #15171d;
-  --glass-ink-muted: #3f4350;
-  --glass-hover: rgb(21 23 29 / 0.05);
-  --glass-lozenge: rgb(255 255 255 / 0.88);
-  --glass-lozenge-edge: rgb(21 23 29 / 0.08);
-  --glass-lozenge-shadow: 0 1px 4px rgb(21 23 29 / 0.14);
-  /* The active icon's section color, pulled toward ink for 3:1 on glass. */
-  --glass-tone-strength: 80%;
+    0 10px 26px -12px rgb(0 0 0 / 0.28), 0 1px 0 rgb(255 255 255 / 0.6) inset;
+  --glass-ink: #121212;
+  --glass-ink-muted: #4a4a46;
+  --glass-hover: rgb(0 0 0 / 0.04);
+  --glass-lozenge: linear-gradient(180deg, #ffffff, #e6e5df);
+  --glass-lozenge-edge: #bdbcb4;
+  --glass-lozenge-shadow: 0 2px 0 #bdbcb4, 0 4px 8px -4px rgb(0 0 0 / 0.25);
+  --glass-tone-strength: 0%;
+  /* Keys (`.key`): a raised cap on a darker edge, pressed when on. */
+  --key-top: #ffffff;
+  --key-bottom: #e4e3dd;
+  --key-edge: #bdbcb4;
+  --key-shade: rgb(0 0 0 / 0.16);
+  --key-highlight: rgb(255 255 255 / 0.8);
 }
 
 .dark {
-  --background: #0e1015;
-  --surface: #14171e;
-  --bubble: #232733;
-  --bubble-border: #232733;
-  --notice: #1a1d25;
-  --border: #1f232c;
-  --foreground: #eef0f5;
-  --muted: #8a90a0;
-  --accent: #8fa2ff;
-  --accent-soft: #1a1d25;
-  --live: #ff6b5e;
-  --scoring: #ffb612;
-  --notable: #8fa2ff;
-  --positive: #34d399;
-  --negative: #f87171;
-  --warning: #fbbf24;
-  --in-play: #fcd34d;
-  --section-reactions: #f472b6;
-  --section-predictions: #34d399;
-  --section-fantasy: #fbbf24;
-  --section-alerts: #38bdf8;
-  --section-agents: #a78bfa;
-  --section-health: #f87171;
-  --slot-1: #fb7185;
-  --slot-2: #34d399;
-  --slot-3: #38bdf8;
-  --slot-4: #fbbf24;
-  --slot-5: #a78bfa;
-  --slot-6: #cbd5e1;
-  --slot-7: #facc15;
-  --slot-8: #fb923c;
+  --background: #111111;
+  --surface: #1a1a1a;
+  --bubble: #1d1d1d;
+  --bubble-border: #2a2a2a;
+  --notice: #0b0b0b;
+  --border: #262626;
+  --foreground: #ecebe6;
+  --muted: #8f8e88;
+  --accent: #ecebe6;
+  --accent-soft: #222222;
+  --signal: #ff4f00;
+  --live: #ff6a2b;
+  --scoring: #ff6a2b;
+  --notable: #c4c3bd;
+  --positive: #5cc38a;
+  --negative: #ff7586;
+  --warning: #e0bd4a;
+  --in-play: #ff6a2b;
+  --section-reactions: #c4c3bd;
+  --section-predictions: #c4c3bd;
+  --section-fantasy: #c4c3bd;
+  --section-alerts: #c4c3bd;
+  --section-agents: #c4c3bd;
+  --section-health: #c4c3bd;
+  --slot-1: #ff7a93;
+  --slot-2: #5cc38a;
+  --slot-3: #6fb6e8;
+  --slot-4: #e0bd4a;
+  --slot-5: #b49cff;
+  --slot-6: #c4c3bd;
+  --slot-7: #e8cf5a;
+  --slot-8: #ff9a5c;
   --manager-1: #34d3bd;
   --manager-2: #fb8a4c;
   --manager-3: #b69cff;
@@ -162,26 +222,27 @@
   --manager-6: #e8b53a;
   --manager-7: #4ade80;
   --manager-8: #8f94ff;
-  /*
-    Dark glass: a deeper fill, and the backdrop dimmed, so a white logo
-    behind it still leaves glass-ink-muted at 4.5:1.
-  */
-  --glass-fill: rgb(30 33 42 / 0.74);
-  --glass-sheen: rgb(255 255 255 / 0.07);
-  --glass-backdrop: blur(14px) saturate(170%) brightness(0.7);
-  --glass-solid: rgb(24 27 35 / 0.97);
-  --glass-highlight: rgb(255 255 255 / 0.2);
-  --glass-lowlight: rgb(255 255 255 / 0.06);
-  --glass-border: rgb(0 0 0 / 0.55);
+  --glass-fill: #1c1c1c;
+  --glass-sheen: rgb(255 255 255 / 0.05);
+  --glass-backdrop: none;
+  --glass-solid: #1c1c1c;
+  --glass-highlight: rgb(255 255 255 / 0.07);
+  --glass-lowlight: rgb(0 0 0 / 0.4);
+  --glass-border: rgb(0 0 0 / 0.6);
   --glass-shadow:
-    0 12px 32px -8px rgb(0 0 0 / 0.7), 0 2px 8px -2px rgb(0 0 0 / 0.4);
-  --glass-ink: #f4f5f9;
-  --glass-ink-muted: #d3d6df;
-  --glass-hover: rgb(255 255 255 / 0.06);
-  --glass-lozenge: rgb(255 255 255 / 0.09);
-  --glass-lozenge-edge: rgb(255 255 255 / 0.14);
-  --glass-lozenge-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
-  --glass-tone-strength: 75%;
+    0 12px 30px -10px rgb(0 0 0 / 0.8), 0 1px 0 rgb(255 255 255 / 0.05) inset;
+  --glass-ink: #ecebe6;
+  --glass-ink-muted: #a9a8a2;
+  --glass-hover: rgb(255 255 255 / 0.04);
+  --glass-lozenge: linear-gradient(180deg, #303030, #232323);
+  --glass-lozenge-edge: #050505;
+  --glass-lozenge-shadow: 0 2px 0 #050505, 0 4px 8px -4px rgb(0 0 0 / 0.6);
+  --glass-tone-strength: 0%;
+  --key-top: #2e2e2e;
+  --key-bottom: #222222;
+  --key-edge: #050505;
+  --key-shade: rgb(0 0 0 / 0.6);
+  --key-highlight: rgb(255 255 255 / 0.07);
 }
 
 @theme inline {
@@ -195,6 +256,7 @@
   --color-muted: var(--muted);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-signal: var(--signal);
   --color-live: var(--live);
   --color-scoring: var(--scoring);
   --color-notable: var(--notable);
@@ -219,7 +281,10 @@
   --color-glass-ink: var(--glass-ink);
   --color-glass-ink-muted: var(--glass-ink-muted);
   --color-glass-hover: var(--glass-hover);
-  --font-sans: 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Space Mono', ui-monospace, monospace;
+  --font-label: 'Space Mono', ui-monospace, monospace;
+  --font-dots: 'Doto', 'Space Mono', ui-monospace, monospace;
 }
 
 /*
@@ -229,10 +294,10 @@
 @theme {
   --text-3xs: 0.6875rem; /* 11px: the floor */
   --text-2xs: 0.75rem; /* 12px, without text-xs's line-height */
-  --radius-control: 0.375rem;
-  --radius-card: 0.75rem;
-  --radius-sheet: 1.25rem;
-  --radius-glass: 1.75rem; /* the navigation's floating rail */
+  --radius-control: 0.625rem;
+  --radius-card: 1.125rem;
+  --radius-sheet: 1.75rem;
+  --radius-glass: 2rem; /* the dock and the rail */
 }
 
 body {
@@ -268,65 +333,158 @@ textarea,
 }
 
 /*
-  The navigation's glass (layout/AppNav.tsx): a floating sheet the screen
-  scrolls beneath. A tinted fill over a blurred, saturated backdrop; a
-  sheen across its top; a rim brighter on the top-leading edge than the
-  opposite one; a hairline and a soft shadow lifting it off the page. The
-  active tab sits on a lozenge of brighter glass that slides between tabs.
-  No refraction filter: Safari (the installed app) cannot use one in
-  backdrop-filter, and Chrome would re-run it on every scrolled frame.
+  Signal's parts. Every uppercase run is a label, set in Space Mono the way
+  a manual labels a device; mixed-case text stays in Inter.
+*/
+@layer components {
+  .uppercase {
+    font-family: var(--font-label);
+    letter-spacing: 0.06em;
+  }
+
+  /* A panel: a card lifted off the aluminum by a lit top edge. */
+  .bg-surface.rounded-card,
+  .panel {
+    box-shadow:
+      inset 0 1px 0 var(--key-highlight),
+      0 10px 24px -20px var(--key-shade);
+  }
+
+  /* A well: recessed into the page (meters, readouts, segmented controls). */
+  .well {
+    background: var(--notice);
+    box-shadow: inset 0 1px 3px var(--key-shade);
+  }
+
+  /* A key: a raised cap that presses in. `.key-on` is lit orange. */
+  .key {
+    background: linear-gradient(180deg, var(--key-top), var(--key-bottom));
+    box-shadow:
+      0 2px 0 var(--key-edge),
+      0 4px 8px -4px var(--key-shade),
+      inset 0 1px 0 var(--key-highlight);
+    color: var(--foreground);
+    transition:
+      transform 90ms ease,
+      box-shadow 90ms ease;
+  }
+  .key:active:not(:disabled),
+  .key[aria-pressed='true'],
+  .key-pressed {
+    transform: translateY(2px);
+    box-shadow:
+      0 0 0 var(--key-edge),
+      inset 0 1px 3px var(--key-shade);
+  }
+  .key-on,
+  .key[aria-pressed='true'].key-lit {
+    background: var(--signal);
+    color: #121212;
+  }
+  .key-ink {
+    background: var(--foreground);
+    color: var(--background);
+    box-shadow:
+      0 2px 0 #000,
+      0 4px 8px -4px var(--key-shade);
+  }
+  .key:disabled {
+    opacity: 0.5;
+  }
+
+  /* A status light: lit orange means live. `.led-off` is unlit. */
+  .led {
+    display: inline-block;
+    flex: none;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background: var(--signal);
+    box-shadow:
+      0 0 8px var(--signal),
+      0 0 2px var(--signal);
+  }
+  .led-pulse {
+    animation: led-pulse 1.6s ease-in-out infinite;
+  }
+  .led-off {
+    background: var(--notice);
+    box-shadow: inset 0 1px 2px var(--key-shade);
+  }
+  .led-ink {
+    background: var(--foreground);
+    box-shadow: none;
+  }
+
+  /* A segmented meter (Meter.tsx): unlit wells, ink when filled, the last lit. */
+  .meter-seg {
+    border-radius: 2px;
+    background: var(--notice);
+    box-shadow: inset 0 1px 1px var(--key-shade);
+    transition: background-color 300ms ease;
+  }
+  .meter-seg[data-on] {
+    background: var(--foreground);
+    box-shadow: none;
+  }
+  .meter-seg[data-edge] {
+    background: var(--signal);
+    box-shadow: 0 0 6px var(--signal);
+  }
+
+  /* A unit beside a dot numeral (%, ¢): Doto's are hard to read. */
+  .num-unit {
+    font-family: var(--font-label);
+    font-weight: 700;
+    font-size: 0.55em;
+    letter-spacing: 0;
+    margin-left: 0.04em;
+  }
+}
+
+@keyframes led-pulse {
+  50% {
+    opacity: 0.35;
+    box-shadow: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .led-pulse {
+    animation: none;
+  }
+}
+
+/*
+  The dock (layout/AppNav.tsx; the class names are the old glass ones): an
+  aluminum tray, opaque, with a lit top edge, holding four keys. The
+  current key is a pressed cap (the lozenge) that slides between them, and
+  carries an orange light. No translucency: Signal is solid material.
 */
 .glass-nav {
   background:
-    linear-gradient(to bottom, var(--glass-sheen), transparent 2rem),
+    linear-gradient(to bottom, var(--glass-sheen), transparent 1.5rem),
     var(--glass-fill);
-  -webkit-backdrop-filter: var(--glass-backdrop);
-  backdrop-filter: var(--glass-backdrop);
   box-shadow:
-    0 0 0 0.5px var(--glass-border),
+    0 0 0 1px var(--glass-border),
     var(--glass-shadow);
 }
 .glass-nav::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(
-    160deg,
-    var(--glass-highlight),
-    transparent 35%,
-    transparent 65%,
-    var(--glass-lowlight)
-  );
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask:
-    linear-gradient(#000 0 0) content-box exclude,
-    linear-gradient(#000 0 0);
-  pointer-events: none;
+  content: none;
 }
 
-/* The active tab's lozenge: a quarter of the bar, a row of the rail. */
+/* The current key's cap: a quarter of the dock, a row of the rail. */
 .glass-nav-lozenge {
   position: absolute;
-  top: 0.25rem;
-  bottom: 0.25rem;
-  left: 0.25rem;
-  width: calc((100% - 0.5rem) / 4);
-  border-radius: 9999px;
-  background:
-    linear-gradient(to bottom, var(--glass-sheen), transparent 70%),
-    var(--glass-lozenge);
-  box-shadow:
-    inset 0 1px 0 var(--glass-highlight),
-    inset 0 0 0 0.5px var(--glass-lozenge-edge),
-    var(--glass-lozenge-shadow);
+  top: 0.375rem;
+  bottom: 0.375rem;
+  left: 0.375rem;
+  width: calc((100% - 0.75rem) / 4);
+  border-radius: 1.375rem;
+  background: var(--glass-lozenge);
+  box-shadow: var(--glass-lozenge-shadow);
   transform: translateX(calc(var(--i, 0) * 100%));
   transition:
-    transform 460ms cubic-bezier(0.3, 1.3, 0.5, 1),
+    transform 380ms cubic-bezier(0.3, 1.4, 0.5, 1),
     opacity 200ms ease;
 }
 .glass-nav-lozenge[data-active='-1'] {
@@ -350,77 +508,53 @@ textarea,
     left: 0.5rem;
     right: 0.5rem;
     height: 2.75rem;
+    border-radius: var(--radius-control);
   }
 }
 
 .glass-nav-tab {
   -webkit-tap-highlight-color: transparent;
+  font-family: var(--font-label);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   transition:
-    transform 160ms ease,
+    transform 120ms ease,
     background-color 160ms ease;
 }
-/* Press: the tab gives a little under the finger. */
 .glass-nav-tab:active {
-  transform: scale(0.92);
+  transform: translateY(1px);
 }
 @media (hover: hover) {
   .glass-nav-tab:not([aria-current='page']):hover {
     background-color: var(--glass-hover);
   }
 }
-/* The focus ring inside the tab, so it reads on the glass, not the page. */
 .glass-nav-tab:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
-.glass-nav-tab[aria-current='page'] .glass-nav-icon {
-  color: color-mix(
-    in oklab,
-    var(--nav-tone) var(--glass-tone-strength),
-    var(--glass-ink)
-  );
+/* The current key's light. */
+.glass-nav-icon {
+  position: relative;
+}
+.glass-nav-tab[aria-current='page'] .glass-nav-icon::after {
+  content: '';
+  position: absolute;
+  top: -1px;
+  right: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--signal);
+  box-shadow: 0 0 6px var(--signal);
 }
 
-/* No backdrop blur: a near-solid fill, so the labels still read. */
-@supports not (
-  (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
-) {
-  .glass-nav {
-    background: var(--glass-solid);
-  }
-}
-
-/* Less transparency, or more contrast: solid, bordered, no glass. */
-@media (prefers-reduced-transparency: reduce) {
-  .glass-nav {
-    background: var(--surface);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    box-shadow:
-      0 0 0 1px var(--border),
-      var(--glass-shadow);
-  }
-  .glass-nav::before {
-    display: none;
-  }
-  .glass-nav-lozenge {
-    background: var(--background);
-    box-shadow: inset 0 0 0 1px var(--border);
-  }
-}
 @media (prefers-contrast: more) {
   .glass-nav {
     --glass-ink-muted: var(--foreground);
-    background: var(--surface);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
     box-shadow: 0 0 0 1.5px var(--foreground);
   }
-  .glass-nav::before {
-    display: none;
-  }
   .glass-nav-lozenge {
-    background: var(--background);
     box-shadow: inset 0 0 0 1.5px var(--foreground);
   }
 }

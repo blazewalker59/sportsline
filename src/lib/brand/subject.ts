@@ -27,7 +27,7 @@ export interface SubjectSide {
 export type Subject = SubjectSide | { a: SubjectSide; b: SubjectSide }
 
 /** The page backgrounds (styles.css --background). */
-const PAGE = { light: '#f3f4f8', dark: '#0e1015' } as const
+const PAGE = { light: '#e9e8e3', dark: '#111111' } as const
 /**
  * Under this against the page, a primary would vanish as a wash (the
  * Raiders' black, the Packers' green in dark): its secondary washes

@@ -8,7 +8,7 @@ import type { TeamRef } from '@/lib/model/timeline'
 import { contrast } from '@/lib/timeline/chat'
 
 /** The page backgrounds (styles.css --background). */
-const PAGE = { light: '#f3f4f8', dark: '#0e1015' } as const
+const PAGE = { light: '#e9e8e3', dark: '#111111' } as const
 const NEUTRAL = { light: '#5d6170', dark: '#c4c8d4' } as const
 /** Under this against the page, a thin line all but disappears. */
 const MIN_ON_PAGE = 2.2
