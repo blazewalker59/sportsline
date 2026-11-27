@@ -7,8 +7,7 @@
 import { Link } from '@tanstack/react-router'
 import type { ScopeSetup } from './useTimelineScope'
 import type { IconName } from '@/components/layout/NavIcon'
-import { ICON_TONES, NavGlyph } from '@/components/layout/NavIcon'
-import { cn } from '@/lib/utils'
+import { NavGlyph } from '@/components/layout/NavIcon'
 
 const PROMPTS: Record<
   ScopeSetup,
@@ -58,12 +57,7 @@ export function ScopePrompt({ setup }: { setup: ScopeSetup }) {
       data-scope-prompt={setup}
       className="flex flex-col items-center gap-3 rounded-card border border-border bg-surface px-6 py-8 text-center"
     >
-      <span
-        className={cn(
-          'flex size-12 items-center justify-center rounded-full',
-          ICON_TONES[p.icon],
-        )}
-      >
+      <span className="well flex size-12 items-center justify-center rounded-full">
         <NavGlyph name={p.icon} className="size-6" />
       </span>
       <h2 id="scope-prompt-title" className="text-base font-bold">
@@ -72,7 +66,7 @@ export function ScopePrompt({ setup }: { setup: ScopeSetup }) {
       <p className="max-w-80 text-sm text-muted">{p.body}</p>
       <Link
         to={p.to}
-        className="mt-1 flex min-h-11 items-center rounded-full bg-foreground px-5 text-sm font-semibold text-background"
+        className="key key-ink mt-1 inline-flex h-11 items-center rounded-control px-5 text-3xs font-bold uppercase"
       >
         {p.action}
       </Link>

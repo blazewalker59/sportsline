@@ -515,7 +515,8 @@ textarea,
 .glass-nav-tab {
   -webkit-tap-highlight-color: transparent;
   font-family: var(--font-label);
-  letter-spacing: 0.04em;
+  /* Tight on the phone's dock, where "Predictions" has a quarter of it. */
+  letter-spacing: 0;
   text-transform: uppercase;
   transition:
     transform 120ms ease,
@@ -523,6 +524,11 @@ textarea,
 }
 .glass-nav-tab:active {
   transform: translateY(1px);
+}
+@media (width >= 64rem) {
+  .glass-nav-tab {
+    letter-spacing: 0.04em;
+  }
 }
 @media (hover: hover) {
   .glass-nav-tab:not([aria-current='page']):hover {
@@ -692,9 +698,10 @@ textarea,
   --s2: var(--s2-light);
   --s2-ink: var(--s2-ink-light);
   /* How strongly the color enters each surface: gentler on light. */
-  --subject-crown: 30%;
-  --subject-tint: 7%;
-  --subject-edge: 28%;
+  /* Signal: team color is data, so a crown and an edge, barely a wash. */
+  --subject-crown: 16%;
+  --subject-tint: 2%;
+  --subject-edge: 14%;
   --subject-ink-base: #000;
   --subject-ink-amount: 72%;
   /* The page's own surface and border, before cards take the tint. */
@@ -716,9 +723,9 @@ textarea,
   --s-ink: var(--s-ink-dark);
   --s2: var(--s2-dark);
   --s2-ink: var(--s2-ink-dark);
-  --subject-crown: 46%;
-  --subject-tint: 16%;
-  --subject-edge: 40%;
+  --subject-crown: 26%;
+  --subject-tint: 5%;
+  --subject-edge: 22%;
   --subject-ink-base: #fff;
   --subject-ink-amount: 68%;
 }
@@ -985,18 +992,4 @@ body:has(.subject-page) {
   font-size: 12px;
   line-height: 1.45;
   font-variant-numeric: tabular-nums;
-}
-
-/*
-  Two teams' lines on one chart (games/GameFlow): each team's color for
-  the current theme, chosen in lib/games/flowColors (set inline as
-  --team-away-light/-dark and --team-home-light/-dark).
-*/
-.team-lines {
-  --team-away: var(--team-away-light);
-  --team-home: var(--team-home-light);
-}
-.dark .team-lines {
-  --team-away: var(--team-away-dark);
-  --team-home: var(--team-home-dark);
 }

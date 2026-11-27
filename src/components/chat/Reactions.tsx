@@ -178,7 +178,7 @@ function ReactionPicker({
     }
   }, [onClose])
   const above = anchor.top > 120
-  const width = REACTIONS.length * 48 + 12
+  const width = REACTIONS.length * 50 + 16
   const left = Math.min(Math.max(8, anchor.left), window.innerWidth - width - 8)
   return (
     <div
@@ -194,10 +194,10 @@ function ReactionPicker({
       />
       <div
         ref={bar}
-        className="animate-in fade-in zoom-in-95 absolute flex gap-1 rounded-full border border-border bg-surface p-1.5 shadow-xl duration-150"
+        className="animate-in fade-in zoom-in-95 panel absolute flex gap-1.5 rounded-card border border-border bg-surface p-2 pb-2.5 duration-150"
         style={{
           left,
-          top: above ? anchor.top - 60 : anchor.bottom + 8,
+          top: above ? anchor.top - 68 : anchor.bottom + 8,
         }}
       >
         {REACTIONS.map((emoji) => (
@@ -208,8 +208,9 @@ function ReactionPicker({
             aria-label={`React ${emoji}`}
             aria-pressed={mine === emoji}
             className={cn(
-              'flex size-11 items-center justify-center rounded-full text-[26px] transition-transform active:scale-90',
-              mine === emoji ? 'bg-accent-soft' : 'hover:bg-notice',
+              // Keys: yours is held down, in ink.
+              'key flex size-11 items-center justify-center rounded-control text-[24px]',
+              mine === emoji && 'key-ink',
             )}
           >
             {emoji}
@@ -240,10 +241,10 @@ export function ReactionPills({
         <span
           key={emoji}
           className={cn(
-            'relative z-[1] flex items-center gap-0.5 rounded-full border px-1.5 py-px text-[12px] font-semibold tabular-nums shadow-sm',
+            'relative z-[1] flex items-center gap-0.5 rounded-control border px-1.5 py-px font-label text-[12px] font-bold tabular-nums',
             reactions.mine === emoji
-              ? 'border-accent/50 bg-accent-soft text-accent'
-              : 'border-border bg-surface text-muted',
+              ? 'border-foreground bg-foreground text-background'
+              : 'panel border-border bg-surface text-muted',
           )}
         >
           {emoji}

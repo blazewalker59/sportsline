@@ -133,13 +133,13 @@ export function FeedFooter({
       {error && (
         <div
           role="alert"
-          className="mt-6 flex items-center justify-between gap-3 rounded-card border border-live/40 bg-live/10 px-3 py-2 text-sm text-live"
+          className="well mt-6 flex items-center justify-between gap-3 rounded-card px-3.5 py-2.5 text-sm"
         >
           Couldn’t load this feed.
           <button
             type="button"
             onClick={onRetry}
-            className="min-h-9 rounded-full bg-background px-3 font-semibold"
+            className="key inline-flex h-9 items-center rounded-control px-3 text-3xs font-bold uppercase"
           >
             Try again
           </button>
@@ -151,7 +151,9 @@ export function FeedFooter({
       )}
 
       {!error && empty && !loading && (
-        <p className="mt-16 text-center text-sm text-muted">{emptyText}</p>
+        <p className="well mt-6 rounded-card px-4 py-8 text-center text-sm text-muted">
+          {emptyText}
+        </p>
       )}
 
       {hasMore && (
@@ -159,7 +161,7 @@ export function FeedFooter({
           type="button"
           onClick={onMore}
           disabled={loadingMore}
-          className="mx-auto mt-6 block min-h-11 rounded-full bg-accent-soft px-5 text-sm font-semibold text-accent"
+          className="key mx-auto mt-6 flex h-11 items-center rounded-control px-5 text-3xs font-bold uppercase"
         >
           {loadingMore ? 'Loading…' : 'Earlier plays'}
         </button>

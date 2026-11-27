@@ -22,6 +22,8 @@ import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
 import { ConferenceMark, conferenceName } from '@/components/brand/RowItemMark'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { FollowButton } from '@/components/follows/FollowButton'
+import { Num } from '@/components/signal/Num'
+import { SectionLabel } from '@/components/signal/Section'
 import { gameSearch } from '@/lib/timeline/gameLink'
 import { openTeamGame } from '@/lib/teams/server'
 import { useTeamPage } from '@/lib/teams/queries'
@@ -65,7 +67,7 @@ export function TeamScreen({ teamId }: { teamId: string }) {
           <div
             role="tablist"
             aria-label="Team"
-            className="mb-4 flex gap-1 rounded-full bg-notice p-1"
+            className="well mb-4 flex gap-1 rounded-[13px] p-1"
           >
             {(['schedule', 'roster'] as const).map((t) => (
               <button
@@ -74,16 +76,15 @@ export function TeamScreen({ teamId }: { teamId: string }) {
                 role="tab"
                 aria-selected={tab === t}
                 onClick={() => setTab(t)}
+                // The current tab is the raised key in the well.
                 className={cn(
-                  'min-h-9 flex-1 rounded-full text-sm font-semibold capitalize transition-colors',
-                  tab === t
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted',
+                  'inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-control text-3xs font-bold uppercase',
+                  tab === t ? 'key' : 'text-muted hover:text-foreground',
                 )}
               >
                 {t}
                 {t === 'roster' && data.roster.length > 0 && (
-                  <span className="ml-1 font-normal text-muted">
+                  <span className="font-normal text-muted">
                     {data.roster.length}
                   </span>
                 )}
@@ -111,17 +112,16 @@ function TeamHeader({
   const { team } = page
   return (
     <header className="mb-5 flex items-center gap-4">
-      <span
-        className="flex size-[88px] shrink-0 items-center justify-center rounded-full border border-bubble-border bg-surface"
-        style={
-          team.colors
-            ? {
-                boxShadow: `inset 0 0 0 4px color-mix(in srgb, ${team.colors.primary} 35%, transparent)`,
-              }
-            : undefined
-        }
-      >
+      {/* The logo on a panel, the team's color as its bottom edge. */}
+      <span className="relative flex size-[88px] shrink-0 items-center justify-center overflow-hidden rounded-card border border-border bg-surface">
         <TeamLogo team={team} size={60} />
+        {team.colors && (
+          <span
+            aria-hidden="true"
+            className="absolute inset-x-0 bottom-0 h-1"
+            style={{ background: team.colors.primary }}
+          />
+        )}
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <h1 className="text-xl leading-tight font-bold tracking-tight">
@@ -140,16 +140,16 @@ function TeamHeader({
               {conferenceName(team.conference)}
             </>
           )}
-          {team.record && (
-            <span className="font-semibold text-foreground/80 tabular-nums">
-              {team.conference && '· '}
-              {team.record}
-            </span>
-          )}
         </span>
+        {team.record && (
+          <span className="mt-1 flex items-baseline gap-2">
+            <Num className="text-4xl">{team.record}</Num>
+            <span className="text-3xs text-muted uppercase">Record</span>
+          </span>
+        )}
         <RecentForm page={page} />
         {canFollow && (
-          <div className="mt-1">
+          <div className="mt-1.5">
             <FollowButton follow={{ kind: 'team', teamId: team.id }} />
           </div>
         )}
@@ -235,9 +235,7 @@ function GameSection({
 }) {
   return (
     <section>
-      <h2 className="subject-ink mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-        {title}
-      </h2>
+      <SectionLabel title={title}>{games.length}</SectionLabel>
       <ul className="divide-y divide-border rounded-card border border-border bg-surface">
         {games.map((g) => (
           <GameRow key={g.sourceGameId} game={g} league={league} />
@@ -247,7 +245,7 @@ function GameSection({
         <button
           type="button"
           onClick={more}
-          className="mt-2 w-full rounded-full py-2 text-sm font-semibold text-accent"
+          className="key mt-3 flex h-10 w-full items-center justify-center rounded-control text-3xs font-bold uppercase"
         >
           {moreLabel}
         </button>
@@ -300,7 +298,7 @@ function GameRow({
   )
   return (
     <li className="flex min-h-14 items-center gap-2 px-3">
-      <span className="w-[4.5rem] shrink-0 text-xs text-muted">
+      <span className="w-[5.5rem] shrink-0 text-3xs whitespace-nowrap text-muted uppercase">
         {dateLabel(game.startsAt, timeZone)}
       </span>
       {game.opponent.id ? (
@@ -323,7 +321,7 @@ function GameRow({
         onClick={() => (game.gameId ? void goTo(game.gameId) : open.mutate())}
         aria-label={playable ? 'Open this game' : undefined}
         className={cn(
-          'flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-2 text-sm tabular-nums',
+          'flex min-h-11 shrink-0 items-center gap-1.5 rounded-control px-2 text-sm tabular-nums',
           playable && 'hover:bg-notice',
         )}
       >
@@ -354,8 +352,9 @@ function Outcome({ game }: { game: TeamGame }) {
     <span className="flex items-center gap-1">
       <span className="flex w-10 justify-center">
         {live ? (
-          <span className="rounded-full bg-live/15 px-1 text-3xs font-bold text-live">
-            LIVE
+          <span className="flex items-center gap-1.5 text-3xs font-bold text-live uppercase">
+            <span aria-hidden="true" className="led led-pulse size-1.5" />
+            Live
           </span>
         ) : (
           <ResultMark result={game.result} />
@@ -373,7 +372,7 @@ function ResultMark({ result }: { result: TeamGame['result'] }) {
     <span
       className={cn(
         'text-[13px] font-bold',
-        result === 'W' ? 'text-scoring' : 'text-muted',
+        result === 'W' ? 'text-foreground' : 'text-muted',
       )}
     >
       {result}
@@ -405,22 +404,21 @@ function RecentForm({ page }: { page: TeamPage }) {
         : `${w}–${l + otl}`
   return (
     <span className="flex flex-col gap-1 text-sm">
-      <span className="whitespace-nowrap text-muted">
+      <span className="text-3xs whitespace-nowrap text-muted uppercase">
         Last {recent.length}{' '}
-        <span className="font-semibold text-foreground/80 tabular-nums">
-          {record}
-        </span>
+        <span className="text-foreground/80 tabular-nums">{record}</span>
       </span>
       <span className="flex flex-wrap gap-0.5" aria-hidden="true">
         {recent.map((g) => (
           <span
             key={g.sourceGameId}
             title={`${g.result} ${g.score.team}–${g.score.opponent} ${g.home ? 'vs' : '@'} ${g.opponent.abbreviation}`}
+            // Wins in ink, the rest recessed.
             className={cn(
-              'flex h-5 min-w-5 items-center justify-center rounded-control px-1 text-3xs font-bold',
+              'flex h-5 min-w-5 items-center justify-center rounded-[5px] px-1 font-label text-3xs font-bold',
               g.result === 'W'
-                ? 'bg-scoring/15 text-scoring'
-                : 'bg-notice text-muted',
+                ? 'bg-foreground text-background'
+                : 'well text-muted',
             )}
           >
             {g.result}
@@ -449,10 +447,7 @@ function Roster({
     <div className="flex flex-col gap-5">
       {rosterGroups(league, roster).map(({ label, players }) => (
         <section key={label}>
-          <h2 className="subject-ink mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-            {label}
-            <span className="ml-1 font-normal">{players.length}</span>
-          </h2>
+          <SectionLabel title={label}>{players.length}</SectionLabel>
           <ul className="divide-y divide-border rounded-card border border-border bg-surface">
             {players.map((p) => (
               <li key={p.id}>
@@ -465,11 +460,11 @@ function Roster({
                     headshotUrl={p.headshotUrl}
                     size={40}
                   />
-                  <span className="subject-ink min-w-0 flex-1 truncate font-medium">
+                  <span className="min-w-0 flex-1 truncate font-medium">
                     {p.name}
                   </span>
                   {p.position && (
-                    <span className="text-xs font-semibold text-muted">
+                    <span className="text-3xs text-muted uppercase">
                       {p.position}
                     </span>
                   )}

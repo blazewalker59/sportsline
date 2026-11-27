@@ -49,7 +49,7 @@ export function DetailPane({
         )}
       >
         <div className="flex min-h-9 items-center gap-3">
-          <h2 className="min-w-0 flex-1 truncate text-base font-bold">
+          <h2 className="min-w-0 flex-1 truncate text-base font-bold tracking-tight">
             {title}
           </h2>
           {action}
@@ -91,7 +91,7 @@ export function DetailPaneMissing({
           }
         />
       ) : (
-        <p className="rounded-card border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
+        <p className="well rounded-card px-3 py-4 text-center text-sm text-muted">
           {kind === 'prediction'
             ? 'This Prediction isn’t in your Kalshi account any more.'
             : 'This Matchup isn’t on in your leagues any more.'}
@@ -117,8 +117,8 @@ function CloseDetail({
       aria-label={`Close ${kind}`}
       title="Close (Esc)"
       className={cn(
-        'flex size-9 shrink-0 items-center justify-center rounded-full text-muted hover:text-foreground',
-        subject ? 'hover:bg-foreground/10' : 'hover:bg-surface',
+        'key flex size-9 shrink-0 items-center justify-center rounded-control',
+        subject && 'opacity-90',
       )}
     >
       <svg

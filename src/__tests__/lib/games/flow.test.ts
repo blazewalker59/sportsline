@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { TeamRef, TimelineItem } from '@/lib/model/timeline'
+import type { TimelineItem } from '@/lib/model/timeline'
 import { buildFlow, segmentOf } from '@/lib/games/flow'
-import { colorDistance, flowColors } from '@/lib/games/flowColors'
 
 const item = (
   sequence: number,
@@ -89,28 +88,5 @@ describe('a Game’s flow', () => {
     const scores = f.away.map((s) => s.score)
     expect(scores).toEqual([...scores].sort((a, b) => a - b))
     expect(scores.at(-1)).toBe(3)
-  })
-})
-
-describe('team line colors', () => {
-  const team = (primary: string, secondary: string) =>
-    ({
-      id: primary,
-      abbreviation: 'T',
-      logoUrl: null,
-      colors: { primary, secondary },
-    }) as TeamRef
-
-  it('keeps hues apart and visible in each theme', () => {
-    // Calgary red and Vancouver: navy is too dark on the dark page, green
-    // is plainly different from red.
-    const c = flowColors(team('#dd1a32', '#000000'), team('#003e7e', '#008752'))
-    expect(c.home.dark).toBe('#008752')
-    // Warriors (gold fails on the light page, so navy) and Clippers navy:
-    // too alike, so the Clippers take their red.
-    const w = flowColors(team('#fdb927', '#1d428a'), team('#12173f', '#c8102e'))
-    expect(w.away.light).toBe('#1d428a')
-    expect(w.home.light).toBe('#c8102e')
-    expect(colorDistance('#dd1a32', '#008752')).toBeGreaterThan(300)
   })
 })

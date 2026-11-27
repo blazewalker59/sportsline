@@ -230,7 +230,9 @@ export function Sheet({
       />
       <div
         className={cn(
-          'animate-in slide-in-from-bottom relative mx-auto flex max-h-[calc(100dvh-max(env(safe-area-inset-top),1.5rem))] w-full max-w-xl flex-col rounded-t-sheet bg-background pb-[env(safe-area-inset-bottom)] shadow-2xl duration-300',
+          // Solid material with a lit top edge (Signal). The aluminum
+          // page, not the panel's surface, so the panels inside it lift.
+          'animate-in slide-in-from-bottom relative mx-auto flex max-h-[calc(100dvh-max(env(safe-area-inset-top),1.5rem))] w-full max-w-xl flex-col rounded-t-sheet bg-background pb-[env(safe-area-inset-bottom)] shadow-[inset_0_1px_0_var(--key-highlight),0_-1px_0_var(--border),0_-20px_40px_-20px_rgb(0_0_0/0.35)] duration-300',
           subject && 'subject subject-crown',
           subject && isPair(subject) && 'subject-crown--split',
         )}
@@ -250,7 +252,7 @@ export function Sheet({
           onTouchCancel={onTouchEnd}
         >
           <div className="flex justify-center pt-2 pb-1" aria-hidden="true">
-            <span className="h-1.5 w-10 rounded-full bg-muted/40" />
+            <span className="well h-1.5 w-10 rounded-full" />
           </div>
           <div
             className={cn(
@@ -261,7 +263,7 @@ export function Sheet({
               subject ? 'border-transparent' : 'border-border',
             )}
           >
-            <span className="min-w-0 flex-1 truncate text-base font-bold">
+            <span className="min-w-0 flex-1 truncate text-base font-bold tracking-tight">
               {title}
             </span>
             {action}
@@ -269,10 +271,7 @@ export function Sheet({
               ref={close}
               type="button"
               onClick={dismiss}
-              className={cn(
-                'min-h-11 rounded-full px-4 text-[13px] font-semibold',
-                subject ? 'bg-foreground/10' : 'bg-notice',
-              )}
+              className="key inline-flex h-11 items-center rounded-control px-3.5 text-3xs font-bold uppercase"
             >
               Done
             </button>

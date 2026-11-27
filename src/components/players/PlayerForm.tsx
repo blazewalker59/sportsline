@@ -2,6 +2,7 @@
  * A Player's recent form: their headline stat (receiving yards, points,
  * strikeouts…) in each recent game as bars, oldest to newest, against
  * their per-game average as a dashed rule. Tap a bar for the full line.
+ * Signal: ink bars (muted under the average), the latest one lit.
  */
 
 import { barY, defineChart, ruleY } from '@tanstack/charts'
@@ -11,18 +12,16 @@ import { scaleLinear } from '@tanstack/charts/scales/linear'
 import { tooltip } from '@tanstack/charts/tooltip'
 import { useMemo } from 'react'
 import type { PlayerOverview } from '@/lib/model/types'
-import {
-  CHART_COLORS,
-  ChartCard,
-  subjectColor,
-} from '@/components/charts/ChartCard'
+import { CHART_COLORS, ChartCard } from '@/components/charts/ChartCard'
 import { shortDate } from '@/lib/time/format'
 import { useTimeZone } from '@/lib/time/useTimeZone'
 
 type Game = PlayerOverview['recent'][number]
 
-/** A game under their average: their team's ink, else the accent. */
-const GAME = subjectColor(CHART_COLORS.accent)
+/** A game at or over their average in ink; under it, muted; the latest lit. */
+const GAME = CHART_COLORS.foreground
+const UNDER = `color-mix(in srgb, ${CHART_COLORS.muted} 55%, transparent)`
+const LATEST = 'var(--signal)'
 
 interface Bar {
   key: string
@@ -30,6 +29,7 @@ interface Bar {
   value: number
   game: Game
   above: boolean
+  latest: boolean
 }
 
 export function PlayerForm({
@@ -50,19 +50,22 @@ export function PlayerForm({
 
   const bars = useMemo(
     () =>
-      [...recent].reverse().flatMap((g, i): Array<Bar> =>
-        g.value === null
-          ? []
-          : [
-              {
-                key: `${i}`,
-                tick: `${g.home ? '' : '@'}${g.opponent}`,
-                value: g.value,
-                game: g,
-                above: form.average !== null && g.value >= form.average,
-              },
-            ],
-      ),
+      [...recent]
+        .reverse()
+        .flatMap((g, i): Array<Omit<Bar, 'latest'>> =>
+          g.value === null
+            ? []
+            : [
+                {
+                  key: `${i}`,
+                  tick: `${g.home ? '' : '@'}${g.opponent}`,
+                  value: g.value,
+                  game: g,
+                  above: form.average === null || g.value >= form.average,
+                },
+              ],
+        )
+        .map((b, i, all) => ({ ...b, latest: i === all.length - 1 })),
     [recent, form.average],
   )
 
@@ -75,9 +78,9 @@ export function PlayerForm({
             x: 'key',
             y: 'value',
             key: 'key',
-            fill: (b) => (b.above ? CHART_COLORS.good : GAME),
-            fillOpacity: 0.75,
-            radius: 3,
+            fill: (b) => (b.latest ? LATEST : b.above ? GAME : UNDER),
+            fillOpacity: 0.9,
+            radius: 1,
           }),
           ...(form.average !== null
             ? [

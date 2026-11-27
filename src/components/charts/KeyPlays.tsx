@@ -103,7 +103,7 @@ export function KeyPlayPanel({
   const none = index === -1
   return (
     <div
-      className="mt-1.5 flex min-h-[4.75rem] items-center gap-2 rounded-control border border-border bg-background/60 px-1.5 text-2xs"
+      className="well mt-1.5 flex min-h-[4.75rem] items-center gap-2 rounded-control px-1.5 font-sans text-2xs"
       aria-live="polite"
     >
       <StepButton
@@ -121,7 +121,7 @@ export function KeyPlayPanel({
           </p>
         ) : (
           <>
-            <p className="mb-0.5 flex items-center justify-between text-3xs text-muted tabular-nums">
+            <p className="mb-0.5 flex items-center justify-between font-label text-3xs text-muted uppercase tabular-nums">
               {index + 1} of {count}
               <button
                 type="button"
@@ -174,9 +174,8 @@ function StepButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'flex size-11 shrink-0 touch-manipulation items-center justify-center rounded-full sm:size-9',
-        'border border-border bg-foreground/10 text-foreground transition',
-        'hover:bg-foreground/15 active:scale-95 active:bg-foreground/20',
+        // A key: a raised cap that presses in.
+        'key flex size-11 shrink-0 touch-manipulation items-center justify-center rounded-control sm:size-9',
         'disabled:pointer-events-none disabled:opacity-30',
       )}
     >

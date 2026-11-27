@@ -62,9 +62,12 @@ export function BoxBody({
         {[game.awayTeam, game.homeTeam].map((team, i) => (
           <div
             key={team.id}
-            className={cn('flex items-center gap-2', i === 1 && 'subject-b')}
+            className={cn(
+              'flex items-center gap-2',
+              i === 1 && 'subject-b flex-row-reverse',
+            )}
           >
-            <TeamMark team={team} size={20} bold className="subject-ink" />
+            <TeamMark team={team} size={20} bold />
             <FollowButton follow={{ kind: 'team', teamId: team.id }} />
           </div>
         ))}
@@ -74,7 +77,7 @@ export function BoxBody({
       {box && box.tables.length > 0 ? (
         <BoxScore box={box} game={game} />
       ) : (
-        <p className="mt-10 text-center text-sm text-muted">
+        <p className="well rounded-card px-4 py-6 text-center text-sm text-muted">
           No box score yet.
         </p>
       )}
@@ -84,14 +87,15 @@ export function BoxBody({
 
 /**
  * Score by segment. With 9+ innings it is wider than a phone, so the team
- * column and the totals stay pinned and only the segments scroll.
+ * column and the totals stay pinned and only the segments scroll. Signal:
+ * Inter figures, the headers in the label face, the total in bold ink.
  */
 export function Linescore({ box, game }: { box: GameBox; game: GameSummary }) {
   const ls = box.linescore
   if (ls.segments.length === 0) return null
   const pinnedLeft = 'sticky left-0 z-[1] bg-surface'
   const pinnedRight = 'sticky right-0 z-[1] bg-surface'
-  // Each team's mark in its own ink (no row tint: the rows read as one).
+  // Each team by its logo and abbreviation (no row tint: the rows read as one).
   const row = (
     team: GameSummary['awayTeam'],
     runs: Array<number | null>,
@@ -100,23 +104,29 @@ export function Linescore({ box, game }: { box: GameBox; game: GameSummary }) {
   ) => (
     <tr className={cn(home && 'subject-b')}>
       <th
-        className={cn(pinnedLeft, 'py-1.5 pr-2 pl-3 text-left font-semibold')}
+        className={cn(
+          pinnedLeft,
+          'border-t border-border py-2 pr-2 pl-3 text-left font-semibold',
+        )}
       >
-        <TeamMark team={team} size={18} className="subject-ink" />
+        <TeamMark team={team} size={18} />
       </th>
       {runs.map((r, i) => (
-        <td key={i} className="min-w-6 px-1 text-center text-muted">
+        <td
+          key={i}
+          className="min-w-6 border-t border-border px-1 text-center text-foreground/75"
+        >
           {r ?? '–'}
         </td>
       ))}
-      <td className={cn(pinnedRight, 'pr-3 pl-2')}>
+      <td className={cn(pinnedRight, 'border-t border-border pr-3 pl-2')}>
         <span className="flex gap-3 border-l border-border pl-2.5">
           {totals.map((t, i) => (
             <span
               key={i}
               className={cn(
                 'min-w-5 text-center',
-                i === 0 ? 'font-extrabold' : 'font-semibold',
+                i === 0 ? 'font-bold text-foreground' : 'text-foreground/75',
               )}
             >
               {t}
@@ -127,17 +137,17 @@ export function Linescore({ box, game }: { box: GameBox; game: GameSummary }) {
     </tr>
   )
   return (
-    <div className="overflow-x-auto rounded-card border border-border bg-surface py-1.5">
+    <div className="overflow-x-auto rounded-card border border-border bg-surface pt-1 pb-0.5">
       <table className="w-full border-separate border-spacing-0 text-[13px] tabular-nums">
         <thead>
-          <tr className="text-2xs text-muted">
+          <tr className="text-3xs text-muted uppercase">
             <th className={pinnedLeft} />
             {ls.segments.map((seg) => (
-              <th key={seg} className="min-w-6 px-1 font-normal">
+              <th key={seg} className="min-w-6 px-1 py-1.5 font-normal">
                 {seg}
               </th>
             ))}
-            <th className={cn(pinnedRight, 'pr-3 pl-2 font-normal')}>
+            <th className={cn(pinnedRight, 'py-1.5 pr-3 pl-2 font-normal')}>
               <span className="flex gap-3 border-l border-border pl-2.5">
                 {ls.totalColumns.map((c) => (
                   <span key={c} className="min-w-5 text-center">

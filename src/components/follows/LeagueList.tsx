@@ -82,9 +82,9 @@ export function LeagueList() {
           <li
             key={league}
             className={cn(
-              'relative flex h-14 items-center gap-3 bg-surface pr-3 pl-1',
+              'relative flex h-14 items-center gap-3 bg-surface pr-3 pl-1 first:rounded-t-card last:rounded-b-card',
               dragging
-                ? 'z-10 rounded-card shadow-lg ring-1 ring-border'
+                ? 'panel z-10 rounded-card ring-1 ring-border'
                 : drag && 'transition-transform duration-150',
             )}
             style={
@@ -145,8 +145,8 @@ export function LeagueList() {
                 hidden && 'opacity-45',
               )}
             >
-              <span className="flex w-[30px] shrink-0 justify-center">
-                <RowItemMark item={league} size={26} />
+              <span className="well flex size-9 shrink-0 items-center justify-center rounded-control">
+                <RowItemMark item={league} size={24} />
               </span>
               <span className="flex min-w-0 flex-col">
                 <span className="truncate font-medium">
@@ -165,10 +165,11 @@ export function LeagueList() {
               disabled={!hidden && isLeague(league) && lastLeague}
               aria-pressed={!hidden}
               className={cn(
-                'min-h-9 rounded-full px-3 text-[13px] font-semibold disabled:opacity-40',
-                hidden
-                  ? 'bg-notice text-muted'
-                  : 'border border-border text-foreground/80',
+                // A raised key either way: its aria-pressed says the League
+                // is shown, while its label is the action (Hide or Show).
+                'key inline-flex h-8 items-center justify-center rounded-control px-3 text-3xs font-bold uppercase',
+                'aria-pressed:not-active:transform-none aria-pressed:not-active:shadow-[0_2px_0_var(--key-edge),0_4px_8px_-4px_var(--key-shade),inset_0_1px_0_var(--key-highlight)]',
+                hidden ? 'text-foreground' : 'text-muted',
               )}
             >
               {hidden ? 'Show' : 'Hide'}

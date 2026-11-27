@@ -164,9 +164,9 @@ export function TimeOverview({
             endAriaLabel: 'To',
             handleSize: HANDLE,
             selectionStyle: {
-              fill: 'var(--color-accent)',
-              fillOpacity: 0.1,
-              stroke: 'var(--color-accent)',
+              fill: 'var(--color-foreground)',
+              fillOpacity: 0.06,
+              stroke: 'var(--color-foreground)',
               strokeOpacity: 0.7,
             },
             // The handles stay as touch areas; the grips below draw them.
@@ -186,7 +186,7 @@ export function TimeOverview({
         {/* The strip's track, under the series. */}
         <div
           aria-hidden="true"
-          className="absolute rounded-control bg-background/60"
+          className="well absolute rounded-control"
           style={{
             top: PAD,
             height: STRIP,
@@ -228,12 +228,12 @@ export function TimeOverview({
           <Grip x={right} side="end" />
         </div>
       </div>
-      <div className="mt-0.5 flex items-center justify-between gap-2 px-1 text-2xs">
+      <div className="mt-0.5 flex items-center justify-between gap-2 px-1 font-label text-3xs">
         <span className="tabular-nums" aria-live="polite">
           {format(view.start)} – {format(view.end)}
         </span>
         {!sameWindow(action, extent) && (
-          <span className="flex gap-1">
+          <span className="well flex gap-0.5 rounded-control p-[3px]">
             <WindowButton active={onAction} onClick={onShowAction}>
               Latest action
             </WindowButton>
@@ -255,15 +255,15 @@ export function TimeOverview({
 function Grip({ x, side }: { x: number; side: 'start' | 'end' }) {
   return (
     <div
-      className="absolute flex w-3 items-center justify-center gap-px rounded-full border-2 border-accent bg-surface shadow-sm"
+      className="key absolute flex w-3 items-center justify-center gap-px rounded-full border border-foreground/60"
       style={{
         left: side === 'start' ? x - 12 : x,
         top: PAD - 5,
         height: STRIP + 10,
       }}
     >
-      <span className="h-2.5 w-px rounded-full bg-accent" />
-      <span className="h-2.5 w-px rounded-full bg-accent" />
+      <span className="h-2.5 w-px rounded-full bg-foreground/70" />
+      <span className="h-2.5 w-px rounded-full bg-foreground/70" />
     </div>
   )
 }
@@ -283,10 +283,10 @@ function WindowButton({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        'rounded-full border px-2 py-0.5 font-medium',
+        'rounded-[8px] px-2 py-1 font-bold uppercase transition-colors',
         active
-          ? 'border-accent bg-accent/15 text-foreground'
-          : 'border-border text-muted hover:text-foreground',
+          ? 'bg-surface text-foreground shadow-[0_1px_2px_var(--key-shade),inset_0_1px_0_var(--key-highlight)]'
+          : 'text-muted hover:text-foreground',
       )}
     >
       {children}

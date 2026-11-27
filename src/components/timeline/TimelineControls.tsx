@@ -19,11 +19,10 @@ export function HighlightsButton({
       type="button"
       onClick={() => onChange(!on)}
       aria-pressed={on}
+      // A key, held down (and inked) while on.
       className={cn(
-        'flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold transition-colors',
-        on
-          ? 'bg-accent text-background'
-          : 'bg-notice text-muted hover:text-foreground',
+        'key inline-flex h-9 items-center gap-1.5 rounded-control px-3 text-3xs font-bold uppercase',
+        on ? 'key-ink' : 'text-muted',
       )}
     >
       <svg
@@ -76,10 +75,7 @@ export function ConnectionDot({ connection }: { connection: Connection }) {
       className="flex size-6 items-center justify-center"
     >
       <span
-        className={cn(
-          'size-2 rounded-full',
-          connection === 'live' ? 'animate-pulse bg-live' : 'bg-muted',
-        )}
+        className={cn('led', connection === 'live' ? 'led-pulse' : 'led-off')}
       />
     </span>
   )

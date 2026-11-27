@@ -76,7 +76,16 @@ export function FollowPicker({ onClose }: { onClose: () => void }) {
     >
       <header className="flex items-start gap-3 px-4 pt-4">
         <div className="min-w-0 flex-1">
-          <p className="text-3xs font-semibold tracking-wide text-muted uppercase">
+          <p className="flex items-center gap-2 text-3xs text-muted uppercase">
+            <span aria-hidden="true" className="flex gap-1">
+              <span className="led led-ink size-1.5" />
+              <span
+                className={cn(
+                  'led size-1.5',
+                  step.kind === 'leagues' ? 'led-off' : 'led-ink',
+                )}
+              />
+            </span>
             Step {step.kind === 'leagues' ? 1 : 2} of 2
           </p>
           <h2 id="first-run-title" className="mt-0.5 text-base font-semibold">
@@ -93,7 +102,7 @@ export function FollowPicker({ onClose }: { onClose: () => void }) {
         <button
           type="button"
           onClick={skip}
-          className="-mr-2 shrink-0 rounded-full px-3 py-1.5 text-sm text-muted hover:text-foreground"
+          className="key inline-flex h-8 shrink-0 items-center rounded-control px-3 text-3xs font-bold uppercase"
         >
           Skip
         </button>
@@ -134,7 +143,7 @@ export function FollowPicker({ onClose }: { onClose: () => void }) {
                   leagues: leagues.filter((l) => picked.includes(l)),
                 })
               }
-              className="rounded-full bg-accent px-5 py-2 text-sm font-semibold text-background transition-opacity disabled:opacity-40"
+              className="key key-ink inline-flex h-10 items-center rounded-control px-5 text-3xs font-bold uppercase disabled:opacity-40"
             >
               Next
             </button>
@@ -147,7 +156,7 @@ export function FollowPicker({ onClose }: { onClose: () => void }) {
             <button
               type="button"
               onClick={() => setStep({ kind: 'leagues' })}
-              className="-ml-2 rounded-full px-3 py-1.5 text-sm text-muted hover:text-foreground"
+              className="key inline-flex h-10 items-center rounded-control px-3 text-3xs font-bold uppercase"
             >
               Back
             </button>
@@ -160,7 +169,7 @@ export function FollowPicker({ onClose }: { onClose: () => void }) {
               type="button"
               disabled={followCount === 0}
               onClick={finish}
-              className="shrink-0 rounded-full bg-accent px-5 py-2 text-sm font-semibold text-background transition-opacity disabled:opacity-40"
+              className="key key-ink inline-flex h-10 shrink-0 items-center rounded-control px-5 text-3xs font-bold uppercase disabled:opacity-40"
             >
               Done
             </button>
@@ -207,7 +216,7 @@ function TeamStep({ leagues }: { leagues: Array<League> }) {
           placeholder="Find a Team"
           aria-label="Find a Team"
           autoComplete="off"
-          className="mt-3 w-full rounded-control border border-border bg-background px-3 py-2 text-base outline-none focus:border-foreground/50"
+          className="well mt-3 w-full rounded-control border border-transparent px-3 py-2 text-base outline-none placeholder:text-muted focus:border-foreground/50"
         />
       )}
       {teams.isPending ? (
@@ -218,7 +227,7 @@ function TeamStep({ leagues }: { leagues: Array<League> }) {
           <button
             type="button"
             onClick={() => void teams.refetch()}
-            className="font-semibold text-accent"
+            className="font-semibold text-foreground underline underline-offset-2"
           >
             Try again
           </button>
@@ -318,12 +327,8 @@ function Tile({
       aria-pressed={on}
       disabled={disabled}
       onClick={onClick}
-      className={cn(
-        'relative flex h-20 w-full flex-col items-center justify-center gap-1.5 rounded-control border px-1.5 text-center transition-colors',
-        on
-          ? 'border-accent bg-accent-soft'
-          : 'border-border hover:border-foreground/40',
-      )}
+      // A key: pressed in while picked.
+      className="key relative flex h-20 w-full flex-col items-center justify-center gap-1.5 rounded-control px-1.5 text-center"
     >
       {/* The name labels the tile; a League's logo would say it twice. */}
       <span
@@ -345,6 +350,12 @@ function Tile({
           <Check />
         </span>
       )}
+      {!on && (
+        <span
+          aria-hidden="true"
+          className="led led-off absolute top-2 right-2 size-1.5"
+        />
+      )}
     </button>
   )
 }
@@ -361,7 +372,7 @@ function Check() {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
-      className="shrink-0 text-accent"
+      className="shrink-0 text-foreground"
     >
       <path d="M2.5 7.5l3 3 6-7" />
     </svg>

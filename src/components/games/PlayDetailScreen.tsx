@@ -12,8 +12,10 @@ import { AppHeader } from '@/components/layout/AppHeader'
 import { InlineError } from '@/components/layout/RouteStates'
 import { CardSkeleton } from '@/components/layout/Skeleton'
 import { Bases } from '@/components/mlb/Bases'
-import { StrikeZone, pitchColor } from '@/components/mlb/StrikeZone'
+import { StrikeZone, pitchStyle } from '@/components/mlb/StrikeZone'
 import { Rink } from '@/components/nhl/Rink'
+import { Num } from '@/components/signal/Num'
+import { SectionLabel } from '@/components/signal/Section'
 import { playDetailQuery } from '@/lib/games/queries'
 import { gameSearch, playSearch } from '@/lib/timeline/gameLink'
 import { PlayerButton } from '@/components/players/playerSheet'
@@ -67,14 +69,14 @@ interface NflDetail {
 function NflContext({ detail }: { detail: NflDetail }) {
   return (
     <>
-      <section className="grid grid-cols-3 gap-2 text-center">
+      <Readouts>
         <Stat label="Before" value={detail.before ?? '–'} />
         <Stat
           label="Yards"
           value={detail.yards != null ? String(detail.yards) : '–'}
         />
         <Stat label="After" value={detail.after ?? '–'} />
-      </section>
+      </Readouts>
       {detail.drive && (
         <p className="rounded-card border border-border bg-surface px-4 py-2.5 text-sm text-muted">
           Drive {detail.drive.number}
@@ -114,19 +116,15 @@ function NhlContext({
   return (
     <>
       {facts.length > 0 && (
-        <section className="grid grid-cols-2 gap-2 text-center sm:grid-cols-3">
+        <Readouts className="grid-cols-2 sm:grid-cols-3">
           {facts.map(([label, value]) => (
             <Stat key={label} label={label} value={value} />
           ))}
-        </section>
+        </Readouts>
       )}
       {detail.x != null && detail.y != null && (
         <section className="rounded-card border border-border bg-surface p-3">
-          <Rink
-            x={detail.x}
-            y={detail.y}
-            color={scoring ? 'var(--scoring)' : 'var(--notable)'}
-          />
+          <Rink x={detail.x} y={detail.y} lit={scoring} />
         </section>
       )}
     </>
@@ -232,6 +230,10 @@ function Play({ detail }: { detail: PlayDetail }) {
   const mlb = item.league === 'mlb' ? (item.detail as MlbDetail | null) : null
   const overturn = item.kind === 'overturn'
   const timeZone = useTimeZone()
+  const live = game.status === 'live' || game.status === 'delayed'
+  const scoring = item.significance === 'scoring' && !overturn
+  // The score this Play changed is lit while its Game is live.
+  const lit = scoring && live ? item.side : null
   return (
     <article className="flex flex-col gap-4">
       <Link
@@ -241,63 +243,98 @@ function Play({ detail }: { detail: PlayDetail }) {
           play: undefined,
           ...gameSearch(game.id, game.sportsDay),
         })}
-        className="flex items-center justify-between rounded-card border border-border bg-surface px-4 py-2.5 text-sm"
+        className="flex items-center justify-between gap-3 rounded-card border border-border bg-surface px-4 py-2.5 text-sm"
       >
-        <span className="flex items-center gap-2 tabular-nums">
+        <span className="flex items-center gap-2 font-semibold">
           <LeagueLogo league={item.league} size={18} />
           <TeamMark team={game.awayTeam} />
-          {item.score.away} – {item.score.home}
+          <span className="font-normal text-muted">@</span>
           <TeamMark team={game.homeTeam} />
         </span>
-        <span className="text-xs text-muted">{item.segmentLabel} · Game →</span>
+        <span className="flex items-center gap-2 text-3xs text-muted uppercase">
+          {live && <span aria-hidden="true" className="led led-pulse" />}
+          Game →
+        </span>
       </Link>
 
-      <header>
-        <div className="mb-1 flex flex-wrap gap-2 text-xs">
+      <header className="rounded-card border border-border bg-surface p-4">
+        <div className="mb-2.5 flex flex-wrap items-center gap-2 text-3xs uppercase">
           {item.significance && !overturn && (
-            <span
-              className={cn(
-                'rounded-full px-2 py-0.5 capitalize',
-                item.significance === 'scoring' && 'bg-scoring/15 text-scoring',
-                item.significance === 'notable' && 'bg-notable/15 text-notable',
-                item.significance === 'routine' && 'bg-surface text-muted',
-              )}
-            >
-              {item.significance}
+            <span className="flex items-center gap-2 text-muted">
+              <span
+                aria-hidden="true"
+                className={cn(
+                  'led',
+                  item.significance === 'scoring'
+                    ? live && 'led-pulse'
+                    : item.significance === 'notable'
+                      ? 'led-ink'
+                      : 'led-off',
+                )}
+              />
+              <span
+                className={cn(
+                  item.significance === 'scoring' && 'text-scoring',
+                )}
+              >
+                {item.significance}
+              </span>
             </span>
           )}
           {overturn && (
-            <span className="rounded-full bg-live/15 px-2 py-0.5 text-live">
+            <span className="rounded-[5px] bg-foreground px-1.5 text-background">
               Overturned
             </span>
           )}
           {item.status === 'overturned' && (
-            <span className="rounded-full bg-live/15 px-2 py-0.5 text-live">
+            <span className="rounded-[5px] bg-foreground px-1.5 text-background">
               Later overturned
             </span>
           )}
           {item.revisedAt && item.status === 'active' && (
-            <span className="rounded-full border border-border px-2 py-0.5 text-muted">
+            <span className="rounded-[5px] border border-border px-1.5 text-muted">
               Updated by the scorer
             </span>
           )}
           {mlb?.reviewed && (
-            <span className="rounded-full border border-border px-2 py-0.5 text-muted">
+            <span className="rounded-[5px] border border-border px-1.5 text-muted">
               Reviewed
             </span>
           )}
+          <span className="ml-auto text-muted">
+            {clockTime(item.occurredAt, timeZone)}
+          </span>
         </div>
         <h1
           className={cn(
-            'text-xl leading-snug font-semibold',
+            'text-xl leading-snug font-semibold tracking-tight',
             item.status === 'overturned' && 'line-through',
           )}
         >
           <PlayText item={item} />
         </h1>
-        <p className="mt-1 text-xs text-muted">
-          {clockTime(item.occurredAt, timeZone)}
-        </p>
+        {/* The situation after the Play, as readouts in a well. */}
+        <div
+          className="well mt-4 grid grid-cols-3 items-end gap-2 rounded-[14px] px-3 py-3 text-center"
+          aria-label={`${game.awayTeam.abbreviation} ${item.score.away}, ${game.homeTeam.abbreviation} ${item.score.home}, ${item.segmentLabel}`}
+          role="group"
+        >
+          <Readout label={game.awayTeam.abbreviation}>
+            <Num className={cn('text-4xl', lit === 'away' && 'text-scoring')}>
+              {item.score.away}
+            </Num>
+          </Readout>
+          <Readout label="When">
+            <span className="block truncate pb-0.5 font-label text-sm font-bold">
+              {item.segmentLabel || '–'}
+            </span>
+          </Readout>
+          <Readout label={game.homeTeam.abbreviation}>
+            <Num className={cn('text-4xl', lit === 'home' && 'text-scoring')}>
+              {item.score.home}
+            </Num>
+          </Readout>
+        </div>
       </header>
 
       {mlb && <MlbContext detail={mlb} />}
@@ -307,21 +344,18 @@ function Play({ detail }: { detail: PlayDetail }) {
       {item.league === 'nhl' && item.detail && (
         <NhlContext
           detail={item.detail as NhlDetail}
-          scoring={item.significance === 'scoring'}
+          scoring={scoring && live}
         />
       )}
 
       {detail.players.length > 0 && (
         <section>
-          <h2 className="subject-ink mb-2 text-sm font-semibold text-muted">
-            Players
-          </h2>
+          <SectionLabel
+            title={detail.players.length === 1 ? 'Involved player' : 'Players'}
+          />
           <ul className="divide-y divide-border rounded-card border border-border bg-surface">
             {detail.players.map(({ player, lines, headshotUrl, team }) => (
-              <li
-                key={player.id}
-                className="flex items-center gap-3 px-4 py-2.5"
-              >
+              <li key={player.id} className="flex items-center gap-3 px-4 py-3">
                 <PlayerButton
                   playerId={player.id}
                   className="flex min-w-0 flex-1 items-center gap-3"
@@ -333,13 +367,17 @@ function Play({ detail }: { detail: PlayDetail }) {
                     size={44}
                   />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">
+                    <span className="block truncate font-semibold">
                       {player.name}
                     </span>
-                    <span className="block truncate text-xs text-muted">
+                    <span className="block truncate text-3xs text-muted uppercase">
                       {ROLE_LABELS[player.role] ?? player.role}
-                      {lines.length > 0 && ` · ${lines.join(' · ')}`}
                     </span>
+                    {lines.length > 0 && (
+                      <span className="mt-0.5 block truncate text-xs text-foreground/80 tabular-nums">
+                        {lines.join(' · ')}
+                      </span>
+                    )}
                   </span>
                 </PlayerButton>
                 <FollowButton
@@ -349,7 +387,7 @@ function Play({ detail }: { detail: PlayDetail }) {
             ))}
           </ul>
           {item.league === 'mlb' && (
-            <p className="mt-1.5 px-1 text-2xs text-muted">
+            <p className="mt-1.5 px-1 text-3xs text-muted uppercase">
               Stats are for this game, through this play.
             </p>
           )}
@@ -359,13 +397,29 @@ function Play({ detail }: { detail: PlayDetail }) {
   )
 }
 
+/** A readout in the situation well: its label over its value. */
+function Readout({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex min-w-0 flex-col items-center gap-2">
+      <span className="text-3xs text-muted uppercase">{label}</span>
+      {children}
+    </div>
+  )
+}
+
 function MlbContext({ detail }: { detail: MlbDetail }) {
   const pitches = detail.pitches ?? []
   const hit = detail.hit
   return (
     <>
       {(detail.basesBefore || detail.outs != null) && (
-        <section className="flex items-center justify-around rounded-card border border-border bg-surface px-4 py-3 text-xs text-muted">
+        <section className="well flex items-center justify-around rounded-card px-4 py-3 text-3xs text-muted uppercase">
           {detail.basesBefore && (
             <BaseState label="Before" bases={detail.basesBefore} />
           )}
@@ -373,16 +427,16 @@ function MlbContext({ detail }: { detail: MlbDetail }) {
             <BaseState label="After" bases={detail.basesAfter} />
           )}
           {detail.outs != null && (
-            <span className="flex flex-col items-center gap-1">
-              <span className="text-lg font-semibold text-foreground tabular-nums">
-                {detail.outs}
+            <span className="flex flex-col items-center gap-1.5">
+              <Outs outs={detail.outs} />
+              <span aria-hidden="true">
+                {detail.outs === 1 ? 'out' : 'outs'}
               </span>
-              {detail.outs === 1 ? 'out' : 'outs'}
             </span>
           )}
           {detail.rbi ? (
             <span className="flex flex-col items-center gap-1">
-              <span className="text-lg font-semibold text-foreground tabular-nums">
+              <span className="text-lg leading-none font-semibold text-foreground tabular-nums">
                 {detail.rbi}
               </span>
               RBI
@@ -392,7 +446,7 @@ function MlbContext({ detail }: { detail: MlbDetail }) {
       )}
 
       {hit && (hit.exitVelocity || hit.distance) && (
-        <section className="grid grid-cols-3 gap-2 text-center">
+        <Readouts>
           <Stat
             label="Exit velo"
             value={
@@ -407,25 +461,29 @@ function MlbContext({ detail }: { detail: MlbDetail }) {
             label="Distance"
             value={hit.distance ? `${hit.distance} ft` : '–'}
           />
-        </section>
+        </Readouts>
       )}
 
       {pitches.length > 0 && (
         <section>
-          <h2 className="subject-ink mb-2 text-sm font-semibold text-muted">
-            {pitches.length} {pitches.length === 1 ? 'pitch' : 'pitches'}
-          </h2>
+          <SectionLabel
+            title={`${pitches.length} ${pitches.length === 1 ? 'pitch' : 'pitches'}`}
+          />
           <div className="flex flex-col items-center gap-4 rounded-card border border-border bg-surface p-4 sm:flex-row sm:items-start">
             <StrikeZone pitches={pitches} />
             <ol className="w-full flex-1 text-sm">
               {pitches.map((p, i) => (
                 <li
                   key={i}
-                  className="flex items-center gap-2 border-b border-border/50 py-1.5 last:border-0"
+                  className="flex items-center gap-2 border-b border-border py-1.5 last:border-0"
                 >
                   <span
-                    className="flex size-6 shrink-0 items-center justify-center rounded-full text-3xs font-bold text-background tabular-nums"
-                    style={{ background: pitchColor(p) }}
+                    className="flex size-6 shrink-0 items-center justify-center rounded-full font-label text-3xs font-bold tabular-nums"
+                    style={{
+                      background: pitchStyle(p).fill,
+                      color: pitchStyle(p).ink,
+                      boxShadow: `inset 0 0 0 1px ${pitchStyle(p).stroke}`,
+                    }}
                   >
                     {p.number ?? i + 1}
                   </span>
@@ -438,7 +496,7 @@ function MlbContext({ detail }: { detail: MlbDetail }) {
                     </span>
                   </span>
                   {p.balls != null && (
-                    <span className="text-xs tabular-nums text-muted">
+                    <span className="font-label text-xs text-muted tabular-nums">
                       {p.balls}-{p.strikes}
                     </span>
                   )}
@@ -446,7 +504,7 @@ function MlbContext({ detail }: { detail: MlbDetail }) {
               ))}
             </ol>
           </div>
-          <p className="mt-1.5 px-1 text-2xs text-muted">
+          <p className="mt-1.5 px-1 text-3xs text-muted uppercase">
             Catcher’s view. Count shown after each pitch.
           </p>
         </section>
@@ -485,11 +543,49 @@ function BaseState({
   )
 }
 
+/** A row of readouts, recessed in one well. */
+function Readouts({
+  className,
+  children,
+}: {
+  className?: string
+  children: React.ReactNode
+}) {
+  return (
+    <section
+      className={cn(
+        'well grid grid-cols-3 gap-2 rounded-card px-2 py-3 text-center',
+        className,
+      )}
+    >
+      {children}
+    </section>
+  )
+}
+
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-card border border-border bg-surface px-2 py-2.5">
+    <div className="flex min-w-0 flex-col gap-1 px-1">
+      <p className="text-3xs text-muted uppercase">{label}</p>
       <p className="text-base font-semibold tabular-nums">{value}</p>
-      <p className="subject-ink text-2xs text-muted">{label}</p>
     </div>
+  )
+}
+
+/** Outs as three lights: ink for each out, unlit for the rest. */
+function Outs({ outs }: { outs: number }) {
+  return (
+    <span
+      role="img"
+      aria-label={`${outs} ${outs === 1 ? 'out' : 'outs'}`}
+      className="flex h-[30px] items-center gap-1.5"
+    >
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className={cn('led size-2.5', i < outs ? 'led-ink' : 'led-off')}
+        />
+      ))}
+    </span>
   )
 }

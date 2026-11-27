@@ -1,14 +1,20 @@
-/** A base diamond: filled bases are occupied. */
+/**
+ * A base diamond: occupied bases filled in ink (lit orange when `live`:
+ * the runners on now), empty ones outlined.
+ */
 export function Bases({
   first,
   second,
   third,
   size = 18,
+  live = false,
 }: {
   first?: boolean
   second?: boolean
   third?: boolean
   size?: number
+  /** The Game's situation now: occupied bases light up. */
+  live?: boolean
 }) {
   const base = (on: boolean | undefined, x: number, y: number) => (
     <rect
@@ -17,7 +23,13 @@ export function Bases({
       width="5"
       height="5"
       transform={`rotate(45 ${x + 2.5} ${y + 2.5})`}
-      className={on ? 'fill-scoring' : 'fill-none stroke-muted'}
+      className={
+        on
+          ? live
+            ? 'fill-signal'
+            : 'fill-foreground'
+          : 'fill-none stroke-muted'
+      }
       strokeWidth="1"
     />
   )

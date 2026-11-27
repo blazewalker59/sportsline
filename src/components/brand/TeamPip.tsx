@@ -1,6 +1,7 @@
 /**
- * A small mark in a team's color beside a row (a combo's Leg, a Lineup
- * Player), so whose it is reads at a glance. Its color holds up in both
+ * A small square chip in a team's color beside a row (a combo's Leg, a
+ * Lineup Player), so whose it is reads at a glance (Signal: team color is
+ * data, carried by chips and edges). Its color holds up in both
  * themes (lib/brand/subject.ts washColor); without colors, nothing.
  */
 
@@ -20,7 +21,7 @@ export function TeamPip({
   return (
     <span
       aria-hidden="true"
-      className={cn('subject subject-pip shrink-0 rounded-full', className)}
+      className={cn('subject subject-pip shrink-0 rounded-[2px]', className)}
       style={subjectStyle(side)}
     />
   )

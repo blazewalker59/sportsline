@@ -7,7 +7,9 @@
  * Conventions, so the app's charts read as one family:
  * - Colors come from the theme tokens in CHART_COLORS (CSS variables), so
  *   light and dark mode follow automatically; tooltips are themed in
- *   styles.css (.ts-chart-tooltip).
+ *   styles.css (.ts-chart-tooltip). Signal: lines are ink, the losing or
+ *   falling side muted, and orange (`now`) only for the live point.
+ * - Captions, legends and axes are labels, in the label face.
  * - The card sets `color: var(--muted)`, which the library uses for axes,
  *   ticks and grid lines (it paints them in currentColor).
  * - Money, percent and dates use ./format.
@@ -21,10 +23,14 @@ import { cn } from '@/lib/utils'
 /** Theme colors for marks: CSS variables, so they follow light and dark. */
 export const CHART_COLORS = {
   accent: 'var(--color-accent)',
-  good: 'var(--color-scoring)',
-  bad: 'var(--color-live)',
+  /** Rising, ahead: ink. */
+  good: 'var(--color-foreground)',
+  /** Falling, behind: secondary ink (never orange, which means live). */
+  bad: 'var(--color-muted)',
   muted: 'var(--color-muted)',
   foreground: 'var(--color-foreground)',
+  /** The live point, the latest value: the one lit orange. */
+  now: 'var(--color-signal)',
   /**
    * A head-to-head's sides: the Matchup sheet sets each manager's color
    * as --matchup-left / --matchup-right (lib/brand/subject.ts
@@ -67,12 +73,12 @@ export function ChartCard({
   return (
     <figure
       className={cn(
-        'rounded-card border border-border bg-surface px-2 py-2.5 text-muted',
+        'rounded-card border border-border bg-surface px-2 py-2.5 font-label text-muted',
         className,
       )}
     >
       {(legend.length > 0 || headline) && (
-        <figcaption className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-1 text-2xs">
+        <figcaption className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-1 text-3xs uppercase">
           <span className="flex flex-wrap gap-x-3 gap-y-1">
             {legend.map((l) => (
               <span key={l.label} className="flex items-center gap-1">
@@ -84,7 +90,7 @@ export function ChartCard({
                       ? 'h-0.5 w-3'
                       : l.shape === 'dot'
                         ? 'size-2 rounded-full'
-                        : 'size-2 rounded-sm opacity-70',
+                        : 'size-2 rounded-[2px] opacity-70',
                   )}
                   style={{ background: l.color }}
                 />
@@ -92,11 +98,15 @@ export function ChartCard({
               </span>
             ))}
           </span>
-          {headline && <span>{headline}</span>}
+          {headline && (
+            <span className="font-sans font-semibold text-foreground normal-case">
+              {headline}
+            </span>
+          )}
         </figcaption>
       )}
       {children}
-      {footer && <div className="mt-1 px-1 text-2xs">{footer}</div>}
+      {footer && <div className="mt-1 px-1 font-sans text-2xs">{footer}</div>}
     </figure>
   )
 }

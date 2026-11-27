@@ -36,19 +36,20 @@ export function StakeTags({
   return (
     <span
       className={cn(
-        'flex flex-wrap gap-1 px-1 text-3xs font-semibold',
+        'flex flex-wrap gap-x-3 gap-y-1 px-1.5 font-label text-3xs leading-tight',
         align === 'right' ? 'justify-end' : 'justify-start',
       )}
     >
       {fantasy && (
         <span
+          data-stake={fantasy.side}
           className={cn(
-            'rounded-full px-2 py-0.5',
-            fantasy.side === 'mine'
-              ? 'bg-scoring/15 text-scoring'
-              : 'bg-live/10 text-live',
+            'inline-flex items-center gap-1.5',
+            // Orange is the Viewer's own; an opponent's stays in ink.
+            fantasy.side === 'mine' ? 'text-live' : 'text-notable',
           )}
         >
+          <Dot mine={fantasy.side === 'mine'} />
           {fantasy.side === 'mine' ? '★ Your starter' : 'Opponent'} ·{' '}
           {fantasy.names.join(', ')}
         </span>
@@ -56,28 +57,52 @@ export function StakeTags({
       {legs.map(({ prediction, leg }, i) => (
         <span
           key={`${prediction.id}:${i}`}
-          className="inline-flex items-center gap-1.5 rounded-full bg-positive/15 px-2 py-0.5 text-positive tabular-nums"
+          data-stake="leg"
+          className="inline-flex items-center gap-1.5 text-live tabular-nums"
         >
+          <Dot mine />
           {leg.title}
           {leg.progress && (
             <>
               <span>
                 {leg.progress.current}/{leg.progress.target}
               </span>
-              <span
-                aria-hidden="true"
-                className="h-1 w-7 overflow-hidden rounded-full bg-positive/25"
-              >
-                <span
-                  className="block h-full rounded-full bg-positive"
-                  style={{
-                    width: `${Math.min(100, (leg.progress.current / Math.max(1, leg.progress.target)) * 100)}%`,
-                  }}
-                />
-              </span>
+              <LegMeter
+                share={leg.progress.current / Math.max(1, leg.progress.target)}
+              />
             </>
           )}
         </span>
+      ))}
+    </span>
+  )
+}
+
+function Dot({ mine }: { mine: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'size-1.5 shrink-0 rounded-full',
+        mine ? 'bg-signal' : 'bg-notable',
+      )}
+    />
+  )
+}
+
+/** A Leg's Progress as a tiny segmented meter (Signal's Meter, in small). */
+function LegMeter({ share }: { share: number }) {
+  const segments = 6
+  const filled = Math.round(Math.min(1, Math.max(0, share)) * segments)
+  return (
+    <span aria-hidden="true" className="inline-grid grid-cols-6 gap-px">
+      {Array.from({ length: segments }, (_, i) => (
+        <span
+          key={i}
+          className="meter-seg h-1.5 w-1"
+          data-on={i < filled ? '' : undefined}
+          data-edge={i === filled - 1 ? '' : undefined}
+        />
       ))}
     </span>
   )

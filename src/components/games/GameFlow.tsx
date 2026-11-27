@@ -4,7 +4,9 @@
  * be noise), and its segments (quarters, innings, periods) along the
  * bottom. Tap anywhere for the nearest scoring play, which reads under the
  * chart (the lines are decorative, so focus lands only on plays).
- * Refreshes while live.
+ * Refreshes while live. Signal: drawn in ink (the home team solid, the
+ * away team muted and dashed), with the lit orange only for "now": the
+ * lines' ends while the Game is live.
  */
 
 import { defineChart, dot, lineY } from '@tanstack/charts'
@@ -15,19 +17,21 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import type { FlowScore, FlowStep } from '@/lib/games/flow'
 import type { GameSummary } from '@/lib/model/timeline'
-import { ChartCard } from '@/components/charts/ChartCard'
+import { CHART_COLORS, ChartCard } from '@/components/charts/ChartCard'
 import {
   KeyPlayPanel,
   keyPlaySelection,
   useKeyPlay,
 } from '@/components/charts/KeyPlays'
 import { buildFlow } from '@/lib/games/flow'
-import { flowColors } from '@/lib/games/flowColors'
 import { gameDetailQuery } from '@/lib/games/queries'
 import { scoringHeadline } from '@/lib/timeline/chat'
+import { SectionLabel } from '@/components/signal/Section'
 
-const AWAY = 'var(--team-away)'
-const HOME = 'var(--team-home)'
+const AWAY = CHART_COLORS.muted
+const HOME = CHART_COLORS.foreground
+const AWAY_DASH = '5 3'
+const NOW = 'var(--signal)'
 
 const scoreKey = (s: FlowScore) => s.item.id
 
@@ -37,10 +41,6 @@ export function GameFlow({ game }: { game: GameSummary }) {
   const flow = useMemo(
     () => (detail.data ? buildFlow(detail.data.items, game.league) : null),
     [detail.data, game.league],
-  )
-  const colors = useMemo(
-    () => flowColors(game.awayTeam, game.homeTeam),
-    [game.awayTeam, game.homeTeam],
   )
   const away = game.awayTeam.abbreviation
   const home = game.homeTeam.abbreviation
@@ -62,13 +62,42 @@ export function GameFlow({ game }: { game: GameSummary }) {
     )
     const segmentAt = new Map(flow.segments.map((s) => [s.x, s.label]))
     // The lines are context: focus and tooltips land on the scoring dots.
-    const step = (id: string, rows: Array<FlowStep>, stroke: string) =>
+    const step = (
+      id: string,
+      rows: Array<FlowStep>,
+      stroke: string,
+      strokeDasharray?: string,
+    ) =>
       decorative(
         lineY(
           rows.map((r, i) => ({ ...r, i })),
-          { id, x: 'x', y: 'score', key: 'i', stroke, strokeWidth: 2.25 },
+          {
+            id,
+            x: 'x',
+            y: 'score',
+            key: 'i',
+            stroke,
+            strokeWidth: 2,
+            ...(strokeDasharray ? { strokeDasharray } : {}),
+          },
         ),
       )
+    // Now: where each line ends, lit while the Game is live.
+    const ends = [flow.away.at(-1), flow.home.at(-1)].flatMap((r, i) =>
+      r ? [{ x: r.x, score: r.score, i }] : [],
+    )
+    const now = decorative(
+      dot(ends, {
+        id: 'now',
+        x: 'x',
+        y: 'score',
+        key: 'i',
+        r: 3.5,
+        fill: NOW,
+        stroke: 'var(--color-surface)',
+        strokeWidth: 1.5,
+      }),
+    )
     const scored = (side: 'away' | 'home', fill: string) =>
       dot(
         flow.scores.filter((s) => s.side === side),
@@ -85,7 +114,7 @@ export function GameFlow({ game }: { game: GameSummary }) {
       )
     return defineChart({
       marks: [
-        step('away', flow.away, AWAY),
+        step('away', flow.away, AWAY, AWAY_DASH),
         step('home', flow.home, HOME),
         ...(dots
           ? [
@@ -98,6 +127,7 @@ export function GameFlow({ game }: { game: GameSummary }) {
               }),
             ]
           : []),
+        ...(live ? [now] : []),
       ],
       scales: {
         x: {
@@ -125,7 +155,7 @@ export function GameFlow({ game }: { game: GameSummary }) {
           }
         : {}),
     })
-  }, [flow, dots, scores, keyPlay.selected, keyPlay.pick])
+  }, [flow, dots, live, scores, keyPlay.selected, keyPlay.pick])
 
   if (!flow || !definition || flow.end < 2) return null
   const leader =
@@ -136,27 +166,16 @@ export function GameFlow({ game }: { game: GameSummary }) {
         : home
   return (
     <section>
-      <h3 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-        Game flow
-      </h3>
-      <div
-        className="team-lines"
-        style={
-          {
-            '--team-away-light': colors.away.light,
-            '--team-away-dark': colors.away.dark,
-            '--team-home-light': colors.home.light,
-            '--team-home-dark': colors.home.dark,
-          } as React.CSSProperties
-        }
-      >
+      <SectionLabel title="Game flow" as="h3" />
+      <div>
         <ChartCard
           legend={[
             { label: away, color: AWAY, shape: 'line' },
             { label: home, color: HOME, shape: 'line' },
           ]}
           headline={
-            <span className="font-semibold text-foreground tabular-nums">
+            <span className="flex items-center gap-1.5 font-semibold text-foreground tabular-nums">
+              {live && <span aria-hidden="true" className="led led-pulse" />}
               {away} {game.score.away} – {game.score.home} {home}
               {live ? ' · live' : game.status === 'final' ? ' · Final' : ''}
             </span>
@@ -207,7 +226,7 @@ function ScoreDetail({
       <p className="flex items-center gap-1.5 font-semibold text-foreground">
         <span
           aria-hidden="true"
-          className="size-2 shrink-0 rounded-full"
+          className="size-2 shrink-0 rounded-[2px]"
           style={{ background: score.side === 'away' ? AWAY : HOME }}
         />
         <span className="truncate">{scoringHeadline(item)}</span>
