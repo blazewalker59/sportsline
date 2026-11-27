@@ -11,6 +11,7 @@ import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { InlineError } from '@/components/layout/RouteStates'
 import { RowsSkeleton } from '@/components/layout/Skeleton'
+import { SectionLabel } from '@/components/signal/Section'
 import { followablesQuery } from '@/lib/viewer/queries'
 import { useViewer } from '@/lib/viewer/useViewer'
 
@@ -29,8 +30,8 @@ export function FollowsScreen() {
         </p>
       ) : (
         <>
-          <h2 className="mb-1 text-sm font-semibold text-muted">Leagues</h2>
-          <p className="mb-2 text-xs text-muted">
+          <SectionLabel title="Leagues" index="F1" className="mt-2 mb-1" />
+          <p className="mb-3 text-xs text-muted">
             Drag to set their order on the main screen. Hidden Leagues leave the
             row and All.
           </p>
@@ -38,12 +39,10 @@ export function FollowsScreen() {
             <LeagueList />
           </div>
 
-          <label
-            className="mb-2 block text-sm font-semibold text-muted"
-            htmlFor="follow-search"
-          >
-            Teams and Players
-          </label>
+          <SectionLabel
+            title={<label htmlFor="follow-search">Teams and Players</label>}
+            index="F2"
+          />
           <input
             id="follow-search"
             type="search"
@@ -51,7 +50,7 @@ export function FollowsScreen() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search, e.g. Yankees or Aaron Judge"
             autoComplete="off"
-            className="w-full rounded-card border border-border bg-surface px-4 py-2.5 text-base outline-none focus:border-foreground/50"
+            className="well w-full rounded-control border border-transparent px-4 py-2.5 text-base outline-none placeholder:text-muted focus:border-foreground/50"
           />
           {q.length < 2 ? null : results.isPending ? (
             <RowsSkeleton rows={3} label="Searching" className="mt-2" />
@@ -73,11 +72,11 @@ export function FollowsScreen() {
             </ul>
           )}
 
-          <h2 className="mt-8 mb-2 text-sm font-semibold text-muted">
-            Following
-          </h2>
+          <SectionLabel title="Following" index="F3" className="mt-8">
+            {data.follows.length > 0 && data.follows.length}
+          </SectionLabel>
           {data.follows.length === 0 ? (
-            <p className="text-sm text-muted">
+            <p className="well rounded-card px-4 py-3 text-sm text-muted">
               Nothing yet. Until you follow something, your{' '}
               <Link to="/" className="underline">
                 Timeline
@@ -112,7 +111,7 @@ function EntryRow({ entry }: { entry: FollowEntry }) {
           }
         />
       ) : (
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-full border border-bubble-border bg-surface">
+        <span className="well flex size-10 shrink-0 items-center justify-center rounded-control">
           {entry.logoUrl ? (
             <TeamLogo
               team={{ abbreviation: entry.label, logoUrl: entry.logoUrl }}
@@ -124,7 +123,7 @@ function EntryRow({ entry }: { entry: FollowEntry }) {
         </span>
       )}
       <span className="min-w-0 flex-1">
-        <span className="block truncate">{entry.label}</span>
+        <span className="block truncate font-medium">{entry.label}</span>
         <span className="flex items-center gap-1.5 truncate text-xs text-muted">
           <LeagueLogo league={entry.league} size={14} />
           {entry.detail}

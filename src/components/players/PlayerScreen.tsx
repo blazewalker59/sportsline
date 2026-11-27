@@ -15,6 +15,7 @@ import {
   DetailHeaderSkeleton,
 } from '@/components/layout/Skeleton'
 import { SubjectPage } from '@/components/brand/SubjectPage'
+import { SectionLabel } from '@/components/signal/Section'
 import { teamSubject } from '@/lib/brand/subject'
 import {
   PlayerDetailSections,
@@ -80,19 +81,17 @@ export function PlayerScreen({
           <div className="mt-6 mb-6">
             <PlayerDetailSections player={first.player} />
           </div>
-          <h2 className="subject-ink mb-3 text-xs font-bold tracking-wide text-muted uppercase">
-            Plays
-          </h2>
+          <SectionLabel title="Plays" className="mb-3" />
 
           {items.length === 0 ? (
-            <p className="mt-10 text-center text-sm text-muted">
+            <p className="well mt-4 rounded-card px-4 py-6 text-center text-sm text-muted">
               No plays yet. Their plays will collect here.
             </p>
           ) : (
             <div className="flex flex-col gap-6">
               {groupByDay(items).map(({ sportsDay, entries }) => (
                 <section key={sportsDay} className="flex flex-col gap-3">
-                  <h2 className="subject-ink text-xs font-bold tracking-wide text-muted uppercase">
+                  <h2 className="text-3xs text-muted uppercase">
                     {dayLabel(sportsDay, today)}
                   </h2>
                   {entries.map((item) => (
@@ -105,7 +104,7 @@ export function PlayerScreen({
                   type="button"
                   onClick={() => void query.fetchNextPage()}
                   disabled={query.isFetchingNextPage}
-                  className="mx-auto block min-h-11 rounded-full bg-accent-soft px-5 text-sm font-semibold text-accent"
+                  className="key mx-auto flex h-10 items-center rounded-control px-5 text-3xs font-bold uppercase"
                 >
                   {query.isFetchingNextPage ? 'Loading…' : 'Earlier plays'}
                 </button>
@@ -129,9 +128,9 @@ function PlayEntry({ item }: { item: TimelineItem }) {
         <LeagueAvatar league={item.league} />
       )}
       <div className="flex min-w-0 flex-col gap-1">
-        <span className="truncate px-1 text-2xs text-muted">
-          <span className="font-semibold text-foreground/80">
-            {item.awayTeam.abbreviation} {item.score.away} – {item.score.home}{' '}
+        <span className="truncate px-1 text-3xs text-muted uppercase tabular-nums">
+          <span className="text-foreground/80">
+            {item.awayTeam.abbreviation} {item.score.away}–{item.score.home}{' '}
             {item.homeTeam.abbreviation}
           </span>{' '}
           · {item.segmentLabel}

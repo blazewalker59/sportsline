@@ -1,7 +1,9 @@
 /**
  * Pitch locations from the catcher's view. StatsAPI gives `px` (feet from
  * the middle of the plate) and `pz` (feet off the ground); the zone is the
- * plate's width by the batter's own top and bottom.
+ * plate's width by the batter's own top and bottom. Signal: the zone is a
+ * recessed well, strikes are ink, balls are hollow, and the pitch put in
+ * play (the one that made the Play) is the lit orange.
  */
 
 export interface ZonePitch {
@@ -25,12 +27,23 @@ const H = 240
 const sx = (px: number) => ((px + X_RANGE) / (2 * X_RANGE)) * W
 const sz = (pz: number) => H - ((pz - Z_MIN) / (Z_MAX - Z_MIN)) * H
 
-export function pitchColor(
+/** A pitch's marker: its fill, the ink of its number, and its ring. */
+export function pitchStyle(
   p: Pick<ZonePitch, 'isStrike' | 'isBall' | 'isInPlay'>,
-): string {
-  if (p.isInPlay) return 'var(--scoring)'
-  if (p.isStrike) return 'var(--live)'
-  return 'var(--notable)'
+): { fill: string; ink: string; stroke: string } {
+  if (p.isInPlay)
+    return { fill: 'var(--signal)', ink: '#121212', stroke: 'var(--signal)' }
+  if (p.isStrike)
+    return {
+      fill: 'var(--foreground)',
+      ink: 'var(--background)',
+      stroke: 'var(--foreground)',
+    }
+  return {
+    fill: 'var(--surface)',
+    ink: 'var(--foreground)',
+    stroke: 'var(--muted)',
+  }
 }
 
 export function StrikeZone({ pitches }: { pitches: Array<ZonePitch> }) {
@@ -49,7 +62,7 @@ export function StrikeZone({ pitches }: { pitches: Array<ZonePitch> }) {
         y={sz(top)}
         width={sx(HALF_PLATE_FT) - sx(-HALF_PLATE_FT)}
         height={sz(bottom) - sz(top)}
-        className="fill-surface stroke-muted"
+        className="fill-notice stroke-muted"
         strokeWidth="1.5"
       />
       {[1, 2].map((i) => {
@@ -67,18 +80,27 @@ export function StrikeZone({ pitches }: { pitches: Array<ZonePitch> }) {
           </g>
         )
       })}
-      {located.map((p, i) => (
-        <g key={i} transform={`translate(${sx(p.px!)} ${sz(p.pz!)})`}>
-          <circle r="11" fill={pitchColor(p)} fillOpacity="0.9" />
-          <text
-            textAnchor="middle"
-            dy="4"
-            className="fill-background text-2xs font-bold"
-          >
-            {p.number ?? i + 1}
-          </text>
-        </g>
-      ))}
+      {located.map((p, i) => {
+        const style = pitchStyle(p)
+        return (
+          <g key={i} transform={`translate(${sx(p.px!)} ${sz(p.pz!)})`}>
+            <circle
+              r="11"
+              fill={style.fill}
+              stroke={style.stroke}
+              strokeWidth="1.25"
+            />
+            <text
+              textAnchor="middle"
+              dy="4"
+              fill={style.ink}
+              className="font-label text-2xs font-bold"
+            >
+              {p.number ?? i + 1}
+            </text>
+          </g>
+        )
+      })}
     </svg>
   )
 }

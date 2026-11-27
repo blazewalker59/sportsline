@@ -26,7 +26,7 @@ export function DayButton({
       onClick={onToggle}
       aria-expanded={open}
       aria-label={`${dayLabel(sportsDay, today)}. Choose a day`}
-      className="-ml-2 flex min-h-11 items-center gap-1 rounded-full px-2 text-lg font-extrabold tracking-tight hover:bg-notice"
+      className="-ml-2 flex min-h-11 items-center gap-1 rounded-control px-2 text-lg font-extrabold tracking-tight hover:bg-notice"
     >
       {dayLabel(sportsDay, today)}
       <svg

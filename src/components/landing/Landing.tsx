@@ -1,12 +1,14 @@
 /**
  * The front door: Sportsline is for signed-in Viewers, so a visitor sees
- * this and nothing else. A product page on a night-game stage (team-color
- * glow over yard lines): the headline and one way in, then the app itself
- * on a desktop with a phone beside it, both drawn with the app's own parts
- * (the tab's hero, the board's tiles, the narrowed strip, a feed tagged
- * with what each play did for you) so it can't drift from what you get.
- * Then the four tabs, in the navigation's order and colors, and three
- * steps to get going. Motion stops for reduced-motion settings.
+ * this and nothing else. Signal's product page: aluminum and ink in the
+ * visitor's own theme, the headline closing on the one orange point, and
+ * one key in (Continue with Google). Then the product as objects, sitting
+ * in a recessed tray like a spec sheet: a phone on the Timeline (the home
+ * board's score in dots over its win-chance meter, the board's own tiles,
+ * the feed tagged with what each play did for you, the dock) and the
+ * imagined Sportsline device beside it (a dot display, scope keys, stake
+ * lights). Then the four tabs, in the navigation's order, and three steps.
+ * Motion stops for reduced-motion settings.
  *
  * Only live and final Games are shown: a start time reads in the
  * visitor's zone, which the server rendering this doesn't know.
@@ -17,14 +19,13 @@ import type { ScopePage } from '@/components/timeline/scopePages'
 import type { GameStake } from '@/lib/timeline/stakes'
 import type { IconName } from '@/components/layout/NavIcon'
 import { signIn } from '@/lib/auth/client'
-import {
-  LiveBoard,
-  NarrowedBar,
-  ScopeHero,
-  TabHero,
-} from '@/components/timeline/LiveBoard'
+import { LiveBoard } from '@/components/timeline/LiveBoard'
 import { NavGlyph } from '@/components/layout/NavIcon'
-import { TeamLogo } from '@/components/brand/TeamMark'
+import { ThemeButton } from '@/components/layout/ThemeButton'
+import { Mark, Wordmark } from '@/components/signal/Logo'
+import { Meter } from '@/components/signal/Meter'
+import { Num } from '@/components/signal/Num'
+import { SectionLabel } from '@/components/signal/Section'
 import { cn } from '@/lib/utils'
 
 const logo = (league: string, abbr: string) =>
@@ -112,42 +113,39 @@ const STAKES: Record<string, Array<GameStake>> = {
 const stakesOf = (g: GameSummary) => STAKES[g.id] ?? []
 
 interface Moment {
-  team: string
-  logo: string
+  game: string
   text: string
+  /** A Scoring Play: the orange glyph. */
   scoring?: boolean
   ago: string
-  tags?: Array<{ tone: 'fantasy' | 'prediction'; text: string }>
+  /** What it did for the Viewer: orange, with a dot. */
+  stake?: string
 }
 
-/** The feed, as the app draws it: bubbles, scoring outlined, tagged. */
+/** The feed, as the app draws it: numbered, glyphed, tagged. */
 const MOMENTS: ReadonlyArray<Moment> = [
   {
-    team: 'Broncos',
-    logo: logo('nfl', 'den'),
+    game: 'KC @ DEN',
     text: 'Nix to Waddle for 18 yards. Touchdown, Broncos lead 24–20.',
     scoring: true,
     ago: '8s',
-    tags: [{ tone: 'fantasy', text: '★ Your starter · Waddle' }],
+    stake: 'Your starter · Waddle +10.8',
   },
   {
-    team: 'Celtics',
-    logo: logo('nba', 'bos'),
+    game: 'NY @ BOS',
     text: 'Tatum step-back three. Celtics by 3 with 38 seconds left.',
     scoring: true,
     ago: '40s',
-    tags: [{ tone: 'prediction', text: 'Celtics to win · 81%' }],
+    stake: 'Celtics to win · 81%',
   },
   {
-    team: 'Oilers',
-    logo: logo('nhl', 'edm'),
+    game: 'VAN @ EDM',
     text: 'McDavid from Draisaitl on the power play. 3–2 Oilers.',
     scoring: true,
     ago: '2m',
   },
   {
-    team: 'Dodgers',
-    logo: logo('mlb', 'lad'),
+    game: 'SD @ LAD',
     text: 'Ohtani homers, 431 feet to right. Dodgers up 5–3.',
     scoring: true,
     ago: '4m',
@@ -165,39 +163,36 @@ const TICKER = [
   'DEN 88 · MIN 90 · Q4',
 ]
 
-/** The four tabs, in the navigation's order and colors. */
+/** The four tabs, in the navigation's order. */
 const TABS: ReadonlyArray<{
   icon: IconName
   label: string
-  tone: string
   figure: string
+  live?: boolean
   text: string
 }> = [
   {
     icon: 'follows',
     label: 'Following',
-    tone: 'var(--accent)',
     figure: '2 live',
+    live: true,
     text: 'Every play from your teams and players, as it happens.',
   },
   {
     icon: 'all',
     label: 'All',
-    tone: 'var(--accent)',
     figure: '5 games',
     text: 'Every league you watch, live, with the scores on top.',
   },
   {
     icon: 'predictions',
     label: 'Predictions',
-    tone: 'var(--section-predictions)',
     figure: '$37.80',
     text: 'Your Kalshi odds moving with the game, leg by leg.',
   },
   {
     icon: 'fantasy',
     label: 'Fantasy',
-    tone: 'var(--section-fantasy)',
     figure: '88.4–71.2',
     text: 'ESPN and Sleeper matchups, starter by starter.',
   },
@@ -221,73 +216,86 @@ const STEPS = [
 const signInWithGoogle = () =>
   void signIn.social({ provider: 'google', callbackURL: '/' })
 
+/** A key's cap, in the label face (styles.css `.key`). */
+const KEY =
+  'key inline-flex items-center justify-center gap-2 rounded-control font-bold uppercase'
+
 export function Landing() {
   return (
-    // Always the app's dark theme, whatever the device's: the stage is night.
-    <div className="landing dark relative isolate flex min-h-dvh flex-col overflow-hidden bg-[#07080c] text-white">
-      {/* The stage: team-color glow drifting over yard lines. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10"
-      >
-        <span className="landing-glow top-[-10%] left-[-20%] bg-[#FB4F14]" />
-        <span className="landing-glow landing-glow-2 top-[20%] right-[-25%] bg-[#005A9C]" />
-        <span className="landing-glow landing-glow-3 bottom-[-20%] left-[10%] bg-[#007A33]" />
-        <span className="landing-field absolute inset-0" />
-        <span className="absolute inset-0 bg-gradient-to-b from-transparent via-[#07080c]/40 to-[#07080c]" />
-      </div>
-
-      <header className="mx-auto flex w-full max-w-6xl items-center gap-2 px-5 pt-[max(env(safe-area-inset-top),1.25rem)]">
-        <img src="/favicon.svg" alt="" width={28} height={28} />
-        <span className="text-lg font-bold tracking-tight">Sportsline</span>
-        <span className="ml-1 flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-3xs font-bold tracking-wider uppercase">
-          <span className="landing-live size-1.5 rounded-full bg-[#ff5a4e]" />
-          Live
+    <div className="landing flex min-h-dvh flex-col bg-background text-foreground">
+      <header className="mx-auto flex w-full max-w-6xl items-center gap-3 px-5 pt-[max(env(safe-area-inset-top),1.25rem)]">
+        <span className="text-[1.375rem]">
+          <span className="sr-only">Sportsline</span>
+          <Wordmark aria-hidden />
         </span>
         <span className="flex-1" />
+        <ThemeButton />
         <button
           type="button"
           onClick={signInWithGoogle}
-          className="landing-cta hidden min-h-10 items-center gap-2 rounded-full bg-white px-4 text-[13px] font-semibold text-[#111318] transition-transform active:scale-[0.98] sm:flex"
+          className={cn(KEY, 'hidden h-10 px-4 text-3xs sm:inline-flex')}
         >
-          <GoogleMark />
           Sign in
         </button>
       </header>
 
       <main className="flex flex-1 flex-col">
-        <section className="landing-rise mx-auto flex w-full max-w-3xl flex-col items-center gap-5 px-5 pt-10 text-center md:pt-14">
-          <h1 className="text-[2.6rem] leading-[1.02] font-extrabold tracking-tight md:text-6xl">
+        <section className="landing-rise mx-auto flex w-full max-w-6xl flex-col items-start gap-5 px-5 pt-12 md:pt-20">
+          <span className="flex items-center gap-2 text-3xs text-muted uppercase">
+            <span aria-hidden="true" className="led led-pulse" />
+            Live sports · your stakes
+          </span>
+          <h1 className="max-w-4xl text-[2.75rem] leading-[0.98] font-extrabold tracking-[-0.04em] md:text-7xl">
             Every play that matters to you,{' '}
-            <span className="landing-ink bg-gradient-to-r from-[#ffb612] via-[#ff5a4e] to-[#8fbce6] bg-clip-text text-transparent">
-              live.
+            <span className="font-dots font-black tracking-[-0.02em] whitespace-nowrap">
+              live<span className="text-signal">.</span>
             </span>
           </h1>
-          <p className="max-w-xl text-base leading-relaxed text-white/70 md:text-lg">
+          <p className="max-w-xl text-base leading-relaxed text-muted md:text-lg">
             Your teams, your predictions and your fantasy matchups in one live
             feed, on your phone and your desktop.
           </p>
-          <div className="flex flex-col items-center gap-2">
+          <div className="mt-1 flex flex-col items-start gap-2.5">
             <CallToAction />
-            <span className="text-xs text-white/50">
+            <span className="text-3xs text-muted uppercase">
               Sign in to start. Your connected accounts stay yours.
             </span>
           </div>
         </section>
 
-        {/* The app itself, drawn with its own parts, in its dark theme. */}
+        {/* The product as objects, drawn with its own parts. */}
         <section
           aria-hidden="true"
           inert
-          className="landing-rise relative mx-auto mt-10 w-full max-w-5xl px-5 md:mt-14"
+          className="landing-rise mx-auto mt-12 w-full max-w-6xl px-5 md:mt-16"
           style={{ animationDelay: '0.15s' }}
         >
-          {/* The phone stands off the window's corner, clear of its pane. */}
-          <div className="hidden md:block md:pr-40 lg:pr-48">
-            <Desktop />
-          </div>
-          <div className="mx-auto w-full max-w-[320px] md:absolute md:right-5 md:-bottom-12 md:w-[300px]">
-            <Phone />
+          <div className="well relative flex flex-col items-center gap-10 overflow-hidden rounded-sheet px-4 pt-10 pb-6 md:flex-row md:items-end md:justify-center md:gap-14 md:px-10 md:pt-12">
+            <span className="absolute top-4 left-5 text-3xs text-muted uppercase">
+              Fig. 1 · On the phone and the desk
+            </span>
+            <figure className="flex flex-col items-center gap-3">
+              <Phone />
+              <Caption index="A">Timeline · All</Caption>
+            </figure>
+            <figure className="hidden flex-col items-center gap-3 md:flex md:self-center">
+              <Device />
+              <ol className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-3xs text-muted uppercase">
+                {[
+                  'Dot display',
+                  'Scope keys',
+                  'Stake lights',
+                  'Calls the plays',
+                ].map((c, i) => (
+                  <li key={c} className="flex items-center gap-1.5">
+                    <span className="flex size-4 items-center justify-center rounded-full border border-current text-[9px]">
+                      {i + 1}
+                    </span>
+                    {c}
+                  </li>
+                ))}
+              </ol>
+            </figure>
           </div>
         </section>
 
@@ -295,37 +303,30 @@ export function Landing() {
           aria-labelledby="landing-tabs"
           className="mx-auto w-full max-w-6xl px-5 pt-16 md:pt-24"
         >
-          <h2
-            id="landing-tabs"
-            className="text-2xl font-bold tracking-tight md:text-3xl"
+          <SectionLabel
+            index="B1"
+            title={<span id="landing-tabs">Four ways to watch</span>}
           >
-            Four ways to watch
-          </h2>
-          <p className="mt-1 text-[15px] text-white/60">
-            The same four tabs, in the same order, on every screen.
-          </p>
-          <ul className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            Same order, every screen
+          </SectionLabel>
+          <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {TABS.map((t, i) => (
               <li
                 key={t.label}
-                className="landing-rise flex flex-col gap-2 rounded-sheet border border-[color-mix(in_srgb,var(--tone)_35%,rgb(255_255_255/0.08))] bg-[linear-gradient(160deg,color-mix(in_srgb,var(--tone)_18%,#0f1117),#0f1117_70%)] p-4"
-                style={
-                  {
-                    '--tone': t.tone,
-                    animationDelay: `${0.2 + i * 0.08}s`,
-                  } as React.CSSProperties
-                }
+                className="landing-rise flex flex-col gap-3 rounded-card border border-border bg-surface p-4"
+                style={{ animationDelay: `${0.2 + i * 0.08}s` }}
               >
-                <span className="flex items-center gap-1.5 text-3xs font-bold tracking-wide text-(--tone) uppercase">
-                  <NavGlyph name={t.icon} className="size-4" />
+                <span className="flex items-center gap-2 text-3xs font-bold uppercase">
+                  <span className="well flex size-7 items-center justify-center rounded-control">
+                    <NavGlyph name={t.icon} className="size-4" />
+                  </span>
                   {t.label}
                 </span>
-                <span className="text-2xl font-extrabold tracking-tight tabular-nums">
+                <span className="flex items-center gap-2 text-2xl font-bold tracking-tight tabular-nums">
+                  {t.live && <span aria-hidden="true" className="led" />}
                   {t.figure}
                 </span>
-                <p className="text-[13px] leading-snug text-white/60">
-                  {t.text}
-                </p>
+                <p className="text-[13px] leading-snug text-muted">{t.text}</p>
               </li>
             ))}
           </ul>
@@ -335,32 +336,34 @@ export function Landing() {
           aria-labelledby="landing-steps"
           className="mx-auto w-full max-w-6xl px-5 pt-16 pb-14 md:pt-20"
         >
-          <h2
-            id="landing-steps"
-            className="text-2xl font-bold tracking-tight md:text-3xl"
+          <SectionLabel
+            index="B2"
+            title={<span id="landing-steps">Set up in a minute</span>}
           >
-            Set up in a minute
-          </h2>
-          <p className="mt-1 text-[15px] text-white/60">
-            Everything’s optional: start with your teams.
-          </p>
-          <ol className="mt-5 grid gap-3 md:grid-cols-3">
+            Everything’s optional
+          </SectionLabel>
+          <ol className="mt-3 grid rounded-card border border-border bg-surface md:grid-cols-3">
             {STEPS.map((s, i) => (
               <li
                 key={s.title}
-                className="rounded-sheet border border-white/10 bg-white/[0.04] p-4"
+                className="flex gap-4 border-border p-4 not-last:border-b md:not-last:border-r md:not-last:border-b-0"
               >
-                <span className="mb-2 flex size-6 items-center justify-center rounded-full bg-white/10 text-xs font-bold">
-                  {i + 1}
+                <span className="pt-0.5 font-label text-3xs text-muted">
+                  {String(i + 1).padStart(2, '0')}
                 </span>
-                <p className="text-[15px] font-bold">{s.title}</p>
-                <p className="mt-0.5 text-[13px] leading-snug text-white/60">
-                  {s.text}
-                </p>
+                <span>
+                  <span className="block text-[15px] font-semibold">
+                    {s.title}
+                  </span>
+                  <span className="mt-0.5 block text-[13px] leading-snug text-muted">
+                    {s.text}
+                  </span>
+                </span>
               </li>
             ))}
           </ol>
-          <div className="mt-8 flex justify-center">
+          <div className="mt-10 flex flex-col items-center gap-3">
+            <Mark className="h-8" />
             <CallToAction />
           </div>
         </section>
@@ -368,12 +371,14 @@ export function Landing() {
 
       <footer
         aria-hidden="true"
-        className="relative border-t border-white/10 bg-black/30 py-2.5 pb-[max(env(safe-area-inset-bottom),0.625rem)]"
+        className="well overflow-hidden py-2.5 pb-[max(env(safe-area-inset-bottom),0.625rem)]"
       >
-        <div className="landing-ticker flex w-max gap-8 text-[12px] font-semibold tracking-wide whitespace-nowrap text-white/70 tabular-nums">
+        <div className="landing-ticker flex w-max gap-8 text-3xs whitespace-nowrap text-muted uppercase tabular-nums">
           {[...TICKER, ...TICKER].map((t, i) => (
             <span key={i} className="flex items-center gap-2">
-              <span className="size-1 rounded-full bg-white/30" />
+              <span
+                className={cn('led size-1.5', t.endsWith('Final') && 'led-off')}
+              />
               {t}
             </span>
           ))}
@@ -388,88 +393,99 @@ function CallToAction() {
     <button
       type="button"
       onClick={signInWithGoogle}
-      className="landing-cta flex min-h-12 items-center gap-3 rounded-full bg-white px-6 text-[15px] font-semibold text-[#111318] shadow-[0_8px_30px_rgba(255,255,255,0.15)] transition-transform active:scale-[0.98]"
+      className={cn(KEY, 'key-ink h-12 px-5 text-2xs')}
     >
-      <GoogleMark />
+      <span className="flex size-6 items-center justify-center rounded-full bg-white">
+        <GoogleMark />
+      </span>
       Continue with Google
     </button>
   )
 }
 
+function Caption({
+  index,
+  children,
+}: {
+  index: string
+  children: React.ReactNode
+}) {
+  return (
+    <figcaption className="flex items-center gap-2 text-3xs text-muted uppercase">
+      <span className="rounded-[5px] border border-border px-1.5 leading-4">
+        {index}
+      </span>
+      {children}
+    </figcaption>
+  )
+}
+
 const noop = () => {}
 
-/** The All tab's hero, its League row drawn as the app draws it. */
-function AllHero() {
+/** The home board's hero: the headline Game in dots over its meter. */
+function Board() {
+  const g = GAMES[1]
   return (
-    <TabHero
-      icon="all"
-      tone="var(--accent)"
-      kicker="All Leagues"
-      figure="4 live"
-      aside="5 games"
-    >
-      <span className="flex w-max gap-0.5 rounded-full bg-notice p-0.5 text-xs font-semibold">
-        {['All leagues', 'NFL', 'NBA', 'NHL', 'MLB'].map((l, i) => (
-          <span
-            key={l}
-            className={cn(
-              'flex h-7 items-center rounded-full px-3',
-              i === 0 ? 'bg-surface text-foreground shadow-sm' : 'text-muted',
-            )}
-          >
-            {l}
+    <div className="rounded-card border border-border bg-surface p-3">
+      <div className="flex items-center justify-between text-[9px] whitespace-nowrap text-muted uppercase">
+        <span className="flex items-center gap-1.5">
+          <span className="led led-pulse" />4 live · Tue
+        </span>
+        <span>All leagues</span>
+      </div>
+      <div className="mt-2.5 mb-2 grid grid-cols-2">
+        <span>
+          <span className="block text-3xs text-muted uppercase">
+            {g.awayTeam.abbreviation} · Q4 0:38
           </span>
-        ))}
-      </span>
-    </TabHero>
+          <Num className="mt-1 block text-5xl">{g.score.away}</Num>
+        </span>
+        <span className="text-right">
+          <span className="block text-3xs text-muted uppercase">
+            {g.homeTeam.abbreviation}
+          </span>
+          <Num className="mt-1 block text-5xl text-live">{g.score.home}</Num>
+        </span>
+      </div>
+      <Meter value={0.81} label="Celtics win chance" thin />
+      <div className="mt-1.5 flex justify-between text-[9px] text-muted uppercase">
+        <span>NY</span>
+        <span>Celtics win chance 81%</span>
+        <span>BOS</span>
+      </div>
+    </div>
   )
 }
 
 function Feed({ moments }: { moments: ReadonlyArray<Moment> }) {
   return (
-    <ol className="flex flex-col gap-3">
-      {moments.map((m) => (
-        <li key={m.text} className="flex items-end gap-2">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-bubble-border bg-surface">
-            <img src={m.logo} alt="" width={20} height={20} />
+    <ol className="flex flex-col">
+      {moments.map((m, i) => (
+        <li
+          key={m.text}
+          className="grid grid-cols-[18px_1fr_auto] items-baseline gap-2 border-b border-border py-2.5 last:border-b-0"
+        >
+          <span className="font-label text-[9px] text-muted">
+            {String(i + 1).padStart(2, '0')}
           </span>
-          <span className="flex min-w-0 flex-col items-start gap-1">
-            <span className="px-1 text-3xs font-semibold text-muted">
-              {m.team}
+          <span className="min-w-0">
+            <span className="block text-[13px] leading-snug font-medium">
+              {m.text}
             </span>
-            <span
-              className={cn(
-                'rounded-sheet bg-bubble px-3 py-2 text-[13px] leading-snug',
-                m.scoring
-                  ? 'border-2 border-scoring'
-                  : 'border border-bubble-border',
-              )}
-            >
-              {m.scoring && (
-                <span className="block text-[9px] font-bold tracking-widest text-scoring">
-                  SCORING
+            <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9px] uppercase">
+              <span className="text-muted">
+                {m.ago} · {m.game}
+              </span>
+              {m.stake && (
+                <span className="flex items-center gap-1 text-live">
+                  <span className="size-1.5 rounded-full bg-signal" />
+                  {m.stake}
                 </span>
               )}
-              {m.text}
-              <span className="ml-1.5 text-3xs text-muted">{m.ago}</span>
             </span>
-            {m.tags && (
-              <span className="flex flex-wrap gap-1 px-1 text-3xs font-semibold">
-                {m.tags.map((t) => (
-                  <span
-                    key={t.text}
-                    className={cn(
-                      'rounded-full px-2 py-0.5',
-                      t.tone === 'fantasy'
-                        ? 'bg-scoring/15 text-scoring'
-                        : 'bg-positive/15 text-positive',
-                    )}
-                  >
-                    {t.text}
-                  </span>
-                ))}
-              </span>
-            )}
+          </span>
+          <span className={cn('text-xs', m.scoring && 'text-live')}>
+            {m.scoring ? '●' : '○'}
           </span>
         </li>
       ))}
@@ -477,167 +493,63 @@ function Feed({ moments }: { moments: ReadonlyArray<Moment> }) {
   )
 }
 
-const RAIL: ReadonlyArray<{ icon: IconName; label: string; on?: boolean }> = [
-  { icon: 'follows', label: 'Following' },
-  { icon: 'all', label: 'All', on: true },
-  { icon: 'predictions', label: 'Predictions' },
-  { icon: 'fantasy', label: 'Fantasy' },
-]
-
-/** The desktop app: rail, the home board over the feed, and the pane. */
-function Desktop() {
-  const chosen = GAMES[0]
-  return (
-    <div className="overflow-hidden rounded-card border border-white/15 bg-background text-foreground shadow-[0_40px_100px_rgba(0,0,0,0.6)]">
-      <div className="flex h-8 items-center gap-1.5 bg-[#1b1e26] px-3">
-        {['#ff5f57', '#febc2e', '#28c840'].map((c) => (
-          <span
-            key={c}
-            className="size-2.5 rounded-full"
-            style={{ background: c }}
-          />
-        ))}
-      </div>
-      <div className="grid h-[580px] grid-cols-[150px_1fr_1fr] gap-5 overflow-hidden pr-5">
-        <nav className="glass-nav m-3 flex flex-col gap-1 rounded-sheet p-2">
-          <span className="flex items-center gap-2 px-2 pt-1 pb-3 text-sm font-bold">
-            <img src="/favicon.svg" alt="" width={18} height={18} />
-            Sportsline
-          </span>
-          {RAIL.map((r) => (
-            <span
-              key={r.label}
-              className={cn(
-                'flex items-center gap-2 rounded-card px-2.5 py-2 text-xs font-semibold text-glass-ink-muted',
-                r.on && 'bg-surface/60 text-accent',
-              )}
-            >
-              <NavGlyph name={r.icon} />
-              {r.label}
-            </span>
-          ))}
-        </nav>
-        <div className="flex min-w-0 flex-col pt-4">
-          <span className="mb-3 text-base font-bold">Today</span>
-          <AllHero />
-          <LiveBoard
-            pages={PAGES}
-            current={`game:${chosen.id}`}
-            stakesOf={stakesOf}
-            layout="grid"
-            onLayout={noop}
-            onPick={noop}
-            opensOnPick
-          />
-          <NarrowedBar page={PAGES[0]} onClear={noop} />
-          <Feed moments={MOMENTS.slice(0, 1)} />
-        </div>
-        <div className="flex min-w-0 flex-col gap-3 border-l border-border pt-4 pl-5">
-          <Scoreboard game={chosen} />
-          <table className="w-full overflow-hidden rounded-card bg-surface text-xs tabular-nums">
-            <thead className="text-3xs text-muted uppercase">
-              <tr>
-                {['Broncos', 'C/ATT', 'YDS', 'TD'].map((h) => (
-                  <th key={h} className="px-3 py-2 text-right first:text-left">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                ['Bo Nix', '24/33', '281', '3'],
-                ['Jaylen Waddle', '9 rec', '104', '1'],
-                ['J.K. Dobbins', '17 car', '86', '0'],
-              ].map((row) => (
-                <tr key={row[0]} className="border-t border-border">
-                  {row.map((c, i) => (
-                    <td
-                      key={i}
-                      className="px-3 py-2 text-right first:text-left"
-                    >
-                      {c}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <span className="text-3xs font-bold tracking-wide text-muted uppercase">
-            This game’s plays
-          </span>
-          <Feed moments={MOMENTS.slice(0, 1)} />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/** A Game's scoreboard, as the pane opens it. */
-function Scoreboard({ game: g }: { game: GameSummary }) {
-  return (
-    <div
-      className="grid grid-cols-[1fr_auto_1fr] items-center rounded-sheet border border-border p-3"
-      style={{
-        background:
-          'linear-gradient(90deg, color-mix(in srgb, #E31837 30%, var(--surface)), var(--surface) 45%, var(--surface) 55%, color-mix(in srgb, #FB4F14 30%, var(--surface)))',
-      }}
-    >
-      <span className="flex items-center gap-2 text-2xl font-bold tabular-nums">
-        <TeamLogo team={g.awayTeam} size={30} />
-        {g.score.away}
-      </span>
-      <span className="text-center text-3xs font-semibold text-live">
-        {g.situation?.segmentLabel}
-      </span>
-      <span className="flex items-center justify-end gap-2 text-2xl font-bold tabular-nums">
-        {g.score.home}
-        <TeamLogo team={g.homeTeam} size={30} />
-      </span>
-    </div>
-  )
-}
-
-const TAB_BAR: ReadonlyArray<{ icon: IconName; label: string }> = [
+const DOCK: ReadonlyArray<{ icon: IconName; label: string }> = [
   { icon: 'follows', label: 'Following' },
   { icon: 'all', label: 'All' },
   { icon: 'predictions', label: 'Predictions' },
   { icon: 'fantasy', label: 'Fantasy' },
 ]
 
-/** The phone app: the Fantasy tab's hero, its Games, and the tab bar. */
+/** The phone: the Timeline's All tab, its board, its feed and the dock. */
 function Phone() {
   return (
-    <div className="relative rounded-[2.4rem] border border-white/15 bg-[#0e1015] p-2.5 shadow-[0_30px_80px_rgba(0,0,0,0.6)]">
-      <div className="relative h-[520px] overflow-hidden rounded-[1.9rem] bg-background px-3 pt-8 text-foreground">
-        <ScopeHero
-          tab="fantasy"
-          headline={{
-            kicker: 'Fantasy',
-            figure: '88.4–71.2',
-            aside: 'leading GG',
-            line: 'The League',
-          }}
-        />
-        <LiveBoard
-          pages={PAGES.slice(0, 2)}
-          current="all"
-          stakesOf={stakesOf}
-          layout="grid"
-          onLayout={noop}
-          onPick={noop}
-        />
-        <Feed moments={MOMENTS.slice(0, 2)} />
-        <div className="glass-nav absolute inset-x-3 bottom-3 flex rounded-full p-1">
-          {TAB_BAR.map((t) => (
+    <div className="relative w-[300px] rounded-[2.75rem] bg-black p-2.5 shadow-[0_0_0_1.5px_#2a2a2a,0_40px_70px_-30px_rgb(0_0_0/0.45)]">
+      <div className="relative h-[600px] overflow-hidden rounded-[2.1rem] bg-background text-foreground">
+        <span className="absolute top-2.5 left-1/2 z-10 h-6 w-24 -translate-x-1/2 rounded-full bg-black" />
+        <div className="flex h-10 items-end justify-between px-6 pb-1 text-[11px] font-semibold">
+          <span>9:41</span>
+          <span className="flex items-center gap-1">
+            <span className="h-2 w-3 rounded-[2px] bg-current" />
+            <span className="h-2 w-4 rounded-[3px] bg-current" />
+          </span>
+        </div>
+        <div className="flex flex-col gap-3 px-3 pt-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xl font-semibold tracking-tight">All</span>
+            <span className="flex gap-1.5">
+              {['Alrt', 'Agnt'].map((k) => (
+                <span key={k} className={cn(KEY, 'h-8 px-2 text-[9px]')}>
+                  {k}
+                </span>
+              ))}
+            </span>
+          </div>
+          <Board />
+          <LiveBoard
+            pages={PAGES.slice(0, 2)}
+            current="all"
+            stakesOf={stakesOf}
+            layout="grid"
+            onLayout={noop}
+            onPick={noop}
+          />
+          <Feed moments={MOMENTS.slice(0, 2)} />
+        </div>
+        <div className="glass-nav absolute inset-x-2.5 bottom-2.5 grid grid-cols-4 gap-1 rounded-[1.5rem] p-1.5">
+          {DOCK.map((t) => (
             <span
               key={t.label}
               className={cn(
-                'flex flex-1 flex-col items-center gap-0.5 rounded-full py-1 text-[9px] font-semibold text-glass-ink-muted',
-                t.icon === 'fantasy' && 'bg-surface/60 text-section-fantasy',
+                'flex flex-col items-center gap-0.5 rounded-[1.1rem] py-1.5 font-label text-[8px] tracking-wide text-glass-ink-muted uppercase',
+                t.icon === 'all' && 'key key-pressed text-foreground',
               )}
             >
-              <NavGlyph name={t.icon} />
+              <span className="relative">
+                <NavGlyph name={t.icon} />
+                {t.icon === 'all' && (
+                  <span className="absolute -top-px -right-1 size-1.5 rounded-full bg-signal shadow-[0_0_6px_var(--signal)]" />
+                )}
+              </span>
               {t.label}
             </span>
           ))}
@@ -647,9 +559,85 @@ function Phone() {
   )
 }
 
+/** The imagined device: a dot display, scope keys and stake lights. */
+function Device() {
+  return (
+    <div
+      className="relative grid h-[290px] w-[420px] grid-cols-[1fr_112px] grid-rows-[1fr_auto] gap-x-5 gap-y-3.5 rounded-[2rem] px-6 pt-6 pb-5"
+      style={{
+        background:
+          'linear-gradient(180deg, var(--key-top), var(--key-bottom))',
+        boxShadow:
+          'inset 0 2px 0 var(--key-highlight), 0 0 0 1px var(--border), 0 50px 80px -40px var(--key-shade)',
+      }}
+    >
+      {[
+        'top-3 left-3',
+        'top-3 right-3',
+        'bottom-3 left-3',
+        'right-3 bottom-3',
+      ].map((at) => (
+        <span
+          key={at}
+          className={cn(
+            'absolute size-2.5 rounded-full bg-notice shadow-[inset_0_1px_1px_var(--key-shade)]',
+            at,
+          )}
+        />
+      ))}
+      {/* The display: always dark glass, lit in the label face. */}
+      <div className="flex flex-col justify-between overflow-hidden rounded-card bg-black p-4 text-[#f2f1ec] shadow-[inset_0_0_0_2px_#000,inset_0_6px_20px_rgb(0_0_0/0.6)]">
+        <span className="flex items-center justify-between font-label text-[10px] tracking-widest text-[#8f8e88] uppercase">
+          KC @ DEN
+          <span className="led led-pulse" />
+        </span>
+        <span className="font-label text-2xl leading-none font-bold text-signal">
+          WADDLE TD
+        </span>
+        <span className="font-label text-base leading-none font-bold text-[#bdbcb5]">
+          18 YDS FROM NIX
+        </span>
+        <Num className="text-[2.75rem]">
+          20<span className="text-[#5a5a56]">:</span>24
+        </Num>
+      </div>
+      <div className="flex flex-col gap-2.5">
+        <div className="grid grid-cols-2 gap-2.5">
+          {['Foll', 'All', 'Pred', 'Fant'].map((s) => (
+            <span
+              key={s}
+              className={cn(
+                KEY,
+                'h-11 text-[9px]',
+                s === 'Foll' && 'key-pressed',
+              )}
+            >
+              {s}
+            </span>
+          ))}
+        </div>
+        <span className="mt-1 text-[9px] text-muted uppercase">Stakes</span>
+        <span className="flex gap-2">
+          <span className="led size-3" />
+          <span className="led size-3" />
+          <span className="led led-off size-3" />
+        </span>
+      </div>
+      <span className="col-span-2 grid grid-cols-[repeat(18,6px)] gap-[5px]">
+        {Array.from({ length: 36 }, (_, i) => (
+          <span
+            key={i}
+            className="size-1.5 rounded-full bg-foreground/25 shadow-[inset_0_1px_1px_rgb(0_0_0/0.4)]"
+          />
+        ))}
+      </span>
+    </div>
+  )
+}
+
 function GoogleMark() {
   return (
-    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
       <path
         fill="#FFC107"
         d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"

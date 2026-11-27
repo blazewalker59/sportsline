@@ -20,6 +20,16 @@
 import { useCallback } from 'react'
 import { gameStatusLabel } from './gameStatus'
 import { pageKey } from './scopePages'
+import {
+  CHIP,
+  CHIP_ON,
+  KEY,
+  LABEL,
+  LED_LIVE,
+  SEGMENT,
+  SEGMENTS,
+  SEGMENT_ON,
+} from './signalClasses'
 import type { ScopePage } from './scopePages'
 import type { GameSummary } from '@/lib/model/timeline'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
@@ -28,7 +38,7 @@ import type { ChangeDisplay } from '@/lib/kalshi/server'
 import type { GameStake } from '@/lib/timeline/stakes'
 import type { IconName } from '@/components/layout/NavIcon'
 import { isLiveGame } from '@/lib/timeline/stakes'
-import { LeagueLogo } from '@/components/brand/LeagueLogo'
+import { LeagueLogo, leagueLabel } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { portfolioTotals } from '@/components/predictions/PredictionPortfolio'
 import {
@@ -43,6 +53,9 @@ import { SPORTS } from '@/lib/fantasy/sports'
 import { notifyDeviceValue, useDeviceValue } from '@/lib/useDeviceValue'
 import { useTimeZone } from '@/lib/time/useTimeZone'
 import { NavGlyph } from '@/components/layout/NavIcon'
+import { Meter } from '@/components/signal/Meter'
+import { Num } from '@/components/signal/Num'
+import { SectionLabel } from '@/components/signal/Section'
 import { cn } from '@/lib/utils'
 
 export type BoardLayout = 'grid' | 'row'
@@ -77,10 +90,20 @@ const STAKE_LABEL: Record<GameStake, string> = {
   prediction: 'Prediction',
   fantasy: 'Fantasy',
 }
-const STAKE_TONE: Record<GameStake, string> = {
-  following: 'bg-accent/15 text-accent',
-  prediction: 'bg-positive/15 text-positive',
-  fantasy: 'bg-scoring/15 text-scoring',
+
+/** The Viewer's stakes in a Game: orange, since they're theirs. */
+function StakeLine({ stakes }: { stakes: Array<GameStake> }) {
+  return (
+    <span className="flex min-w-0 items-center gap-1.5 text-3xs leading-tight text-live uppercase">
+      <span
+        aria-hidden="true"
+        className="size-1.5 shrink-0 rounded-full bg-signal"
+      />
+      <span className="truncate">
+        {stakes.map((s) => STAKE_LABEL[s]).join(' · ')}
+      </span>
+    </span>
+  )
 }
 
 type Tiled = Exclude<ScopePage, { kind: 'all' }>
@@ -176,28 +199,31 @@ export function LiveBoard({
       aria-label={kind === 'game' ? 'Games' : title.split(' · ')[0]}
       className="mb-3 flex flex-col gap-2"
     >
-      <div className="flex min-h-8 items-center gap-2">
-        <h2 className="flex items-center gap-1.5 text-3xs font-bold tracking-wide text-muted uppercase">
-          {live.length > 0 && (
-            <span
-              aria-hidden="true"
-              className="size-1.5 rounded-full bg-live"
-            />
+      <SectionLabel
+        index="A1"
+        className="mb-0"
+        title={
+          <span className="flex items-center gap-2">
+            {live.length > 0 && (
+              <span aria-hidden="true" className={LED_LIVE} />
+            )}
+            {title}
+          </span>
+        }
+      >
+        <span className="flex items-center gap-2">
+          {kind === 'prediction' && onPortfolio && (
+            <button
+              type="button"
+              onClick={onPortfolio}
+              className={cn(KEY, 'h-8 px-2.5')}
+            >
+              Portfolio ›
+            </button>
           )}
-          {title}
-        </h2>
-        <span className="flex-1" />
-        {kind === 'prediction' && onPortfolio && (
-          <button
-            type="button"
-            onClick={onPortfolio}
-            className="min-h-8 px-1 text-2xs font-semibold text-accent"
-          >
-            Portfolio ›
-          </button>
-        )}
-        <LayoutToggle layout={layout} onLayout={onLayout} />
-      </div>
+          <LayoutToggle layout={layout} onLayout={onLayout} />
+        </span>
+      </SectionLabel>
       {layout === 'grid' ? (
         tiles.length > 0 && (
           <ul className="grid grid-cols-2 gap-2">
@@ -251,11 +277,7 @@ function LayoutToggle({
   onLayout: (next: BoardLayout) => void
 }) {
   return (
-    <span
-      role="group"
-      aria-label="Board layout"
-      className="flex rounded-full bg-notice p-0.5"
-    >
+    <span role="group" aria-label="Board layout" className={SEGMENTS}>
       {(['grid', 'row'] as const).map((value) => (
         <button
           key={value}
@@ -263,10 +285,7 @@ function LayoutToggle({
           aria-pressed={layout === value}
           aria-label={value === 'grid' ? 'Grid' : 'One row'}
           onClick={() => onLayout(value)}
-          className={cn(
-            'flex h-7 w-8 items-center justify-center rounded-full text-muted transition-colors',
-            layout === value && 'bg-surface text-foreground shadow-sm',
-          )}
+          className={cn(SEGMENT, 'h-7 w-8', layout === value && SEGMENT_ON)}
         >
           <svg viewBox="0 0 16 16" className="size-3.5" aria-hidden="true">
             {value === 'grid' ? (
@@ -326,9 +345,9 @@ function Tile({
             : 'Show only this'
       }`}
       className={cn(
-        'flex w-full flex-col gap-1.5 rounded-card border p-2.5 text-left tabular-nums transition-[transform,background-color] active:scale-[0.98]',
-        // The chosen tile a shade deeper, as the cards are, not outlined.
-        here ? 'border-transparent bg-accent/15' : 'border-border bg-surface',
+        'flex w-full flex-col gap-1.5 rounded-card border bg-surface p-3 text-left tabular-nums transition-transform active:translate-y-px',
+        // The chosen tile ringed in ink, as a selected module is.
+        here ? 'border-foreground ring-1 ring-foreground' : 'border-border',
       )}
     >
       {page.kind === 'game' ? (
@@ -364,14 +383,10 @@ function GameTileBody({
   const leader = leaderOf(g)
   return (
     <>
-      <span
-        className={cn(
-          'flex items-center gap-1 text-3xs font-semibold text-muted',
-          live && 'text-live',
-        )}
-      >
-        <LeagueLogo league={g.league} size={12} />
-        <span className="min-w-0 flex-1 truncate">
+      <span className={cn('flex items-center gap-1.5', LABEL)}>
+        {live && <span aria-hidden="true" className={LED_LIVE} />}
+        <span className="shrink-0">{leagueLabel(g.league)}</span>
+        <span className="min-w-0 flex-1 truncate text-right">
           {gameStatusLabel(g, timeZone)}
         </span>
         {dots &&
@@ -379,7 +394,7 @@ function GameTileBody({
             <span
               key={s}
               title={STAKE_LABEL[s]}
-              className={cn('size-1.5 rounded-full bg-current', STAKE_TONE[s])}
+              className="size-1.5 shrink-0 rounded-full bg-signal"
             />
           ))}
       </span>
@@ -393,7 +408,7 @@ function GameTileBody({
               started && leader !== side && 'text-muted',
             )}
           >
-            <TeamLogo team={team} size={20} />
+            <TeamLogo team={team} size={18} />
             <span className="min-w-0 flex-1 truncate">
               {team.rank && (
                 <span className="mr-0.5 text-3xs font-bold text-muted">
@@ -402,34 +417,11 @@ function GameTileBody({
               )}
               {team.abbreviation}
             </span>
-            {started && (
-              <span
-                className={cn(
-                  'text-lg leading-none font-bold',
-                  leader === side && 'text-foreground',
-                )}
-              >
-                {g.score[side]}
-              </span>
-            )}
+            {started && <Num className="text-[26px]">{g.score[side]}</Num>}
           </span>
         )
       })}
-      {!dots && stakes.length > 0 && (
-        <span className="flex flex-wrap gap-1">
-          {stakes.map((s) => (
-            <span
-              key={s}
-              className={cn(
-                'rounded-full px-1.5 py-px text-3xs font-bold',
-                STAKE_TONE[s],
-              )}
-            >
-              {STAKE_LABEL[s]}
-            </span>
-          ))}
-        </span>
-      )}
+      {!dots && stakes.length > 0 && <StakeLine stakes={stakes} />}
     </>
   )
 }
@@ -445,7 +437,7 @@ function PredictionTileBody({
   const hit = p.legs.filter((l) => l.status === 'won').length
   return (
     <>
-      <span className="truncate text-3xs font-semibold text-muted">
+      <span className={cn('truncate', LABEL)}>
         {p.kind === 'combo' ? `Combo · ${hit}/${p.legs.length} hit` : 'Single'}
       </span>
       <span className="line-clamp-2 text-xs leading-tight font-semibold">
@@ -453,17 +445,27 @@ function PredictionTileBody({
         {p.title}
       </span>
       <span className="mt-auto flex items-baseline gap-1.5">
-        <span className="text-lg leading-tight font-bold">
-          {p.chance === null ? '—' : pct(p.chance)}
-        </span>
+        {p.chance === null ? (
+          <Num className="text-[26px]">—</Num>
+        ) : (
+          <Num className="text-[26px]" unit="%" title={pct(p.chance)}>
+            {Math.round(p.chance * 100)}
+          </Num>
+        )}
         {profit && (
           <span
-            className={cn('text-3xs font-semibold', toneOf(profit.dollars))}
+            className={cn(
+              'ml-auto text-3xs font-semibold',
+              toneOf(profit.dollars),
+            )}
           >
             {profitText(profit, display)}
           </span>
         )}
       </span>
+      {p.chance !== null && (
+        <Meter value={p.chance} segments={16} thin label="Odds" />
+      )}
     </>
   )
 }
@@ -488,14 +490,12 @@ function MatchupTileBody({ league }: { league: FantasyLeagueView }) {
       )}
     >
       <span className="min-w-0 flex-1 truncate">{s.abbrev}</span>
-      <span className="text-lg leading-none font-bold">
-        {m.categories ? s.score : pts(s.score)}
-      </span>
+      <Num className="text-[22px]">{m.categories ? s.score : pts(s.score)}</Num>
     </span>
   )
   return (
     <>
-      <span className="flex items-center gap-1 truncate text-3xs font-semibold text-muted">
+      <span className={cn('flex items-center gap-1.5 truncate', LABEL)}>
         <LeagueLogo league={SPORTS[m.sport].league} size={12} />
         <span className="truncate">{m.leagueName}</span>
       </span>
@@ -528,18 +528,21 @@ function GameChip({
       onClick={() => onPick(page)}
       aria-current={here ? 'true' : undefined}
       className={cn(
-        'flex items-center gap-1.5 rounded-control px-2.5 py-1.5 text-2xs font-semibold whitespace-nowrap text-muted tabular-nums',
-        here ? 'bg-accent/15' : 'bg-notice',
+        'flex items-center gap-1.5 rounded-control px-2.5 py-1.5 text-2xs font-semibold whitespace-nowrap tabular-nums',
+        CHIP,
+        here && CHIP_ON,
       )}
     >
       <TeamLogo team={g.awayTeam} size={14} />
-      <span className="text-foreground">
+      <span>
         {final
           ? `${g.awayTeam.abbreviation} ${g.score.away} · ${g.homeTeam.abbreviation} ${g.score.home}`
           : `${g.awayTeam.abbreviation} @ ${g.homeTeam.abbreviation}`}
       </span>
       <TeamLogo team={g.homeTeam} size={14} />
-      {gameStatusLabel(g, timeZone)}
+      <span className={cn('font-label', here ? 'opacity-75' : 'text-muted')}>
+        {gameStatusLabel(g, timeZone)}
+      </span>
     </button>
   )
 }
@@ -562,17 +565,17 @@ export function NarrowedBar({
     <div
       role="status"
       data-narrowed=""
-      className="mb-3 flex items-center gap-2 rounded-card bg-accent/10 py-1 pr-1 pl-3"
+      className="well mb-3 flex items-center gap-2 rounded-card py-1.5 pr-1.5 pl-3"
     >
       <span className="min-w-0 flex-1 truncate text-xs font-semibold">
-        <span className="text-muted">Showing </span>
+        <span className={LABEL}>Showing </span>
         {pageName(page)}
       </span>
       {onOpen && (
         <button
           type="button"
           onClick={onOpen}
-          className="min-h-9 shrink-0 rounded-full px-2.5 text-2xs font-semibold text-accent"
+          className={cn(KEY, 'h-9 shrink-0 px-2.5')}
         >
           {openLabel(page)} ›
         </button>
@@ -581,7 +584,7 @@ export function NarrowedBar({
         type="button"
         onClick={onClear}
         aria-label="Show everything"
-        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface text-sm text-muted"
+        className={cn(KEY, 'size-9 shrink-0 px-0 text-sm')}
       >
         ✕
       </button>
@@ -590,27 +593,30 @@ export function NarrowedBar({
 }
 
 /**
- * The top of every tab on a phone: one card in the tab's own color (its
- * icon's, from the main navigation) with the tab's headline (live Games,
- * the portfolio's worth, the Matchup's score) and a line or a control
- * under it (under All, the League row). The same shape on every tab.
+ * The top of every tab on a phone: one panel with a label row (a pulsing
+ * light while something is live, the tab's context in the label face),
+ * the tab's headline as the one dot numeral (live Games, the portfolio's
+ * worth, the Matchup's score), and a line or a control under it (under
+ * All, the League row). The same shape on every tab.
  */
 export function TabHero({
   icon,
-  tone,
   kicker,
   figure,
   aside,
+  live = false,
   children,
 }: {
   icon: IconName
-  /** The tab's color, as a CSS value (the nav's tone). */
-  tone: string
+  /** No longer drawn: Signal's heroes are ink, not the tab's color. */
+  tone?: string
   kicker: string
   /** The headline: "4 live", "$37.80", "5–3–1". */
   figure: string
   /** Beside the headline, smaller: "8 games", "+$22.40", "leading GG". */
   aside?: React.ReactNode
+  /** Something in it is live now: the label row's light pulses. */
+  live?: boolean
   /** Under it: a line, or a control (the League row). */
   children?: React.ReactNode
 }) {
@@ -618,19 +624,20 @@ export function TabHero({
     <section
       aria-label={kicker}
       data-tab-hero=""
-      style={{ '--tone': tone } as React.CSSProperties}
-      className="mb-2 flex flex-col gap-2 rounded-sheet border border-[color-mix(in_srgb,var(--tone)_30%,var(--border))] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--tone)_22%,var(--surface)),var(--surface)_70%)] px-3.5 py-3"
+      className="mb-3 flex flex-col gap-3 rounded-card border border-border bg-surface px-4 pt-3.5 pb-4"
     >
-      <span className="flex items-center gap-1.5 text-3xs font-bold tracking-wide text-(--tone) uppercase">
-        <NavGlyph name={icon} className="size-3.5" />
-        {kicker}
+      <span className={cn('flex items-center gap-2', LABEL)}>
+        {live ? (
+          <span aria-hidden="true" className={LED_LIVE} />
+        ) : (
+          <NavGlyph name={icon} className="size-3.5" />
+        )}
+        <span className="truncate">{kicker}</span>
       </span>
-      <span className="flex items-baseline gap-2 tabular-nums">
-        <span className="text-3xl leading-none font-bold tracking-tight whitespace-nowrap">
-          {figure}
-        </span>
+      <span className="flex min-w-0 items-baseline gap-3">
+        <HeroFigure figure={figure} />
         {aside && (
-          <span className="truncate text-sm font-semibold text-muted">
+          <span className="min-w-0 truncate text-sm font-semibold text-muted">
             {aside}
           </span>
         )}
@@ -640,14 +647,46 @@ export function TabHero({
   )
 }
 
+/**
+ * The headline in dots: its figure ("4", "$37.80", "88.4–71.2"), and any
+ * words after it ("live", "of 3") small beside it in the label face.
+ */
+function HeroFigure({ figure }: { figure: string }) {
+  const [, digits, words] = /^([^a-z]*?\d[^a-z ]*)(.*)$/i.exec(figure) ?? [
+    '',
+    '',
+    figure,
+  ]
+  if (!digits) {
+    return (
+      <span className="text-3xl leading-none font-bold tracking-tight whitespace-nowrap">
+        {figure}
+      </span>
+    )
+  }
+  return (
+    <span className="whitespace-nowrap">
+      <Num className="text-[56px]">{digits}</Num>
+      {words.trim() && (
+        <>
+          {' '}
+          <span className="ml-1 font-label text-sm font-bold text-muted uppercase">
+            {words.trim()}
+          </span>
+        </>
+      )}
+    </span>
+  )
+}
+
 type HeroTab = 'following' | 'all' | 'predictions' | 'fantasy'
 
-/** Each tab's icon and color, as the main navigation draws them. */
-const HERO_LOOK: Record<HeroTab, { icon: IconName; tone: string }> = {
-  following: { icon: 'follows', tone: 'var(--accent)' },
-  all: { icon: 'all', tone: 'var(--accent)' },
-  predictions: { icon: 'predictions', tone: 'var(--section-predictions)' },
-  fantasy: { icon: 'fantasy', tone: 'var(--section-fantasy)' },
+/** Each tab's icon, as the main navigation draws it. */
+const HERO_LOOK: Record<HeroTab, { icon: IconName }> = {
+  following: { icon: 'follows' },
+  all: { icon: 'all' },
+  predictions: { icon: 'predictions' },
+  fantasy: { icon: 'fantasy' },
 }
 
 /** A tab's headline, in words and figures, for its hero and pinned bar. */
@@ -674,6 +713,8 @@ export function heroHeadline({
   /** The aside's color class, for money up or down. */
   asideTone?: string
   line: string | null
+  /** A Game in it is live now (its light pulses). */
+  live?: boolean
 } {
   if (tab === 'predictions') {
     const totals = portfolioTotals(predictions)
@@ -717,6 +758,7 @@ export function heroHeadline({
     kicker: tab === 'following' ? 'Following' : allKicker,
     figure: live.length > 0 ? `${live.length} live` : count,
     aside: live.length > 0 ? count : null,
+    live: live.length > 0,
     line:
       tab === 'following' && live.length > 0
         ? live
@@ -746,14 +788,11 @@ export function ScopeHero({
       {...HERO_LOOK[tab]}
       kicker={h.kicker}
       figure={h.figure}
+      live={h.live}
       aside={h.aside && <span className={h.asideTone}>{h.aside}</span>}
     >
       {children ??
-        (h.line && (
-          <span className="truncate text-xs font-semibold text-muted">
-            {h.line}
-          </span>
-        ))}
+        (h.line && <span className={cn('truncate', LABEL)}>{h.line}</span>)}
     </TabHero>
   )
 }
@@ -768,13 +807,14 @@ export function HeroLead({
 }) {
   const look = HERO_LOOK[tab]
   return (
-    <span
-      style={{ color: look.tone }}
-      className="flex items-center gap-1.5 text-2xs font-bold whitespace-nowrap tabular-nums"
-    >
-      <NavGlyph name={look.icon} className="size-3.5" />
-      {h.kicker}
-      <span className="text-foreground">{h.figure}</span>
+    <span className="flex items-center gap-1.5 text-2xs font-bold whitespace-nowrap tabular-nums">
+      {h.live ? (
+        <span aria-hidden="true" className={LED_LIVE} />
+      ) : (
+        <NavGlyph name={look.icon} className="size-3.5 text-muted" />
+      )}
+      <span className={LABEL}>{h.kicker}</span>
+      <span>{h.figure}</span>
     </span>
   )
 }
@@ -816,7 +856,8 @@ export function LiveTicker({
             aria-current={current === `game:${g.id}` ? 'true' : undefined}
             className={cn(
               'flex items-center gap-1.5 rounded-control px-2 py-1 text-2xs font-bold whitespace-nowrap tabular-nums',
-              current === `game:${g.id}` ? 'bg-accent/15' : 'bg-surface',
+              CHIP,
+              current === `game:${g.id}` && CHIP_ON,
             )}
           >
             <TeamLogo team={g.awayTeam} size={16} />
@@ -826,8 +867,12 @@ export function LiveTicker({
             <TeamLogo team={g.homeTeam} size={16} />
             <span
               className={cn(
-                'font-semibold',
-                isLiveGame(g) ? 'text-live' : 'text-muted',
+                'font-label font-normal',
+                current === `game:${g.id}`
+                  ? 'opacity-75'
+                  : isLiveGame(g)
+                    ? 'text-live'
+                    : 'text-muted',
               )}
             >
               {gameStatusLabel(g, timeZone)}
@@ -851,7 +896,7 @@ export function FeedFilter({
     <div
       role="group"
       aria-label="Which plays"
-      className="mb-3 flex self-start rounded-full bg-notice p-0.5"
+      className={cn(SEGMENTS, 'mb-3 self-start')}
     >
       {[
         { value: false, label: 'Everything' },
@@ -863,8 +908,9 @@ export function FeedFilter({
           aria-pressed={mine === o.value}
           onClick={() => onMine(o.value)}
           className={cn(
-            'min-h-8 rounded-full px-3 text-2xs font-semibold text-muted transition-colors',
-            mine === o.value && 'bg-surface text-foreground shadow-sm',
+            SEGMENT,
+            'min-h-8 px-3 text-3xs font-bold uppercase',
+            mine === o.value && SEGMENT_ON,
           )}
         >
           {o.label}

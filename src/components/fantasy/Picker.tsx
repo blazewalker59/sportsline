@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useId, useRef, useState } from 'react'
+import { SectionLabel } from '@/components/signal/Section'
 import { cn } from '@/lib/utils'
 
 function Chevron({ className }: { className?: string }) {
@@ -118,8 +119,8 @@ export function Picker<T extends string>({
         onClick={() => (open ? setOpen(false) : show())}
         onKeyDown={onButtonKey}
         className={cn(
-          'flex min-h-8 items-center gap-1 rounded-control px-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-notice',
-          open && 'bg-notice',
+          'key flex h-8 items-center gap-1 rounded-control pr-2 pl-2.5 text-3xs font-bold whitespace-nowrap text-foreground uppercase',
+          open && 'key-pressed',
         )}
       >
         {options[chosen]?.label}
@@ -139,7 +140,7 @@ export function Picker<T extends string>({
           aria-label={label}
           aria-activedescendant={`${id}-${active}`}
           onKeyDown={onListKey}
-          className="absolute top-full right-0 z-30 mt-1 max-h-72 min-w-36 overflow-y-auto rounded-card border border-border bg-surface py-1 shadow-lg outline-none"
+          className="panel absolute top-full right-0 z-30 mt-1.5 max-h-72 min-w-36 overflow-y-auto rounded-card border border-border bg-surface py-1 outline-none"
         >
           {options.map((o, i) => (
             <li
@@ -177,22 +178,40 @@ export function Picker<T extends string>({
   )
 }
 
-/** A section's heading, its Pickers on the right. */
+/**
+ * A section's heading (Signal's SectionLabel: an index, the name in the
+ * label face, a hairline), its Pickers at the end of the rule.
+ */
 export function SectionHead({
   title,
+  index,
   children,
 }: {
   title: string
+  /** "H1": where the section sits on its screen. */
+  index?: string
   children?: React.ReactNode
 }) {
   return (
-    <div className="mb-1.5 flex min-h-8 items-center justify-between gap-2">
-      <h2 className="min-w-0 truncate text-xs font-bold tracking-wide text-muted uppercase">
-        {title}
-      </h2>
-      {children && (
-        <div className="-mr-1.5 flex shrink-0 items-center">{children}</div>
-      )}
-    </div>
+    <SectionLabel title={title} index={index} className="mb-1.5">
+      {children && <div className="flex items-center gap-1.5">{children}</div>}
+    </SectionLabel>
+  )
+}
+
+/** A switch as a recessed well with a key for its thumb, inked when on. */
+export function SwitchWell({ on }: { on: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="well relative h-7 w-12 shrink-0 rounded-full transition-colors"
+    >
+      <span
+        className={cn(
+          'key absolute top-0.5 size-6 rounded-full transition-transform',
+          on ? 'translate-x-[22px] key-ink' : 'translate-x-0.5',
+        )}
+      />
+    </span>
   )
 }

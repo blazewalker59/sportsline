@@ -11,6 +11,7 @@ import type {
   PredictionRecord,
   Range,
 } from '@/lib/kalshi/record'
+import { Segmented } from '@/components/signal/Segmented'
 import { CalibrationChart, RecordTrend } from '@/components/charts/lazy'
 import { buildRecord, calibrationOf, winRate } from '@/lib/kalshi/record'
 import { usePredictionRecord } from '@/lib/kalshi/usePredictions'
@@ -18,6 +19,7 @@ import { useStoredValue } from '@/lib/useStoredValue'
 import { StatGrid, StatTile } from '@/components/layout/StatTile'
 import { InlineError } from '@/components/layout/RouteStates'
 import { CardSkeleton } from '@/components/layout/Skeleton'
+import { SectionLabel } from '@/components/signal/Section'
 import { cn } from '@/lib/utils'
 import { dayOf, formatNumber, shiftDay, startOfDay } from '@/lib/time/format'
 import { useTimeZone } from '@/lib/time/useTimeZone'
@@ -34,7 +36,14 @@ const signed = (n: number) =>
   `${n > 0.004 ? '+' : n < -0.004 ? '−' : ''}${usd(n)}`
 const pct = (n: number | null) => (n === null ? '—' : `${Math.round(n * 100)}%`)
 const tone = (n: number) =>
-  n > 0.004 ? 'text-scoring' : n < -0.004 ? 'text-live' : 'text-muted'
+  n > 0.004 ? 'text-positive' : n < -0.004 ? 'text-negative' : 'text-muted'
+
+const RANGES: ReadonlyArray<readonly [RangeKey, string]> = [
+  ['7d', '7D'],
+  ['30d', '30D'],
+  ['all', 'All'],
+  ['custom', 'Custom'],
+]
 
 const parseRange = (v: string | null): RangeKey =>
   v === '30d' || v === 'all' || v === 'custom' ? v : '7d'
@@ -81,41 +90,14 @@ export function PredictionRecordSection() {
 
   return (
     <section className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-xs font-bold tracking-wide text-muted uppercase">
-          Your record
-        </h2>
-        <span
-          role="radiogroup"
-          aria-label="Range"
-          className="flex gap-0.5 rounded-full bg-notice p-0.5"
-        >
-          {(
-            [
-              ['7d', '7D'],
-              ['30d', '30D'],
-              ['all', 'All'],
-              ['custom', 'Custom'],
-            ] as const
-          ).map(([k, label]) => (
-            <button
-              key={k}
-              type="button"
-              role="radio"
-              aria-checked={key === k}
-              onClick={() => choose(k)}
-              className={cn(
-                'min-h-7 rounded-full px-2.5 text-xs font-semibold transition-colors',
-                key === k
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted',
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </span>
-      </div>
+      <SectionLabel title="Your record" index="E3" className="mb-0" />
+      <Segmented
+        fill
+        label="Range"
+        value={key}
+        options={RANGES}
+        onChange={choose}
+      />
       {key === 'custom' && (
         <div className="flex items-center gap-2 text-sm">
           <input
@@ -126,7 +108,7 @@ export function PredictionRecordSection() {
             onChange={(e) =>
               e.target.value && setPicked({ ...custom, from: e.target.value })
             }
-            className="min-w-0 flex-1 rounded-control border border-border bg-surface px-2 py-1.5"
+            className="well min-w-0 flex-1 rounded-control px-2 py-1.5"
           />
           <span className="text-muted">to</span>
           <input
@@ -137,7 +119,7 @@ export function PredictionRecordSection() {
             onChange={(e) =>
               e.target.value && setPicked({ ...custom, to: e.target.value })
             }
-            className="min-w-0 flex-1 rounded-control border border-border bg-surface px-2 py-1.5"
+            className="well min-w-0 flex-1 rounded-control px-2 py-1.5"
           />
         </div>
       )}
@@ -150,7 +132,7 @@ export function PredictionRecordSection() {
           onRetry={() => history.refetch()}
         />
       ) : !record || record.totals.count === 0 ? (
-        <p className="rounded-card border border-border bg-surface px-3 py-4 text-center text-sm text-muted">
+        <p className="well rounded-card px-4 py-5 text-center text-sm text-muted">
           No predictions in this range.
         </p>
       ) : (
@@ -204,20 +186,22 @@ function RecordBody({
       )}
 
       {r.insights.length > 0 && (
-        <ul className="flex flex-col gap-1.5 rounded-card border border-border bg-surface px-3 py-2.5">
+        <ul className="flex flex-col gap-1.5 rounded-card bg-surface px-4 py-3">
           {r.insights.map((i) => (
             <li key={i.text} className="flex items-start gap-2 text-[13px]">
               <span
                 aria-hidden="true"
                 className={cn(
-                  'mt-1.5 size-1.5 shrink-0 rounded-full',
+                  'w-3 shrink-0 text-center text-xs',
                   i.tone === 'good'
-                    ? 'bg-scoring'
+                    ? 'text-positive'
                     : i.tone === 'bad'
-                      ? 'bg-live'
-                      : 'bg-muted',
+                      ? 'text-negative'
+                      : 'text-muted',
                 )}
-              />
+              >
+                {i.tone === 'good' ? '▲' : i.tone === 'bad' ? '▼' : '◐'}
+              </span>
               {i.text}
             </li>
           ))}
@@ -226,14 +210,14 @@ function RecordBody({
 
       <Breakdowns record={r} />
 
-      <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+      <p className="flex flex-wrap gap-x-4 gap-y-1 text-3xs text-muted uppercase tabular-nums">
         {r.streak && (
           <span>
             Streak:{' '}
             <span
               className={cn(
                 'font-semibold',
-                r.streak.kind === 'won' ? 'text-scoring' : 'text-live',
+                r.streak.kind === 'won' ? 'text-positive' : 'text-negative',
               )}
             >
               {r.streak.length}
@@ -244,12 +228,12 @@ function RecordBody({
         {r.longestWin > 1 && <span>Longest win run: {r.longestWin}</span>}
         {t.best && (
           <span>
-            Best: <span className="text-scoring">{signed(t.best.pnl!)}</span>
+            Best: <span className="text-positive">{signed(t.best.pnl!)}</span>
           </span>
         )}
         {t.worst && (
           <span>
-            Worst: <span className="text-live">{signed(t.worst.pnl!)}</span>
+            Worst: <span className="text-negative">{signed(t.worst.pnl!)}</span>
           </span>
         )}
         {t.open > 0 && <span>Open stake: {usd(t.openStaked)}</span>}
@@ -269,8 +253,11 @@ function Breakdowns({ record: r }: { record: PredictionRecord }) {
     ['legs', 'Legs', r.legs.byMarket.length > 0],
   ]
   return (
-    <div className="rounded-card border border-border bg-surface px-3 py-2.5">
-      <div role="tablist" className="mb-2 flex gap-3 text-xs font-semibold">
+    <div className="rounded-card bg-surface p-3">
+      <div
+        role="tablist"
+        className="well mb-3 flex gap-1 overflow-x-auto rounded-control p-1"
+      >
         {tabs
           .filter(([, , shown]) => shown)
           .map(([k, label]) => (
@@ -281,10 +268,10 @@ function Breakdowns({ record: r }: { record: PredictionRecord }) {
               aria-selected={tab === k}
               onClick={() => setTab(k)}
               className={cn(
-                'border-b-2 pb-1 transition-colors',
+                'min-h-8 flex-1 rounded-[8px] px-2 text-3xs font-bold whitespace-nowrap uppercase',
                 tab === k
-                  ? 'border-accent text-foreground'
-                  : 'border-transparent text-muted',
+                  ? 'key key-pressed text-foreground'
+                  : 'text-muted hover:text-foreground',
               )}
             >
               {label}
@@ -308,13 +295,12 @@ function Breakdowns({ record: r }: { record: PredictionRecord }) {
   )
 }
 
-const head =
-  'text-right text-3xs font-semibold tracking-wide text-muted uppercase'
+const head = 'text-right text-3xs text-muted uppercase'
 
 /** Each group's count, win rate, stake and P&L, aligned like a table. */
 function LineTable({ lines }: { lines: ReadonlyArray<Line> }) {
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_2rem_2.75rem_4rem_4.25rem] gap-x-2 gap-y-1.5 text-[13px] tabular-nums">
+    <div className="grid grid-cols-[minmax(0,1fr)_2rem_2.75rem_4rem_4.25rem] gap-x-2 gap-y-2 text-[13px] tabular-nums">
       <span className={cn(head, 'text-left')}>Group</span>
       <span className={head}>#</span>
       <span className={head}>Won</span>

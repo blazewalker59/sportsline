@@ -87,15 +87,15 @@ export function CategoryLineup({
       aria-selected={side === value}
       onClick={() => setSide(value)}
       className={cn(
-        'min-w-0 flex-1 truncate rounded-control px-3 py-1 text-xs font-semibold transition-colors',
+        'min-w-0 flex-1 truncate rounded-[8px] px-3 py-1 text-3xs uppercase transition-colors',
         side === value
-          ? 'bg-surface text-foreground shadow-sm'
+          ? 'panel bg-surface font-bold text-foreground'
           : 'text-muted hover:text-foreground',
       )}
     >
       <span
         aria-hidden="true"
-        className="mr-1.5 inline-block size-2 rounded-full align-middle"
+        className="mr-1.5 inline-block size-2 rounded-[2px] align-middle"
         style={{ background: tone }}
       />
       {label}
@@ -114,7 +114,13 @@ export function CategoryLineup({
           )}
           aria-label={state?.onField ? `${p.name}: on the court` : undefined}
         >
-          <PlayerLabel sport={sport} player={p} games={games} slot={!summary} />
+          <PlayerLabel
+            sport={sport}
+            player={p}
+            games={games}
+            slot={!summary}
+            inPlay={!summary && p.starter && state?.live === true}
+          />
         </th>
         {columns.map((c) => {
           const leads = p.starter && leaders.get(c.statId)?.has(p.espnId)
@@ -153,14 +159,14 @@ export function CategoryLineup({
   return (
     <section className="min-w-0">
       <div className="mb-2 flex items-center justify-between gap-3">
-        <h3 className="text-xs font-bold tracking-wide text-muted uppercase">
+        <h3 className="text-3xs font-bold text-foreground/80 uppercase">
           Lineup
         </h3>
         {opponent && (
           <div
             role="tablist"
             aria-label="Whose lineup"
-            className="flex w-44 gap-0.5 rounded-control bg-notice p-0.5"
+            className="well flex w-44 gap-0.5 rounded-[10px] p-[3px]"
           >
             {tab('mine', mine.abbrev, CHART_COLORS.mine)}
             {tab('opponent', opponent.abbrev, CHART_COLORS.opponent)}
@@ -171,13 +177,13 @@ export function CategoryLineup({
         <table className="w-max min-w-full border-separate border-spacing-0 text-xs tabular-nums">
           <thead>
             <tr>
-              <th className="sticky left-0 z-20 min-w-[9.5rem] border-r border-b border-border bg-surface px-2 py-1.5 text-left text-3xs font-semibold tracking-wide text-muted uppercase">
+              <th className="sticky left-0 z-20 min-w-[9.5rem] border-r border-b border-border bg-surface px-2 py-1.5 text-left text-3xs font-normal text-muted uppercase">
                 {side === 'mine' || !opponent ? mine.name : opponent.name}
               </th>
               {columns.map((c) => (
                 <th
                   key={c.statId}
-                  className="min-w-[2.75rem] border-b border-border px-1 py-1.5 text-center text-3xs font-semibold tracking-wide text-muted uppercase"
+                  className="min-w-[2.75rem] border-b border-border px-1 py-1.5 text-center text-3xs font-normal text-muted uppercase"
                 >
                   {c.label}
                 </th>
@@ -189,7 +195,7 @@ export function CategoryLineup({
             <tr className="bg-notice/60 font-semibold">
               <th
                 scope="row"
-                className="sticky left-0 z-10 border-r border-b border-border bg-notice px-2 py-1.5 text-left text-3xs tracking-wide uppercase"
+                className="sticky left-0 z-10 border-r border-b border-border bg-notice px-2 py-1.5 text-left text-3xs uppercase"
               >
                 {summary ? 'Matchup' : 'Starters'}
               </th>
@@ -219,12 +225,15 @@ function PlayerLabel({
   player,
   games,
   slot,
+  inPlay = false,
 }: {
   sport: FantasySport
   player: LineupPlayer
   games: ReadonlyArray<GameSummary>
   /** Mark a Player who isn't starting with their slot (BN, IR). */
   slot: boolean
+  /** A Starter whose Game is on now: lit. */
+  inPlay?: boolean
 }) {
   const state = gameState(player, games, useTimeZone())
   const position = player.positionId
@@ -284,6 +293,7 @@ function PlayerLabel({
           ) : (
             name
           )}
+          {inPlay && <span className="led" role="img" aria-label="In play" />}
           {slot && !player.starter && (
             <span className="shrink-0 rounded-control bg-notice px-1 text-3xs leading-tight font-bold whitespace-nowrap text-muted uppercase">
               {player.slot === 'Bench' ? 'BN' : player.slot}

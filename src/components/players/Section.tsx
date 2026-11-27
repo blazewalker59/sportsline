@@ -1,19 +1,26 @@
+import { SectionLabel } from '@/components/signal/Section'
+
 /**
- * A titled section of a Player's (or Team's) page, its title in the
- * Subject's ink when there is one.
+ * A titled section of a Player's (or Team's) page: Signal's section head
+ * (the name in the label face, a hairline to the edge), with an optional
+ * reading at the end of the rule.
  */
 export function Section({
   title,
+  index,
+  aside,
   children,
 }: {
   title: string
+  index?: string
+  aside?: React.ReactNode
   children: React.ReactNode
 }) {
   return (
     <section>
-      <h2 className="subject-ink mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-        {title}
-      </h2>
+      <SectionLabel title={title} index={index}>
+        {aside}
+      </SectionLabel>
       {children}
     </section>
   )

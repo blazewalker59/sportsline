@@ -18,11 +18,7 @@ import type {
   PredictionDetail,
   PredictionMove,
 } from '@/lib/kalshi/predictionDetail'
-import {
-  CHART_COLORS,
-  ChartCard,
-  subjectColor,
-} from '@/components/charts/ChartCard'
+import { CHART_COLORS, ChartCard } from '@/components/charts/ChartCard'
 import {
   KeyPlayPanel,
   keyPlaySelection,
@@ -42,7 +38,6 @@ import {
 import { InlineError } from '@/components/layout/RouteStates'
 import { Skeleton, SkeletonStatus } from '@/components/layout/Skeleton'
 import { usePredictionDetail } from '@/lib/kalshi/usePredictions'
-import { cn } from '@/lib/utils'
 import { clockTime, shortDate } from '@/lib/time/format'
 import { useTimeZone } from '@/lib/time/useTimeZone'
 
@@ -129,7 +124,7 @@ export function OddsChart({ predictionId }: { predictionId: string }) {
   }
   if (!detail.data || detail.data.history.length < 2) {
     return (
-      <p className="rounded-card border border-border bg-surface px-3 py-3 text-center text-xs text-muted">
+      <p className="well rounded-card px-4 py-4 text-center text-xs text-muted">
         No odds history kept for this one.
       </p>
     )
@@ -205,10 +200,8 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
   const now = rows[rows.length - 1].chance
   const entry = detail.entryChance
   const move = entry === null ? null : Math.round((now - entry) * 100)
-  const up = move === null ? now >= rows[0].chance : move >= 0
-  // In a team's sheet, the odds draw in its ink (the move above stays
-  // up or down); elsewhere the line says which way they went.
-  const lineColor = subjectColor(up ? CHART_COLORS.good : CHART_COLORS.bad)
+  // Signal: the odds are ink; only where they are now is lit (yours).
+  const lineColor = CHART_COLORS.foreground
   const axis = chanceAxis(Math.max(entry ?? 0, ...rows.map((r) => r.chance)))
   // Over a day and a half, label dates; within one, clock times.
   const timeZone = useTimeZone()
@@ -245,7 +238,7 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
             x: 't',
             y: 'chance',
             fill: lineColor,
-            fillOpacity: 0.12,
+            fillOpacity: 0.06,
           }),
         ),
         ...(entry === null
@@ -266,7 +259,18 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
             x: 't',
             y: 'chance',
             stroke: lineColor,
-            strokeWidth: 2,
+            strokeWidth: 1.75,
+          }),
+        ),
+        decorative(
+          dot(shown.slice(-1), {
+            id: 'now',
+            x: 't',
+            y: 'chance',
+            r: 4,
+            fill: CHART_COLORS.now,
+            stroke: 'var(--color-surface)',
+            strokeWidth: 1.5,
           }),
         ),
         ...[...byColor].map(([color, group], i) =>
@@ -323,6 +327,7 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
     <ChartCard
       legend={[
         { label: 'Your odds', color: lineColor, shape: 'line' },
+        { label: 'Now', color: CHART_COLORS.now, shape: 'dot' },
         ...(entry === null
           ? []
           : [
@@ -346,12 +351,7 @@ function OddsChartBody({ detail }: { detail: PredictionDetail }) {
         <span className="tabular-nums">
           <span className="font-semibold text-foreground">{pct(now)}</span>
           {move !== null && (
-            <span
-              className={cn(
-                'ml-1 font-semibold',
-                move > 0 ? 'text-scoring' : move < 0 ? 'text-live' : '',
-              )}
-            >
+            <span className="ml-1 text-muted">
               · {move > 0 ? '▲' : move < 0 ? '▼' : ''}
               {Math.abs(move)} since you bought in
             </span>
@@ -414,12 +414,7 @@ function PlayDetail({ play }: { play: PlayRow }) {
       <p className="tabular-nums">
         Odds {pct(play.chance)} → {pct(play.after)}
         {swing !== 0 && (
-          <span
-            className={cn(
-              'ml-1 font-semibold',
-              swing > 0 ? 'text-scoring' : 'text-live',
-            )}
-          >
+          <span className="ml-1 font-semibold text-foreground">
             {swing > 0 ? '▲' : '▼'}
             {Math.abs(swing)}
           </span>

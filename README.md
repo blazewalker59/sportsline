@@ -3,7 +3,8 @@
 A live, livestream-style Timeline of play-by-play across MLB, NBA, NFL, NHL,
 and college football, filtered to the Teams, Players and Leagues you follow.
 Predictions, Fantasy, and Agents sit on the same account. Domain language lives
-in [CONTEXT.md](./CONTEXT.md); decisions in [docs/adr](./docs/adr).
+in [CONTEXT.md](./CONTEXT.md); decisions in [docs/adr](./docs/adr); the design
+language, Signal, in [docs/design/signal.md](./docs/design/signal.md).
 
 Deployed as a single Cloudflare Worker (TanStack Start + D1 + Durable Objects),
 the same setup as dreamteam.

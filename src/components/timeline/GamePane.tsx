@@ -14,7 +14,8 @@ import type { FeedEntry, Typing } from '@/lib/timeline/chat'
 import type { GameSummary } from '@/lib/model/timeline'
 import type { GameBox } from '@/lib/model/types'
 import { BoxBody } from '@/components/games/GameView'
-import { LeagueLogo } from '@/components/brand/LeagueLogo'
+import { leagueLabel } from '@/components/brand/LeagueLogo'
+import { Num } from '@/components/signal/Num'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { InlineError } from '@/components/layout/RouteStates'
 import { DetailHeaderSkeleton } from '@/components/layout/Skeleton'
@@ -147,15 +148,10 @@ function PaneHeader({ game }: { game: GameSummary | null }) {
   return (
     <header className="sticky top-0 z-10 border-b border-border bg-background pt-[max(env(safe-area-inset-top),0.75rem)] pb-3">
       <div className="flex min-h-9 items-center gap-2">
-        {game && <LeagueLogo league={game.league} size={16} />}
         {game && (
-          <span
-            className={cn(
-              'text-2xs font-semibold',
-              live ? 'text-live' : 'text-muted',
-            )}
-          >
-            {gameStatusLabel(game, timeZone)}
+          <span className="flex items-center gap-2 text-3xs text-muted uppercase">
+            {live && <span aria-hidden="true" className="led led-pulse" />}
+            {leagueLabel(game.league)} · {gameStatusLabel(game, timeZone)}
           </span>
         )}
         <Link
@@ -165,7 +161,7 @@ function PaneHeader({ game }: { game: GameSummary | null }) {
           resetScroll={false}
           aria-label="Close game"
           title="Close (Esc)"
-          className="ml-auto flex size-9 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-foreground"
+          className="key ml-auto flex size-9 items-center justify-center rounded-control"
         >
           <svg
             width="18"
@@ -190,7 +186,7 @@ function PaneHeader({ game }: { game: GameSummary | null }) {
             return (
               <Fragment key={side}>
                 {i === 1 && started && (
-                  <span aria-hidden="true" className="text-muted">
+                  <span aria-hidden="true" className="font-label text-muted">
                     –
                   </span>
                 )}
@@ -219,17 +215,15 @@ function PaneHeader({ game }: { game: GameSummary | null }) {
                       {team.name}
                     </span>
                   </span>
-                  <span
+                  <Num
                     className={cn(
-                      'text-2xl',
-                      trailing
-                        ? 'font-semibold text-foreground/60'
-                        : 'font-bold',
+                      'text-[40px]',
+                      trailing && 'text-muted',
                       i === 1 ? 'mr-auto' : 'ml-auto',
                     )}
                   >
                     {started ? game.score[side] : ''}
-                  </span>
+                  </Num>
                 </div>
               </Fragment>
             )
@@ -247,7 +241,7 @@ function PaneHeader({ game }: { game: GameSummary | null }) {
 function PaneBox({ game, box }: { game: GameSummary; box: GameBox | null }) {
   return (
     <details className="group rounded-card border border-border bg-surface">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-3xs font-bold uppercase [&::-webkit-details-marker]:hidden">
         Box score
         <svg
           width="16"

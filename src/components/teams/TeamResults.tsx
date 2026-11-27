@@ -1,7 +1,8 @@
 /**
  * A Team's season so far: each completed game's scoring margin as a bar,
  * up for a win and down for a loss, oldest to newest (the last 20 in a
- * long season). Tap a bar for the result.
+ * long season). Tap a bar for the result. Signal: wins in ink, losses
+ * muted, the latest game lit.
  */
 
 import { barY, defineChart, ruleY } from '@tanstack/charts'
@@ -11,7 +12,7 @@ import { scaleLinear } from '@tanstack/charts/scales/linear'
 import { tooltip } from '@tanstack/charts/tooltip'
 import { useMemo } from 'react'
 import type { TeamGame, TeamPage } from '@/lib/teams/server'
-import { ChartCard } from '@/components/charts/ChartCard'
+import { CHART_COLORS, ChartCard } from '@/components/charts/ChartCard'
 import { shortDate } from '@/lib/time/format'
 import { useTimeZone } from '@/lib/time/useTimeZone'
 
@@ -24,9 +25,10 @@ interface Bar {
   game: TeamGame
 }
 
-/** Wins and losses read apart in both themes (the theme's gold doesn't). */
-const WIN = '#10b981'
-const LOSS = '#ef4444'
+/** Wins in ink, losses muted (they also hang below the line). */
+const WIN = CHART_COLORS.foreground
+const LOSS = `color-mix(in srgb, ${CHART_COLORS.muted} 60%, transparent)`
+const LATEST = 'var(--signal)'
 
 const sign = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0')
 
@@ -62,9 +64,14 @@ export function TeamResults({ page }: { page: TeamPage }) {
             x: 'key',
             y: 'margin',
             key: 'key',
-            fill: (b) => (b.game.result === 'W' ? WIN : LOSS),
-            fillOpacity: 0.8,
-            radius: 2,
+            fill: (b) =>
+              b.key === `${bars.length - 1}`
+                ? LATEST
+                : b.game.result === 'W'
+                  ? WIN
+                  : LOSS,
+            fillOpacity: 0.9,
+            radius: 1,
           }),
         ],
         scales: {

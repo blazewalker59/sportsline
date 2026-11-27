@@ -72,7 +72,7 @@ function CategoryBoard({
   const when = span === 'today' ? 'today' : 'this matchup'
   return (
     <section>
-      <SectionHead title="Category leaders">
+      <SectionHead title="Category leaders" index="H2">
         {leaders.teamCategories !== undefined && (
           <Picker
             label="Leaders among"
@@ -163,7 +163,7 @@ function CategoryRow({
         <button
           type="button"
           onClick={() => onToggle(statId)}
-          className="w-10 shrink-0 self-stretch text-left text-xs font-bold text-muted"
+          className="w-10 shrink-0 self-stretch text-left text-3xs font-bold text-muted uppercase"
         >
           {label}
           {most && <span className="block text-3xs font-normal">most</span>}
@@ -219,7 +219,7 @@ function RankRow({
         mine && 'bg-notice font-semibold',
       )}
     >
-      <span className="w-10 shrink-0 text-right text-xs text-muted tabular-nums">
+      <span className="w-10 shrink-0 text-right font-label text-3xs text-muted tabular-nums">
         {rank}
       </span>
       {children}
@@ -377,7 +377,7 @@ function PointsLeaders({
     return <p className="text-sm text-muted">No points scored yet {when}.</p>
   return (
     <section>
-      <SectionHead title={`Scoring leaders ${when}`}>
+      <SectionHead title={`Scoring leaders ${when}`} index="H2">
         {view === 'players' && groups.length > 1 && (
           <Picker
             label="Position"
@@ -410,8 +410,8 @@ function PointsLeaders({
                   p.mine && 'bg-notice',
                 )}
               >
-                <span className="w-5 shrink-0 text-xs text-muted tabular-nums">
-                  {i + 1}
+                <span className="w-5 shrink-0 font-label text-3xs text-muted tabular-nums">
+                  {String(i + 1).padStart(2, '0')}
                 </span>
                 <LeaderName sport={sport} p={p} />
                 <span className="shrink-0 text-sm font-bold tabular-nums">
@@ -431,8 +431,8 @@ function PointsLeaders({
                 t.mine && 'bg-notice font-semibold',
               )}
             >
-              <span className="w-5 shrink-0 text-xs text-muted tabular-nums">
-                {i + 1}
+              <span className="w-5 shrink-0 font-label text-3xs text-muted tabular-nums">
+                {String(i + 1).padStart(2, '0')}
               </span>
               <span className="min-w-0 flex-1 truncate">{t.name}</span>
               <span className="shrink-0 font-bold tabular-nums">

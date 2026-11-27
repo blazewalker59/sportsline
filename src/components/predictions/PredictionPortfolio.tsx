@@ -6,6 +6,8 @@
 import { useState } from 'react'
 import {
   PropProgress,
+  arrowOf,
+  isLivePrediction,
   money,
   pct,
   profitOf,
@@ -16,13 +18,15 @@ import type { ChangeDisplay } from '@/lib/kalshi/server'
 import type { PredictionView } from '@/lib/kalshi/predictionViews'
 import { Sheet } from '@/components/chat/Sheet'
 import { TeamPip } from '@/components/brand/TeamPip'
+import { Num } from '@/components/signal/Num'
 import { predictionTeams } from '@/lib/kalshi/legTeam'
 import { cn } from '@/lib/utils'
 
 /**
- * Open Predictions at a glance, across the strip's width: how many, what's
- * staked, and what cashing everything out now would bring. Tapping it opens
- * the portfolio, every open Prediction with its status and payout.
+ * Open Predictions at a glance, the Predictions screen's hero: what
+ * cashing everything out now would bring, in dots, how that moved over the
+ * last day, and what's staked. Tapping it opens the portfolio, every open
+ * Prediction with its status and payout.
  */
 export function PredictionSummary({
   predictions,
@@ -38,41 +42,57 @@ export function PredictionSummary({
   const open = predictions.filter((p) => p.status === 'open')
   if (open.length === 0) return null
   const totals = portfolioTotals(open)
+  const live = open.filter(isLivePrediction).length
+  const day = dayChange(open)
   return (
     <>
       <button
         type="button"
         onClick={() => setPortfolioOpen(true)}
         aria-label="Your portfolio"
-        className="mt-2 flex w-full items-stretch divide-x divide-border rounded-card border border-border bg-surface text-center transition-colors hover:border-accent/50"
+        className="flex w-full flex-col gap-3 rounded-card bg-surface p-4 text-left"
       >
-        <span className="flex flex-1 flex-col justify-center px-2 py-1.5">
-          <span className="text-2xs text-muted">Open</span>
-          <span className="text-[15px] font-bold tabular-nums">
-            {open.length}
+        <span className="flex items-center justify-between gap-2 text-3xs text-muted uppercase">
+          <span className="flex items-center gap-2">
+            <span className={cn('led', live > 0 ? 'led-pulse' : 'led-off')} />
+            Portfolio · Kalshi
+          </span>
+          <span>Cash out now ›</span>
+        </span>
+        <Num className="text-[52px]">
+          {money(totals.profit ? totals.cashout : totals.staked)}
+        </Num>
+        <span className="flex items-baseline justify-between gap-2">
+          {day !== null ? (
+            <span
+              className={cn(
+                'font-label text-xs font-bold tabular-nums',
+                toneOf(day),
+              )}
+            >
+              {arrowOf(day)} ${Math.abs(day).toFixed(2)} today
+            </span>
+          ) : (
+            <span className="text-3xs text-muted uppercase">
+              {totals.profit ? 'Not priced today' : 'Staked'}
+            </span>
+          )}
+          <span className="text-3xs text-muted uppercase">
+            {open.length} open{live > 0 && ` · ${live} live`}
           </span>
         </span>
-        <span className="flex flex-1 flex-col justify-center px-2 py-1.5">
-          <span className="text-2xs text-muted">Staked</span>
-          <span className="text-[15px] font-bold tabular-nums">
-            {money(totals.staked)}
-          </span>
-        </span>
-        <span className="flex flex-[1.4] flex-col justify-center px-2 py-1.5">
-          <span className="text-2xs text-muted">Cash out now ›</span>
-          <span className="text-[15px] font-bold tabular-nums">
-            {totals.profit ? money(totals.cashout) : '—'}
-            {totals.profit && (
-              <span
-                className={cn(
-                  'ml-1 text-xs font-semibold',
-                  toneOf(totals.profit.dollars),
-                )}
-              >
+        <span className="grid grid-cols-3 gap-2 border-t border-border pt-3">
+          <Fact label="Staked">{money(totals.staked)}</Fact>
+          <Fact label="P&L">
+            {totals.profit ? (
+              <span className={toneOf(totals.profit.dollars)}>
                 {profitText(totals.profit, display)}
               </span>
+            ) : (
+              '—'
             )}
-          </span>
+          </Fact>
+          <Fact label="If all win">{money(totals.payout)}</Fact>
         </span>
       </button>
       {portfolioOpen && (
@@ -92,6 +112,38 @@ export function PredictionSummary({
       )}
     </>
   )
+}
+
+function Fact({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <span className="flex flex-col gap-0.5">
+      <span className="text-3xs text-muted uppercase">{label}</span>
+      <span className="text-sm font-semibold tabular-nums">{children}</span>
+    </span>
+  )
+}
+
+/**
+ * How open Predictions' worth moved over the last day (their Odds' kept
+ * history), in dollars: a winning contract pays $1. Null when none has a
+ * day's history to compare.
+ */
+export function dayChange(open: ReadonlyArray<PredictionView>): number | null {
+  let change = 0
+  let any = false
+  for (const p of open) {
+    const first = p.history[0]
+    if (p.chance === null || !first) continue
+    change += p.contracts * (p.chance - first.chance)
+    any = true
+  }
+  return any ? change : null
 }
 
 /** Across open Predictions: staked, what cashing out now brings, the payout. */
@@ -129,16 +181,16 @@ export function PortfolioSheet({
   const totals = portfolioTotals(predictions)
   return (
     <Sheet title="Portfolio" onClose={onClose}>
-      <dl className="grid grid-cols-3 gap-2 rounded-card border border-border bg-surface p-3 text-center text-xs text-muted">
+      <dl className="grid grid-cols-3 gap-2 rounded-card bg-surface p-3 text-3xs text-muted uppercase">
         <div>
           <dt>Staked</dt>
-          <dd className="text-base font-semibold text-foreground tabular-nums">
+          <dd className="mt-0.5 font-sans text-base font-semibold tracking-normal text-foreground normal-case tabular-nums">
             {money(totals.staked)}
           </dd>
         </div>
         <div>
           <dt>Cash out now</dt>
-          <dd className="text-base font-semibold text-foreground tabular-nums">
+          <dd className="mt-0.5 font-sans text-base font-semibold tracking-normal text-foreground normal-case tabular-nums">
             {totals.profit ? money(totals.cashout) : '—'}
             {totals.profit && (
               <span
@@ -154,12 +206,12 @@ export function PortfolioSheet({
         </div>
         <div>
           <dt>If all win</dt>
-          <dd className="text-base font-semibold text-foreground tabular-nums">
+          <dd className="mt-0.5 font-sans text-base font-semibold tracking-normal text-foreground normal-case tabular-nums">
             {money(totals.payout)}
           </dd>
         </div>
       </dl>
-      <ul className="divide-y divide-border rounded-card border border-border bg-surface">
+      <ul className="divide-y divide-border rounded-card bg-surface">
         {predictions.map((p) => {
           const profit = profitOf(p)
           const won = p.legs.filter((l) => l.status === 'won').length
@@ -180,7 +232,7 @@ export function PortfolioSheet({
                 </span>
                 <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted tabular-nums">
                   {p.kind === 'combo' && (
-                    <span className={cn(lost && 'text-live')}>
+                    <span className={cn(lost && 'text-negative')}>
                       {lost ? 'Busted · ' : ''}
                       {won}/{p.legs.length} legs ·
                     </span>
@@ -191,7 +243,13 @@ export function PortfolioSheet({
                 {progress && <PropProgress progress={progress} compact />}
               </span>
               <span className="flex shrink-0 flex-col items-end">
-                <span className="text-base leading-tight font-bold tabular-nums">
+                <span className="flex items-center gap-1.5 text-base leading-tight font-bold tabular-nums">
+                  {isLivePrediction(p) && (
+                    <>
+                      <span className="led led-pulse" aria-hidden="true" />
+                      <span className="sr-only">Live</span>
+                    </>
+                  )}
                   {p.chance === null ? '—' : pct(p.chance)}
                 </span>
                 <span className="text-xs tabular-nums">

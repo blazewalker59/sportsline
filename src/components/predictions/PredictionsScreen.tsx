@@ -4,7 +4,19 @@
  */
 
 import { useState } from 'react'
-import { Sparkline, money, pct, profitOf, profitText } from './PredictionParts'
+import {
+  LegDots,
+  OddsMeter,
+  PropProgress,
+  arrowOf,
+  isLivePrediction,
+  leadGame,
+  money,
+  pct,
+  profitOf,
+  profitText,
+  toneOf,
+} from './PredictionParts'
 import { PredictionSheet } from './PredictionSheet'
 import { PredictionSummary } from './PredictionPortfolio'
 import { PredictionRecordSection } from './PredictionRecord'
@@ -12,7 +24,9 @@ import { SharpPicksSection } from './SharpPicks'
 import { PriceDisplayToggle } from './PriceDisplayToggle'
 import type { ChangeDisplay } from '@/lib/kalshi/server'
 import type { PredictionView } from '@/lib/kalshi/predictionViews'
+import { Segmented } from '@/components/signal/Segmented'
 import { AppHeader } from '@/components/layout/AppHeader'
+import { SectionLabel } from '@/components/signal/Section'
 import { InlineError, ScreenError } from '@/components/layout/RouteStates'
 import { CardSkeleton, RowsSkeleton } from '@/components/layout/Skeleton'
 import { timeAgo, useNow } from '@/components/timeline/format'
@@ -74,26 +88,35 @@ function ConnectForm() {
         Follow your Kalshi predictions here: their odds move with the game, and
         you’ll get Alerts for every big play in the games they depend on.
       </p>
-      <ol className="list-decimal space-y-1 rounded-card border border-border bg-surface py-3 pr-3 pl-8 text-sm">
-        <li>On Kalshi, open Account → API Keys and create a key.</li>
-        <li>
-          Give it <span className="font-semibold">read-only</span> access.
-          Sportsline refuses keys that can trade.
-        </li>
-        <li>Paste its key ID and the private key below.</li>
+      <ol className="flex flex-col gap-2 rounded-card bg-surface p-4 text-sm">
+        {[
+          <>On Kalshi, open Account → API Keys and create a key.</>,
+          <>
+            Give it <span className="font-semibold">read-only</span> access.
+            Sportsline refuses keys that can trade.
+          </>,
+          <>Paste its key ID and the private key below.</>,
+        ].map((step, i) => (
+          <li key={i} className="flex gap-3">
+            <span className="mt-0.5 font-label text-3xs text-muted">
+              0{i + 1}
+            </span>
+            <span>{step}</span>
+          </li>
+        ))}
       </ol>
-      <label className="flex flex-col gap-1 text-sm font-semibold">
+      <label className="flex flex-col gap-1.5 text-3xs text-muted uppercase">
         Key ID
         <input
           value={keyId}
           onChange={(e) => setKeyId(e.target.value)}
           autoComplete="off"
           spellCheck={false}
-          className="rounded-card border border-border bg-surface px-3 py-2 font-mono text-sm font-normal"
+          className={FIELD}
           placeholder="a952bcbe-ec3b-4b5b-…"
         />
       </label>
-      <label className="flex flex-col gap-1 text-sm font-semibold">
+      <label className="flex flex-col gap-1.5 text-3xs text-muted uppercase">
         Private key
         <textarea
           value={privateKey}
@@ -101,21 +124,21 @@ function ConnectForm() {
           autoComplete="off"
           spellCheck={false}
           rows={6}
-          className="rounded-card border border-border bg-surface px-3 py-2 font-mono text-xs font-normal"
+          className={cn(FIELD, 'text-xs')}
           placeholder={
             '-----BEGIN RSA PRIVATE KEY-----\n…\n-----END RSA PRIVATE KEY-----'
           }
         />
       </label>
       {connect.error && (
-        <p role="alert" className="text-sm text-live">
+        <p role="alert" className="text-sm text-negative">
           {connect.error.message}
         </p>
       )}
       <button
         type="submit"
         disabled={!keyId.trim() || !privateKey.trim() || connect.isPending}
-        className="min-h-11 rounded-full bg-accent px-5 text-sm font-semibold text-background disabled:opacity-50"
+        className="key key-ink inline-flex h-11 items-center justify-center rounded-control px-5 text-3xs font-bold uppercase"
       >
         {connect.isPending ? 'Checking with Kalshi…' : 'Connect Kalshi'}
       </button>
@@ -126,6 +149,10 @@ function ConnectForm() {
     </form>
   )
 }
+
+/** A text field (Signal): recessed into the page. */
+const FIELD =
+  'well rounded-control px-3 py-2 font-mono text-sm tracking-normal text-foreground normal-case'
 
 function Connected() {
   const now = useNow()
@@ -142,89 +169,11 @@ function Connected() {
   const c = connection.data!
   return (
     <div className="flex flex-col gap-6">
-      <section className="flex items-center gap-3 rounded-card border border-border bg-surface px-3 py-2.5 text-sm">
-        <span
-          className={cn(
-            'size-2 shrink-0 rounded-full',
-            c.status === 'ok' ? 'bg-scoring' : 'bg-live',
-          )}
-        />
-        <span className="min-w-0 flex-1">
-          <span className="block font-semibold">Kalshi connected</span>
-          <span className="block truncate text-xs text-muted">
-            {c.status === 'error'
-              ? (c.lastError ?? 'Last sync failed')
-              : c.syncedAt
-                ? `Synced ${timeAgo(c.syncedAt, now)}`
-                : 'Syncing…'}
-          </span>
-        </span>
-        <button
-          type="button"
-          onClick={() => sync.mutate()}
-          disabled={sync.isPending}
-          className="min-h-9 rounded-full bg-notice px-3 text-[13px] font-semibold"
-        >
-          {sync.isPending ? 'Syncing…' : 'Sync now'}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            if (
-              window.confirm(
-                'Disconnect Kalshi and delete its key and Predictions?',
-              )
-            )
-              disconnect.mutate()
-          }}
-          className="min-h-9 rounded-full px-2 text-[13px] font-semibold text-muted hover:text-live"
-        >
-          Disconnect
-        </button>
-      </section>
-
-      <section className="flex items-center justify-between gap-3 text-sm">
-        <span className="text-muted">Show profit and loss as</span>
-        <span
-          role="radiogroup"
-          aria-label="Show profit and loss as"
-          className="flex gap-1 rounded-full bg-notice p-1"
-        >
-          {(
-            [
-              ['dollars', 'Dollars'],
-              ['percent', 'Percent'],
-            ] as Array<[ChangeDisplay, string]>
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              role="radio"
-              aria-checked={c.changeDisplay === value}
-              onClick={() => setDisplay.mutate(value)}
-              className={cn(
-                'min-h-8 rounded-full px-3 text-[13px] font-semibold transition-colors',
-                c.changeDisplay === value
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted',
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </span>
-      </section>
-      <PriceDisplayToggle />
-
       <PredictionSummary
         predictions={open}
         display={c.changeDisplay}
         onOpen={setOpenId}
       />
-
-      <SharpPicksSection />
-
-      <PredictionRecordSection />
 
       {list.isPending ? (
         <RowsSkeleton rows={3} label="Loading your Predictions" />
@@ -235,16 +184,79 @@ function Connected() {
           onRetry={() => list.refetch()}
         />
       ) : (
-        <PredictionList
-          title="Open"
-          empty="No open Predictions. New ones appear within a few minutes of making them on Kalshi."
+        <OpenPredictions
           predictions={open}
           onOpen={setOpenId}
           display={c.changeDisplay}
         />
       )}
+
+      <SharpPicksSection />
+
+      <PredictionRecordSection />
+
+      <section className="flex flex-col gap-3">
+        <SectionLabel title="Kalshi" index="E4" />
+        <div className="flex items-center gap-3 rounded-card bg-surface px-4 py-3 text-sm">
+          <span
+            aria-hidden="true"
+            className={cn(
+              'led shadow-none',
+              c.status === 'ok' ? 'bg-positive' : 'bg-negative',
+            )}
+          />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Kalshi connected</span>
+            <span className="block truncate text-3xs text-muted uppercase">
+              {c.status === 'error'
+                ? (c.lastError ?? 'Last sync failed')
+                : c.syncedAt
+                  ? `Synced ${timeAgo(c.syncedAt, now)}`
+                  : 'Syncing…'}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={() => sync.mutate()}
+            disabled={sync.isPending}
+            className={KEY}
+          >
+            {sync.isPending ? 'Syncing…' : 'Sync now'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (
+                window.confirm(
+                  'Disconnect Kalshi and delete its key and Predictions?',
+                )
+              )
+                disconnect.mutate()
+            }}
+            className={cn(KEY, 'text-muted')}
+          >
+            Disconnect
+          </button>
+        </div>
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <span className="text-muted">Show profit and loss as</span>
+          <Segmented
+            label="Show profit and loss as"
+            value={c.changeDisplay}
+            options={
+              [
+                ['dollars', 'Dollars'],
+                ['percent', 'Percent'],
+              ] as Array<[ChangeDisplay, string]>
+            }
+            onChange={(v) => setDisplay.mutate(v)}
+          />
+        </div>
+        <PriceDisplayToggle />
+      </section>
+
       {past.length > 0 && (
-        <PredictionList title="Settled" predictions={past} onOpen={setOpenId} />
+        <SettledPredictions predictions={past} onOpen={setOpenId} />
       )}
       {selected && (
         <PredictionSheet
@@ -256,110 +268,172 @@ function Connected() {
   )
 }
 
-function PredictionList({
-  title,
-  empty,
+/** A key (Signal): a raised cap with its label in the manual's face. */
+const KEY =
+  'key inline-flex h-9 shrink-0 items-center justify-center rounded-control px-3 text-3xs font-bold uppercase'
+
+/** Open Predictions as panels: each one's Odds on a meter, Combos' Legs as glyphs. */
+function OpenPredictions({
   predictions,
   onOpen,
-  display = 'dollars',
+  display,
 }: {
-  title: string
-  empty?: string
   predictions: Array<PredictionView>
   onOpen: (id: string) => void
-  display?: ChangeDisplay
+  display: ChangeDisplay
 }) {
   return (
     <section>
-      <h2 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-        {title}
-        {predictions.length > 0 && (
-          <span className="ml-1 font-normal">{predictions.length}</span>
-        )}
-      </h2>
+      <SectionLabel title="Open" index="E1">
+        {predictions.length > 0 && predictions.length}
+      </SectionLabel>
       {predictions.length === 0 ? (
-        <p className="text-sm text-muted">{empty}</p>
+        <p className="well rounded-card px-4 py-5 text-center text-sm text-muted">
+          No open Predictions. New ones appear within a few minutes of making
+          them on Kalshi.
+        </p>
       ) : (
-        <ul className="divide-y divide-border rounded-card border border-border bg-surface">
+        <ul className="flex flex-col gap-2.5">
           {predictions.map((p) => (
             <li key={p.id}>
-              <button
-                type="button"
-                onClick={() => onOpen(p.id)}
-                className="flex w-full items-center gap-3 px-3 py-2.5 text-left"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold">
-                    {p.side === 'no' && (
-                      <span className="text-muted">Not: </span>
-                    )}
-                    {p.title}
-                  </span>
-                  <span className="block truncate text-xs text-muted">
-                    {p.kind === 'combo'
-                      ? `${p.legs.filter((l) => l.status === 'won').length}/${p.legs.length} legs · `
-                      : ''}
-                    {money(p.cost)} in
-                  </span>
-                </span>
-                {p.status === 'open' ? (
-                  <span className="flex items-center gap-2">
-                    <Sparkline
-                      points={p.history}
-                      entry={p.entryChance}
-                      width={48}
-                      height={22}
-                    />
-                    <span className="flex w-16 flex-col text-right">
-                      <span className="text-base leading-tight font-bold tabular-nums">
-                        {p.chance === null ? '—' : pct(p.chance)}
-                      </span>
-                      {(() => {
-                        const profit = profitOf(p)
-                        return profit ? (
-                          <span
-                            className={cn(
-                              'text-2xs font-semibold tabular-nums',
-                              profit.dollars > 0.004
-                                ? 'text-scoring'
-                                : profit.dollars < -0.004
-                                  ? 'text-live'
-                                  : 'text-muted',
-                            )}
-                          >
-                            {profitText(profit, display)}
-                          </span>
-                        ) : null
-                      })()}
-                    </span>
-                  </span>
-                ) : (
-                  <span
-                    className={cn(
-                      'text-right text-sm font-semibold tabular-nums',
-                      p.result === 'won' ? 'text-scoring' : 'text-muted',
-                    )}
-                  >
-                    {p.status === 'closed'
-                      ? 'Closed'
-                      : p.result === 'won'
-                        ? 'Won'
-                        : p.result === 'lost'
-                          ? 'Lost'
-                          : 'Void'}
-                    {p.pnl !== null && (
-                      <span className="block text-xs">
-                        {p.pnl >= 0 ? '+' : ''}
-                        {money(p.pnl)}
-                      </span>
-                    )}
-                  </span>
-                )}
-              </button>
+              <OpenPanel prediction={p} onOpen={onOpen} display={display} />
             </li>
           ))}
         </ul>
       )}
+    </section>
+  )
+}
+
+function OpenPanel({
+  prediction: p,
+  onOpen,
+  display,
+}: {
+  prediction: PredictionView
+  onOpen: (id: string) => void
+  display: ChangeDisplay
+}) {
+  const live = isLivePrediction(p)
+  const game = leadGame(p)
+  const profit = profitOf(p)
+  const progress = p.kind === 'single' ? (p.legs[0]?.progress ?? null) : null
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(p.id)}
+      className="flex w-full flex-col gap-2.5 rounded-card bg-surface p-4 text-left"
+    >
+      <span className="flex items-center justify-between gap-2 text-3xs text-muted uppercase">
+        <span className="truncate">
+          {p.kind === 'combo'
+            ? `Combo · ${p.legs.length} legs`
+            : `Single${game ? ` · ${game.league}` : ''}`}
+        </span>
+        {live && (
+          <span className="flex shrink-0 items-center gap-1.5">
+            <span className="led led-pulse" aria-hidden="true" />
+            {game?.situation?.segmentLabel ?? 'Live'}
+          </span>
+        )}
+      </span>
+      <span className="flex items-start justify-between gap-3">
+        <span className="min-w-0 text-[15px] leading-snug font-semibold">
+          {p.side === 'no' && <span className="text-muted">Not: </span>}
+          {p.title}
+        </span>
+        <span className="flex shrink-0 flex-col items-end">
+          <span className="text-xl leading-none font-bold tabular-nums">
+            {p.chance === null ? '—' : pct(p.chance)}
+          </span>
+          {profit && (
+            <span
+              className={cn(
+                'mt-1 text-2xs font-semibold tabular-nums',
+                toneOf(profit.dollars),
+              )}
+            >
+              {arrowOf(profit.dollars)} {profitText(profit, display)}
+            </span>
+          )}
+        </span>
+      </span>
+      {p.kind === 'combo' && (
+        <span className="flex items-center gap-2">
+          <LegDots legs={p.legs} />
+          <span className="ml-auto shrink-0 text-3xs text-muted uppercase tabular-nums">
+            {money(p.cost)} to win {money(p.contracts)}
+          </span>
+        </span>
+      )}
+      <OddsMeter prediction={p} />
+      {progress && <PropProgress progress={progress} />}
+    </button>
+  )
+}
+
+/** Settled Predictions: hairline rows, ● won and ○ lost down the left. */
+function SettledPredictions({
+  predictions,
+  onOpen,
+}: {
+  predictions: Array<PredictionView>
+  onOpen: (id: string) => void
+}) {
+  return (
+    <section>
+      <SectionLabel title="Settled" index="E5">
+        {predictions.length}
+      </SectionLabel>
+      <ul className="divide-y divide-border rounded-card bg-surface">
+        {predictions.map((p) => (
+          <li key={p.id}>
+            <button
+              type="button"
+              onClick={() => onOpen(p.id)}
+              className="flex w-full items-center gap-3 px-4 py-3 text-left"
+            >
+              <span aria-hidden="true" className="w-3 text-center text-xs">
+                {p.result === 'won' ? '●' : '○'}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold">
+                  {p.side === 'no' && <span className="text-muted">Not: </span>}
+                  {p.title}
+                </span>
+                <span className="block truncate text-3xs text-muted uppercase">
+                  {p.kind === 'combo'
+                    ? `${p.legs.filter((l) => l.status === 'won').length}/${p.legs.length} legs · `
+                    : ''}
+                  {money(p.cost)} in
+                </span>
+              </span>
+              <span className="flex flex-col items-end text-right">
+                <span className="text-3xs text-muted uppercase">
+                  {p.status === 'closed'
+                    ? 'Closed'
+                    : p.result === 'won'
+                      ? 'Won'
+                      : p.result === 'lost'
+                        ? 'Lost'
+                        : 'Void'}
+                </span>
+                {p.pnl !== null && (
+                  <span
+                    className={cn(
+                      'text-sm font-semibold tabular-nums',
+                      toneOf(p.pnl),
+                    )}
+                  >
+                    {p.pnl >= 0 ? '+' : ''}
+                    {money(p.pnl)}
+                  </span>
+                )}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }

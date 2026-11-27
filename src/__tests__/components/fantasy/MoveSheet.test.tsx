@@ -70,10 +70,8 @@ describe('AvailablePlayers with roster moves on', () => {
     expect(html).toContain('aria-label="Claim Bub Carrington"')
     expect(html).toContain('aria-label="Add Free Guy"')
     // A claim a shade deeper than an add; its row doesn't say waivers again.
-    expect(html).toMatch(
-      /aria-label="Claim Bub Carrington"[^>]*bg-foreground\/15/,
-    )
-    expect(html).toMatch(/aria-label="Add Free Guy"[^>]*bg-notice/)
+    expect(html).toMatch(/aria-label="Claim Bub Carrington"[^>]*well/)
+    expect(html).toMatch(/aria-label="Add Free Guy"[^>]*key/)
     expect(html).not.toContain('Waivers')
   })
 })

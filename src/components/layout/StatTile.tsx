@@ -1,14 +1,16 @@
 /**
  * A row of headline numbers (a Record's volume and results, the Sharp
- * picks' record, an Agent's trend picks): small label, the number, and an
- * optional note under it, in a ruled grid of three.
+ * picks' record, an Agent's trend picks), Signal style: a panel of dot
+ * numerals in threes, each over its label in the manual's face and an
+ * optional note.
  */
 
+import { Num } from '@/components/signal/Num'
 import { cn } from '@/lib/utils'
 
 export function StatGrid({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-3 gap-px overflow-hidden rounded-card border border-border bg-border">
+    <div className="grid grid-cols-3 gap-x-3 gap-y-5 rounded-card bg-surface p-4">
       {children}
     </div>
   )
@@ -27,19 +29,14 @@ export function StatTile({
   className?: string
 }) {
   return (
-    <div className="flex flex-col bg-surface px-3 py-2">
-      <span className="text-3xs font-semibold tracking-wide text-muted uppercase">
-        {label}
-      </span>
-      <span
-        className={cn(
-          'text-lg leading-tight font-bold tabular-nums',
-          className,
-        )}
-      >
+    <div className="flex min-w-0 flex-col gap-1.5" data-stat-tile="">
+      <Num className={cn('text-[24px] whitespace-nowrap', className)}>
         {value}
+      </Num>
+      <span className="flex flex-col gap-0.5">
+        <span className="truncate text-3xs text-muted uppercase">{label}</span>
+        {sub && <span className="truncate text-2xs text-muted">{sub}</span>}
       </span>
-      {sub && <span className="text-2xs text-muted">{sub}</span>}
     </div>
   )
 }

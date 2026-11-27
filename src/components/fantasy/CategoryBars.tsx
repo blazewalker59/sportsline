@@ -16,7 +16,49 @@ import type { CategoryResult } from '@/lib/fantasy/categories'
 import type { MatchupView } from '@/lib/fantasy/matchup'
 import { CHART_COLORS, ChartCard } from '@/components/charts/ChartCard'
 import { categoryLean } from '@/lib/fantasy/categories'
+import { SectionLabel } from '@/components/signal/Section'
 import { cn } from '@/lib/utils'
+
+/** Segments each side of a category's lean meter. */
+const SEGMENTS = 10
+
+/**
+ * A category's lean as a segmented meter from the middle: unlit wells,
+ * filled outward toward whoever leads, in their manager's color.
+ */
+function LeanMeter({ lean }: { lean: number }) {
+  const filled = Math.round(Math.min(1, Math.abs(lean)) * SEGMENTS)
+  const half = (side: 'mine' | 'opponent') => {
+    const on = lean > 0 === (side === 'mine') && lean !== 0
+    const color = side === 'mine' ? CHART_COLORS.mine : CHART_COLORS.opponent
+    return Array.from({ length: SEGMENTS }, (_, i) => {
+      // Counted from the middle out.
+      const out = side === 'mine' ? SEGMENTS - 1 - i : i
+      const lit = on && out < filled
+      return (
+        <span
+          key={`${side}${i}`}
+          className="meter-seg h-1.5"
+          style={lit ? { background: color, boxShadow: 'none' } : undefined}
+        />
+      )
+    })
+  }
+  return (
+    <span
+      aria-hidden="true"
+      data-lean={lean}
+      className="grid w-full items-center gap-[3px]"
+      style={{
+        gridTemplateColumns: `repeat(${SEGMENTS}, minmax(0, 1fr)) 1px repeat(${SEGMENTS}, minmax(0, 1fr))`,
+      }}
+    >
+      {half('mine')}
+      <span className="h-2.5 w-px bg-border" />
+      {half('opponent')}
+    </span>
+  )
+}
 
 /** The day the toggle can show: its name, and its categories once read. */
 export interface CategoryDay {
@@ -54,18 +96,16 @@ export function CategoryBars({
       aria-checked={view === key}
       onClick={() => setView(key)}
       className={cn(
-        'min-h-7 rounded-full px-2.5 tabular-nums transition-colors',
-        view === key ? 'bg-background text-foreground shadow-sm' : 'text-muted',
+        'min-h-7 rounded-[8px] px-2.5 text-3xs whitespace-nowrap tabular-nums uppercase transition-colors',
+        view === key ? 'panel bg-surface text-foreground' : 'text-muted',
       )}
     >
-      {label} <span className="font-semibold">{record}</span>
+      {label} <span className="font-bold">{record}</span>
     </button>
   )
   return (
     <section>
-      <h3 className="subject-ink mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-        Categories
-      </h3>
+      <SectionLabel as="h3" title="Categories" />
       <ChartCard
         legend={[
           { label: m.mine.abbrev, color: CHART_COLORS.mine },
@@ -78,7 +118,7 @@ export function CategoryBars({
             <span
               role="radiogroup"
               aria-label="Show categories for"
-              className="flex gap-0.5 rounded-full bg-notice p-0.5"
+              className="well flex gap-0.5 rounded-[10px] p-[3px]"
             >
               {option('matchup', 'Matchup', categoryRecord(m))}
               {option(
@@ -118,7 +158,10 @@ export function CategoryBars({
                   >
                     {figure('mine')}
                   </span>
-                  <span className="text-center text-2xs leading-none font-semibold text-muted">
+                  <span
+                    data-category-label=""
+                    className="text-center text-3xs leading-none text-muted uppercase"
+                  >
                     {c.label}
                     {c.reverse && (
                       <span className="sr-only"> (lower is better)</span>
@@ -131,23 +174,7 @@ export function CategoryBars({
                     {figure('opponent')}
                   </span>
                 </span>
-                <span
-                  aria-hidden="true"
-                  className="relative h-1.5 w-full rounded-full bg-notice"
-                >
-                  <span className="absolute top-[-2px] left-1/2 h-[10px] w-px -translate-x-1/2 bg-border" />
-                  {lean !== 0 && (
-                    <span
-                      className="absolute top-0 h-full rounded-full"
-                      style={{
-                        width: `${Math.abs(lean) * 50}%`,
-                        background:
-                          lean > 0 ? CHART_COLORS.mine : CHART_COLORS.opponent,
-                        ...(lean > 0 ? { right: '50%' } : { left: '50%' }),
-                      }}
-                    />
-                  )}
-                </span>
+                <LeanMeter lean={lean} />
               </li>
             )
           })}

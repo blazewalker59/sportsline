@@ -2,6 +2,10 @@ import type { ViewerFollow } from '@/lib/model/timeline'
 import { cn } from '@/lib/utils'
 import { followKey, useSetFollow, useViewer } from '@/lib/viewer/useViewer'
 
+/**
+ * Follow, as a key (Signal): raised to follow, pressed in while following.
+ * Never lit: orange is for what's live.
+ */
 export function FollowButton({
   follow,
   className,
@@ -21,13 +25,14 @@ export function FollowButton({
       onClick={() => setFollow.mutate({ follow, following: !following })}
       aria-pressed={following}
       className={cn(
-        'shrink-0 rounded-full border px-3 py-1 text-xs transition-colors disabled:opacity-60',
-        following
-          ? 'border-foreground/60 bg-foreground text-background'
-          : 'border-border text-muted hover:text-foreground',
+        'key inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-control px-3 text-3xs font-bold uppercase',
+        following ? 'text-foreground' : 'text-foreground/80',
         className,
       )}
     >
+      {following && (
+        <span aria-hidden="true" className="led led-ink size-1.5" />
+      )}
       {following ? 'Following' : 'Follow'}
     </button>
   )

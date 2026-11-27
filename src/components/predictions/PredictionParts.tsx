@@ -8,6 +8,8 @@ import type { ChangeDisplay } from '@/lib/kalshi/server'
 import type { LegView, PredictionView } from '@/lib/kalshi/predictionViews'
 import type { Progress } from '@/lib/kalshi/props'
 import type { GameSummary } from '@/lib/model/timeline'
+import { Meter } from '@/components/signal/Meter'
+import { isLiveGame } from '@/lib/timeline/stakes'
 import { cn } from '@/lib/utils'
 
 export const pct = (n: number) => `${Math.round(n * 100)}%`
@@ -42,20 +44,35 @@ export function profitText(
   return `${sign}$${Math.abs(profit.dollars).toFixed(2)}`
 }
 
+/** Money's tone: made is positive, lost negative (never the live orange). */
 export const toneOf = (n: number) =>
-  n > 0.004 ? 'text-scoring' : n < -0.004 ? 'text-live' : 'text-muted'
+  n > 0.004 ? 'text-positive' : n < -0.004 ? 'text-negative' : 'text-muted'
 
-/** Odds over time as a line, with where the Viewer got in dashed. */
+/** ▲ made, ▼ lost, · even. */
+export const arrowOf = (n: number) => (n > 0.004 ? '▲' : n < -0.004 ? '▼' : '·')
+
+/** A Prediction riding on a Game being played now. */
+export const isLivePrediction = (p: Pick<PredictionView, 'legs' | 'status'>) =>
+  p.status === 'open' && p.legs.some((l) => l.game && isLiveGame(l.game))
+
+/** A Leg's state as a glyph: ● won, ○ lost (unlit), ◐ still to play. */
+export const legGlyph = (status: LegView['status']) =>
+  status === 'won' ? '●' : status === 'lost' ? '○' : '◐'
+
+/** Odds over time as an ink line, with where the Viewer got in dashed. */
 export function Sparkline({
   points,
   entry,
   width = 96,
   height = 28,
+  live = false,
 }: {
   points: ReadonlyArray<{ chance: number }>
   entry: number | null
   width?: number
   height?: number
+  /** Its Game is on: the latest point is lit. */
+  live?: boolean
 }) {
   if (points.length < 2) return null
   const y = (c: number) => height - 2 - c * (height - 4)
@@ -63,7 +80,6 @@ export function Sparkline({
   const line = points
     .map((p, i) => `${(i * step).toFixed(1)},${y(p.chance).toFixed(1)}`)
     .join(' ')
-  const up = points.at(-1)!.chance >= points[0].chance
   return (
     <svg
       width={width}
@@ -87,10 +103,18 @@ export function Sparkline({
         points={line}
         fill="none"
         stroke="currentColor"
-        strokeWidth="1.75"
+        strokeWidth="1.5"
         strokeLinejoin="round"
-        className={up ? 'text-scoring' : 'text-live'}
+        className="text-foreground"
       />
+      {live && (
+        <circle
+          cx={width}
+          cy={y(points.at(-1)!.chance)}
+          r="2.5"
+          className="fill-signal"
+        />
+      )}
     </svg>
   )
 }
@@ -99,33 +123,33 @@ export function Sparkline({
 export const MAX_LEG_DOTS = 6
 
 /**
- * A dot per Leg, colored by status. A big Combo (16 Legs) would run past the
- * card's fixed width, so past MAX_LEG_DOTS the rest read as "+K".
+ * A glyph per Leg by status (● won, ◐ to play, ○ lost). A big Combo (16
+ * Legs) would run past the card's fixed width, so past MAX_LEG_DOTS the
+ * rest read as "+K".
  */
 export function LegDots({ legs }: { legs: ReadonlyArray<LegView> }) {
   const shown = legs.slice(0, MAX_LEG_DOTS)
   const rest = legs.length - shown.length
   return (
     <span
-      className="flex min-w-0 shrink items-center gap-0.5 overflow-hidden"
+      className="flex min-w-0 shrink items-center gap-1 overflow-hidden text-[11px] leading-none"
       aria-hidden="true"
     >
       {shown.map((l, i) => (
         <span
           key={i}
           data-leg-dot=""
+          data-status={l.status}
           className={cn(
-            'size-1.5 shrink-0 rounded-full',
-            l.status === 'won'
-              ? 'bg-scoring'
-              : l.status === 'lost'
-                ? 'bg-live'
-                : 'bg-muted/40',
+            'w-3 shrink-0 text-center',
+            l.status === 'lost' ? 'text-muted' : 'text-foreground',
           )}
-        />
+        >
+          {legGlyph(l.status)}
+        </span>
       ))}
       {rest > 0 && (
-        <span className="shrink-0 text-3xs leading-none tabular-nums">
+        <span className="shrink-0 font-label text-3xs tabular-nums">
           +{rest}
         </span>
       )}
@@ -139,8 +163,9 @@ export function leadGame(p: PredictionView): GameSummary | null {
 }
 
 /**
- * A stat prop's count against its line: "212 / 300 rec yds", filling as it
- * climbs, a check once the line is reached.
+ * A stat prop's count against its line (Progress): a segmented meter
+ * filling as it climbs, "212 of 300 rec yds" under it, a check once the
+ * line is reached.
  */
 export function PropProgress({
   progress,
@@ -152,42 +177,52 @@ export function PropProgress({
   const hit = progress.current >= progress.target
   const share = Math.min(1, progress.current / Math.max(1, progress.target))
   return (
-    <span className="flex flex-col gap-0.5">
-      <span
-        className={cn(
-          'flex items-baseline justify-between gap-2 tabular-nums',
-          compact ? 'text-3xs' : 'text-xs',
-        )}
-      >
-        <span className={cn('font-semibold', hit && 'text-scoring')}>
+    <span className="flex flex-col gap-1">
+      <Meter
+        value={share}
+        segments={compact ? 16 : 20}
+        thin={compact}
+        label={`${progress.current} of ${progress.target} ${progress.label}`}
+      />
+      <span className="flex items-baseline justify-between gap-2 text-3xs text-muted uppercase tabular-nums">
+        <span className={cn(hit && 'font-bold text-foreground')}>
           {hit && '✓ '}
-          {progress.current}
-          <span className="font-normal text-muted">
-            {' '}
-            / {progress.target} {progress.label}
-          </span>
+          {progress.current} of {progress.target} {progress.label}
         </span>
         {!hit && !compact && (
-          <span className="text-muted">
-            {progress.target - progress.current} to go
-          </span>
+          <span>{progress.target - progress.current} to go</span>
         )}
       </span>
-      <span
-        className="h-1.5 overflow-hidden rounded-full bg-notice"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={progress.target}
-        aria-valuenow={progress.current}
-        aria-label={`${progress.current} of ${progress.target} ${progress.label}`}
-      >
-        <span
-          className={cn(
-            'block h-full rounded-full transition-[width] duration-500',
-            hit ? 'bg-scoring' : 'bg-accent',
-          )}
-          style={{ width: `${share * 100}%` }}
-        />
+    </span>
+  )
+}
+
+/**
+ * A Prediction's Odds as a segmented meter, with the label row a manual
+ * would print under it: Odds now · got in at · cash out.
+ */
+export function OddsMeter({
+  prediction: p,
+  thin,
+  segments = 24,
+}: {
+  prediction: PredictionView
+  thin?: boolean
+  segments?: number
+}) {
+  if (p.chance === null) return null
+  return (
+    <span className="flex flex-col gap-1.5">
+      <Meter
+        value={p.chance}
+        segments={segments}
+        thin={thin}
+        label={`Odds ${pct(p.chance)}`}
+      />
+      <span className="flex justify-between gap-2 text-3xs text-muted uppercase tabular-nums">
+        <span>Odds {pct(p.chance)}</span>
+        {p.entryChance !== null && <span>Got in at {pct(p.entryChance)}</span>}
+        <span>Cash out {p.value === null ? '—' : money(p.value)}</span>
       </span>
     </span>
   )

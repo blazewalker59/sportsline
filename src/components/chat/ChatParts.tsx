@@ -16,13 +16,7 @@ import { LeagueLogo } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { TimeAgo } from '@/components/timeline/format'
 import { segmentDescription } from '@/lib/timeline/format'
-import {
-  bubbleTints,
-  fillEdges,
-  notableLead,
-  scoringHeadline,
-  textOn,
-} from '@/lib/timeline/chat'
+import { bubbleTints, notableLead, scoringHeadline } from '@/lib/timeline/chat'
 import { gameSearch, useVtName } from '@/lib/timeline/gameLink'
 import { markPlayOpened } from '@/lib/timeline/playSheet'
 import { scoringSummary } from '@/lib/timeline/sides'
@@ -39,7 +33,7 @@ export function TeamAvatar({
 }) {
   return (
     <span
-      className="flex shrink-0 items-center justify-center rounded-full border border-bubble-border bg-surface px-1"
+      className="panel flex shrink-0 items-center justify-center rounded-full border border-bubble-border bg-surface px-1"
       style={{ minWidth: size, height: size }}
       title={team.abbreviation}
     >
@@ -132,14 +126,29 @@ function actingTeam(item: TimelineItem): TeamRef {
   return item.side === 'home' ? item.homeTeam : item.awayTeam
 }
 
-/** A team-color fill, with an edge in whichever theme it would vanish in. */
-function fillStyle(fill: string): React.CSSProperties {
-  const edges = fillEdges(fill)
+/** A team as Signal draws it small: a square chip of its color. */
+function TeamChip({ team }: { team: TeamRef }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-block size-2.5 shrink-0 rounded-[2px] bg-current"
+      style={
+        team.colors?.primary ? { background: team.colors.primary } : undefined
+      }
+    />
+  )
+}
+
+/**
+ * The team's wash on a bubble (styles.css .team-tint), kept faint as
+ * Signal asks: graphite's mix is strong, so its tint is pre-thinned here.
+ */
+function tintStyle(colors: TeamRef['colors']): React.CSSProperties | undefined {
+  const tints = bubbleTints(colors)
+  if (!tints) return undefined
   return {
-    background: fill,
-    color: textOn(fill),
-    ...(edges.light && { '--fill-edge-light': edges.light }),
-    ...(edges.dark && { '--fill-edge-dark': edges.dark }),
+    '--tint-light': `color-mix(in srgb, ${tints.light} 50%, var(--bubble))`,
+    '--tint-dark': `color-mix(in srgb, ${tints.dark} 20%, var(--bubble))`,
   } as React.CSSProperties
 }
 
@@ -203,17 +212,11 @@ function PlayBubbleLink({
   const scoring = item.kind === 'overturn' || item.significance === 'scoring'
 
   if (scoring) {
-    const team = actingTeam(item)
-    const fill =
-      item.kind === 'overturn' ? null : (team.colors?.primary ?? null)
-    // Logos on the fill: the dark-background mark on a dark team color.
-    const onFill = fill
-      ? textOn(fill) === '#ffffff'
-        ? ('dark' as const)
-        : ('light' as const)
-      : undefined
+    const overturn = item.kind === 'overturn'
     // T4: the headline word, a short "who did what", the full sentence small.
     const summary = scoringSummary(item)
+    // Signal: ink-inverted, with the orange light for the score just made
+    // (an Overturn stays on the bubble's own material, ringed in ink).
     return (
       <Link
         to="."
@@ -221,21 +224,24 @@ function PlayBubbleLink({
         resetScroll={false}
         onClick={markPlayOpened}
         {...press}
+        data-scoring=""
         className={cn(
-          'flex max-w-[300px] flex-col gap-1.5 px-4 py-3 transition-transform select-none [-webkit-touch-callout:none] active:scale-[0.99]',
+          'flex max-w-[300px] flex-col gap-1.5 px-4 pt-3 pb-3.5 transition-transform select-none [-webkit-touch-callout:none] active:translate-y-px',
           shape,
-          !fill && 'border-2 border-live bg-bubble',
-          fill && 'fill-edge',
+          overturn
+            ? 'border-2 border-foreground bg-bubble text-foreground'
+            : 'bg-foreground text-background shadow-[0_2px_0_#000,0_8px_18px_-10px_var(--key-shade)]',
           struck && 'opacity-60',
         )}
-        style={fill ? fillStyle(fill) : undefined}
       >
-        <span
-          className={cn(
-            'text-[22px] leading-none font-extrabold tracking-tight',
-            !fill && 'text-live',
-          )}
-        >
+        <span className="flex items-center gap-2 text-3xs font-bold uppercase">
+          <span
+            aria-hidden="true"
+            className={cn('led', overturn && 'led-off')}
+          />
+          <span className={overturn ? 'text-muted' : 'opacity-70'}>Score</span>
+        </span>
+        <span className="text-[22px] leading-none font-extrabold tracking-tight">
           {scoringHeadline(item)}
         </span>
         {summary ? (
@@ -250,8 +256,7 @@ function PlayBubbleLink({
             </span>
             <span
               className={cn(
-                'text-[12.5px] leading-snug',
-                fill ? 'opacity-75' : 'text-muted',
+                'text-[12.5px] leading-snug opacity-70',
                 struck && 'line-through',
               )}
             >
@@ -262,15 +267,15 @@ function PlayBubbleLink({
           <span
             className={cn('text-[15px] leading-snug', struck && 'line-through')}
           >
-            <PlayText item={item} onFill={Boolean(fill)} />
+            <PlayText item={item} onFill />
           </span>
         )}
         {!compact && (
-          <span className="flex items-center gap-2 text-sm font-bold tabular-nums">
-            <TeamLogo team={item.awayTeam} size={18} surface={onFill} />
+          <span className="mt-0.5 flex items-center gap-2 border-t border-current/15 pt-2 font-label text-xs font-bold tabular-nums">
+            <TeamChip team={item.awayTeam} />
             {item.awayTeam.abbreviation} {item.score.away} – {item.score.home}{' '}
             {item.homeTeam.abbreviation}
-            <TeamLogo team={item.homeTeam} size={18} surface={onFill} />
+            <TeamChip team={item.homeTeam} />
           </span>
         )}
       </Link>
@@ -278,7 +283,6 @@ function PlayBubbleLink({
   }
 
   const lead = notableLead(item)
-  const tints = bubbleTints(actingTeam(item).colors)
   return (
     <Link
       to="."
@@ -287,18 +291,11 @@ function PlayBubbleLink({
       onClick={markPlayOpened}
       {...press}
       className={cn(
-        'team-tint block max-w-[300px] border px-3.5 py-2.5 text-[15px] leading-snug transition-colors select-none [-webkit-touch-callout:none] hover:brightness-[0.97] dark:hover:brightness-110',
+        'team-tint block max-w-[300px] border px-3.5 py-2.5 text-[15px] leading-snug shadow-[inset_0_1px_0_var(--key-highlight),0_8px_18px_-16px_var(--key-shade)] transition-colors select-none [-webkit-touch-callout:none] hover:brightness-[0.97] dark:hover:brightness-110',
         shape,
         struck && 'line-through opacity-60',
       )}
-      style={
-        tints
-          ? ({
-              '--tint-light': tints.light,
-              '--tint-dark': tints.dark,
-            } as React.CSSProperties)
-          : undefined
-      }
+      style={tintStyle(actingTeam(item).colors)}
     >
       {lead && <span className="mr-1 font-bold text-notable">{lead}.</span>}
       <PlayText item={item} />
@@ -322,25 +319,17 @@ function FoldBubble({
 }) {
   const [open, setOpen] = useState(false)
   if (open) return <>{renderOpen(items)}</>
-  const tints = bubbleTints(actingTeam(items[0]).colors)
   return (
     <button
       type="button"
       onClick={() => setOpen(true)}
       className={cn(
-        'team-tint flex min-h-11 max-w-[300px] items-center gap-2 rounded-full border border-dashed px-4 text-left text-[13px] text-muted hover:text-foreground',
+        'team-tint flex min-h-11 max-w-[300px] items-center gap-2 rounded-control border border-dashed px-4 text-left text-[13px] text-muted hover:text-foreground',
         align === 'right' && 'self-end',
       )}
-      style={
-        tints
-          ? ({
-              '--tint-light': tints.light,
-              '--tint-dark': tints.dark,
-            } as React.CSSProperties)
-          : undefined
-      }
+      style={tintStyle(actingTeam(items[0]).colors)}
     >
-      <span className="shrink-0 font-semibold text-foreground">
+      <span className="shrink-0 font-label text-3xs font-bold text-foreground uppercase">
         +{items.length} plays
       </span>
       <span className="truncate">
@@ -426,14 +415,14 @@ export const Notice = memo(function Notice({
   showLeague?: boolean
 }) {
   const className = cn(
-    'flex max-w-[320px] items-center gap-1.5 self-center rounded-full bg-notice px-3 py-1 text-xs font-semibold text-muted hover:text-foreground',
+    'well flex max-w-[320px] items-center gap-1.5 self-center rounded-full px-3 py-1 text-xs font-semibold text-muted hover:text-foreground',
     item.milestone === 'final' && 'text-foreground',
   )
   const body = (
     <>
       {showLeague && <LeagueLogo league={item.league} size={16} />}
       <span className="truncate">{item.description}</span>
-      <span className="shrink-0 font-normal tabular-nums">
+      <span className="shrink-0 font-label text-3xs font-normal tabular-nums">
         · <TimeAgo iso={item.occurredAt} />
       </span>
     </>
@@ -461,13 +450,13 @@ export const Notice = memo(function Notice({
       resetScroll={false}
       onClick={markPlayOpened}
       className={cn(
-        'flex max-w-[320px] items-center gap-1.5 self-center rounded-full bg-notice px-3 py-1 text-xs font-semibold text-muted hover:text-foreground',
+        'well flex max-w-[320px] items-center gap-1.5 self-center rounded-full px-3 py-1 text-xs font-semibold text-muted hover:text-foreground',
         item.milestone === 'final' && 'text-foreground',
       )}
     >
       {showLeague && <LeagueLogo league={item.league} size={16} />}
       <span className="truncate">{item.description}</span>
-      <span className="shrink-0 font-normal tabular-nums">
+      <span className="shrink-0 font-label text-3xs font-normal tabular-nums">
         · <TimeAgo iso={item.occurredAt} />
       </span>
     </Link>
@@ -478,7 +467,7 @@ export function TypingDots({ align }: { align: Align }) {
   return (
     <span
       className={cn(
-        'flex w-14 items-center justify-center gap-1 rounded-sheet bg-bubble px-3.5 py-3',
+        'flex w-14 items-center justify-center gap-1 rounded-sheet border border-bubble-border bg-bubble px-3.5 py-3 shadow-[inset_0_1px_0_var(--key-highlight)]',
         align === 'left' ? 'rounded-bl-control' : 'rounded-br-control',
       )}
       role="img"
@@ -487,7 +476,7 @@ export function TypingDots({ align }: { align: Align }) {
       {[0, 0.2, 0.4].map((delay) => (
         <span
           key={delay}
-          className="typing-dot size-[7px] rounded-full bg-muted"
+          className="typing-dot size-[7px] rounded-full bg-foreground"
           style={{ animationDelay: `${delay}s` }}
         />
       ))}
@@ -499,11 +488,12 @@ export function ReadDivider({ count }: { count: number }) {
   return (
     <div
       aria-label="You were here"
-      className="flex items-center gap-2 text-xs font-bold text-accent"
+      data-read-marker=""
+      className="my-1 flex items-center gap-2.5 text-3xs text-notable uppercase"
     >
-      <span className="h-px flex-1 bg-accent/60" />
+      <span className="h-0 flex-1 border-t border-dashed border-muted" />
       You were here{count > 0 ? ` · ${count} new` : ''}
-      <span className="h-px flex-1 bg-accent/60" />
+      <span className="h-0 flex-1 border-t border-dashed border-muted" />
     </div>
   )
 }

@@ -1,0 +1,2179 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sportsline · Signal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Doto:wght@600;800;900&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ═══ Signal tokens ════════════════════════════════════════════════════
+   One orange, and it means live. Numbers in dots, words in plain text,
+   labels like a manual. Everything else is aluminum and ink.          */
+      .sig {
+        --alu: #e9e8e3;
+        --panel: #f5f4ef;
+        --well: #dcdbd4;
+        --ink: #121212;
+        --ink2: #3b3b38;
+        --mut: #8b8a84;
+        --hair: rgba(0, 0, 0, 0.09);
+        --hi: rgba(255, 255, 255, 0.75);
+        --sh: rgba(0, 0, 0, 0.14);
+        --o: #ff4f00;
+        --o-wash: rgba(255, 79, 0, 0.12);
+        --key-top: #ffffff;
+        --key-bot: #e3e2dc;
+        --key-edge: #bdbcb4;
+      }
+      .sig.dark {
+        --alu: #111111;
+        --panel: #1a1a1a;
+        --well: #0a0a0a;
+        --ink: #ecebe6;
+        --ink2: #c4c3bd;
+        --mut: #74736d;
+        --hair: rgba(255, 255, 255, 0.08);
+        --hi: rgba(255, 255, 255, 0.06);
+        --sh: rgba(0, 0, 0, 0.6);
+        --o-wash: rgba(255, 79, 0, 0.16);
+        --key-top: #2e2e2e;
+        --key-bot: #1f1f1f;
+        --key-edge: #050505;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      body {
+        font-family: 'Inter', system-ui, sans-serif;
+        background: #cfcec8;
+        color: #121212;
+        display: grid;
+        grid-template-rows: auto 1fr;
+        overflow: hidden;
+        transition: background 0.3s;
+      }
+      body.dark {
+        background: #050505;
+        color: #ecebe6;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+      }
+
+      /* ═══ Lab bar ═══ */
+      .bar {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 10px 18px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        background: rgba(255, 255, 255, 0.35);
+        backdrop-filter: blur(10px);
+      }
+      body.dark .bar {
+        background: rgba(255, 255, 255, 0.03);
+        border-color: rgba(255, 255, 255, 0.06);
+      }
+      .bar .ttl {
+        font-family: 'Space Mono';
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .seg {
+        display: inline-flex;
+        background: rgba(0, 0, 0, 0.08);
+        border-radius: 12px;
+        padding: 3px;
+        gap: 2px;
+      }
+      body.dark .seg {
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .seg button {
+        border: 0;
+        background: transparent;
+        padding: 7px 14px;
+        border-radius: 9px;
+        cursor: pointer;
+        font-family: 'Space Mono';
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .seg button[aria-pressed='true'] {
+        background: #fff;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+      }
+      body.dark .seg button[aria-pressed='true'] {
+        background: #2a2a2a;
+      }
+      .bar .sp {
+        flex: 1;
+      }
+      .tog {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-family: 'Space Mono';
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        cursor: pointer;
+        user-select: none;
+      }
+      .tog i {
+        width: 34px;
+        height: 18px;
+        border-radius: 9px;
+        background: rgba(0, 0, 0, 0.18);
+        position: relative;
+        transition: 0.2s;
+      }
+      .tog i::after {
+        content: '';
+        position: absolute;
+        left: 2px;
+        top: 2px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #fff;
+        transition: 0.2s;
+      }
+      .tog.on i {
+        background: #ff4f00;
+      }
+      .tog.on i::after {
+        transform: translateX(16px);
+      }
+      .main {
+        overflow: auto;
+      }
+
+      /* ═══ Flow board ═══ */
+      .flow {
+        padding: 30px 34px 60px;
+      }
+      .flow h2 {
+        font-family: 'Space Mono';
+        font-size: 12px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin: 30px 0 14px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        opacity: 0.7;
+      }
+      .flow h2::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: currentColor;
+        opacity: 0.25;
+      }
+      .flow .row {
+        display: flex;
+        gap: 34px;
+        flex-wrap: wrap;
+      }
+      .flow .item {
+        display: grid;
+        gap: 10px;
+        cursor: pointer;
+      }
+      .flow .item .cap {
+        font-family: 'Space Mono';
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        display: flex;
+        gap: 8px;
+      }
+      .flow .item .cap b {
+        font-weight: 700;
+      }
+      .flow .item:hover .phone {
+        transform: translateY(-4px);
+      }
+      .flow .phone {
+        transition: transform 0.2s;
+      }
+
+      /* ═══ Phone + desktop frames ═══ */
+      .phone {
+        width: 390px;
+        height: 820px;
+        border-radius: 60px;
+        background: #0b0b0b;
+        padding: 11px;
+        box-shadow:
+          0 0 0 1.5px #2a2a2a,
+          inset 0 0 0 1px #3a3a3a,
+          0 40px 70px -30px rgba(0, 0, 0, 0.45);
+        position: relative;
+        flex: none;
+      }
+      .screen {
+        position: relative;
+        height: 100%;
+        border-radius: 49px;
+        overflow: hidden;
+        background: var(--alu);
+        color: var(--ink);
+      }
+      .island {
+        position: absolute;
+        top: 11px;
+        left: 50%;
+        width: 120px;
+        height: 35px;
+        margin-left: -60px;
+        border-radius: 20px;
+        background: #000;
+        z-index: 30;
+      }
+      .sbar {
+        height: 54px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 32px 0;
+        font-weight: 600;
+        font-size: 15px;
+      }
+      .sbar .ic {
+        display: flex;
+        gap: 5px;
+        align-items: center;
+      }
+      .sbar .ic i {
+        display: block;
+        background: currentColor;
+        border-radius: 2px;
+      }
+      .content {
+        position: absolute;
+        inset: 54px 0 0;
+        overflow-y: auto;
+        padding: 0 18px 120px;
+        scrollbar-width: none;
+      }
+      .content::-webkit-scrollbar {
+        display: none;
+      }
+      .single {
+        display: grid;
+        place-items: center;
+        padding: 30px;
+        min-height: 100%;
+      }
+      .single-wrap {
+        display: flex;
+        gap: 40px;
+        align-items: flex-start;
+      }
+      .notes {
+        width: 300px;
+        font-size: 13.5px;
+        line-height: 1.55;
+      }
+      .notes .k {
+        font-family: 'Space Mono';
+        font-size: 10.5px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        opacity: 0.6;
+        margin: 18px 0 6px;
+      }
+      .notes h3 {
+        font-size: 24px;
+        letter-spacing: -0.03em;
+        margin: 0;
+      }
+      .notes ul {
+        padding-left: 18px;
+        margin: 0;
+      }
+      .desk {
+        width: 1320px;
+        height: 840px;
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow:
+          0 0 0 1px rgba(0, 0, 0, 0.2),
+          0 50px 90px -40px rgba(0, 0, 0, 0.6);
+        background: var(--alu);
+        color: var(--ink);
+        display: grid;
+        grid-template-rows: 38px 1fr;
+      }
+      .desk .chrome {
+        background: var(--well);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 14px;
+      }
+      .desk .chrome i {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--key-edge);
+      }
+      .desk .chrome .url {
+        margin-left: 16px;
+        font-family: 'Space Mono';
+        font-size: 11px;
+        color: var(--mut);
+        background: var(--panel);
+        border-radius: 7px;
+        padding: 4px 12px;
+        width: 360px;
+      }
+      .desk .body {
+        display: grid;
+        grid-template-columns: 236px 520px 1fr;
+        min-height: 0;
+      }
+      .desk .col {
+        overflow-y: auto;
+        padding: 18px;
+        scrollbar-width: none;
+        min-height: 0;
+      }
+      .desk .col + .col {
+        border-left: 1px solid var(--hair);
+      }
+      .desk-wrap {
+        padding: 30px;
+        display: grid;
+        place-items: center;
+      }
+
+      /* ═══ Signal components ═══ */
+      .lbl {
+        font-family: 'Space Mono', monospace;
+        font-size: 10.5px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--mut);
+      }
+      /* Numbers: heavy Inter, never dots (the dots are the mark's). */
+      .dn {
+        font-family: 'Inter', sans-serif;
+        font-weight: 800;
+        letter-spacing: -0.035em;
+        line-height: 0.9;
+        font-variant-numeric: tabular-nums;
+      }
+      .wm {
+        font-family: 'Doto', monospace;
+        font-weight: 900;
+        letter-spacing: -0.02em;
+      }
+      .o {
+        color: var(--o);
+      }
+      .dp {
+        display: inline-block;
+        width: 0.13em;
+        height: 0.13em;
+        border-radius: 50%;
+        background: currentColor;
+        margin: 0 0.05em;
+      }
+      .dc {
+        display: inline-flex;
+        flex-direction: column;
+        gap: 0.15em;
+        margin: 0 0.05em;
+        vertical-align: 0.18em;
+      }
+      .dc::before,
+      .dc::after {
+        content: '';
+        width: 0.13em;
+        height: 0.13em;
+        border-radius: 50%;
+        background: currentColor;
+      }
+      .led {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--o);
+        box-shadow:
+          0 0 8px var(--o),
+          0 0 2px var(--o);
+        animation: led 1.6s ease-in-out infinite;
+        flex: none;
+      }
+      .led.off {
+        background: var(--well);
+        box-shadow: inset 0 1px 2px var(--sh);
+        animation: none;
+      }
+      .led.ink {
+        background: var(--ink);
+        box-shadow: none;
+        animation: none;
+      }
+      @keyframes led {
+        50% {
+          opacity: 0.35;
+          box-shadow: none;
+        }
+      }
+      .hd {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 0 14px;
+      }
+      .hd .t {
+        font-size: 24px;
+        font-weight: 600;
+        letter-spacing: -0.03em;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .hd .keys {
+        display: flex;
+        gap: 8px;
+      }
+      .back {
+        font-family: 'Space Mono';
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .key {
+        min-width: 38px;
+        height: 38px;
+        padding: 0 10px;
+        border-radius: 11px;
+        border: 0;
+        background: linear-gradient(180deg, var(--key-top), var(--key-bot));
+        box-shadow:
+          0 2.5px 0 var(--key-edge),
+          0 5px 8px -4px var(--sh),
+          inset 0 1px 0 var(--hi);
+        display: inline-grid;
+        place-items: center;
+        font-family: 'Space Mono';
+        font-size: 10.5px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        cursor: pointer;
+        position: relative;
+        color: var(--ink);
+      }
+      .key:active,
+      .key.on {
+        transform: translateY(2px);
+        box-shadow:
+          0 0.5px 0 var(--key-edge),
+          inset 0 1px 3px var(--sh);
+      }
+      .key.on {
+        background: var(--o);
+        color: #fff;
+      }
+      .key .n {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--o);
+        box-shadow: 0 0 6px var(--o);
+      }
+      .key.wide {
+        width: 100%;
+        height: 44px;
+        font-size: 11px;
+      }
+      .key.ink {
+        background: var(--ink);
+        color: var(--alu);
+        box-shadow:
+          0 2.5px 0 #000,
+          0 5px 8px -4px var(--sh);
+      }
+      .sec {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 22px 0 10px;
+      }
+      .sec .no {
+        font-family: 'Space Mono';
+        font-size: 10px;
+        color: var(--mut);
+        border: 1px solid var(--hair);
+        border-radius: 5px;
+        padding: 1px 5px;
+      }
+      .sec .nm {
+        font-family: 'Space Mono';
+        font-size: 10.5px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--ink2);
+      }
+      .sec .rule {
+        flex: 1;
+        height: 1px;
+        background: var(--hair);
+      }
+      .sec .mt {
+        font-family: 'Space Mono';
+        font-size: 10.5px;
+        color: var(--mut);
+      }
+      .mod {
+        background: var(--panel);
+        border-radius: 20px;
+        padding: 16px;
+        box-shadow:
+          inset 0 1px 0 var(--hi),
+          0 0 0 1px var(--hair),
+          0 10px 24px -18px var(--sh);
+      }
+      .mod + .mod {
+        margin-top: 10px;
+      }
+      .well {
+        background: var(--well);
+        border-radius: 14px;
+        box-shadow: inset 0 1px 3px var(--sh);
+        padding: 12px;
+      }
+      .meter {
+        display: grid;
+        gap: 3px;
+      }
+      .meter i {
+        height: 12px;
+        border-radius: 2px;
+        background: var(--well);
+        box-shadow: inset 0 1px 1px var(--sh);
+        transition: background 0.3s;
+      }
+      .meter i.on {
+        background: var(--ink);
+        box-shadow: none;
+      }
+      .meter i.edge {
+        background: var(--o);
+        box-shadow: 0 0 6px var(--o);
+      }
+      .meter.thin i {
+        height: 6px;
+      }
+      .tchip {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        border-radius: 2px;
+        flex: none;
+      }
+      .rows {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .rows > * {
+        display: grid;
+        align-items: center;
+        gap: 10px;
+        padding: 11px 0;
+        border-bottom: 1px solid var(--hair);
+      }
+      .rows > *:last-child {
+        border-bottom: 0;
+      }
+      .mono {
+        font-family: 'Space Mono';
+        font-size: 11px;
+      }
+      .muted {
+        color: var(--mut);
+      }
+      .glyph {
+        font-size: 12px;
+        width: 14px;
+        text-align: center;
+      }
+      .chips {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .chip {
+        font-family: 'Space Mono';
+        font-size: 10.5px;
+        letter-spacing: 0.06em;
+        padding: 7px 10px;
+        border-radius: 9px;
+        background: var(--panel);
+        box-shadow: 0 0 0 1px var(--hair);
+        white-space: nowrap;
+        cursor: pointer;
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .chip.on {
+        background: var(--ink);
+        color: var(--alu);
+      }
+      .callout {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-family: 'Space Mono';
+        font-size: 10px;
+        color: var(--mut);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .callout b {
+        width: 16px;
+        height: 16px;
+        border: 1px solid currentColor;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        font-weight: 400;
+        font-size: 9px;
+      }
+      .stake {
+        font-family: 'Space Mono';
+        font-size: 10.5px;
+        color: var(--o);
+        letter-spacing: 0.02em;
+        display: inline-flex;
+        gap: 5px;
+        align-items: center;
+      }
+      .stake::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--o);
+      }
+      .stake.cold {
+        color: var(--ink2);
+      }
+      .stake.cold::before {
+        background: var(--ink2);
+      }
+
+      /* Feed */
+      .feed .play {
+        display: grid;
+        grid-template-columns: 24px 1fr auto;
+        gap: 10px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--hair);
+        cursor: pointer;
+        align-items: baseline;
+      }
+      .feed .play:last-child {
+        border-bottom: 0;
+      }
+      .feed .play.is-new {
+        animation: blink 0.6s steps(5);
+      }
+      @keyframes blink {
+        from {
+          opacity: 0;
+        }
+      }
+      .feed .idx {
+        font-family: 'Space Mono';
+        font-size: 10px;
+        color: var(--mut);
+      }
+      .feed .tx {
+        font-size: 15px;
+        font-weight: 500;
+        letter-spacing: -0.01em;
+        line-height: 1.28;
+      }
+      .feed .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 10px;
+        margin-top: 4px;
+        align-items: center;
+      }
+      .feed .w-routine .tx {
+        color: var(--mut);
+        font-weight: 400;
+      }
+      .feed .w-scoring .glyph {
+        color: var(--o);
+      }
+      .marker {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 8px 0;
+      }
+      .marker span {
+        font-family: 'Space Mono';
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--ink2);
+        background: var(--alu);
+        padding: 0 4px;
+      }
+      .marker::before,
+      .marker::after {
+        content: '';
+        flex: 1;
+        height: 0;
+        border-top: 1px dashed var(--mut);
+      }
+
+      /* Game tiles */
+      .tiles {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .tile {
+        background: var(--panel);
+        border-radius: 16px;
+        padding: 12px;
+        box-shadow:
+          inset 0 1px 0 var(--hi),
+          0 0 0 1px var(--hair);
+        cursor: pointer;
+        display: grid;
+        gap: 6px;
+      }
+      .tile.sel {
+        box-shadow: 0 0 0 2px var(--ink);
+      }
+      .tile .tl {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .tile .tr {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 13.5px;
+        font-weight: 600;
+      }
+      .tile .tr .dn {
+        font-size: 24px;
+      }
+      .tile .tr.lose {
+        color: var(--mut);
+      }
+
+      /* Dock */
+      .dock {
+        position: absolute;
+        left: 12px;
+        right: 12px;
+        bottom: 14px;
+        height: 86px;
+        border-radius: 32px;
+        background: var(--well);
+        display: grid;
+        grid-template-columns: 1fr 70px 1fr;
+        align-items: center;
+        padding: 0 18px;
+        box-shadow:
+          inset 0 1px 0 var(--hi),
+          0 10px 26px -12px var(--sh),
+          0 0 0 1px var(--hair);
+        z-index: 20;
+      }
+      .sig.dark .dock {
+        background: #1c1c1c;
+      }
+      .dock .scope {
+        font-family: 'Space Mono';
+        font-weight: 700;
+        font-size: 25px;
+        line-height: 1;
+        margin-top: 3px;
+      }
+      .knob {
+        width: 64px;
+        height: 64px;
+        cursor: pointer;
+        justify-self: center;
+      }
+      .knob .rot {
+        transition: transform 0.35s cubic-bezier(0.3, 1.6, 0.5, 1);
+        transform-origin: 32px 32px;
+      }
+      .dock .ticks {
+        display: flex;
+        gap: 4px;
+        margin-top: 5px;
+      }
+      .dock .ticks i {
+        width: 14px;
+        height: 3px;
+        border-radius: 2px;
+        background: var(--key-edge);
+      }
+      .dock .ticks i.on {
+        background: var(--o);
+        box-shadow: 0 0 6px var(--o);
+      }
+
+      /* Bars / charts */
+      .bars {
+        display: flex;
+        align-items: flex-end;
+        gap: 2px;
+        height: 90px;
+      }
+      .bars i {
+        flex: 1;
+        background: var(--ink);
+        border-radius: 1px;
+        opacity: 0.85;
+      }
+      .bars i.last {
+        background: var(--o);
+        box-shadow: 0 0 8px var(--o);
+        opacity: 1;
+      }
+      .bars i.lo {
+        background: var(--mut);
+        opacity: 0.5;
+      }
+
+      /* Tables */
+      .tbl {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+      }
+      .tbl th {
+        font-family: 'Space Mono';
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--mut);
+        font-weight: 400;
+        text-align: right;
+        padding: 6px 4px;
+        border-bottom: 1px solid var(--hair);
+      }
+      .tbl td {
+        padding: 8px 4px;
+        text-align: right;
+        border-bottom: 1px solid var(--hair);
+      }
+      .tbl tr:last-child td {
+        border-bottom: 0;
+      }
+      .tbl th:first-child,
+      .tbl td:first-child {
+        text-align: left;
+      }
+      .tbl tr.me td {
+        font-weight: 700;
+      }
+      .tbl tr.cut td {
+        border-bottom: 1.5px dashed var(--mut);
+      }
+
+      /* Tabs */
+      .tabs {
+        display: flex;
+        gap: 4px;
+        background: var(--well);
+        border-radius: 13px;
+        padding: 3px;
+        box-shadow: inset 0 1px 2px var(--sh);
+        margin-bottom: 14px;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .tabs span {
+        flex: 1 0 auto;
+        text-align: center;
+        font-family: 'Space Mono';
+        font-size: 9px;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        padding: 8px 5px;
+        border-radius: 10px;
+        cursor: pointer;
+        white-space: nowrap;
+        color: var(--mut);
+      }
+      .tabs span.on {
+        background: var(--panel);
+        color: var(--ink);
+        box-shadow:
+          0 1px 2px var(--sh),
+          inset 0 1px 0 var(--hi);
+      }
+
+      /* Three-position switch (Alert levels) */
+      .sw3 {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        background: var(--well);
+        border-radius: 11px;
+        padding: 3px;
+        box-shadow: inset 0 1px 2px var(--sh);
+        position: relative;
+      }
+      .sw3 span {
+        text-align: center;
+        font-family: 'Space Mono';
+        font-size: 9.5px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        padding: 8px 2px;
+        color: var(--mut);
+        cursor: pointer;
+        z-index: 1;
+        position: relative;
+      }
+      .sw3 span.on {
+        color: var(--ink);
+      }
+      .sw3 .thumb {
+        position: absolute;
+        top: 3px;
+        bottom: 3px;
+        width: calc((100% - 6px) / 3);
+        border-radius: 9px;
+        background: linear-gradient(180deg, var(--key-top), var(--key-bot));
+        box-shadow:
+          0 1px 2px var(--sh),
+          inset 0 1px 0 var(--hi);
+        transition: left 0.25s cubic-bezier(0.3, 1.4, 0.5, 1);
+      }
+
+      /* Ring timer (trade proposal) */
+      .ringseg {
+        width: 88px;
+        height: 88px;
+      }
+
+      /* Lock screen */
+      .lock {
+        background: radial-gradient(120% 80% at 50% 0%, #3a3a36, #0d0d0c 70%);
+        color: #f2f1ec;
+      }
+      .lock .clock {
+        text-align: center;
+        font-family: 'Inter';
+        font-weight: 800;
+        letter-spacing: -0.04em;
+        font-size: 92px;
+        line-height: 1;
+        margin-top: 18px;
+      }
+      .lock .date {
+        text-align: center;
+        font-family: 'Space Mono';
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        opacity: 0.8;
+        margin-top: 26px;
+      }
+      .lock .card {
+        margin: 10px 12px 0;
+        border-radius: 24px;
+        background: rgba(30, 30, 28, 0.75);
+        backdrop-filter: blur(24px);
+        padding: 14px 16px;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      }
+      .lock .card .lbl {
+        color: rgba(255, 255, 255, 0.55);
+      }
+
+      /* Reactions */
+      .reacts {
+        display: flex;
+        gap: 8px;
+      }
+      .reacts .key {
+        font-size: 18px;
+        min-width: 50px;
+        height: 46px;
+      }
+      .reacts .key.on {
+        background: var(--ink);
+      }
+
+      /* Logo mark */
+      .mark {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bar">
+      <div class="ttl" id="brand"></div>
+      <div class="seg" id="views"></div>
+      <span class="sp"></span>
+      <span class="tog" id="tLive"><i></i>Live</span>
+      <span class="tog" id="tDark"><i></i>Graphite</span>
+      <button class="seg" id="score" style="border: 0; cursor: pointer">
+        <span
+          style="
+            padding: 7px 12px;
+            font-family: 'Space Mono';
+            font-size: 11px;
+            letter-spacing: 0.06em;
+          "
+          >KNICKS SCORE</span
+        >
+      </button>
+    </div>
+    <div class="main" id="main"></div>
+
+    <script>
+      /* ═══ Data ═══════════════════════════════════════════════════════════ */
+      const T = {
+        NYK: { name: 'Knicks', city: 'New York', c: '#006BB6' },
+        BOS: { name: 'Celtics', city: 'Boston', c: '#007A33' },
+        DEN: { name: 'Broncos', city: 'Denver', c: '#FB4F14' },
+        KC: { name: 'Chiefs', city: 'Kansas City', c: '#E31837' },
+        COL: { name: 'Avalanche', city: 'Colorado', c: '#6F263D' },
+        EDM: { name: 'Oilers', city: 'Edmonton', c: '#FF4C00' },
+        LAL: { name: 'Lakers', city: 'Los Angeles', c: '#552583' },
+        GSW: { name: 'Warriors', city: 'Golden State', c: '#1D428A' },
+        PHI: { name: '76ers', city: 'Philadelphia', c: '#006BB6' },
+        MIL: { name: 'Bucks', city: 'Milwaukee', c: '#00471B' },
+      }
+      const S0 = {
+        home: 101,
+        away: 98,
+        clock: 221,
+        wp: 0.64,
+        me: 112.4,
+        opp: 104.9,
+        den: 17,
+        kc: 21,
+        sutton: 41,
+      }
+      let uid = 0
+      const P = (o) => ({ id: ++uid, game: 'BOS @ NYK', ...o })
+      const PLAYS0 = [
+        P({
+          t: 221,
+          w: 'scoring',
+          team: 'NYK',
+          who: 'Brunson',
+          text: 'Brunson pull-up three from the left wing',
+          short: 'Pull-up three',
+          stake: ['★ Your starter · Brunson', '+3.6'],
+          leg: 'Knicks to win 57→64%',
+          pts: 3,
+        }),
+        P({
+          t: 244,
+          w: 'notable',
+          team: 'NYK',
+          who: 'Hart',
+          text: 'Hart strips Tatum at the elbow',
+          short: 'Steal',
+          stake: ['Opponent’s starter · Tatum', 'cold'],
+        }),
+        P({
+          t: 0,
+          game: 'DEN @ KC',
+          w: 'notable',
+          team: 'DEN',
+          who: 'Sutton',
+          text: 'Nix to Sutton, 22 yards down the sideline',
+          short: '22-yard catch',
+          stake: ['Leg 1 · Sutton 41 of 50 yds', ''],
+          clockText: '3Q 6:12',
+        }),
+        P({
+          t: 262,
+          w: 'routine',
+          team: 'BOS',
+          who: 'Celtics',
+          text: 'Timeout, Celtics',
+          short: 'Timeout',
+        }),
+        P({
+          t: 281,
+          w: 'scoring',
+          team: 'BOS',
+          who: 'Brown',
+          text: 'Brown drives baseline, and-one',
+          short: 'And-one',
+          stake: ['Opponent’s starter · Brown', 'cold'],
+          pts: 3,
+        }),
+        P({
+          t: 0,
+          game: 'COL @ EDM',
+          w: 'scoring',
+          team: 'EDM',
+          who: 'McDavid',
+          text: 'McDavid one-timer on the power play',
+          short: 'Power-play goal',
+          clockText: 'P2 4:40',
+        }),
+        P({
+          t: 307,
+          w: 'notable',
+          team: 'NYK',
+          who: 'Towns',
+          text: 'Towns offensive rebound, kicks it out',
+          short: 'Offensive rebound',
+          stake: ['★ Your starter · Towns', '+1.2'],
+        }),
+        P({
+          t: 330,
+          w: 'routine',
+          team: 'BOS',
+          who: 'Holiday',
+          text: 'Holiday misses a 26-footer',
+          short: 'Miss',
+        }),
+        P({
+          t: 352,
+          w: 'scoring',
+          team: 'NYK',
+          who: 'Bridges',
+          text: 'Bridges floater in the lane',
+          short: 'Floater',
+          pts: 2,
+        }),
+      ]
+      const POOL = [
+        {
+          w: 'scoring',
+          team: 'BOS',
+          who: 'Tatum',
+          text: 'Tatum step-back three over Anunoby',
+          short: 'Step-back three',
+          stake: ['Opponent’s starter · Tatum', 'cold'],
+          wpd: -0.09,
+          pts: 3,
+          opp: 3.6,
+        },
+        {
+          w: 'routine',
+          team: 'NYK',
+          who: 'McBride',
+          text: 'McBride checks in for Hart',
+          short: 'Substitution',
+        },
+        {
+          w: 'scoring',
+          team: 'NYK',
+          who: 'Towns',
+          text: 'Towns pick-and-pop three',
+          short: 'Pick-and-pop three',
+          stake: ['★ Your starter · Towns', '+4.2'],
+          wpd: 0.08,
+          pts: 3,
+          fp: 4.2,
+        },
+        {
+          w: 'notable',
+          team: 'BOS',
+          who: 'Porziņģis',
+          text: 'Porziņģis blocks Anunoby at the rim',
+          short: 'Block',
+          wpd: -0.02,
+        },
+        {
+          w: 'scoring',
+          team: 'BOS',
+          who: 'White',
+          text: 'White corner three from Holiday',
+          short: 'Corner three',
+          wpd: -0.07,
+          pts: 3,
+        },
+        {
+          w: 'scoring',
+          team: 'NYK',
+          who: 'Brunson',
+          text: 'Brunson to the line, makes both',
+          short: 'Free throws 2/2',
+          stake: ['★ Your starter · Brunson', '+2.0'],
+          wpd: 0.05,
+          pts: 2,
+          fp: 2,
+        },
+        {
+          w: 'notable',
+          team: 'BOS',
+          who: 'Brown',
+          text: 'Offensive foul on Brown',
+          short: 'Charge',
+          stake: ['Opponent’s starter · Brown', 'cold'],
+          wpd: 0.03,
+        },
+      ]
+      const GAMES = () => [
+        {
+          id: 'g1',
+          lg: 'NBA',
+          a: 'BOS',
+          h: 'NYK',
+          as: st.away,
+          hs: st.home,
+          s: `Q4 ${clk(st.clock)}`,
+          live: true,
+          mine: 'Follow · Fantasy · Prediction',
+        },
+        {
+          id: 'g2',
+          lg: 'NFL',
+          a: 'DEN',
+          h: 'KC',
+          as: st.den,
+          hs: st.kc,
+          s: '3Q 6:12',
+          live: true,
+          mine: 'Prediction',
+        },
+        {
+          id: 'g3',
+          lg: 'NHL',
+          a: 'COL',
+          h: 'EDM',
+          as: 1,
+          hs: 2,
+          s: 'P2 4:40',
+          live: true,
+        },
+        {
+          id: 'g4',
+          lg: 'NBA',
+          a: 'LAL',
+          h: 'GSW',
+          as: 112,
+          hs: 108,
+          s: 'Final',
+          live: false,
+        },
+        {
+          id: 'g5',
+          lg: 'NBA',
+          a: 'PHI',
+          h: 'MIL',
+          as: null,
+          hs: null,
+          s: '8:00 PM',
+          live: false,
+        },
+      ]
+      const MANAGERS = [
+        { n: 'You', yrs: 7, w: 74, l: 51, po: '5 (9-3)', t: 2, f: 1, me: true },
+        { n: 'Marcus Webb', yrs: 7, w: 71, l: 54, po: '5 (8-4)', t: 2, f: 2 },
+        { n: 'Priya Shah', yrs: 7, w: 69, l: 56, po: '4 (6-3)', t: 1, f: 2 },
+        { n: 'Dev Okafor', yrs: 6, w: 60, l: 65, po: '3 (3-2)', t: 1, f: 0 },
+        { n: 'Sam Ortiz', yrs: 7, w: 58, l: 67, po: '3 (4-2)', t: 1, f: 1 },
+        { n: 'Jo Kim', yrs: 5, w: 55, l: 70, po: '2 (1-2)', t: 0, f: 1 },
+      ]
+      const CHAMPS = [
+        [2025, 'You', 'Night Shift', 'Marcus Webb', true],
+        [2024, 'Marcus Webb', 'Webb Gems', 'Priya Shah'],
+        [2023, 'You', 'Night Shift', 'Sam Ortiz', true],
+        [2022, 'Priya Shah', 'Shah-shank', 'You'],
+        [2021, 'Dev Okafor', 'Okafor Forte', 'Marcus Webb'],
+        [2020, 'Marcus Webb', 'Webb Gems', 'Priya Shah'],
+        [2019, 'Sam Ortiz', 'Ortiz Ops', 'Jo Kim'],
+      ]
+
+      /* ═══ State ══════════════════════════════════════════════════════════ */
+      const st = {
+        view: localStorage.getItem('sig-view') || 'flow',
+        dark: localStorage.getItem('sig-dark') === '1',
+        live: true,
+        route: ['timeline'],
+        scope: 1,
+        narrowed: null,
+        tab: 'history',
+        react: '🔥',
+        alertLv: [0, 0, 1],
+        open: null,
+        highlights: false,
+        plays: PLAYS0.slice(),
+        ...structuredClone(S0),
+        newId: null,
+        poolAt: 0,
+        wpSeries: [],
+      }
+      for (let i = 0; i < 47; i++)
+        st.wpSeries.push(
+          Math.min(
+            0.92,
+            Math.max(0.12, 0.5 + Math.sin(i / 4) * 0.14 + (i - 24) * 0.006),
+          ),
+        )
+      st.wpSeries.push(st.wp)
+      const clk = (s) =>
+        `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+      const whenOf = (p) => p.clockText || `Q4 ${clk(p.t)}`
+      const esc = (s) =>
+        String(s).replace(
+          /[&<>"]/g,
+          (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c],
+        )
+      const pct = (x) => Math.round(x * 100)
+      const lead = () =>
+        st.home > st.away ? 'home' : st.home < st.away ? 'away' : null
+      const SCOPES = ['Following', 'All', 'Predictions', 'Fantasy']
+
+      function tick(force) {
+        const base = force
+          ? POOL.find((x) => x.team === 'NYK' && x.pts)
+          : POOL[st.poolAt++ % POOL.length]
+        st.clock = Math.max(5, st.clock - (8 + Math.floor(Math.random() * 14)))
+        const p = P({ ...base, t: st.clock })
+        if (p.pts) {
+          if (p.team === 'NYK') st.home += p.pts
+          else st.away += p.pts
+        }
+        if (p.wpd) st.wp = Math.min(0.97, Math.max(0.03, st.wp + p.wpd))
+        if (p.fp) st.me = +(st.me + p.fp).toFixed(1)
+        if (p.opp) st.opp = +(st.opp + p.opp).toFixed(1)
+        st.wpSeries.push(st.wp)
+        if (st.wpSeries.length > 48) st.wpSeries.shift()
+        st.plays.unshift(p)
+        st.plays = st.plays.slice(0, 14)
+        st.newId = p.id
+        if (st.clock < 20) Object.assign(st, structuredClone(S0))
+        render()
+      }
+      let timer
+      const schedule = () => {
+        clearInterval(timer)
+        if (st.live) timer = setInterval(() => tick(false), 4500)
+      }
+
+      /* ═══ Parts ══════════════════════════════════════════════════════════ */
+      const S_DOTS = [
+        '.####',
+        '#....',
+        '#....',
+        '.###.',
+        '....#',
+        '....#',
+        '####.',
+      ]
+      function markSvg(d = 3.2, gap = 1.3) {
+        const pitch = d + gap
+        let o = ''
+        S_DOTS.forEach((row, r) =>
+          [...row].forEach((c, i) => {
+            const a = r === 3 && i === 4
+            o += `<circle cx="${i * pitch + d / 2}" cy="${r * pitch + d / 2}" r="${d / 2}" fill="${a ? '#ff4f00' : c === '#' ? 'currentColor' : 'transparent'}" ${c === '#' || a ? '' : 'opacity=".1"'}/>`
+          }),
+        )
+        return `<svg width="${5 * pitch - gap}" height="${7 * pitch - gap}" viewBox="0 0 ${5 * pitch - gap} ${7 * pitch - gap}">${o}</svg>`
+      }
+      const wordmark = (size = 20) =>
+        `<span class="mark">${markSvg(size / 6.3, size / 16)}<span class="wm" style="font-size:${size}px;line-height:1">sportsline<span class="dp" style="color:#ff4f00"></span></span></span>`
+      const meter = (n, of = 24, cls = '') =>
+        `<div class="meter ${cls}" style="grid-template-columns:repeat(${of},1fr)">${Array.from({ length: of }, (_, i) => `<i class="${i < n ? (i === n - 1 ? 'edge' : 'on') : ''}"></i>`).join('')}</div>`
+      const sec = (no, nm, mt = '') =>
+        `<div class="sec"><span class="no">${no}</span><span class="nm">${nm}</span><span class="rule"></span>${mt ? `<span class="mt">${mt}</span>` : ''}</div>`
+      const glyph = (w) => (w === 'scoring' ? '●' : w === 'notable' ? '◐' : '○')
+      const tchip = (abbr) =>
+        `<span class="tchip" style="background:${T[abbr]?.c || '#888'}"></span>`
+      function sbar() {
+        return `<div class="sbar"><span>9:41</span><span class="ic"><i style="width:17px;height:11px"></i><i style="width:15px;height:11px;border-radius:3px"></i><i style="width:25px;height:12px;border-radius:4px"></i></span></div>`
+      }
+      function header(title, opts = {}) {
+        return `<div class="hd">${opts.back ? `<span class="back" data-back="1">← ${opts.back}</span>` : `<span class="t">${title}</span>`}<span class="keys">${opts.keys ?? `<button class="key" data-go="alerts">ALRT<span class="n"></span></button><button class="key" data-go="agents">AGNT</button>`}</span></div>${opts.back ? `<div class="hd" style="padding-top:0"><span class="t">${title}</span></div>` : ''}`
+      }
+      function knob(scope) {
+        const a = [-60, -20, 20, 60][scope]
+        return `<svg class="knob" viewBox="0 0 64 64" data-knob="1"><defs><radialGradient id="kg${scope}" cx=".4" cy=".3"><stop offset="0" stop-color="var(--key-top)"/><stop offset="1" stop-color="var(--key-bot)"/></radialGradient></defs>${Array.from({ length: 24 }, (_, i) => `<line x1="32" y1="2" x2="32" y2="6" stroke="var(--mut)" stroke-width="1.1" transform="rotate(${i * 15} 32 32)"/>`).join('')}<circle cx="32" cy="32" r="22" fill="url(#kg${scope})" stroke="var(--key-edge)"/><circle cx="32" cy="32" r="16" fill="none" stroke="var(--hair)"/><g class="rot" style="transform:rotate(${a}deg)"><line x1="32" y1="14" x2="32" y2="24" stroke="#ff4f00" stroke-width="3" stroke-linecap="round"/></g></svg>`
+      }
+      function dock(scope) {
+        const right = [
+          ['Live games', `${GAMES().filter((g) => g.live && g.mine).length}`],
+          ['Live games', `${GAMES().filter((g) => g.live).length}`],
+          ['Worth', `$${worth().toFixed(0)}`],
+          ['Matchup', `${st.me.toFixed(0)}–${st.opp.toFixed(0)}`],
+        ][scope]
+        return `<div class="dock"><span><span class="lbl">Scope</span><div class="scope">${SCOPES[scope].slice(0, 4).toUpperCase()}</div><div class="ticks">${[0, 1, 2, 3].map((i) => `<i class="${i === scope ? 'on' : ''}"></i>`).join('')}</div></span>${knob(scope)}<span style="text-align:right"><span class="lbl">${right[0]}</span><div class="scope ${scope === 3 && st.me >= st.opp ? 'o' : ''}">${right[1]}</div></span></div>`
+      }
+      const worth = () => 412.8 + (st.wp - 0.64) * 120
+
+      /* ═══ Screens ═══════════════════════════════════════════════════════ */
+      function feedHtml(list, { num = true } = {}) {
+        return `<div class="feed">${list.map((p, i) => `<div class="play w-${p.w} ${p.id === st.newId ? 'is-new' : ''}" data-play="${p.id}"><span class="idx">${num ? String(i + 1).padStart(2, '0') : ''}</span><span><div class="tx">${esc(p.text)}</div><div class="meta"><span class="lbl">${whenOf(p)}${p.game !== 'BOS @ NYK' ? ' · ' + p.game : ''}</span>${p.stake ? `<span class="stake ${p.stake[1] === 'cold' ? 'cold' : ''}">${esc(p.stake[0])}${p.stake[1] && p.stake[1] !== 'cold' ? ' ' + p.stake[1] : ''}</span>` : ''}</div></span><span class="glyph">${glyph(p.w)}</span></div>`).join('')}</div>`
+      }
+      function tile(g, sel) {
+        const lose = (x, y) => (x !== null && y !== null && x < y ? 'lose' : '')
+        return `<div class="tile ${sel ? 'sel' : ''}" data-narrow="${g.id}"><div class="tl"><span class="lbl" style="display:flex;gap:6px;align-items:center">${g.live ? '<span class="led"></span>' : ''}${g.lg}</span><span class="lbl">${g.s}</span></div>
+    <div class="tr ${lose(g.as, g.hs)}"><span style="display:flex;gap:6px;align-items:center">${tchip(g.a)}${g.a}</span><span class="dn">${g.as ?? '—'}</span></div>
+    <div class="tr ${lose(g.hs, g.as)}"><span style="display:flex;gap:6px;align-items:center">${tchip(g.h)}${g.h}</span><span class="dn">${g.hs ?? '—'}</span></div>
+    ${g.mine ? `<span class="stake" style="font-size:9.5px">${g.mine}</span>` : ''}</div>`
+      }
+      function sTimeline(scope = st.scope, narrowed = st.narrowed) {
+        const following = scope === 0
+        const games = GAMES().filter((g) => !following || g.mine)
+        let plays = st.plays.filter(
+          (p) => !following || p.stake || p.game === 'BOS @ NYK',
+        )
+        if (st.highlights) plays = plays.filter((p) => p.w !== 'routine')
+        const g = narrowed && games.find((x) => x.id === narrowed)
+        if (g) plays = plays.filter((p) => p.game === `${g.a} @ ${g.h}`)
+        return `${header(following ? 'Following' : 'All', { keys: `<button class="key" data-go="alerts">ALRT<span class="n"></span></button><button class="key" data-go="agents">AGNT</button>` })}
+    <div class="mod">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl" style="display:flex;gap:8px;align-items:center"><span class="led"></span>${games.filter((x) => x.live).length} live · Thu Nov 26</span><span class="lbl">${following ? '4 follows' : 'All leagues'}</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;margin:14px 0 12px">
+        <div><div class="lbl" style="display:flex;gap:6px;align-items:center">${tchip('BOS')}BOS · Q4 ${clk(st.clock)}</div><div class="dn ${lead() === 'away' ? 'o' : ''}" style="font-size:68px;margin-top:8px">${st.away}</div></div>
+        <div style="text-align:right"><div class="lbl" style="display:flex;gap:6px;align-items:center;justify-content:flex-end">NYK${tchip('NYK')}</div><div class="dn ${lead() === 'home' ? 'o' : ''}" style="font-size:68px;margin-top:8px">${st.home}</div></div>
+      </div>
+      ${meter(Math.round(st.wp * 24))}
+      <div style="display:flex;justify-content:space-between;margin-top:6px" class="lbl"><span>BOS</span><span>Knicks win chance ${pct(st.wp)}%</span><span>NYK</span></div>
+      ${!following ? `<div class="chips" style="margin-top:14px">${['NBA 6', 'NFL 2', 'NHL 4', 'CFB', 'CBB'].map((x, i) => `<span class="chip ${i === 0 ? 'on' : ''}">${x}</span>`).join('')}</div>` : ''}
+    </div>
+    ${sec('A1', 'Games', `${games.length}`)}
+    <div class="tiles">${games
+      .slice(0, 4)
+      .map((x) => tile(x, x.id === narrowed))
+      .join('')}</div>
+    ${g ? `<div class="well" style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;padding:10px 12px"><span class="lbl">Narrowed to ${g.a} @ ${g.h}</span><span style="display:flex;gap:6px"><button class="key" data-go="game" style="height:30px">Open</button><button class="key" data-narrow="" style="height:30px">All</button></span></div>` : ''}
+    ${sec('A2', 'Plays', `<span class="chip ${st.highlights ? 'on' : ''}" data-hl="1" style="padding:4px 8px">Highlights</span>`)}
+    ${!g && !following ? `<div class="well" style="margin-bottom:6px"><div style="display:flex;justify-content:space-between"><span class="lbl">Catch-up · since 7:12 PM</span><span class="lbl" style="cursor:pointer">Dismiss ×</span></div><div style="margin-top:8px;font-size:13.5px;line-height:1.45">Lakers beat the Warriors 112–108. Sutton has 41 of your 50 yards. McDavid scored on the power play.</div></div>` : ''}
+    ${feedHtml(plays.slice(0, 4))}
+    ${!g ? `<div class="marker"><span>You were here · 8:47 PM</span></div>` : ''}
+    ${feedHtml(plays.slice(4, 9), { num: false })}`
+      }
+      function sGame() {
+        const lines = [
+          [27, 24, 26, st.away - 77],
+          [25, 28, 22, st.home - 75],
+        ]
+        const bars = st.wpSeries
+          .map(
+            (v, i, a) =>
+              `<i class="${i === a.length - 1 ? 'last' : v < 0.5 ? 'lo' : ''}" style="height:${Math.round(v * 100)}%"></i>`,
+          )
+          .join('')
+        return `${header('Celtics @ Knicks', { back: 'Timeline' })}
+    <div class="mod">
+      <div style="display:flex;justify-content:space-between" class="lbl"><span style="display:flex;gap:8px;align-items:center"><span class="led"></span>Q4 ${clk(st.clock)} · Clutch</span><span>Madison Square Garden</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;margin:14px 0 10px">
+        <div><div class="lbl" style="display:flex;gap:6px;align-items:center">${tchip('BOS')}BOS Celtics</div><div class="dn ${lead() === 'away' ? 'o' : ''}" style="font-size:72px">${st.away}</div></div>
+        <div style="text-align:right"><div class="lbl" style="display:flex;gap:6px;align-items:center;justify-content:flex-end">NYK Knicks${tchip('NYK')}</div><div class="dn ${lead() === 'home' ? 'o' : ''}" style="font-size:72px">${st.home}</div></div>
+      </div>
+      <table class="tbl"><tr><th></th><th>1</th><th>2</th><th>3</th><th>4</th><th>T</th></tr>${[
+        ['BOS', lines[0], st.away],
+        ['NYK', lines[1], st.home],
+      ]
+        .map(
+          ([a, l, t]) =>
+            `<tr><td>${a}</td>${l.map((x) => `<td>${x}</td>`).join('')}<td><b>${t}</b></td></tr>`,
+        )
+        .join('')}</table>
+    </div>
+    ${sec('B1', 'Win chance', `NYK ${pct(st.wp)}%`)}
+    <div class="mod"><div class="bars">${bars}</div><div style="display:flex;justify-content:space-between;margin-top:8px" class="lbl"><span>Tip-off</span><span>50%</span><span>Now</span></div></div>
+    ${sec('B2', 'Your stakes here', '3')}
+    <div class="mod"><div class="rows">
+      <div style="grid-template-columns:1fr auto"><span><span class="stake">★ Brunson · your starter</span><div class="muted" style="font-size:12.5px;margin-top:3px">31 pts · 3 reb · 8 ast</div></span><span class="dn" style="font-size:28px">38.6</span></div>
+      <div style="grid-template-columns:1fr auto"><span><span class="stake">★ Towns · your starter</span><div class="muted" style="font-size:12.5px;margin-top:3px">22 pts · 13 reb</div></span><span class="dn" style="font-size:28px">31.2</span></div>
+      <div style="grid-template-columns:1fr auto"><span><span class="stake">Knicks to win · 120 @ 58¢</span><div class="muted" style="font-size:12.5px;margin-top:3px">Odds now ${pct(st.wp)}%</div></span><span class="dn" style="font-size:28px">${pct(st.wp)}¢</span></div>
+    </div></div>
+    <div class="tabs" style="margin-top:20px"><span class="on">Plays</span><span>Box score</span><span>Leaders</span></div>
+    <div class="lbl" style="margin-bottom:4px">4th quarter</div>
+    ${feedHtml(st.plays.filter((p) => p.game === 'BOS @ NYK').slice(0, 7), { num: false })}`
+      }
+      function sPlay() {
+        const p =
+          st.plays.find((x) => x.id === st.open) ||
+          st.plays.find((x) => x.w === 'scoring')
+        return `${header(p.short, { back: 'Game' })}
+    <div class="mod">
+      <div class="lbl" style="display:flex;gap:8px;align-items:center">${p.w === 'scoring' ? '<span class="led"></span>Scoring' : p.w === 'notable' ? 'Notable' : 'Routine'} · ${whenOf(p)}</div>
+      <div style="font-size:22px;font-weight:600;letter-spacing:-0.02em;line-height:1.2;margin:10px 0 14px">${esc(p.text)}</div>
+      <div class="well" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;text-align:center">
+        <div><div class="lbl">Score</div><div class="dn" style="font-size:28px;margin-top:4px">${st.away}:${st.home}</div></div>
+        <div><div class="lbl">Clock</div><div class="dn" style="font-size:28px;margin-top:4px">${clk(p.t || st.clock)}</div></div>
+        <div><div class="lbl">NYK win</div><div class="dn o" style="font-size:28px;margin-top:4px">${pct(st.wp)}</div></div>
+      </div>
+    </div>
+    ${sec('C1', 'Involved player')}
+    <div class="mod" data-go="player" style="cursor:pointer">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span><div style="font-weight:600;font-size:17px">Jalen Brunson</div><div class="lbl">NYK · PG · #11</div></span><span class="lbl">Profile →</span></div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);margin-top:12px;text-align:center">${[
+        ['PTS', 31],
+        ['AST', 8],
+        ['FG', '11/21'],
+        ['3PT', '5/9'],
+      ]
+        .map(
+          ([k, v]) =>
+            `<div><div class="dn" style="font-size:26px">${v}</div><div class="lbl" style="margin-top:4px">${k}</div></div>`,
+        )
+        .join('')}</div>
+      <div class="lbl" style="margin-top:10px;text-align:center">As of this play</div>
+    </div>
+    ${sec('C2', 'What it moved')}
+    <div class="mod"><div class="rows">
+      <div style="grid-template-columns:1fr auto"><span class="stake">★ Your starter · Brunson</span><span class="mono">+3.6 pts</span></div>
+      <div style="grid-template-columns:1fr auto"><span class="stake">Knicks to win</span><span class="mono">57% → 64%</span></div>
+      <div style="grid-template-columns:1fr auto"><span class="stake cold">Night Shift vs Waiver Wire</span><span class="mono">+7.5 lead</span></div>
+    </div></div>
+    ${sec('C3', 'React')}
+    <div class="reacts">${['🔥', '😮', '😬', '🙌', '🧊'].map((e) => `<button class="key ${st.react === e ? 'on' : ''}" data-react="${e}">${e}</button>`).join('')}</div>`
+      }
+      function sPlayer() {
+        return `${header('Jalen Brunson', { back: 'Play' })}
+    <div class="mod">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start"><span><div class="lbl" style="display:flex;gap:6px;align-items:center">${tchip('NYK')}New York Knicks · PG · #11</div><div class="lbl" style="margin-top:6px;display:flex;gap:6px;align-items:center"><span class="led"></span>On the floor · Q4 ${clk(st.clock)}</div></span><button class="key on">Following</button></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);margin-top:18px">${[
+        ['PTS', 31],
+        ['REB', 3],
+        ['AST', 8],
+      ]
+        .map(
+          ([k, v]) =>
+            `<div><div class="dn" style="font-size:54px">${v}</div><div class="lbl" style="margin-top:6px">${k} tonight</div></div>`,
+        )
+        .join('')}</div>
+    </div>
+    ${sec('D1', 'Season', '2026–27')}
+    <div class="mod"><table class="tbl"><tr><th>GP</th><th>PTS</th><th>REB</th><th>AST</th><th>FG%</th><th>3P%</th></tr><tr><td style="text-align:right">18</td><td>27.4</td><td>3.6</td><td>7.1</td><td>48.2</td><td>40.9</td></tr></table></div>
+    ${sec('D2', 'Last 5', 'PTS')}
+    <div class="mod"><div class="bars" style="height:70px">${[24, 33, 19, 28, 31].map((v, i) => `<i class="${i === 4 ? 'last' : ''}" style="height:${v * 2.4}%"></i>`).join('')}</div><div style="display:flex;justify-content:space-between;margin-top:8px" class="lbl"><span>vs MIA</span><span>@ ORL</span><span>vs CHI</span><span>@ PHI</span><span>Tonight</span></div></div>
+    ${sec('D3', 'In your stakes')}
+    <div class="mod"><div class="rows"><div style="grid-template-columns:1fr auto"><span class="stake">Starter · Night Shift</span><span class="dn" style="font-size:24px">38.6</span></div><div style="grid-template-columns:1fr auto"><span class="stake cold">Brunson 30+ pts · settled</span><span class="mono">● Won</span></div></div></div>
+    ${sec('D4', 'His plays tonight')}
+    ${feedHtml(
+      st.plays.filter((p) => p.who === 'Brunson'),
+      { num: false },
+    )}`
+      }
+      function sPredictions() {
+        const w = worth(),
+          today = 23.15 + (st.wp - 0.64) * 120
+        const combo = st.wp * 0.62 * 0.71
+        return `${header('Predictions')}
+    <div class="mod">
+      <div style="display:flex;justify-content:space-between" class="lbl"><span style="display:flex;gap:8px;align-items:center"><span class="led"></span>Portfolio · Kalshi</span><span>Cents</span></div>
+      <div class="dn" style="font-size:62px;margin:14px 0 8px">$${w.toFixed(2)}</div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><span class="mono">${today >= 0 ? '▲' : '▼'} $${Math.abs(today).toFixed(2)} today</span><span class="lbl">3 open · 2 live</span></div>
+    </div>
+    ${sec('E1', 'Open', '3')}
+    <div class="mod" data-go="prediction" style="cursor:pointer">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">Combo · 3 legs</span><span class="lbl" style="display:flex;gap:6px;align-items:center"><span class="led"></span>Live</span></div>
+      <div style="font-weight:600;font-size:16px;margin:8px 0 10px">Sutton 50+ yds · Over 44.5 · Knicks win</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">${['◐', '◐', '◐'].map((x) => `<span class="glyph">${x}</span>`).join('')}<span class="lbl" style="margin-left:auto">$20 to win $148</span></div>
+      ${meter(Math.round(combo * 24))}
+      <div style="display:flex;justify-content:space-between;margin-top:6px" class="lbl"><span>Odds ${pct(combo)}%</span><span>Got in at 13%</span><span>Cash out $${(combo * 148).toFixed(2)}</span></div>
+    </div>
+    <div class="mod">
+      <div style="display:flex;justify-content:space-between" class="lbl"><span>Single · NBA</span><span style="display:flex;gap:6px;align-items:center"><span class="led"></span>Q4</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px"><span style="font-weight:600;font-size:16px">Knicks to win</span><span class="dn" style="font-size:34px">${pct(st.wp)}¢</span></div>
+      ${meter(Math.round(st.wp * 24), 24, 'thin')}
+      <div style="display:flex;justify-content:space-between;margin-top:6px" class="lbl"><span>120 @ 58¢</span><span>${st.wp >= 0.58 ? '▲' : '▼'} $${Math.abs((st.wp - 0.58) * 120).toFixed(2)}</span></div>
+    </div>
+    <div class="mod">
+      <div style="display:flex;justify-content:space-between" class="lbl"><span>Single · NHL · settled</span><span>● Won</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px"><span style="font-weight:600;font-size:16px">McDavid to score</span><span class="mono">+$18.40</span></div>
+    </div>
+    ${sec('E2', 'Sharp picks', 'Today · 5')}
+    <div class="mod"><div class="rows">${[
+      ['Bruins to win', 'NHL', 41, 45.2, 'Strong'],
+      ['Lakers −3.5', 'NBA', 48, 50.9, 'Edge'],
+      ['Chiefs/Broncos under 44.5', 'NFL', 52, 54.1, 'Edge'],
+      ['Rangers to win', 'NHL', 37, 38.6, 'Thin'],
+      ['Thunder −8.5', 'NBA', 51, 52.3, 'Thin'],
+    ]
+      .map(
+        ([n, l, c, f, g]) =>
+          `<div style="grid-template-columns:1fr auto auto"><span><div style="font-weight:600;font-size:14px">${n}</div><div class="lbl" style="margin-top:3px">${l} · fair ${f}%</div></span><span class="mono">${c}¢</span><span class="key" style="height:28px;font-size:9.5px;${g === 'Strong' ? 'background:var(--ink);color:var(--alu)' : ''}">+${(f - c - 1.1).toFixed(1)} ${g}</span></div>`,
+      )
+      .join('')}</div>
+      <div class="lbl" style="margin-top:10px">Edge after Kalshi’s fee · Closing line value +1.8 pts over 30 days</div></div>
+    ${sec('E3', 'Record', '30 days')}
+    <div class="mod"><div style="display:grid;grid-template-columns:repeat(3,1fr)">${[
+      ['42', 'Predictions'],
+      ['57%', 'Won'],
+      ['+$134', 'Profit'],
+    ]
+      .map(
+        ([v, k]) =>
+          `<div><div class="dn" style="font-size:36px">${v}</div><div class="lbl" style="margin-top:6px">${k}</div></div>`,
+      )
+      .join('')}</div></div>`
+      }
+      function sPrediction() {
+        const legs = [
+          {
+            n: 'Courtland Sutton 50+ receiving yards',
+            g: 'DEN @ KC · 3Q 6:12',
+            prog: [st.sutton, 50],
+            odds: 62,
+            live: true,
+          },
+          {
+            n: 'Broncos/Chiefs over 44.5 points',
+            g: 'DEN @ KC · 3Q 6:12',
+            prog: [st.den + st.kc, 45],
+            odds: 71,
+            live: true,
+          },
+          {
+            n: 'Knicks to win',
+            g: `BOS @ NYK · Q4 ${clk(st.clock)}`,
+            prog: null,
+            odds: pct(st.wp),
+            live: true,
+          },
+        ]
+        const combo = legs.reduce((a, l) => (a * l.odds) / 100, 1)
+        const series = [
+          13,
+          12,
+          15,
+          18,
+          17,
+          21,
+          19,
+          24,
+          26,
+          25,
+          27,
+          30,
+          Math.round(combo * 100),
+        ]
+        return `${header('Combo', { back: 'Predictions' })}
+    <div class="mod">
+      <div class="lbl" style="display:flex;gap:8px;align-items:center"><span class="led"></span>3 legs · 2 games · $20 to win $148</div>
+      <div style="display:flex;align-items:baseline;gap:10px;margin:12px 0 4px"><span class="dn o" style="font-size:84px">${pct(combo)}</span><span style="font-family:'Space Mono';font-weight:700;font-size:26px">%</span><span class="lbl" style="margin-left:auto;text-align:right">Odds now<br>got in at 13%</span></div>
+      <div class="bars" style="height:64px;margin-top:10px">${series.map((v, i) => `<i class="${i === series.length - 1 ? 'last' : ''}" style="height:${v * 2.4}%"></i>`).join('')}</div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px" class="lbl"><span>Bought 6:02 PM</span><span>Now</span></div>
+    </div>
+    ${sec('F1', 'Legs', '0 of 3 settled')}
+    ${legs.map((l, i) => `<div class="mod"><div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">Leg ${i + 1} · ${l.g}</span><span class="glyph">◐</span></div><div style="font-weight:600;font-size:15px;margin:8px 0 10px">${l.n}</div>${l.prog ? `${meter(Math.round(Math.min(1, l.prog[0] / l.prog[1]) * 20), 20)}<div style="display:flex;justify-content:space-between;margin-top:6px" class="lbl"><span>${l.prog[0]} of ${l.prog[1]}</span><span>Odds ${l.odds}%</span></div>` : `<div style="display:flex;justify-content:space-between" class="lbl"><span>NYK ${st.home}–${st.away} BOS</span><span>Odds ${l.odds}%</span></div>`}</div>`).join('')}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px"><button class="key wide">Open in Kalshi</button><button class="key wide ink">Cash out $${(combo * 148).toFixed(2)}</button></div>`
+      }
+      function sFantasy() {
+        const diff = st.me - st.opp
+        return `${header('Fantasy')}
+    <div class="mod" data-go="league" style="cursor:pointer">
+      <div style="display:flex;justify-content:space-between" class="lbl"><span style="display:flex;gap:8px;align-items:center"><span class="led"></span>The Dynasty · ESPN NBA</span><span>Matchup 6</span></div>
+      <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:end;margin:14px 0 10px">
+        <div><div class="lbl">Night Shift · you</div><div class="dn ${diff >= 0 ? 'o' : ''}" style="font-size:44px;margin-top:6px">${st.me.toFixed(1)}</div></div>
+        <span class="lbl" style="padding:0 6px 8px">vs</span>
+        <div style="text-align:right"><div class="lbl">Waiver Wire</div><div class="dn" style="font-size:44px;margin-top:6px">${st.opp.toFixed(1)}</div></div>
+      </div>
+      ${meter(Math.round((st.me / 131.2) * 24))}
+      <div style="display:flex;justify-content:space-between;margin-top:6px" class="lbl"><span>Projected 131.2</span><span>3 in play · 2 to go</span><span>126.0</span></div>
+    </div>
+    <div class="mod" style="display:flex;justify-content:space-between;align-items:center"><span><div class="lbl">Sunday Syndicate · Sleeper NFL</div><div style="font-weight:600;margin-top:4px">Week 12 · Won 128.4–117.9</div></span><span class="glyph">●</span></div>
+    ${sec('G1', 'Lineup', 'Night Shift')}
+    <div class="mod"><div class="rows">${[
+      ['PG', 'Jalen Brunson', 'NYK · Q4 live', '38.6', true],
+      ['C', 'Karl-Anthony Towns', 'NYK · Q4 live', '31.2', true],
+      ['SF', 'Mikal Bridges', 'NYK · Q4 live', '17.9', true],
+      ['SG', 'Anthony Edwards', 'MIN · Final', '24.4', false],
+      ['PF', 'Domantas Sabonis', 'SAC · 10:00 PM', '—', false],
+      ['BN', 'Jalen Williams', 'OKC · 9:30 PM', '—', false],
+    ]
+      .map(
+        ([s, n, g, p, live]) =>
+          `<div style="grid-template-columns:30px 1fr auto auto"><span class="lbl">${s}</span><span><div style="font-weight:600;font-size:14px">${n}</div><div class="lbl" style="margin-top:2px">${g}</div></span>${live ? '<span class="led"></span>' : '<span></span>'}<span class="dn" style="font-size:24px;${p === '—' ? 'opacity:.3' : ''}">${p}</span></div>`,
+      )
+      .join('')}</div></div>
+    ${sec('G2', 'Who has?', 'Injury')}
+    <div class="mod"><div style="font-weight:600">Jaylen Brown questionable · ankle</div><div class="lbl" style="margin-top:4px">Which team in The Dynasty has him?</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">${['Waiver Wire', 'Webb Gems', 'Shah-shank', 'Ortiz Ops'].map((x) => `<button class="key" style="height:40px;width:100%">${x}</button>`).join('')}</div></div>`
+      }
+      function sLeague() {
+        const tabs = ['Overview', 'Standings', 'Players', 'Activity', 'History']
+        const tab = st.tab
+        let body = ''
+        if (tab === 'history')
+          body = `
+    ${sec('H1', 'Champions', '7 seasons')}
+    <div class="mod"><div class="rows">${CHAMPS.map(([y, w, team, ru, me]) => `<div style="grid-template-columns:44px 1fr auto"><span class="dn" style="font-size:20px">${y}</span><span><div style="font-weight:600;font-size:14px">${w}${me ? ' <span class="stake" style="margin-left:4px">You</span>' : ''}</div><div class="lbl" style="margin-top:2px">${team} · beat ${ru}</div></span><span class="glyph" style="${me ? 'color:var(--o)' : ''}">●</span></div>`).join('')}<div style="grid-template-columns:44px 1fr"><span class="dn" style="font-size:20px">2026</span><span class="lbl">In progress</span></div></div></div>
+    ${sec('H2', 'All-time')}
+    <div class="mod" style="padding:8px 12px"><table class="tbl"><tr><th>Manager</th><th>Yrs</th><th>W-L</th><th>Playoffs</th><th>Titles</th></tr>${MANAGERS.map((m) => `<tr class="${m.me ? 'me' : ''}"><td>${m.n}</td><td>${m.yrs}</td><td>${m.w}-${m.l}</td><td>${m.po}</td><td>${'●'.repeat(m.t)}${'○'.repeat(m.f)}</td></tr>`).join('')}</table><div class="lbl" style="margin-top:6px">● title ○ lost final</div></div>
+    ${sec('H3', 'Your head-to-head')}
+    <div class="mod"><div class="rows">${[
+      ['Marcus Webb', '9-6', '1-2 playoffs', 'L 98.4–104.1 · 2025 Wk 21'],
+      ['Priya Shah', '8-5', '', 'W 120.2–99.0 · 2026 Wk 3'],
+      ['Dev Okafor', '7-7', '', 'T 101.0–101.0 · 2025 Wk 9'],
+    ]
+      .map(
+        ([n, r, po, last]) =>
+          `<div style="grid-template-columns:1fr auto"><span><div style="font-weight:600;font-size:14px">${n}</div><div class="lbl" style="margin-top:2px">Last: ${last}</div></span><span style="text-align:right"><div class="dn" style="font-size:26px">${r}</div>${po ? `<div class="lbl">${po}</div>` : ''}</span></div>`,
+      )
+      .join('')}</div></div>
+    ${sec('H4', 'Records')}
+    <div class="mod"><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">${[
+      ['214.6', 'Highest · Priya Shah 2022'],
+      ['48.3', 'Lowest · Jo Kim 2021'],
+      ['by 128.8', 'Biggest win · You 2024'],
+      ['by 0.06', 'Closest · Sam Ortiz 2023'],
+    ]
+      .map(
+        ([v, k]) =>
+          `<div><div class="dn" style="font-size:30px">${v}</div><div class="lbl" style="margin-top:6px">${k}</div></div>`,
+      )
+      .join('')}</div></div>`
+        else if (tab === 'standings')
+          body = `${sec('H1', 'Standings', 'Top 6 make the playoffs')}<div class="mod" style="padding:8px 12px"><table class="tbl"><tr><th>#</th><th style="text-align:left">Team</th><th>W-L</th><th>PF</th><th>Strk</th></tr>${[
+            ['Webb Gems', '5-0', 612.4, 'W5'],
+            ['Night Shift', '4-1', 598.1, 'W2', 1],
+            ['Shah-shank', '3-2', 571.0, 'L1'],
+            ['Waiver Wire', '3-2', 566.8, 'W1'],
+            ['Okafor Forte', '3-2', 540.2, 'L2'],
+            ['Ortiz Ops', '2-3', 533.9, 'W1'],
+            ['Kim Possible', '2-3', 520.4, 'L3'],
+            ['Dunk Tank', '1-4', 488.0, 'L4'],
+          ]
+            .map(
+              ([n, r, pf, s, me], i) =>
+                `<tr class="${me ? 'me' : ''} ${i === 5 ? 'cut' : ''}"><td style="text-align:left">${i + 1}</td><td style="text-align:left">${n}</td><td>${r}</td><td>${pf}</td><td>${s}</td></tr>`,
+            )
+            .join('')}</table></div>`
+        else
+          body = `${sec(
+            'H1',
+            tabs.find((t) => t.toLowerCase() === tab),
+          )}<div class="well lbl" style="padding:24px;text-align:center">Pick History or Standings in this prototype</div>`
+        return `${header('The Dynasty', { back: 'Fantasy' })}
+    <div class="lbl" style="margin:-6px 0 12px">ESPN · Basketball · Night Shift</div>
+    <div class="tabs">${tabs.map((t) => `<span class="${t.toLowerCase() === tab ? 'on' : ''}" data-tab="${t.toLowerCase()}">${t}</span>`).join('')}</div>
+    ${body}`
+      }
+      function sAlerts() {
+        const lv = [
+          ['Following', ['Scores', 'Finals', 'Off']],
+          ['Predictions', ['Key', '+Scores', 'Off']],
+          ['Fantasy', ['Both', 'Mine', 'Off']],
+        ]
+        return `${header('Alerts', { back: 'Timeline', keys: '' })}
+    ${sec('I1', 'Alert levels')}
+    <div class="mod">${lv.map(([n, opts], i) => `<div style="display:grid;grid-template-columns:96px 1fr;align-items:center;gap:10px;${i ? 'margin-top:12px' : ''}"><span style="font-weight:600;font-size:14px">${n}</span><div class="sw3"><span class="thumb" style="left:calc(3px + ${st.alertLv[i]} * (100% - 6px) / 3)"></span>${opts.map((o, j) => `<span class="${st.alertLv[i] === j ? 'on' : ''}" data-alv="${i},${j}">${o}</span>`).join('')}</div></div>`).join('')}</div>
+    ${sec('I2', 'Sent tonight', '6')}
+    <div class="mod"><div class="rows">${[
+      ['Fantasy', 'Brunson hits 30 points', '9:38 PM', true],
+      ['Prediction', 'Knicks to win jumps to 64%', '9:38 PM', true],
+      ['Following', 'Lakers 112, Warriors 108 · Final', '9:22 PM'],
+      ['Prediction', 'Leg 1 · Sutton passes 40 yards', '9:15 PM'],
+      ['Fantasy', 'Edwards: 24 pts, final', '9:02 PM'],
+      ['Following', 'McDavid power-play goal', '8:51 PM'],
+    ]
+      .map(
+        ([src, t, at, now]) =>
+          `<div style="grid-template-columns:auto 1fr auto"><span class="${now ? 'led' : 'led off'}"></span><span><div class="lbl">${src}</div><div style="font-weight:500;font-size:14px;margin-top:2px">${t}</div></span><span class="lbl">${at}</span></div>`,
+      )
+      .join('')}</div></div>`
+      }
+      function sAgents() {
+        const left = 462
+        const segs = 30,
+          on = Math.round((left / 600) * segs)
+        return `${header('Agents', { back: 'Timeline', keys: '' })}
+    ${sec('J1', 'Trade proposal', 'Waiting on you')}
+    <div class="mod">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span class="lbl">From Claude · read + propose</span><span class="led"></span></div>
+      <div style="display:grid;grid-template-columns:1fr 92px;gap:14px;align-items:center;margin-top:12px">
+        <div><div style="font-weight:600;font-size:18px;letter-spacing:-0.02em">Buy 40 YES · Knicks to win</div><div class="lbl" style="margin-top:6px">Limit 66¢ · up to $26.40</div><div style="font-size:13px;line-height:1.45;margin-top:10px;color:var(--ink2)">“Brunson’s hot and the Celtics are in the penalty. Fair price is 69%.”</div></div>
+        <svg class="ringseg" viewBox="0 0 88 88">${Array.from({ length: segs }, (_, i) => `<rect x="42.5" y="2" width="3" height="11" rx="1.5" fill="${i < on ? (i === on - 1 ? '#ff4f00' : 'var(--ink)') : 'var(--well)'}" transform="rotate(${i * 12} 44 44)"/>`).join('')}<text x="44" y="50" text-anchor="middle" font-family="Space Mono" font-weight="700" font-size="17" fill="var(--ink)">${clk(left)}</text></svg>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px"><button class="key wide">Reject</button><button class="key wide ink">Approve</button></div>
+    </div>
+    ${sec('J2', 'Your agents', '2')}
+    <div class="mod"><div class="rows"><div style="grid-template-columns:1fr auto auto"><span><div style="font-weight:600">Claude</div><div class="lbl" style="margin-top:2px">Read + propose · used 2 min ago</div></span><span class="led"></span><span class="lbl">On</span></div><div style="grid-template-columns:1fr auto auto"><span><div style="font-weight:600">Grok</div><div class="lbl" style="margin-top:2px">Read only · used yesterday</div></span><span class="led off"></span><span class="lbl">Idle</span></div></div></div>
+    ${sec('J3', 'Limits')}
+    <div class="mod"><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px"><div><div class="dn" style="font-size:30px">$50</div><div class="lbl" style="margin-top:6px">Per proposal</div></div><div><div class="dn" style="font-size:30px">$150</div><div class="lbl" style="margin-top:6px">Per day · $26 used</div></div></div></div>`
+      }
+      function sLock() {
+        return `<div class="screen lock"><div class="island"></div>${sbar()}
+    <div class="date">Thursday, November 26</div><div class="clock">9:41</div>
+    <div class="card" style="margin-top:28px">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span style="display:flex;gap:8px;align-items:center;color:#f2f1ec">${markSvg(2.6, 1)}<span class="lbl">Live · Q4 ${clk(st.clock)}</span></span><span class="led"></span></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 8px"><span><div class="lbl">BOS</div><div class="dn" style="font-size:44px">${st.away}</div></span><span class="lbl" style="text-align:center">Knicks<br>${pct(st.wp)}%</span><span style="text-align:right"><div class="lbl">NYK</div><div class="dn o" style="font-size:44px">${st.home}</div></span></div>
+      <div class="meter thin" style="grid-template-columns:repeat(24,1fr)">${Array.from({ length: 24 }, (_, i) => `<i style="background:${i < Math.round(st.wp * 24) ? (i === Math.round(st.wp * 24) - 1 ? '#ff4f00' : '#f2f1ec') : 'rgba(255,255,255,.12)'};box-shadow:none"></i>`).join('')}</div>
+      <div style="display:flex;justify-content:space-between;margin-top:8px" class="lbl"><span>★ Brunson 38.6</span><span>Matchup ${st.me.toFixed(0)}–${st.opp.toFixed(0)}</span></div>
+    </div>
+    ${[
+      [
+        'Fantasy',
+        'Brunson hits 30 points',
+        'Night Shift leads by 7.5 with 3 in play.',
+      ],
+      [
+        'Prediction',
+        'Knicks to win · 64%',
+        'Up from 57% after Brunson’s three. 120 @ 58¢.',
+      ],
+    ]
+      .map(
+        ([s, t, b]) =>
+          `<div class="card"><div style="display:flex;justify-content:space-between"><span class="lbl">${s}</span><span class="lbl">now</span></div><div style="font-weight:600;margin-top:6px">${t}</div><div style="font-size:13px;opacity:.75;margin-top:2px">${b}</div></div>`,
+      )
+      .join('')}
+  </div>`
+      }
+
+      const SCREENS = {
+        timeline: {
+          name: 'Timeline · All',
+          group: 'Timeline',
+          fn: () => sTimeline(1, null),
+          note: 'Home board on top: the night’s headline game in dots, its win-chance meter, League row. Then Games, Catch-up, Plays, and the Read Marker.',
+        },
+        following: {
+          name: 'Timeline · Following, narrowed',
+          group: 'Timeline',
+          fn: () => sTimeline(0, 'g1'),
+          note: 'Following, narrowed to one Game. The strip opens it or shows everything again. Orange stakes tag what moved yours.',
+        },
+        game: {
+          name: 'Game Detail',
+          group: 'Timeline',
+          fn: sGame,
+          note: 'Score in dots, linescore, win chance as a bar graph, your stakes in this Game, then Plays by quarter.',
+        },
+        play: {
+          name: 'Play Detail',
+          group: 'Timeline',
+          fn: sPlay,
+          note: 'The Situation at that moment, the Involved Player’s line as of the Play, what it moved for you, and Reactions as keys.',
+        },
+        player: {
+          name: 'Player page',
+          group: 'Timeline',
+          fn: sPlayer,
+          note: 'Tonight in big dots, the season, last five as bars, and where he sits in your stakes.',
+        },
+        predictions: {
+          name: 'Predictions',
+          group: 'Predictions',
+          fn: sPredictions,
+          note: 'Portfolio worth up top, open Predictions as meters (Combo first), Sharp picks graded like spec sheets, and the Record.',
+        },
+        prediction: {
+          name: 'Combo detail',
+          group: 'Predictions',
+          fn: sPrediction,
+          note: 'Odds over time, each Leg with its Progress meter, cash-out value as the primary key.',
+        },
+        fantasy: {
+          name: 'Fantasy',
+          group: 'Fantasy',
+          fn: sFantasy,
+          note: 'Your Matchup as two dot numbers and a projection meter. Starters in play carry the orange LED. Who Has? as four keys.',
+        },
+        league: {
+          name: 'Fantasy league · History',
+          group: 'Fantasy',
+          fn: sLeague,
+          note: 'The new League history tab: champions, all-time records with ● titles ○ lost finals, your head-to-head and the league’s records. Standings is clickable too.',
+        },
+        alerts: {
+          name: 'Alerts',
+          group: 'Everything else',
+          fn: sAlerts,
+          note: 'Alert levels as three-position switches. Tonight’s Alerts, with live ones lit.',
+        },
+        agents: {
+          name: 'Agents',
+          group: 'Everything else',
+          fn: sAgents,
+          note: 'A Trade proposal with its 10-minute window as a segmented dial. Approve is the inked key.',
+        },
+        lock: {
+          name: 'Lock screen',
+          group: 'Everything else',
+          fn: null,
+          note: 'The Live Activity and Alerts, where Sportsline is seen most.',
+        },
+      }
+      const SCOPE_ROOT = ['following', 'timeline', 'predictions', 'fantasy']
+
+      function phone(id, interactive) {
+        if (id === 'lock') return `<div class="phone">${sLock()}</div>`
+        const sc = SCREENS[id]
+        const scope =
+          id === 'following'
+            ? 0
+            : ['predictions', 'prediction'].includes(id)
+              ? 2
+              : ['fantasy', 'league'].includes(id)
+                ? 3
+                : id === 'timeline' && interactive
+                  ? st.scope
+                  : 1
+        const html =
+          interactive && (id === 'timeline' || id === 'following')
+            ? sTimeline(st.scope, st.narrowed)
+            : sc.fn()
+        return `<div class="phone"><div class="screen"><div class="island"></div>${sbar()}<div class="content">${html}</div>${dock(scope)}</div></div>`
+      }
+
+      /* ═══ Views ══════════════════════════════════════════════════════════ */
+      function viewFlow() {
+        const groups = {}
+        for (const [id, s] of Object.entries(SCREENS))
+          (groups[s.group] ||= []).push([id, s])
+        return `<div class="flow">${Object.entries(groups)
+          .map(
+            ([g, items], gi) =>
+              `<h2>0${gi + 1} · ${g}</h2><div class="row">${items.map(([id, s], i) => `<div class="item" data-open="${id}"><div class="cap"><b>${String.fromCharCode(65 + gi)}${i + 1}</b>${s.name}</div>${phone(id, false)}</div>`).join('')}</div>`,
+          )
+          .join('')}</div>`
+      }
+      function viewPhone() {
+        const id = st.route.at(-1)
+        const sc = SCREENS[id]
+        return `<div class="single"><div class="single-wrap"><div>${phone(id, true)}</div><div class="notes" style="color:${st.dark ? '#ecebe6' : '#121212'}">
+    <div class="k">Screen</div><h3>${sc.name}</h3><p style="margin-top:8px">${sc.note}</p>
+    <div class="k">Try</div><ul><li>Turn the dial to change Scope.</li><li>Tap a game tile to narrow the feed, then Open.</li><li>Tap a Play, then the player.</li><li>ALRT and AGNT keys top right.</li><li>Toggle Graphite and Live up top.</li></ul>
+    <div class="k">Jump to</div><div style="display:flex;flex-wrap:wrap;gap:6px">${Object.entries(
+      SCREENS,
+    )
+      .filter(([k]) => k !== 'lock')
+      .map(
+        ([k, s]) =>
+          `<span class="chip ${k === id ? 'on' : ''}" data-jump="${k}">${s.name}</span>`,
+      )
+      .join('')}</div>
+  </div></div></div>`
+      }
+      function viewDesktop() {
+        const games = GAMES()
+        return `<div class="desk-wrap"><div class="desk"><div class="chrome"><i></i><i></i><i></i><span class="url">sportsline.dev</span></div><div class="body">
+    <div class="col">
+      <div style="margin:4px 0 22px">${wordmark(22)}</div>
+      <div class="lbl" style="margin-bottom:8px">Scope</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${SCOPES.map((s, i) => `<button class="key ${st.scope === i ? 'on' : ''}" data-scope="${i}" style="width:100%">${s.slice(0, 4)}</button>`).join('')}</div>
+      <div class="lbl" style="margin:24px 0 8px">Live now</div>
+      <div class="rows">${games
+        .filter((g) => g.live)
+        .map(
+          (g) =>
+            `<div style="grid-template-columns:auto 1fr auto;cursor:pointer" data-narrow="${g.id}"><span class="led"></span><span style="font-size:13.5px;font-weight:600">${g.a} @ ${g.h}</span><span class="mono">${g.as}–${g.hs}</span></div>`,
+        )
+        .join('')}</div>
+      <div class="lbl" style="margin:24px 0 8px">Following</div>
+      <div class="rows">${[
+        ['NYK', 'Knicks'],
+        ['DEN', 'Broncos'],
+        ['EDM', 'Oilers'],
+      ]
+        .map(
+          ([a, n]) =>
+            `<div style="grid-template-columns:auto 1fr;font-size:13.5px">${tchip(a)}${n}</div>`,
+        )
+        .join(
+          '',
+        )}<div style="grid-template-columns:auto 1fr;font-size:13.5px"><span class="glyph">★</span>Jalen Brunson</div></div>
+      <div style="margin-top:24px;display:grid;gap:8px"><button class="key wide" data-jump="alerts">Alerts</button><button class="key wide" data-jump="agents">Agents</button></div>
+    </div>
+    <div class="col">${sTimeline(st.scope, st.narrowed || 'g1').replace(/<div class="hd">[\s\S]*?<\/div>/, `<div class="hd"><span class="t">${SCOPES[st.scope]}</span><span class="keys"><button class="key">⌘K</button></span></div>`)}</div>
+    <div class="col">${sGame().replace(/<div class="hd">[\s\S]*?<\/div><div class="hd" style="padding-top:0">/, '<div class="hd" style="padding-top:0">')}</div>
+  </div></div></div>`
+      }
+
+      /* ═══ Render + events ════════════════════════════════════════════════ */
+      const $ = (id) => document.getElementById(id)
+      function render() {
+        document.body.classList.toggle('dark', st.dark)
+        $('brand').innerHTML =
+          `<span style="color:${st.dark ? '#ecebe6' : '#121212'}">${wordmark(18)}</span><span style="opacity:.6">Signal · full app</span>`
+        $('views').innerHTML = [
+          ['flow', 'Flow · all screens'],
+          ['phone', 'Phone · click through'],
+          ['desktop', 'Desktop'],
+        ]
+          .map(
+            ([k, n]) =>
+              `<button aria-pressed="${st.view === k}" data-view="${k}">${n}</button>`,
+          )
+          .join('')
+        $('tLive').classList.toggle('on', st.live)
+        $('tDark').classList.toggle('on', st.dark)
+        const scroll = [
+          ...document.querySelectorAll('.content, .desk .col'),
+        ].map((n) => n.scrollTop)
+        const mainScroll = $('main').scrollTop
+        const html =
+          st.view === 'flow'
+            ? viewFlow()
+            : st.view === 'phone'
+              ? viewPhone()
+              : viewDesktop()
+        $('main').innerHTML =
+          `<div class="sig ${st.dark ? 'dark' : ''}" style="min-height:100%">${html}</div>`
+        document.querySelectorAll('.content, .desk .col').forEach((n, i) => {
+          if (scroll[i] !== undefined) n.scrollTop = scroll[i]
+        })
+        $('main').scrollTop = mainScroll
+        st.newId = null
+      }
+      const go = (id) => {
+        st.view = st.view === 'flow' ? 'phone' : st.view
+        if (st.view === 'desktop') st.view = 'phone'
+        st.route.push(id)
+        localStorage.setItem('sig-view', st.view)
+        render()
+        const c = document.querySelector('.content')
+        if (c) c.scrollTop = 0
+      }
+      document.addEventListener('click', (e) => {
+        const t = (s) => e.target.closest(s)
+        let n
+        if ((n = t('[data-view]'))) {
+          st.view = n.dataset.view
+          localStorage.setItem('sig-view', st.view)
+          render()
+          return
+        }
+        if (t('#tLive')) {
+          st.live = !st.live
+          schedule()
+          render()
+          return
+        }
+        if (t('#tDark')) {
+          st.dark = !st.dark
+          localStorage.setItem('sig-dark', st.dark ? '1' : '0')
+          render()
+          return
+        }
+        if (t('#score')) {
+          tick(true)
+          return
+        }
+        if ((n = t('[data-open]'))) {
+          st.view = 'phone'
+          st.route = [n.dataset.open]
+          if (n.dataset.open === 'following') {
+            st.scope = 0
+            st.narrowed = 'g1'
+          }
+          localStorage.setItem('sig-view', 'phone')
+          render()
+          return
+        }
+        if ((n = t('[data-jump]'))) {
+          st.view = 'phone'
+          st.route = [n.dataset.jump]
+          render()
+          return
+        }
+        if (st.view === 'flow') return
+        if (t('[data-knob]')) {
+          st.scope = (st.scope + 1) % 4
+          st.route = [
+            SCOPE_ROOT[st.scope] === 'following'
+              ? 'following'
+              : SCOPE_ROOT[st.scope],
+          ]
+          st.narrowed = null
+          render()
+          return
+        }
+        if ((n = t('[data-scope]'))) {
+          st.scope = +n.dataset.scope
+          st.narrowed = null
+          render()
+          return
+        }
+        if (t('[data-back]')) {
+          if (st.route.length > 1) st.route.pop()
+          else st.route = [SCOPE_ROOT[st.scope]]
+          render()
+          return
+        }
+        if ((n = t('[data-narrow]'))) {
+          st.narrowed = n.dataset.narrow
+            ? st.narrowed === n.dataset.narrow
+              ? null
+              : n.dataset.narrow
+            : null
+          render()
+          return
+        }
+        if (t('[data-hl]')) {
+          st.highlights = !st.highlights
+          render()
+          return
+        }
+        if ((n = t('[data-react]'))) {
+          st.react = st.react === n.dataset.react ? null : n.dataset.react
+          render()
+          return
+        }
+        if ((n = t('[data-tab]'))) {
+          st.tab = n.dataset.tab
+          render()
+          return
+        }
+        if ((n = t('[data-alv]'))) {
+          const [i, j] = n.dataset.alv.split(',').map(Number)
+          st.alertLv[i] = j
+          render()
+          return
+        }
+        if ((n = t('[data-play]'))) {
+          st.open = +n.dataset.play
+          go('play')
+          return
+        }
+        if ((n = t('[data-go]'))) {
+          go(n.dataset.go)
+          return
+        }
+      })
+      document.fonts.ready.then(render)
+      render()
+      schedule()
+    </script>
+  </body>
+</html>

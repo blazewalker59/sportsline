@@ -24,6 +24,7 @@ import { useRouter } from '@tanstack/react-router'
 import { NavGlyph } from './NavIcon'
 import type { IconName } from './NavIcon'
 import type { Scope, ScopeTab } from '@/lib/model/scope'
+import { Mark } from '@/components/signal/Logo'
 import {
   useCurrentScope,
   useGoToScope,
@@ -138,7 +139,7 @@ function ScopeNav() {
     >
       {/* The rail's brand mark (the header's wordmark is the link home). */}
       <div className="mx-auto mb-3 hidden size-11 items-center justify-center md:flex lg:mx-4 lg:justify-start">
-        <img src="/favicon.svg" alt="" width={28} height={28} />
+        <Mark className="h-7 text-glass-ink" />
       </div>
       <div className="relative h-16 p-1 md:h-auto md:px-1 md:py-0 lg:px-2">
         {/* The current tab's lozenge: one piece of glass that slides. */}

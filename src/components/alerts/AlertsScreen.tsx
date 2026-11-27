@@ -16,6 +16,8 @@ import {
   useAlerts,
 } from '@/lib/push/useAlerts'
 import { useViewer } from '@/lib/viewer/useViewer'
+import { Segmented } from '@/components/signal/Segmented'
+import { SectionLabel } from '@/components/signal/Section'
 import { cn } from '@/lib/utils'
 
 export function AlertsScreen() {
@@ -74,7 +76,7 @@ function DeviceSection() {
       aria-checked={on}
       disabled={busy}
       onClick={() => void (on ? disable() : enable())}
-      className="flex w-full items-center gap-3 rounded-card border border-border bg-surface px-4 py-3 text-left disabled:opacity-60"
+      className="flex w-full items-center gap-3 rounded-card bg-surface p-4 text-left disabled:opacity-60"
     >
       <span className="flex-1">
         <span className="block font-semibold">Alerts on this device</span>
@@ -87,13 +89,13 @@ function DeviceSection() {
       <span
         aria-hidden="true"
         className={cn(
-          'relative h-7 w-12 shrink-0 rounded-full transition-colors',
-          on ? 'bg-accent' : 'bg-notice',
+          'well relative h-7 w-12 shrink-0 rounded-full transition-colors',
+          on && 'bg-foreground',
         )}
       >
         <span
           className={cn(
-            'absolute top-0.5 size-6 rounded-full bg-white shadow transition-transform',
+            'key absolute top-0.5 size-6 rounded-full transition-transform',
             on ? 'translate-x-[22px]' : 'translate-x-0.5',
           )}
         />
@@ -110,7 +112,7 @@ function Notice({
   children: React.ReactNode
 }) {
   return (
-    <div className="rounded-card border border-border bg-surface px-4 py-3 text-sm">
+    <div className="well rounded-card px-4 py-4 text-sm">
       <p className="mb-1 font-semibold">{title}</p>
       <p className="text-muted">{children}</p>
     </div>
@@ -120,6 +122,8 @@ function Notice({
 type Choice<TSource extends keyof AlertLevels> = {
   value: AlertLevels[TSource]
   label: string
+  /** On the switch's key. */
+  short: string
   hint: string
 }
 
@@ -128,40 +132,46 @@ const CHOICES: { [K in keyof AlertLevels]: ReadonlyArray<Choice<K>> } = {
     {
       value: 'scores',
       label: 'Scores & finals',
+      short: 'Scores',
       hint: 'Every score, overturned score and final in your Teams’ and Players’ games; NBA lead changes only in close fourth quarters and overtime.',
     },
     {
       value: 'finals',
       label: 'Finals only',
+      short: 'Finals',
       hint: 'Just how each game ended.',
     },
-    { value: 'off', label: 'Off', hint: '' },
+    { value: 'off', label: 'Off', short: 'Off', hint: '' },
   ],
   predictions: [
     {
       value: 'key',
       label: 'Key moments',
+      short: 'Key',
       hint: 'Your odds swinging 20+ points, a combo leg hitting or missing, and the result.',
     },
     {
       value: 'scores',
       label: 'Key moments + every score',
+      short: '+Scores',
       hint: 'Also every scoring play in your Predictions’ games; NBA lead changes only in close fourth quarters and overtime.',
     },
-    { value: 'off', label: 'Off', hint: '' },
+    { value: 'off', label: 'Off', short: 'Off', hint: '' },
   ],
   fantasy: [
     {
       value: 'key',
       label: 'Key events, both teams',
+      short: 'Both',
       hint: 'Scores by any starter; NBA point thresholds, double-doubles and standout stat lines; plus your starters’ big plays.',
     },
     {
       value: 'mine',
       label: 'Key events, my starters',
+      short: 'Mine',
       hint: 'Only your own starters’ scores, milestones and big plays.',
     },
-    { value: 'off', label: 'Off', hint: '' },
+    { value: 'off', label: 'Off', short: 'Off', hint: '' },
   ],
 }
 
@@ -196,59 +206,40 @@ function Levels() {
     ...(fantasy.connected ? [['fantasy', 'Fantasy'] as const] : []),
   ]
   return (
-    <div className={cn('flex flex-col gap-5', state !== 'on' && 'opacity-60')}>
-      {sections.map(([source, title]) => (
-        <section key={source}>
-          <h2 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-            {title}
-          </h2>
-          <div
-            role="radiogroup"
-            aria-label={`${title} Alerts`}
-            className="divide-y divide-border rounded-card border border-border bg-surface"
+    <section className={cn(state !== 'on' && 'opacity-60')}>
+      <SectionLabel title="Alert levels" index="I1" />
+      <div className="flex flex-col divide-y divide-border rounded-card bg-surface px-4">
+        {sections.map(([source, title]) => {
+          const choices = CHOICES[source] as ReadonlyArray<
+            Choice<typeof source>
           >
-            {(CHOICES[source] as ReadonlyArray<Choice<typeof source>>).map(
-              (c) => {
-                const checked = levels[source] === c.value
-                return (
-                  <button
-                    key={c.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={checked}
-                    onClick={() =>
-                      set({ ...levels, [source]: c.value } as AlertLevels)
-                    }
-                    className="flex w-full items-start gap-3 px-4 py-3 text-left"
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border-2',
-                        checked ? 'border-accent' : 'border-border',
-                      )}
-                    >
-                      {checked && (
-                        <span className="size-2.5 rounded-full bg-accent" />
-                      )}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-medium">
-                        {c.label}
-                      </span>
-                      {c.hint && (
-                        <span className="block text-xs text-muted">
-                          {c.hint}
-                        </span>
-                      )}
-                    </span>
-                  </button>
-                )
-              },
-            )}
-          </div>
-        </section>
-      ))}
-    </div>
+          const current = choices.find((c) => c.value === levels[source])
+          return (
+            <div key={source} className="flex flex-col gap-2 py-4">
+              <div className="grid grid-cols-[6rem_minmax(0,1fr)] items-center gap-3">
+                <h2 className="text-sm font-semibold">{title}</h2>
+                <Segmented
+                  fill
+                  label={`${title} Alerts`}
+                  value={levels[source]}
+                  options={choices.map((c) => [c.value, c.short, c.label])}
+                  onChange={(value) =>
+                    set({ ...levels, [source]: value } as AlertLevels)
+                  }
+                />
+              </div>
+              {current && current.value !== 'off' && (
+                <p className="text-xs text-muted">
+                  <span className="font-semibold text-foreground">
+                    {current.label}.
+                  </span>{' '}
+                  {current.hint}
+                </p>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </section>
   )
 }

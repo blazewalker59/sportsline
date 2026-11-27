@@ -4,10 +4,10 @@
  */
 
 import type { PriceDisplay } from '@/lib/model/price'
+import { Segmented } from '@/components/signal/Segmented'
 import { usePriceDisplay, useSetPriceDisplay } from '@/lib/viewer/useViewer'
-import { cn } from '@/lib/utils'
 
-const OPTIONS: Array<[PriceDisplay, string]> = [
+const OPTIONS: ReadonlyArray<readonly [PriceDisplay, string]> = [
   ['cents', 'Cents'],
   ['multiplier', 'Multiplier'],
 ]
@@ -25,29 +25,12 @@ export function PriceDisplayToggle() {
             : 'What a contract costs: 54¢'}
         </span>
       </span>
-      <span
-        role="radiogroup"
-        aria-label="Show prices as"
-        className="flex gap-1 rounded-full bg-notice p-1"
-      >
-        {OPTIONS.map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            role="radio"
-            aria-checked={display === value}
-            onClick={() => set.mutate(value)}
-            className={cn(
-              'min-h-8 rounded-full px-3 text-[13px] font-semibold transition-colors',
-              display === value
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted',
-            )}
-          >
-            {label}
-          </button>
-        ))}
-      </span>
+      <Segmented
+        label="Show prices as"
+        value={display}
+        options={OPTIONS}
+        onChange={(v) => set.mutate(v)}
+      />
     </section>
   )
 }

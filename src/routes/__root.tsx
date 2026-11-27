@@ -9,12 +9,15 @@ import {
 import { useEffect, useState } from 'react'
 
 import appCss from '../styles.css?url'
-import fontLatin from '../fonts/bricolage-grotesque-latin.woff2?url'
+import interLatin from '../fonts/inter-latin.woff2?url'
+import monoLatin from '../fonts/space-mono-400-latin.woff2?url'
+import dotsLatin from '../fonts/doto-latin.woff2?url'
 import { THEME_BOOT, THEME_COLOR_BOOT } from '../lib/theme'
 
 import type { QueryClient } from '@tanstack/react-query'
 import { PlayerSheetProvider } from '@/components/players/PlayerSheetProvider'
 import { AppShell } from '@/components/layout/AppNav'
+import { Mark } from '@/components/signal/Logo'
 import { Landing } from '@/components/landing/LazyLanding'
 import { WhoHasPopup } from '@/components/fantasy/LazyWhoHas'
 import { useViewer } from '@/lib/viewer/useViewer'
@@ -44,7 +47,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         content: 'width=device-width, initial-scale=1, viewport-fit=cover',
       },
       { title: 'Sportsline' },
-      { name: 'theme-color', content: '#f3f4f8' },
+      { name: 'theme-color', content: '#e9e8e3' },
       { name: 'apple-mobile-web-app-capable', content: 'yes' },
       {
         name: 'apple-mobile-web-app-status-bar-style',
@@ -61,13 +64,14 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       },
     ],
     links: [
-      {
+      // Signal's three faces: words, labels and the dot numerals.
+      ...[interLatin, monoLatin, dotsLatin].map((href) => ({
         rel: 'preload',
-        href: fontLatin,
+        href,
         as: 'font',
         type: 'font/woff2',
-        crossOrigin: 'anonymous',
-      },
+        crossOrigin: 'anonymous' as const,
+      })),
       { rel: 'stylesheet', href: appCss },
       { rel: 'manifest', href: '/manifest.json' },
       { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
@@ -125,6 +129,10 @@ function Crashed({ error }: { error: unknown }) {
   }, [error])
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-background px-6 text-center">
+      <span className="flex items-center gap-2 text-3xs text-muted uppercase">
+        <span className="led led-off" aria-hidden="true" />
+        Fault
+      </span>
       <p className="text-lg font-bold">Something went wrong</p>
       <p className="max-w-sm text-sm text-muted">
         It’s been reported. Reloading usually gets you going again.
@@ -132,7 +140,7 @@ function Crashed({ error }: { error: unknown }) {
       <button
         type="button"
         onClick={() => window.location.reload()}
-        className="min-h-11 rounded-full bg-foreground px-5 text-sm font-semibold text-background"
+        className="key key-ink mt-1 min-h-11 rounded-control px-5 text-3xs font-bold uppercase"
       >
         Reload
       </button>
@@ -144,13 +152,7 @@ function Crashed({ error }: { error: unknown }) {
 function Splash() {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-background">
-      <img
-        src="/favicon.svg"
-        alt="Sportsline"
-        width={44}
-        height={44}
-        className="animate-pulse"
-      />
+      <Mark title="Sportsline" className="h-11 motion-safe:animate-pulse" />
     </div>
   )
 }

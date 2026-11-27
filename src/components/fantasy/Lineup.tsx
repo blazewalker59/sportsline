@@ -28,6 +28,7 @@ import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
 import { TeamLogo } from '@/components/brand/TeamMark'
 import { TeamPip } from '@/components/brand/TeamPip'
 import { teamNameStyle } from '@/lib/brand/subject'
+import { Num } from '@/components/signal/Num'
 import { PlayerButton } from '@/components/players/playerSheet'
 import { cn } from '@/lib/utils'
 
@@ -65,6 +66,12 @@ function PlayerCell({
     ? (INJURY_ABBREV[player.injury] ?? player.injury.slice(0, 4))
     : null
   const tone = injuryTone(player.injury)
+  // A Starter whose Game is on now: lit. Not played yet: muted.
+  const inPlay = player.starter && state?.live === true
+  const unplayed =
+    player.dayLine == null
+      ? state?.upcoming === true || (!state && !player.points)
+      : state?.upcoming === true
   // Their own team's colors, from their Game: the name in its ink.
   const team = state ? stateTeam(state) : null
   const ink = teamNameStyle(team?.colors)
@@ -90,6 +97,7 @@ function PlayerCell({
   )
   return (
     <div
+      data-in-play={inPlay ? '' : undefined}
       className={cn(
         'flex min-w-0 flex-col gap-1 rounded-control px-1 py-1.5',
         state?.onField && 'field-state',
@@ -167,13 +175,30 @@ function PlayerCell({
               : `${shortName(player)}: today's line`
           }
           className={cn(
-            'flex shrink-0 flex-col rounded-control px-0.5 py-0.5 tabular-nums transition-colors',
+            'flex shrink-0 flex-col gap-1 rounded-control px-0.5 py-0.5 tabular-nums transition-colors',
             right ? 'items-start' : 'items-end',
-            open ? 'bg-accent-soft' : 'hover:bg-notice',
+            open ? 'bg-notice' : 'hover:bg-notice',
           )}
         >
-          <span className="text-[14px] leading-tight font-bold">
-            {playerFigure(player)}
+          <span
+            className={cn(
+              'flex items-center gap-1.5',
+              right && 'flex-row-reverse',
+            )}
+          >
+            {inPlay && (
+              <span
+                className="led"
+                role="img"
+                aria-label="In play"
+                data-led=""
+              />
+            )}
+            <Num
+              className={cn('text-[18px]', unplayed && 'text-muted opacity-60')}
+            >
+              {playerFigure(player)}
+            </Num>
           </span>
           {player.dayLine == null && player.projected !== null && (
             <span className="text-3xs leading-tight text-muted">
@@ -187,7 +212,7 @@ function PlayerCell({
       ) : (
         byes &&
         (player.teamId || player.teamAbbrev) && (
-          <span className="block rounded-control border border-border/60 px-1.5 py-1 text-center text-3xs leading-none font-semibold tracking-wide text-muted uppercase">
+          <span className="well block rounded-control px-1.5 py-1 text-center text-3xs leading-none text-muted uppercase">
             Bye week
           </span>
         )
@@ -216,12 +241,8 @@ function GameStrip({
   return (
     <span
       className={cn(
-        'block rounded-control border px-1.5 py-1 tabular-nums',
-        state.upcoming
-          ? 'border-border/70 bg-background/40'
-          : state.live
-            ? 'border-in-play/25 bg-in-play/10'
-            : 'border-border/40 bg-notice/60',
+        'well block rounded-control px-1.5 py-1 tabular-nums',
+        state.upcoming && 'opacity-80',
       )}
     >
       <span className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 text-3xs leading-none font-semibold">
@@ -243,10 +264,13 @@ function GameStrip({
       </span>
       <span
         className={cn(
-          'mt-1 block text-center text-3xs leading-none font-semibold tracking-wide uppercase',
+          'mt-1 flex items-center justify-center gap-1 text-center text-3xs leading-none uppercase',
           state.live ? 'text-in-play' : 'text-muted',
         )}
       >
+        {state.live && (
+          <span aria-hidden="true" className="led led-pulse size-1.5" />
+        )}
         {state.status}
       </span>
     </span>
@@ -291,7 +315,7 @@ export function LineupRows({
   const [open, setOpen] = useState<string | null>(null)
   const rows = Math.max(mine.length, theirs.length)
   return (
-    <ul className="divide-y divide-border rounded-card border border-border bg-surface">
+    <ul className="divide-y divide-border rounded-card border border-border bg-surface px-1">
       {Array.from({ length: rows }, (_, i) => {
         const slot = (mine[i] ?? theirs[i])?.slot ?? ''
         const toggle = (side: 'm' | 't') => () =>
@@ -312,7 +336,7 @@ export function LineupRows({
               />
               <span
                 className={cn(
-                  'mt-2 flex h-6 items-center justify-center rounded-control px-0.5 text-3xs leading-none font-bold tracking-tight whitespace-nowrap uppercase',
+                  'mt-2 flex h-6 items-center justify-center rounded-[6px] px-0.5 text-3xs leading-none font-bold tracking-tight! whitespace-nowrap uppercase',
                   SLOT_TONES[slot] ?? 'bg-notice text-muted',
                 )}
               >

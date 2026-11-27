@@ -14,7 +14,7 @@ import { formatDay, shortDay } from '@/lib/time/format'
 export type MatchupPart = number | 'summary'
 
 const arrow =
-  'size-9 rounded-control text-xl leading-none font-semibold hover:bg-notice disabled:opacity-30 disabled:hover:bg-transparent'
+  'key grid size-9 shrink-0 place-items-center rounded-control text-xl leading-none font-semibold disabled:opacity-30'
 
 export function MatchupDays({
   m,
@@ -48,7 +48,7 @@ export function MatchupDays({
     <div className="flex flex-col gap-1.5">
       <nav
         aria-label="Matchup day"
-        className="flex items-center gap-1 rounded-card border border-border bg-surface p-1"
+        className="well flex items-center gap-1.5 rounded-[14px] p-1.5"
       >
         <button
           type="button"
@@ -64,7 +64,7 @@ export function MatchupDays({
           aria-expanded={open}
           aria-label={`${name}: choose a day or the summary`}
           onClick={() => setOpen((o) => !o)}
-          className="flex flex-1 flex-col items-center rounded-control py-0.5 leading-tight hover:bg-notice"
+          className="flex flex-1 flex-col items-center rounded-control py-0.5 leading-tight hover:bg-surface/60"
         >
           <span className="text-sm font-semibold" aria-live="polite">
             {name}
@@ -72,7 +72,9 @@ export function MatchupDays({
               {open ? '▴' : '▾'}
             </span>
           </span>
-          <span className="text-3xs text-muted tabular-nums">{detail}</span>
+          <span className="text-3xs text-muted tabular-nums uppercase">
+            {detail}
+          </span>
         </button>
         <button
           type="button"
@@ -88,7 +90,7 @@ export function MatchupDays({
         <div
           role="listbox"
           aria-label="Matchup days"
-          className="flex gap-1 overflow-x-auto rounded-card border border-border bg-surface p-1"
+          className="well flex gap-1.5 overflow-x-auto rounded-[14px] p-1.5 pb-2"
         >
           {matchupChoices(m, days, summary).map((c) => (
             <Pill
@@ -154,15 +156,11 @@ function Pill({
       aria-selected={selected}
       onClick={onClick}
       className={cn(
-        'flex shrink-0 flex-col items-center rounded-control px-2.5 py-1 leading-tight',
-        selected
-          ? 'bg-accent-soft text-accent ring-1 ring-accent/40'
-          : today
-            ? 'bg-notice text-foreground'
-            : 'text-muted hover:bg-notice hover:text-foreground',
+        'key flex shrink-0 flex-col items-center rounded-control px-2.5 py-1 leading-tight',
+        selected ? 'key-pressed font-bold' : !today && 'text-muted',
       )}
     >
-      <span className="text-2xs font-semibold">{top}</span>
+      <span className="text-3xs uppercase">{top}</span>
       <span className="text-3xs tabular-nums opacity-75">{bottom}</span>
     </button>
   )

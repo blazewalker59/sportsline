@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useGoToScope } from './scopeNav'
+import { CHIP, CHIP_ON } from './signalClasses'
 import type { Scope } from '@/lib/model/scope'
 import type { RowItem } from '@/lib/model/leagues'
 import {
@@ -12,8 +13,8 @@ import { cn } from '@/lib/utils'
 /**
  * The League row, in the All tab's hero (LiveBoard's ScopeHero): All
  * Leagues, then the Viewer's Leagues in the order they arranged (college
- * ones covering only what the Viewer opted into), as one segmented control (the
- * same control as the board's others) scrolling sideways. Choosing one is
+ * ones covering only what the Viewer opted into), as a row of chips
+ * scrolling sideways, the chosen one inked (Signal: never a blue fill). Choosing one is
  * a View Transition to that Scope. Following, Predictions and Fantasy are
  * the main navigation's other tabs, so they aren't offered here.
  */
@@ -42,12 +43,9 @@ export function LeagueBar({
   return (
     <div
       ref={row}
-      className="-mx-3.5 overflow-x-auto px-3.5 [scrollbar-width:none]"
+      className="-mx-4 overflow-x-auto px-4 py-0.5 [scrollbar-width:none]"
     >
-      <ol
-        className="flex w-max gap-0.5 rounded-full bg-notice p-0.5"
-        aria-label="Leagues"
-      >
+      <ol className="flex w-max gap-1.5" aria-label="Leagues">
         {(['all', ...items] as const).map((item) => {
           const selected = item === scope
           return (
@@ -58,10 +56,9 @@ export function LeagueBar({
                 aria-current={selected ? 'true' : undefined}
                 aria-label={item === 'all' ? 'All Leagues' : rowItemName(item)}
                 className={cn(
-                  'flex h-7 min-w-8 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition-colors',
-                  selected
-                    ? 'bg-surface text-foreground shadow-sm'
-                    : 'text-muted hover:text-foreground',
+                  'flex h-8 min-w-8 items-center justify-center gap-1.5 rounded-control px-2.5 text-3xs font-bold uppercase',
+                  CHIP,
+                  selected && CHIP_ON,
                 )}
               >
                 {item === 'all' ? (

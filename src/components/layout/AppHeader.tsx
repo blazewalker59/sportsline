@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { ThemeButton } from './ThemeButton'
 import { ICON_TONES, NavGlyph } from './NavIcon'
 import type { IconName } from './NavIcon'
+import { Wordmark } from '@/components/signal/Logo'
 import { signIn, signOutClient } from '@/lib/auth/client'
 import { VIEWER_KEY, useViewer } from '@/lib/viewer/useViewer'
 import { cn } from '@/lib/utils'
@@ -32,8 +33,9 @@ export function AppHeader({
     >
       <div className="flex items-center gap-2">
         {title ?? (
-          <Link to="/" className="text-lg font-bold tracking-tight">
-            Sportsline
+          <Link to="/" className="text-[1.375rem]">
+            <span className="sr-only">Sportsline</span>
+            <Wordmark aria-hidden />
           </Link>
         )}
         {children}
@@ -57,7 +59,7 @@ function AccountButton() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open])
-  if (isPending) return <span className="size-7" />
+  if (isPending) return <span className="size-10" />
 
   const viewer = data?.viewer
   if (!viewer) {
@@ -67,7 +69,7 @@ function AccountButton() {
         onClick={() =>
           void signIn.social({ provider: 'google', callbackURL: '/' })
         }
-        className="rounded-full bg-foreground px-3 py-1 text-xs font-medium text-background"
+        className="key inline-flex h-10 items-center rounded-control px-3.5 text-3xs font-bold uppercase"
       >
         Sign in
       </button>
@@ -81,14 +83,14 @@ function AccountButton() {
         onClick={() => setOpen((v) => !v)}
         aria-label="Account"
         aria-expanded={open}
-        className="block size-7 overflow-hidden rounded-full border border-border bg-surface text-xs"
+        className="key flex size-10 shrink-0 items-center justify-center rounded-full p-[3px] text-xs font-semibold"
       >
         {viewer.image ? (
           <img
             src={viewer.image}
             alt=""
             referrerPolicy="no-referrer"
-            className="size-full object-cover"
+            className="size-full rounded-full object-cover"
           />
         ) : (
           viewer.name.slice(0, 1)
@@ -105,10 +107,10 @@ function AccountButton() {
           />
           <nav
             aria-label="Account"
-            className="animate-in fade-in slide-in-from-top-1 absolute right-0 z-50 mt-2 max-h-[calc(100dvh-4.5rem)] w-72 overflow-y-auto rounded-card border border-border bg-surface text-sm shadow-xl duration-150"
+            className="panel animate-in fade-in slide-in-from-top-1 absolute right-0 z-50 mt-2.5 max-h-[calc(100dvh-4.5rem)] w-72 overflow-y-auto rounded-sheet border border-border bg-surface text-sm shadow-[inset_0_1px_0_var(--key-highlight),0_24px_48px_-20px_var(--key-shade)] duration-150"
           >
-            <div className="flex items-center gap-3 border-b border-border px-3 py-3">
-              <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-background font-semibold text-muted">
+            <div className="flex items-center gap-3 px-4 pt-4 pb-3">
+              <span className="well flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold text-muted">
                 {viewer.image ? (
                   <img
                     src={viewer.image}
@@ -124,7 +126,7 @@ function AccountButton() {
                 <span className="block truncate font-semibold">
                   {viewer.name}
                 </span>
-                <span className="block truncate text-xs text-muted">
+                <span className="block truncate font-label text-3xs text-muted">
                   {viewer.email}
                 </span>
               </span>
@@ -133,7 +135,7 @@ function AccountButton() {
               The main navigation's tabs are the Timeline's Scopes; the
               screens for managing what's behind them are here.
             */}
-            <MenuGroup title="Manage">
+            <MenuGroup index="M1" title="Manage">
               <MenuItem
                 to="/follows"
                 icon="follows"
@@ -156,7 +158,7 @@ function AccountButton() {
                 onPick={() => setOpen(false)}
               />
             </MenuGroup>
-            <MenuGroup title="Your feed">
+            <MenuGroup index="M2" title="Your feed">
               <MenuItem
                 to="/reactions"
                 icon="reactions"
@@ -165,7 +167,7 @@ function AccountButton() {
                 onPick={() => setOpen(false)}
               />
             </MenuGroup>
-            <MenuGroup title="Settings">
+            <MenuGroup index="M3" title="Settings">
               <MenuItem
                 to="/alerts"
                 icon="alerts"
@@ -190,7 +192,7 @@ function AccountButton() {
                 />
               )}
             </MenuGroup>
-            <div className="border-t border-border p-1">
+            <div className="px-3 pt-1 pb-3">
               <button
                 type="button"
                 onClick={() =>
@@ -199,9 +201,9 @@ function AccountButton() {
                     void queryClient.invalidateQueries({ queryKey: VIEWER_KEY })
                   })
                 }
-                className="flex w-full items-center gap-3 rounded-card px-3 py-2 text-left font-medium text-live hover:bg-live/10"
+                className="key flex h-10 w-full items-center justify-center gap-2 rounded-control text-3xs font-bold uppercase"
               >
-                <MenuIcon name="signOut" />
+                <NavGlyph name="signOut" />
                 Sign out
               </button>
             </div>
@@ -212,17 +214,27 @@ function AccountButton() {
   )
 }
 
+/** A run of the menu under a manual's label: index, name, hairline. */
 function MenuGroup({
+  index,
   title,
   children,
 }: {
+  index: string
   title: string
   children: React.ReactNode
 }) {
   return (
-    <div className="border-b border-border px-1 py-1.5 last:border-b-0">
-      <p className="px-3 pt-1 pb-1 text-3xs font-bold tracking-wider text-muted uppercase">
+    <div className="px-2 pb-2">
+      <p className="flex items-center gap-2 px-2 pt-1 pb-1.5 text-3xs font-bold text-muted uppercase">
+        <span
+          aria-hidden="true"
+          className="rounded-[5px] border border-border px-1.5 text-[10px] leading-4 font-normal"
+        >
+          {index}
+        </span>
         {title}
+        <span aria-hidden="true" className="h-px flex-1 bg-border" />
       </p>
       {children}
     </div>
@@ -266,8 +278,8 @@ function MenuItem({
     <Link
       to={to}
       onClick={onPick}
-      className="flex items-center gap-3 rounded-card px-2 py-1.5 hover:bg-background"
-      activeProps={{ className: 'bg-background', 'aria-current': 'page' }}
+      className="flex items-center gap-3 rounded-control px-2 py-1.5 hover:bg-background"
+      activeProps={{ className: 'well', 'aria-current': 'page' }}
     >
       <MenuIcon name={icon} />
       <span className="min-w-0 flex-1">

@@ -11,6 +11,8 @@ import { ScreenError } from '@/components/layout/RouteStates'
 import { Skeleton, SkeletonStatus } from '@/components/layout/Skeleton'
 import { timeAgo, useNow } from '@/components/timeline/format'
 import { opsHealthQuery } from '@/lib/ops/queries'
+import { Num } from '@/components/signal/Num'
+import { SectionLabel } from '@/components/signal/Section'
 import { cn } from '@/lib/utils'
 import { dateTime } from '@/lib/time/format'
 import { useTimeZone } from '@/lib/time/useTimeZone'
@@ -28,7 +30,7 @@ export function AdminScreen() {
       ) : health.data === undefined ? (
         <ScreenError error={health.error} onRetry={() => health.refetch()} />
       ) : health.data.denied ? (
-        <p className="rounded-card border border-border bg-surface px-4 py-3 text-sm text-muted">
+        <p className="well rounded-card px-4 py-4 text-sm text-muted">
           Signed in as{' '}
           <span className="font-semibold text-foreground">
             {health.data.email}
@@ -67,11 +69,11 @@ function jobState(j: JobView): 'ok' | 'failing' | 'stale' {
   return 'ok'
 }
 
-/** Health colors, fixed: the app's gold "scoring" reads as a warning here. */
+/** Health lights: Signal's health tones, unlit glow (orange means live). */
 const DOT = {
-  ok: 'bg-positive',
-  failing: 'bg-warning',
-  stale: 'bg-negative',
+  ok: 'led bg-positive shadow-none',
+  failing: 'led bg-warning shadow-none',
+  stale: 'led bg-negative shadow-none',
 } as const
 
 function Health({ health }: { health: OpsHealth }) {
@@ -82,7 +84,7 @@ function Health({ health }: { health: OpsHealth }) {
     .reduce((n, e) => n + e.count, 0)
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-3 gap-px overflow-hidden rounded-card border border-border bg-border text-center">
+      <div className="grid grid-cols-3 gap-3 rounded-card bg-surface p-4">
         <Summary
           label="Stale jobs"
           value={states.filter((s) => s === 'stale').length}
@@ -97,17 +99,16 @@ function Health({ health }: { health: OpsHealth }) {
       </div>
 
       <Section title={`Jobs · ${health.jobs.length}`}>
-        <ul className="divide-y divide-border rounded-card border border-border bg-surface">
+        <ul className="divide-y divide-border rounded-card bg-surface">
           {health.jobs.map((j) => {
             const state = jobState(j)
             const [task, viewer] = j.name.split(':')
             return (
-              <li key={j.name} className="flex items-start gap-3 px-3 py-2">
+              <li key={j.name} className="flex items-start gap-3 px-4 py-2.5">
                 <span
-                  className={cn(
-                    'mt-1.5 size-2 shrink-0 rounded-full',
-                    DOT[state],
-                  )}
+                  aria-label={state}
+                  role="img"
+                  className={cn('mt-1.5', DOT[state])}
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-medium">
@@ -119,7 +120,7 @@ function Health({ health }: { health: OpsHealth }) {
                     )}
                   </span>
                   {state !== 'ok' && j.lastError && (
-                    <span className="block truncate text-xs text-live">
+                    <span className="block truncate text-xs text-negative">
                       {j.lastError}
                     </span>
                   )}
@@ -141,17 +142,16 @@ function Health({ health }: { health: OpsHealth }) {
       </Section>
 
       <Section title="Accounts">
-        <ul className="divide-y divide-border rounded-card border border-border bg-surface">
+        <ul className="divide-y divide-border rounded-card bg-surface">
           {health.accounts.map((a) => (
             <li
               key={`${a.provider}${a.viewer}`}
-              className="flex items-start gap-3 px-3 py-2 text-sm"
+              className="flex items-start gap-3 px-4 py-2.5 text-sm"
             >
               <span
-                className={cn(
-                  'mt-1.5 size-2 shrink-0 rounded-full',
-                  a.status === 'ok' ? DOT.ok : DOT.stale,
-                )}
+                aria-label={a.status === 'ok' ? 'ok' : 'error'}
+                role="img"
+                className={cn('mt-1.5', a.status === 'ok' ? DOT.ok : DOT.stale)}
               />
               <span className="min-w-0 flex-1">
                 <span className="block font-medium capitalize">
@@ -161,7 +161,7 @@ function Health({ health }: { health: OpsHealth }) {
                   </span>
                 </span>
                 {a.lastError && (
-                  <span className="block truncate text-xs text-live">
+                  <span className="block truncate text-xs text-negative">
                     {a.lastError}
                   </span>
                 )}
@@ -178,7 +178,7 @@ function Health({ health }: { health: OpsHealth }) {
         {health.errors.length === 0 ? (
           <p className="text-sm text-muted">None recorded.</p>
         ) : (
-          <ul className="divide-y divide-border rounded-card border border-border bg-surface">
+          <ul className="divide-y divide-border rounded-card bg-surface">
             {health.errors.map((e) => (
               <ErrorRow key={e.fingerprint} error={e} now={now} />
             ))}
@@ -198,9 +198,9 @@ function ErrorRow({ error: e, now }: { error: ErrorView; now: number | null }) {
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="flex w-full items-start gap-3 px-3 py-2 text-left"
+        className="flex w-full items-start gap-3 px-4 py-2.5 text-left"
       >
-        <span className="mt-0.5 shrink-0 rounded-control bg-notice px-1.5 py-0.5 text-3xs font-bold text-muted uppercase">
+        <span className="well mt-0.5 shrink-0 rounded-[5px] px-1.5 py-0.5 text-3xs text-muted uppercase">
           {e.scope}
         </span>
         <span className="min-w-0 flex-1 text-sm leading-snug">{e.message}</span>
@@ -212,13 +212,13 @@ function ErrorRow({ error: e, now }: { error: ErrorView; now: number | null }) {
         </span>
       </button>
       {open && (
-        <div className="px-3 pb-3 text-xs text-muted">
+        <div className="px-4 pb-3 text-xs text-muted">
           <p className="mb-1">
             First seen {dateTime(e.firstAt, timeZone)} · last{' '}
             {dateTime(e.lastAt, timeZone)}
           </p>
           {e.details && (
-            <pre className="max-h-64 overflow-auto rounded-control bg-notice p-2 text-2xs leading-snug whitespace-pre-wrap">
+            <pre className="well max-h-64 overflow-auto rounded-control p-3 text-2xs leading-snug whitespace-pre-wrap">
               {e.details}
             </pre>
           )}
@@ -238,18 +238,16 @@ function Summary({
   bad?: boolean
 }) {
   return (
-    <div className="bg-surface px-3 py-2.5">
-      <span
+    <div className="flex flex-col gap-1.5">
+      <Num
         className={cn(
-          'block text-2xl font-bold tabular-nums',
+          'text-[34px]',
           bad && value > 0 ? 'text-negative' : 'text-positive',
         )}
       >
         {value}
-      </span>
-      <span className="text-2xs font-semibold tracking-wide text-muted uppercase">
-        {label}
-      </span>
+      </Num>
+      <span className="text-3xs text-muted uppercase">{label}</span>
     </div>
   )
 }
@@ -263,9 +261,7 @@ function Section({
 }) {
   return (
     <section>
-      <h2 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-        {title}
-      </h2>
+      <SectionLabel title={title} />
       {children}
     </section>
   )

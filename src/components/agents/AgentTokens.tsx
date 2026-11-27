@@ -5,15 +5,21 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, useSyncExternalStore } from 'react'
+import { FIELD, FIELD_LABEL, KEY, WIDE_KEY } from './shared'
 import { timeAgo, useNow } from '@/components/timeline/format'
 import { InlineError } from '@/components/layout/RouteStates'
 import { RowsSkeleton } from '@/components/layout/Skeleton'
 import { createApiToken, revokeApiToken } from '@/lib/agents/server'
 import { apiTokensQuery, useApiTokens } from '@/lib/agents/queries'
+import { SectionLabel } from '@/components/signal/Section'
+import { cn } from '@/lib/utils'
 
 const TOKENS_KEY = apiTokensQuery().queryKey
 
 const noSubscription = () => () => {}
+
+/** A token used this recently reads as at work. */
+const ACTIVE_MS = 3_600_000
 
 export function Tokens({ tradingReady }: { tradingReady: boolean }) {
   const queryClient = useQueryClient()
@@ -45,15 +51,15 @@ export function Tokens({ tradingReady }: { tradingReady: boolean }) {
 
   return (
     <>
-      <section className="flex flex-col gap-2 rounded-card border border-border bg-surface px-3 py-3 text-sm">
+      <section className="flex flex-col gap-2 rounded-card bg-surface p-4 text-sm">
         <p className="font-semibold">Connect an agent</p>
         <p className="text-muted">
           Add an MCP server with this URL, sending your token as a header:
         </p>
-        <code className="rounded-control bg-background px-2 py-1.5 font-mono text-xs break-all">
+        <code className="well rounded-control px-3 py-2 font-mono text-xs break-all">
           {endpoint}
         </code>
-        <code className="rounded-control bg-background px-2 py-1.5 font-mono text-xs break-all">
+        <code className="well rounded-control px-3 py-2 font-mono text-xs break-all">
           Authorization: Bearer sl_…
         </code>
       </section>
@@ -61,28 +67,31 @@ export function Tokens({ tradingReady }: { tradingReady: boolean }) {
       {created ? (
         <section
           role="status"
-          className="flex flex-col gap-2 rounded-card border border-accent/40 bg-accent/10 px-3 py-3 text-sm"
+          className="flex flex-col gap-2 rounded-card bg-surface p-4 text-sm"
         >
-          <p className="font-semibold">Your new token</p>
+          <p className="flex items-center gap-2 font-semibold">
+            <span className="led led-ink" aria-hidden="true" />
+            Your new token
+          </p>
           <p className="text-muted">
             Copy it now: it won’t be shown again. Anyone with it can use
             Sportsline as you, so keep it in your agent’s secrets.
           </p>
-          <code className="rounded-control bg-background px-2 py-1.5 font-mono text-xs break-all select-all">
+          <code className="well rounded-control px-3 py-2 font-mono text-xs break-all select-all">
             {created}
           </code>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => void navigator.clipboard.writeText(created)}
-              className="min-h-9 rounded-full bg-accent px-4 text-[13px] font-semibold text-background"
+              className={cn(KEY, 'key-ink')}
             >
               Copy
             </button>
             <button
               type="button"
               onClick={() => setCreated(null)}
-              className="min-h-9 rounded-full px-3 text-[13px] font-semibold text-muted"
+              className={KEY}
             >
               Done
             </button>
@@ -96,7 +105,7 @@ export function Tokens({ tradingReady }: { tradingReady: boolean }) {
             if (name.trim()) create.mutate({ name: name.trim(), trade })
           }}
         >
-          <label className="flex flex-col gap-1 text-sm font-semibold">
+          <label className={FIELD_LABEL}>
             New token
             <input
               value={name}
@@ -104,7 +113,7 @@ export function Tokens({ tradingReady }: { tradingReady: boolean }) {
               maxLength={60}
               autoComplete="off"
               placeholder="What it’s for, e.g. Grok"
-              className="rounded-card border border-border bg-surface px-3 py-2 text-sm font-normal"
+              className={FIELD}
             />
           </label>
           <label className="flex items-start gap-2 text-sm">
@@ -112,7 +121,7 @@ export function Tokens({ tradingReady }: { tradingReady: boolean }) {
               type="checkbox"
               checked={trade}
               onChange={(e) => setTrade(e.target.checked)}
-              className="mt-0.5 size-4"
+              className="mt-0.5 size-4 accent-foreground"
             />
             <span>
               <span className="font-semibold">Can propose Kalshi trades</span>
@@ -123,14 +132,14 @@ export function Tokens({ tradingReady }: { tradingReady: boolean }) {
             </span>
           </label>
           {create.error && (
-            <p role="alert" className="text-sm text-live">
+            <p role="alert" className="text-sm text-negative">
               {create.error.message}
             </p>
           )}
           <button
             type="submit"
             disabled={!name.trim() || create.isPending}
-            className="min-h-11 rounded-full bg-accent px-5 text-sm font-semibold text-background disabled:opacity-50"
+            className={WIDE_KEY}
           >
             {create.isPending ? 'Creating…' : 'Create token'}
           </button>
@@ -138,9 +147,9 @@ export function Tokens({ tradingReady }: { tradingReady: boolean }) {
       )}
 
       <section>
-        <h2 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-          Your tokens
-        </h2>
+        <SectionLabel title="Your tokens" index="J2">
+          {tokens.data?.length || null}
+        </SectionLabel>
         {tokens.isPending ? (
           <RowsSkeleton rows={2} label="Loading your tokens" />
         ) : tokens.isError && tokens.data === undefined ? (
@@ -150,43 +159,59 @@ export function Tokens({ tradingReady }: { tradingReady: boolean }) {
             onRetry={() => tokens.refetch()}
           />
         ) : !tokens.data?.length ? (
-          <p className="text-sm text-muted">None yet.</p>
+          <p className="well rounded-card px-4 py-5 text-center text-sm text-muted">
+            None yet.
+          </p>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {tokens.data.map((t) => (
-              <li
-                key={t.id}
-                className="flex items-center gap-3 rounded-card border border-border bg-surface px-3 py-2.5 text-sm"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2">
-                    <span className="truncate font-semibold">{t.name}</span>
-                    {t.scopes.includes('trade') && (
-                      <span className="shrink-0 rounded-full bg-notice px-2 py-0.5 text-3xs font-bold uppercase">
-                        Can trade
-                      </span>
-                    )}
-                  </span>
-                  <span className="block truncate text-xs text-muted">
-                    <span className="font-mono">{t.prefix}…</span> ·{' '}
-                    {t.lastUsedAt
-                      ? `used ${timeAgo(t.lastUsedAt, now)}`
-                      : 'never used'}
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  disabled={revoke.isPending}
-                  onClick={() => {
-                    if (confirm(`Revoke “${t.name}”? Its agent stops working.`))
-                      revoke.mutate(t.id)
-                  }}
-                  className="min-h-9 rounded-full px-2 text-[13px] font-semibold text-muted hover:text-live disabled:opacity-50"
+          <ul className="divide-y divide-border rounded-card bg-surface">
+            {tokens.data.map((t) => {
+              // Lit while its agent is at work (used in the last hour).
+              const active =
+                now !== null &&
+                t.lastUsedAt !== null &&
+                now - Date.parse(t.lastUsedAt) < ACTIVE_MS
+              return (
+                <li
+                  key={t.id}
+                  className="flex items-center gap-3 px-4 py-3 text-sm"
                 >
-                  Revoke
-                </button>
-              </li>
-            ))}
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <span className="truncate font-semibold">{t.name}</span>
+                      {t.scopes.includes('trade') && (
+                        <span className="well shrink-0 rounded-[5px] px-1.5 py-0.5 text-3xs uppercase">
+                          Can trade
+                        </span>
+                      )}
+                    </span>
+                    <span className="block truncate text-3xs text-muted uppercase">
+                      <span className="font-mono normal-case">{t.prefix}…</span>{' '}
+                      ·{' '}
+                      {t.lastUsedAt
+                        ? `used ${timeAgo(t.lastUsedAt, now)}`
+                        : 'never used'}
+                    </span>
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className={cn('led', !active && 'led-off')}
+                  />
+                  <button
+                    type="button"
+                    disabled={revoke.isPending}
+                    onClick={() => {
+                      if (
+                        confirm(`Revoke “${t.name}”? Its agent stops working.`)
+                      )
+                        revoke.mutate(t.id)
+                    }}
+                    className={cn(KEY, 'text-muted')}
+                  >
+                    Revoke
+                  </button>
+                </li>
+              )
+            })}
           </ul>
         )}
       </section>

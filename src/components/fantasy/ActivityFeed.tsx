@@ -15,6 +15,7 @@ import type {
 import type { FantasySport } from '@/lib/fantasy/sports'
 import { PlayerAvatar } from '@/components/brand/PlayerAvatar'
 import { PlayerButton } from '@/components/players/playerSheet'
+import { SectionLabel } from '@/components/signal/Section'
 import { clockTime, dateLabel } from '@/lib/time/format'
 import { cn } from '@/lib/utils'
 
@@ -84,7 +85,7 @@ function ItemRow({
           aria-label={i.action === 'add' ? 'Added' : 'Dropped'}
           className={cn(
             'w-3 shrink-0 text-center font-bold',
-            i.action === 'add' ? 'text-scoring' : 'text-live',
+            i.action === 'add' ? 'text-foreground' : 'text-muted',
           )}
         >
           {i.action === 'add' ? '+' : '−'}
@@ -132,11 +133,7 @@ export function ActivityFeed({
     <div className="flex flex-col gap-5">
       {activityDays(activity.entries, timeZone).map(({ day, entries }) => (
         <section key={day}>
-          {day && (
-            <h2 className="mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-              {day}
-            </h2>
-          )}
+          {day && <SectionLabel title={day} />}
           <ul className="divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
             {entries.map((e) => (
               <li
@@ -152,7 +149,7 @@ export function ActivityFeed({
                       ? e.teamIds.map(teamName).join(' ⇄ ')
                       : teamName(e.teamIds[0] ?? null)}
                   </span>
-                  <span className="shrink-0 text-xs text-muted">
+                  <span className="shrink-0 text-3xs text-muted uppercase">
                     {KIND[e.kind]}
                     {e.bid ? ` · $${e.bid}` : ''}
                     {timeZone && ` · ${clockTime(e.at, timeZone)}`}
@@ -164,7 +161,7 @@ export function ActivityFeed({
                       key={side.teamId ?? 'none'}
                       className="flex flex-col gap-1"
                     >
-                      <span className="text-xs font-semibold text-muted">
+                      <span className="text-3xs text-muted uppercase">
                         To {teamName(side.teamId)}
                       </span>
                       <ul className="flex flex-col gap-1">
@@ -192,7 +189,7 @@ export function ActivityFeed({
                 )}
                 {e.claims && (
                   <details className="group text-sm">
-                    <summary className="cursor-pointer list-none text-xs font-semibold text-accent [&::-webkit-details-marker]:hidden">
+                    <summary className="cursor-pointer list-none text-3xs font-bold text-foreground/80 uppercase underline-offset-4 hover:underline [&::-webkit-details-marker]:hidden">
                       <span className="group-open:hidden">
                         {e.claims.length - 1} other{' '}
                         {e.claims.length === 2 ? 'claim' : 'claims'} ›
@@ -201,7 +198,7 @@ export function ActivityFeed({
                         Every claim
                       </span>
                     </summary>
-                    <ol className="mt-1.5 flex flex-col gap-1 rounded-control bg-background px-2.5 py-2">
+                    <ol className="well mt-1.5 flex flex-col gap-1 rounded-control px-2.5 py-2">
                       {e.claims.map((c) => (
                         <li
                           key={c.teamId}
@@ -216,12 +213,10 @@ export function ActivityFeed({
                           {c.bid !== null && (
                             <span className="tabular-nums">${c.bid}</span>
                           )}
-                          <span
-                            className={cn(
-                              'w-12 text-right text-xs',
-                              c.won ? 'text-scoring' : 'text-muted',
-                            )}
-                          >
+                          <span className="w-14 text-right text-3xs uppercase">
+                            <span aria-hidden="true">
+                              {c.won ? '● ' : '○ '}
+                            </span>
                             {c.won ? 'Won' : 'Lost'}
                           </span>
                         </li>

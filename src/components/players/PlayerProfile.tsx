@@ -26,6 +26,7 @@ import {
   injuryTone,
 } from '@/components/fantasy/FantasyParts'
 import { FollowButton } from '@/components/follows/FollowButton'
+import { Num } from '@/components/signal/Num'
 import { PlaySheet } from '@/components/games/PlayDetailScreen'
 import { InlineError } from '@/components/layout/RouteStates'
 import {
@@ -97,7 +98,7 @@ export function PlayerSheet({
                 to="/players/$playerId"
                 params={{ playerId }}
                 onClick={onClose}
-                className="mt-2 block text-center text-sm font-semibold text-accent"
+                className="key mt-3 flex h-10 w-full items-center justify-center rounded-control text-3xs font-bold uppercase"
               >
                 Every play
               </Link>
@@ -118,25 +119,49 @@ function PlayRow({ item, onOpen }: { item: TimelineItem; onOpen: () => void }) {
       <button
         type="button"
         onClick={onOpen}
-        className="flex w-full flex-col gap-0.5 px-3 py-2.5 text-left"
+        className="grid w-full grid-cols-[1fr_auto] items-baseline gap-x-3 gap-y-0.5 px-3 py-2.5 text-left"
       >
-        <span className="text-2xs text-muted">
-          <span className="font-semibold text-foreground/80">
-            {item.awayTeam.abbreviation} {item.score.away} – {item.score.home}{' '}
-            {item.homeTeam.abbreviation}
-          </span>{' '}
-          · {item.segmentLabel}
+        <span className="text-3xs text-muted uppercase tabular-nums">
+          {item.awayTeam.abbreviation} {item.score.away}–{item.score.home}{' '}
+          {item.homeTeam.abbreviation} · {item.segmentLabel}
         </span>
+        <PlayGlyph significance={item.significance} />
         <span
           className={cn(
-            'text-sm leading-snug',
-            item.significance === 'scoring' && 'font-semibold',
+            'col-span-2 text-sm leading-snug',
+            item.significance === 'scoring'
+              ? 'font-semibold'
+              : item.significance === 'routine' && 'text-muted',
           )}
         >
           {item.description}
         </span>
       </button>
     </li>
+  )
+}
+
+/** ● scored, ◐ notable, ○ routine (Signal's state glyphs). */
+function PlayGlyph({
+  significance,
+}: {
+  significance: TimelineItem['significance']
+}) {
+  if (!significance) return <span />
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'w-3.5 text-center text-xs',
+        significance === 'scoring' ? 'text-scoring' : 'text-muted',
+      )}
+    >
+      {significance === 'scoring'
+        ? '●'
+        : significance === 'notable'
+          ? '◐'
+          : '○'}
+    </span>
   )
 }
 
@@ -163,7 +188,7 @@ export function PlayerHeader({
         <h1 className="text-xl leading-tight font-bold tracking-tight">
           {player.name}
         </h1>
-        <span className="flex items-center gap-1.5 text-sm text-muted">
+        <span className="flex flex-wrap items-center gap-1.5 text-sm text-muted">
           <LeagueLogo league={player.league} size={16} />
           {player.team ? (
             <Link
@@ -181,7 +206,7 @@ export function PlayerHeader({
           {player.position && ` · ${player.position}`}
         </span>
         {viewerState?.viewer && (
-          <div className="mt-1">
+          <div className="mt-1.5">
             <FollowButton follow={{ kind: 'player', playerId: player.id }} />
           </div>
         )}
@@ -221,7 +246,7 @@ export function PlayerDetailSections({
           />
           {overview?.note && (
             <Section title="Latest">
-              <div className="rounded-card border border-border bg-surface px-3 py-2.5">
+              <div className="well rounded-card px-3 py-2.5">
                 <p className="text-sm font-semibold">
                   {overview.note.headline}
                 </p>
@@ -269,13 +294,12 @@ function GameSection({
     if (!next) return null
     return (
       <Section title="Next game">
-        <div className="rounded-card border border-border bg-surface px-3 py-2.5 text-sm">
+        <div className="flex items-baseline justify-between gap-3 rounded-card border border-border bg-surface px-3 py-2.5 text-sm">
           <span className="font-semibold">
             {next.home ? 'vs' : '@'} {next.opponent}
           </span>
-          <span className="text-muted">
-            {' '}
-            · {dateLabel(next.date, timeZone)} {clockTime(next.date, timeZone)}
+          <span className="text-3xs text-muted uppercase">
+            {dateLabel(next.date, timeZone)} · {clockTime(next.date, timeZone)}
           </span>
         </div>
       </Section>
@@ -283,6 +307,14 @@ function GameSection({
   }
   const live = game.status === 'live' || game.status === 'delayed'
   const started = live || game.status === 'final'
+  // The leader's score is lit only while the Game is live.
+  const leader = !live
+    ? null
+    : game.score.away > game.score.home
+      ? 'away'
+      : game.score.home > game.score.away
+        ? 'home'
+        : null
   return (
     <Section title={live ? 'Live now' : started ? 'Today' : 'Next game'}>
       <div className="overflow-hidden rounded-card border border-border bg-surface">
@@ -290,32 +322,39 @@ function GameSection({
           to="/games/$gameId"
           params={{ gameId: game.id }}
           onClick={onNavigate}
-          className="flex items-center gap-3 px-3 py-2.5"
+          className="block px-3 pt-2.5 pb-3"
         >
-          <GameSide
-            team={game.awayTeam}
-            score={started ? game.score.away : null}
-          />
-          <span className="flex-1 text-center text-xs text-muted">
-            {live ? (
-              <span className="font-semibold text-live">
-                {game.situation?.segmentLabel ?? 'Live'}
-              </span>
-            ) : game.status === 'final' ? (
-              'Final'
-            ) : (
-              <>
-                {dateLabel(game.startsAt, timeZone)}
-                <br />
-                {clockTime(game.startsAt, timeZone)}
-              </>
-            )}
+          <span className="flex items-center justify-between gap-2 text-3xs text-muted uppercase">
+            <span className="flex items-center gap-2">
+              {live && <span aria-hidden="true" className="led led-pulse" />}
+              {live ? (
+                <span className="text-live">
+                  {game.situation?.segmentLabel ?? 'Live'}
+                </span>
+              ) : game.status === 'final' ? (
+                'Final'
+              ) : (
+                <>
+                  {dateLabel(game.startsAt, timeZone)} ·{' '}
+                  {clockTime(game.startsAt, timeZone)}
+                </>
+              )}
+            </span>
+            <span aria-hidden="true">Game →</span>
           </span>
-          <GameSide
-            team={game.homeTeam}
-            score={started ? game.score.home : null}
-            right
-          />
+          <span className="mt-2 grid grid-cols-2 items-end gap-3">
+            <GameSide
+              team={game.awayTeam}
+              score={started ? game.score.away : null}
+              lit={leader === 'away'}
+            />
+            <GameSide
+              team={game.homeTeam}
+              score={started ? game.score.home : null}
+              lit={leader === 'home'}
+              right
+            />
+          </span>
         </Link>
         {line.map((l) => (
           <LineTable key={l.title} line={l} />
@@ -333,20 +372,28 @@ function GameSection({
 function GameSide({
   team,
   score,
+  lit,
   right,
 }: {
   team: GameSummary['awayTeam']
   score: number | null
+  /** Leading a live Game. */
+  lit?: boolean
   right?: boolean
 }) {
   return (
-    <span
-      className={cn('flex items-center gap-2', right && 'flex-row-reverse')}
-    >
-      <TeamLogo team={team} size={28} />
-      <span className="text-sm font-semibold">{team.abbreviation}</span>
+    <span className={cn('flex flex-col gap-1.5', right && 'items-end')}>
+      <span
+        className={cn(
+          'flex items-center gap-1.5 text-sm font-semibold',
+          right && 'flex-row-reverse',
+        )}
+      >
+        <TeamLogo team={team} size={22} />
+        {team.abbreviation}
+      </span>
       {score !== null && (
-        <span className="text-lg font-bold tabular-nums">{score}</span>
+        <Num className={cn('text-5xl', lit && 'text-live')}>{score}</Num>
       )}
     </span>
   )
@@ -355,15 +402,16 @@ function GameSide({
 function LineTable({ line }: { line: PlayerLine }) {
   return (
     <div className="border-t border-border px-3 py-2">
-      <p className="subject-ink mb-1 text-2xs font-semibold text-muted">
-        {line.title}
-      </p>
+      <p className="mb-1 text-3xs text-muted uppercase">{line.title}</p>
       <div className="overflow-x-auto [scrollbar-width:none]">
-        <table className="w-full text-center text-xs whitespace-nowrap tabular-nums">
+        <table className="w-full text-center text-[13px] whitespace-nowrap tabular-nums">
           <thead>
             <tr className="text-muted">
               {line.columns.map((c, i) => (
-                <th key={i} className="px-1.5 font-medium">
+                <th
+                  key={i}
+                  className="border-b border-border px-1.5 pb-1 text-3xs font-normal uppercase"
+                >
                   {c}
                 </th>
               ))}
@@ -372,7 +420,7 @@ function LineTable({ line }: { line: PlayerLine }) {
           <tbody>
             <tr className="font-semibold">
               {line.values.map((v, i) => (
-                <td key={i} className="px-1.5 pt-0.5">
+                <td key={i} className="px-1.5 pt-1">
                   {v}
                 </td>
               ))}
@@ -404,20 +452,18 @@ function SeasonSection({
         {groups.map((g, gi) => (
           <div key={gi}>
             {g.name && (
-              <p className="subject-ink mb-1 text-2xs font-semibold text-muted">
-                {g.name}
-              </p>
+              <p className="mb-1 text-3xs text-muted uppercase">{g.name}</p>
             )}
             <ul className="grid grid-cols-4 gap-px overflow-hidden rounded-card border border-border bg-border">
               {g.stats.map((s, i) => (
                 <li
                   key={i}
-                  className="flex flex-col items-center bg-surface px-1 py-2"
+                  className="flex flex-col items-center gap-0.5 bg-surface px-1 py-2"
                 >
-                  <span className="text-base font-bold tabular-nums">
+                  <span className="text-base font-semibold tabular-nums">
                     {s.value}
                   </span>
-                  <span className="subject-ink text-3xs font-semibold text-muted uppercase">
+                  <span className="text-3xs text-muted uppercase">
                     {s.label}
                   </span>
                 </li>
@@ -455,7 +501,7 @@ function RecentSection({
       <ul className="divide-y divide-border rounded-card border border-border bg-surface">
         {recent.map((g, i) => (
           <li key={i} className="flex items-center gap-3 px-3 py-2 text-sm">
-            <span className="w-14 shrink-0 text-xs text-muted">
+            <span className="w-14 shrink-0 text-3xs text-muted uppercase tabular-nums">
               {g.date ? numericDate(g.date, timeZone) : ''}
             </span>
             <span className="w-16 shrink-0 font-medium">
@@ -466,7 +512,7 @@ function RecentSection({
                 <span
                   className={cn(
                     'font-bold',
-                    g.result === 'W' ? 'text-scoring' : 'text-live',
+                    g.result === 'W' ? 'text-foreground' : 'text-muted',
                   )}
                 >
                   {g.result}
@@ -560,7 +606,22 @@ function FantasySection({ playerId }: { playerId: string }) {
               >
                 <LeagueLogo league={SPORTS[e.league.sport].league} size={20} />
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-sm font-semibold">
+                  {/* Orange is the Viewer's own: their starter. */}
+                  <span
+                    className={cn(
+                      'flex items-center gap-1.5 truncate text-sm font-semibold',
+                      e.side === 'mine' && e.player.starter && 'text-live',
+                    )}
+                  >
+                    {e.side === 'mine' && (
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          'led size-1.5',
+                          !e.player.starter && 'led-off',
+                        )}
+                      />
+                    )}
                     {e.side === 'mine'
                       ? (e.league.teamName ?? 'Your team')
                       : `Facing you: ${e.team}`}
@@ -581,12 +642,12 @@ function FantasySection({ playerId }: { playerId: string }) {
                     )}
                   </span>
                 </span>
-                <span className="flex flex-col items-end tabular-nums">
-                  <span className="text-base font-bold">
+                <span className="flex flex-col items-end gap-1 tabular-nums">
+                  <Num className="text-2xl">
                     {e.player.points === null
                       ? '—'
                       : e.player.points.toFixed(1)}
-                  </span>
+                  </Num>
                   {e.player.projected !== null && (
                     <span className="text-2xs text-muted">
                       proj {e.player.projected.toFixed(1)}

@@ -6,6 +6,8 @@
 import { Link } from '@tanstack/react-router'
 import {
   PropProgress,
+  isLivePrediction,
+  legGlyph,
   money,
   movement,
   pct,
@@ -25,42 +27,66 @@ import { isPair } from '@/lib/brand/subject'
 import { legTeam, predictionSubject } from '@/lib/kalshi/legTeam'
 import { gameSearch } from '@/lib/timeline/gameLink'
 import { PlayerButton } from '@/components/players/playerSheet'
+import { Meter } from '@/components/signal/Meter'
+import { Num } from '@/components/signal/Num'
+import { SectionLabel } from '@/components/signal/Section'
+import { isLiveGame } from '@/lib/timeline/stakes'
 import { cn } from '@/lib/utils'
 import { weekdayTime } from '@/lib/time/format'
 import { useTimeZone } from '@/lib/time/useTimeZone'
 
+/** A fact's value under its label: back in the reading face. */
+const DD =
+  'mt-0.5 font-sans text-base font-semibold tracking-normal text-foreground normal-case tabular-nums'
+
 function LegRow({
   leg,
+  index,
   pip,
   onNavigate,
 }: {
   leg: LegView
+  /** Its place in a Combo (1-based), or null for a single's market. */
+  index: number | null
   /** Its own team's pip (when the sheet isn't one team's). */
   pip: boolean
   onNavigate: () => void
 }) {
   const g = leg.game
   const timeZone = useTimeZone()
+  const live = g !== null && isLiveGame(g)
   return (
-    <li className="flex flex-col gap-1 px-3 py-2.5">
+    <li className="flex flex-col gap-2.5 rounded-card bg-surface p-4">
+      <span className="flex items-center justify-between gap-2 text-3xs text-muted uppercase">
+        <span className="flex min-w-0 items-center gap-1.5 truncate">
+          {live && <span className="led led-pulse" aria-hidden="true" />}
+          {index !== null && `Leg ${index}`}
+          {leg.status === 'pending' && leg.chance !== null && (
+            <span>
+              {index !== null && '· '}Odds {pct(leg.chance)}
+            </span>
+          )}
+        </span>
+        <span
+          aria-label={leg.status}
+          className={cn(
+            'text-xs',
+            leg.status === 'lost' ? 'text-muted' : 'text-foreground',
+          )}
+        >
+          {legGlyph(leg.status)}
+        </span>
+      </span>
       <span className="flex items-start gap-2">
         {pip && (
           <TeamPip colors={legTeam(leg)?.colors} className="mt-1 h-3.5 w-1" />
         )}
         <span
-          aria-label={leg.status}
           className={cn(
-            'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-2xs font-bold',
-            leg.status === 'won'
-              ? 'bg-scoring/15 text-scoring'
-              : leg.status === 'lost'
-                ? 'bg-live/15 text-live'
-                : 'bg-notice text-muted',
+            'min-w-0 flex-1 text-[15px] leading-snug font-semibold',
+            leg.status === 'lost' && 'text-muted line-through',
           )}
         >
-          {leg.status === 'won' ? '✓' : leg.status === 'lost' ? '✕' : '·'}
-        </span>
-        <span className="min-w-0 flex-1 text-sm leading-snug font-medium">
           {leg.side === 'no' && <span className="text-muted">Not: </span>}
           {leg.playerId ? (
             <PlayerButton
@@ -73,23 +99,26 @@ function LegRow({
             leg.title
           )}
         </span>
-        {leg.status === 'pending' && leg.chance !== null && (
-          <span className="text-sm font-bold tabular-nums">
-            {pct(leg.chance)}
-          </span>
-        )}
       </span>
-      {leg.progress && (
-        <span className="ml-7">
-          <PropProgress progress={leg.progress} />
-        </span>
+      {leg.progress ? (
+        <PropProgress progress={leg.progress} />
+      ) : (
+        leg.status === 'pending' &&
+        leg.chance !== null && (
+          <Meter
+            value={leg.chance}
+            segments={20}
+            thin
+            label={`Odds ${pct(leg.chance)}`}
+          />
+        )
       )}
       {g && (
         <Link
           to="/"
           search={gameSearch(g.id, g.sportsDay)}
           onClick={onNavigate}
-          className="ml-7 flex items-center gap-1.5 self-start rounded-full bg-notice px-2 py-0.5 text-xs text-muted hover:text-foreground"
+          className="well flex items-center gap-1.5 self-start rounded-control px-2 py-1 text-xs text-muted hover:text-foreground"
         >
           <LeagueLogo league={g.league} size={12} />
           <TeamLogo team={g.awayTeam} size={14} />
@@ -100,9 +129,9 @@ function LegRow({
             {g.homeTeam.abbreviation}
           </span>
           <TeamLogo team={g.homeTeam} size={14} />
-          <span>
+          <span className={cn(live && 'font-semibold text-live')}>
             ·{' '}
-            {g.status === 'live' || g.status === 'delayed'
+            {live
               ? (g.situation?.segmentLabel ?? 'Live')
               : g.status === 'final'
                 ? 'Final'
@@ -157,23 +186,27 @@ export function PredictionDetail({
   const subject = predictionSubject(p.legs)
   // Each Leg's own team, unless the whole sheet is one team's.
   const pips = !subject || isPair(subject)
+  const live = isLivePrediction(p)
   return frame({
     title: combo ? 'Combo' : 'Prediction',
     subject,
     children: (
       <>
-        <header className="flex flex-col gap-1">
+        <header className="flex flex-col gap-2 rounded-card bg-surface p-4">
+          <span className="flex items-center gap-2 text-3xs text-muted uppercase">
+            {live && <span className="led led-pulse" aria-hidden="true" />}
+            {combo ? `${p.legs.length} legs · ` : ''}
+            {money(p.cost)} to win {money(p.contracts)}
+          </span>
           <h2 className="text-lg leading-snug font-bold">
             {p.side === 'no' && <span className="text-muted">Not: </span>}
             {p.title}
           </h2>
           {settled ? (
-            <span
-              className={cn(
-                'text-sm font-semibold',
-                p.result === 'won' ? 'text-scoring' : 'text-muted',
-              )}
-            >
+            <span className="text-sm font-semibold">
+              <span className="mr-1" aria-hidden="true">
+                {p.result === 'won' ? '●' : '○'}
+              </span>
               {p.status === 'closed'
                 ? 'Closed out'
                 : p.result === 'won'
@@ -181,27 +214,27 @@ export function PredictionDetail({
                   : p.result === 'lost'
                     ? 'Lost'
                     : 'Voided'}
-              {p.pnl !== null && ` · ${p.pnl >= 0 ? '+' : ''}${money(p.pnl)}`}
+              {p.pnl !== null && (
+                <span className={toneOf(p.pnl)}>
+                  {` · ${p.pnl >= 0 ? '+' : ''}${money(p.pnl)}`}
+                </span>
+              )}
             </span>
           ) : (
             <span className="flex items-end justify-between gap-3">
-              <span className="flex flex-col">
-                <span className="text-3xl leading-none font-bold tabular-nums">
-                  {p.chance === null ? '—' : pct(p.chance)}
-                </span>
+              <Num
+                unit={p.chance === null ? undefined : '%'}
+                className="text-[76px]"
+              >
+                {p.chance === null ? '—' : Math.round(p.chance * 100)}
+              </Num>
+              <span className="pb-1 text-right text-3xs text-muted uppercase">
+                Odds now
                 {move !== null && (
-                  <span
-                    className={cn(
-                      'text-sm font-semibold tabular-nums',
-                      move > 0
-                        ? 'text-scoring'
-                        : move < 0
-                          ? 'text-live'
-                          : 'text-muted',
-                    )}
-                  >
+                  <span className="block tabular-nums">
                     {move > 0 ? '▲' : move < 0 ? '▼' : '·'} {Math.abs(move)} pts
-                    from {pct(p.entryChance!)} when you got in
+                    from {pct(p.entryChance!)}
+                    <span className="block">when you got in</span>
                   </span>
                 )}
               </span>
@@ -209,10 +242,10 @@ export function PredictionDetail({
           )}
         </header>
         <OddsChart predictionId={p.id} />
-        <dl className="grid grid-cols-3 gap-2 rounded-card border border-border bg-surface p-3 text-center text-xs text-muted">
+        <dl className="grid grid-cols-3 gap-2 rounded-card bg-surface p-4 text-3xs text-muted uppercase">
           <div>
             <dt className="subject-ink">Contracts</dt>
-            <dd className="text-base font-semibold text-foreground tabular-nums">
+            <dd className={DD}>
               {Number.isInteger(p.contracts)
                 ? p.contracts
                 : p.contracts.toFixed(2)}
@@ -220,15 +253,13 @@ export function PredictionDetail({
           </div>
           <div>
             <dt className="subject-ink">Cost</dt>
-            <dd className="text-base font-semibold text-foreground tabular-nums">
-              {money(p.cost)}
-            </dd>
+            <dd className={DD}>{money(p.cost)}</dd>
           </div>
           <div>
             <dt className="subject-ink">
               {settled ? 'Payout' : 'Cash out now'}
             </dt>
-            <dd className="text-base font-semibold text-foreground tabular-nums">
+            <dd className={DD}>
               {settled
                 ? p.payout === null
                   ? '—'
@@ -256,12 +287,22 @@ export function PredictionDetail({
           </div>
         </dl>
         <section>
-          <h3 className="subject-ink mb-2 text-xs font-bold tracking-wide text-muted uppercase">
-            {combo ? `${p.legs.length} legs` : 'Market'}
-          </h3>
-          <ul className="divide-y divide-border rounded-card border border-border bg-surface">
+          <SectionLabel
+            as="h3"
+            title={combo ? `${p.legs.length} legs` : 'Market'}
+          >
+            {combo &&
+              `${p.legs.filter((l) => l.status !== 'pending').length} of ${p.legs.length} settled`}
+          </SectionLabel>
+          <ul className="flex flex-col gap-2">
             {p.legs.map((leg, i) => (
-              <LegRow key={i} leg={leg} pip={pips} onNavigate={onNavigate} />
+              <LegRow
+                key={i}
+                leg={leg}
+                index={combo ? i + 1 : null}
+                pip={pips}
+                onNavigate={onNavigate}
+              />
             ))}
           </ul>
         </section>

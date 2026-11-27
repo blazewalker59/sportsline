@@ -132,9 +132,9 @@ export function CalibrationChart({
           className={cn(
             'font-semibold',
             c.edge > 0.005
-              ? 'text-scoring'
+              ? 'text-positive'
               : c.edge < -0.005
-                ? 'text-live'
+                ? 'text-negative'
                 : '',
           )}
         >

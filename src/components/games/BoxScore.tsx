@@ -1,8 +1,9 @@
 /**
- * A Game's box score as one card: a tab per team, a chip per stat table
- * (Passing, Rushing…), and the one table chosen. The card wears the
- * chosen team's color in a sheet with both teams' (`subject-b` for the
- * home team), so switching teams switches the color with it.
+ * A Game's box score as one card: a tab per team (Signal: keys in a well,
+ * the chosen one raised), a key per stat table (Passing, Rushing…, pressed
+ * when chosen), and the one table chosen. The card wears the chosen team's
+ * color in a sheet with both teams' (`subject-b` for the home team), so
+ * switching teams switches the color with it.
  */
 
 import { useState } from 'react'
@@ -39,7 +40,7 @@ export function BoxScore({ box, game }: { box: GameBox; game: GameSummary }) {
       <div
         role="tablist"
         aria-label="Team"
-        className="flex border-b border-border"
+        className="well m-3 mb-0 flex gap-1 rounded-[13px] p-1"
       >
         {(['away', 'home'] as const).map((s) => {
           const t = s === 'away' ? game.awayTeam : game.homeTeam
@@ -51,25 +52,15 @@ export function BoxScore({ box, game }: { box: GameBox; game: GameSummary }) {
               role="tab"
               aria-selected={selected}
               onClick={() => setSide(s)}
-              // Each tab in its own team's color, whichever is chosen.
+              // The chosen team is the raised key in the well.
               className={cn(
-                'relative flex min-h-11 flex-1 items-center justify-center gap-2 text-sm font-semibold transition-colors',
+                'flex h-10 flex-1 items-center justify-center gap-2 rounded-control text-3xs font-bold uppercase',
                 s === 'home' ? 'subject-b' : 'subject-a',
-                selected
-                  ? 'text-foreground'
-                  : 'text-muted hover:text-foreground',
+                selected ? 'key' : 'text-muted hover:text-foreground',
               )}
             >
               <TeamLogo team={t} size={20} />
-              <span className={cn(selected && 'subject-ink')}>
-                {t.abbreviation}
-              </span>
-              {selected && (
-                <span
-                  aria-hidden="true"
-                  className="subject-fill absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-foreground"
-                />
-              )}
+              {t.abbreviation}
             </button>
           )
         })}
@@ -78,7 +69,7 @@ export function BoxScore({ box, game }: { box: GameBox; game: GameSummary }) {
         <div
           role="group"
           aria-label={`${team.abbreviation} stats`}
-          className="flex gap-1.5 overflow-x-auto px-3 pt-3 [scrollbar-width:none]"
+          className="flex gap-2 overflow-x-auto px-3 pt-3 pb-1 [scrollbar-width:none]"
         >
           {categories.map((c) => (
             <button
@@ -87,10 +78,8 @@ export function BoxScore({ box, game }: { box: GameBox; game: GameSummary }) {
               aria-pressed={c === category}
               onClick={() => setName(c.name)}
               className={cn(
-                'min-h-8 shrink-0 rounded-full px-3 text-xs font-semibold whitespace-nowrap transition-colors',
-                c === category
-                  ? 'bg-foreground text-background'
-                  : 'bg-notice text-muted hover:text-foreground',
+                'key inline-flex h-8 shrink-0 items-center rounded-control px-3 text-3xs font-bold whitespace-nowrap uppercase',
+                c !== category && 'text-foreground/70',
               )}
             >
               {c.name}
@@ -113,10 +102,10 @@ function StatTable({ category }: { category: BoxCategory }) {
   const t = category.table
   return (
     <div className="overflow-x-auto pt-1">
-      <table className="w-full text-xs tabular-nums">
+      <table className="w-full text-[13px] tabular-nums">
         <caption className="sr-only">{category.name}</caption>
         <thead>
-          <tr className="border-b border-border text-muted">
+          <tr className="border-b border-border text-3xs text-muted uppercase">
             <th scope="col" className="px-3 py-2 text-left font-normal">
               <span className="sr-only">Player</span>
             </th>
@@ -124,7 +113,7 @@ function StatTable({ category }: { category: BoxCategory }) {
               <th
                 key={c}
                 scope="col"
-                className="subject-ink px-2 py-2 text-right font-semibold whitespace-nowrap"
+                className="px-2 py-2 text-right font-normal whitespace-nowrap"
               >
                 {c}
               </th>

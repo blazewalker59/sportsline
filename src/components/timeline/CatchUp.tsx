@@ -15,6 +15,7 @@ import {
   TeamAvatar,
   TeamAvatarLink,
 } from '@/components/chat/ChatParts'
+import { SectionLabel } from '@/components/signal/Section'
 
 const DISMISSED_KEY = 'sportsline:catchup-dismissed'
 
@@ -40,7 +41,10 @@ export function CatchUpCard({
     ).values(),
   ].slice(0, 3)
   return (
-    <div className="relative flex items-center gap-3 rounded-card border border-accent/30 bg-accent-soft px-3.5 py-3">
+    <div
+      data-catch-up=""
+      className="well relative flex items-center gap-3 rounded-card px-3.5 py-3"
+    >
       <button
         type="button"
         onClick={onOpen}
@@ -52,7 +56,7 @@ export function CatchUpCard({
             return (
               <span
                 key={team.id}
-                className="absolute rounded-full ring-2 ring-accent-soft"
+                className="absolute rounded-full ring-2 ring-notice"
                 style={{ top: offset, left: offset, zIndex: teams.length - i }}
               >
                 <TeamAvatar team={team} size={24} />
@@ -60,15 +64,11 @@ export function CatchUpCard({
             )
           })}
         </span>
-        <span className="flex min-w-0 flex-col">
-          <span className="text-sm font-bold">
-            While you were away
-            <span className="font-semibold text-muted">
-              {' '}
-              · {catchUp.newCount} new
-            </span>
+        <span className="flex min-w-0 flex-col gap-1">
+          <span className="text-3xs text-muted uppercase">
+            While you were away · {catchUp.newCount} new
           </span>
-          <span className="truncate text-[13px] text-accent">
+          <span className="truncate text-[13.5px] leading-snug font-medium">
             {catchUpLine(catchUp)}
           </span>
         </span>
@@ -77,7 +77,7 @@ export function CatchUpCard({
         type="button"
         onClick={dismiss}
         aria-label="Dismiss catch-up"
-        className="flex size-8 shrink-0 items-center justify-center rounded-full text-lg leading-none text-muted hover:bg-notice hover:text-foreground"
+        className="key flex size-9 shrink-0 items-center justify-center rounded-control text-lg leading-none"
       >
         ×
       </button>
@@ -101,9 +101,7 @@ export function CatchUpSheet({
       </p>
       {catchUp.finals.length > 0 && (
         <section className="flex flex-col gap-2" onClickCapture={onClose}>
-          <h3 className="text-xs font-bold tracking-wide text-muted uppercase">
-            Finals
-          </h3>
+          <SectionLabel as="h3" title="Finals" className="mb-0" />
           {catchUp.finals.map((item) => (
             <div key={item.id} className="flex">
               <Notice item={item} showLeague />
@@ -113,9 +111,7 @@ export function CatchUpSheet({
       )}
       {catchUp.keyPlays.length > 0 && (
         <section className="flex flex-col gap-3" onClickCapture={onClose}>
-          <h3 className="text-xs font-bold tracking-wide text-muted uppercase">
-            Key plays
-          </h3>
+          <SectionLabel as="h3" title="Key plays" className="mb-0" />
           {catchUp.keyPlays.map((item) => {
             const team = item.side === 'home' ? item.homeTeam : item.awayTeam
             return (
@@ -126,8 +122,8 @@ export function CatchUpSheet({
                   <LeagueAvatar league={item.league} />
                 )}
                 <div className="flex min-w-0 flex-col gap-1">
-                  <span className="px-1 text-2xs text-muted">
-                    <span className="font-semibold text-foreground/80">
+                  <span className="px-1 font-label text-3xs text-muted">
+                    <span className="font-bold text-foreground/80">
                       {item.awayTeam.abbreviation} @{' '}
                       {item.homeTeam.abbreviation}
                     </span>{' '}

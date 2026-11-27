@@ -24,7 +24,7 @@ const view = (): MatchupView => {
 const rows = (html: string) =>
   Object.fromEntries(
     [...html.matchAll(/<li[^>]*>.*?<\/li>/g)].map((r) => [
-      /font-semibold text-muted">([^<]+)</.exec(r[0])?.[1],
+      /data-category-label=""[^>]*>([^<]+)</.exec(r[0])?.[1],
       r[0],
     ]),
   )

@@ -1,20 +1,23 @@
 /**
  * Placeholders shaped like the content on its way, so a screen keeps its
- * layout while it loads instead of flashing "Loading…". They pulse only
+ * layout while it loads instead of flashing "Loading…". In Signal they are
+ * empty slots pressed into the aluminum (the well's tone and inner shade),
+ * on the page and in a panel alike, waiting for their part. They pulse only
  * for Viewers who haven't asked for reduced motion, and are hidden from
  * assistive tech behind one "Loading" label.
  */
 
 import { cn } from '@/lib/utils'
 
-/** One grey block; size and shape come from `className`. */
+/** One recessed slot; size and shape come from `className`. */
 export function Skeleton({ className }: { className?: string }) {
   return (
     <span
       data-skeleton=""
       className={cn(
-        // A wash of the ink, so it reads on the page and on a card alike.
-        'block rounded-control bg-foreground/10 motion-safe:animate-pulse',
+        // The well's tone and shade, so it reads as a slot on the page
+        // and on a panel alike.
+        'block rounded-control bg-notice shadow-[inset_0_1px_2px_var(--key-shade)] motion-safe:animate-pulse',
         className,
       )}
     />
