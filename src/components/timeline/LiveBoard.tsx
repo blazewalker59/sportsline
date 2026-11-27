@@ -35,8 +35,9 @@ import type { GameSummary } from '@/lib/model/timeline'
 import type { FantasyLeagueView } from '@/lib/fantasy/server'
 import type { PredictionView } from '@/lib/kalshi/predictionViews'
 import type { ChangeDisplay } from '@/lib/kalshi/server'
-import type { GameStake } from '@/lib/timeline/stakes'
 import type { IconName } from '@/components/layout/NavIcon'
+import type { GameStake } from '@/lib/timeline/stakes'
+import { NavGlyph } from '@/components/layout/NavIcon'
 import { isLiveGame } from '@/lib/timeline/stakes'
 import { LeagueLogo, leagueLabel } from '@/components/brand/LeagueLogo'
 import { TeamLogo } from '@/components/brand/TeamMark'
@@ -52,7 +53,6 @@ import { pts, sideRecord } from '@/components/fantasy/format'
 import { SPORTS } from '@/lib/fantasy/sports'
 import { notifyDeviceValue, useDeviceValue } from '@/lib/useDeviceValue'
 import { useTimeZone } from '@/lib/time/useTimeZone'
-import { NavGlyph } from '@/components/layout/NavIcon'
 import { Meter } from '@/components/signal/Meter'
 import { Num } from '@/components/signal/Num'
 import { SectionLabel } from '@/components/signal/Section'
@@ -89,6 +89,13 @@ const STAKE_LABEL: Record<GameStake, string> = {
   following: 'Following',
   prediction: 'Prediction',
   fantasy: 'Fantasy',
+}
+
+/** Each stake's mark in the one row: its tab's icon. */
+const STAKE_ICON: Record<GameStake, IconName> = {
+  following: 'follows',
+  prediction: 'predictions',
+  fantasy: 'fantasy',
 }
 
 /** The Viewer's stakes in a Game: orange, since they're theirs. */
@@ -396,14 +403,18 @@ function GameTileBody({
         <span className="min-w-0 flex-1 truncate text-right">
           {gameStatusLabel(g, timeZone)}
         </span>
-        {dots &&
-          stakes.map((s) => (
-            <span
-              key={s}
-              title={STAKE_LABEL[s]}
-              className="size-1.5 shrink-0 rounded-full bg-signal"
-            />
-          ))}
+        {dots && stakes.length > 0 && (
+          // Each stake by its tab's icon (Following's star, Predictions'
+          // arrow, Fantasy's trophy), so two read as which two.
+          <span className="flex shrink-0 items-center gap-0.5 text-live">
+            {stakes.map((s) => (
+              <NavGlyph key={s} name={STAKE_ICON[s]} className="size-3" />
+            ))}
+            <span className="sr-only">
+              {stakes.map((s) => STAKE_LABEL[s]).join(', ')}
+            </span>
+          </span>
+        )}
       </span>
       {(['away', 'home'] as const).map((side) => {
         const team = side === 'away' ? g.awayTeam : g.homeTeam
