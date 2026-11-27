@@ -9,6 +9,7 @@ import { isBun, sqliteDb } from '../../helpers/sqliteDb'
 import type * as Db from '@/lib/db'
 import type { MemoryCtx } from '../../helpers/durable'
 import type { ViewerSync as ViewerSyncClass } from '@/lib/live/ViewerSync'
+import type * as CashOutRun from '@/lib/kalshi/cashOutRun'
 
 const NOW = Date.parse('2026-10-08T18:00:00.000Z')
 const MINUTE = 60_000
@@ -78,6 +79,13 @@ vi.mock('@/lib/push/predictionAlerts', () => ({
 vi.mock('@/lib/agents/reconcile', () => ({
   reconcileTrades: () => {
     state.calls.push('trades')
+    return Promise.resolve(1)
+  },
+}))
+vi.mock('@/lib/kalshi/cashOutRun', async (original) => ({
+  ...(await original<typeof CashOutRun>()),
+  reconcileCashOuts: () => {
+    state.calls.push('cash outs')
     return Promise.resolve(1)
   },
 }))
@@ -276,8 +284,21 @@ describe.skipIf(!isBun)('ViewerSync', () => {
     )
     await loop.syncNow('u1')
     await loop.alarm()
-    expect(state.calls).toEqual(['trades'])
+    expect(state.calls).toEqual(['trades', 'cash outs'])
     expect(jobNames()).toEqual(['trades:u1'])
+  })
+
+  it('settles a cash out left in flight', async () => {
+    const loop = sync()
+    await loop.start('u1')
+    await loop.alarm()
+    expect(state.calls).toEqual([])
+    sqlite.run(
+      "INSERT INTO cash_outs (id,viewer_id,prediction_id,market_ticker,title,kind,side,count,method,limit_cents,status,created_at,sent_at,updated_at) VALUES ('c1','u1','p1','KX-1','Yankees','single','yes',10,'order',52,'unknown','2026-10-08T17:00:00Z','2026-10-08T17:00:00Z','2026-10-08T17:00:00Z')",
+    )
+    await loop.syncNow('u1')
+    await loop.alarm()
+    expect(state.calls).toEqual(['trades', 'cash outs'])
   })
 
   it('counts each token’s /mcp requests apart', () => {

@@ -18,6 +18,7 @@ import type { CloudflareEnv } from '@/lib/db'
 import type { RateWindow } from '@/lib/agents/rateLimit'
 import { dbFromD1 } from '@/lib/db'
 import {
+  cashOuts,
   espnAccounts,
   fantasyLeagues,
   games,
@@ -34,6 +35,7 @@ import { syncAccount as syncSleeper } from '@/lib/fantasy/sleeper/sync'
 import { syncAccount as syncEspn } from '@/lib/fantasy/sync'
 import { SPORTS } from '@/lib/fantasy/sports'
 import { refreshPrices, syncAccount as syncKalshi } from '@/lib/kalshi/sync'
+import { UNSETTLED_CASH_OUTS, reconcileCashOuts } from '@/lib/kalshi/cashOutRun'
 import { runJob } from '@/lib/ops/jobs'
 import { sendPredictionAlerts } from '@/lib/push/predictionAlerts'
 
@@ -179,60 +181,76 @@ export class ViewerSync extends DurableObject<CloudflareEnv> {
       case 'sleeper':
         return job(() => syncSleeper(env, viewerId))
       case 'trades':
-        return job(() => reconcileTrades(env, viewerId))
+        // Agents' approved orders and the Viewer's own cash outs.
+        return job(async () => {
+          await reconcileTrades(env, viewerId)
+          await reconcileCashOuts(env, viewerId)
+        })
     }
   }
 
   private async connected(viewerId: string): Promise<Connected> {
     const db = dbFromD1(this.env.DB)
-    const [kalshi, open, espn, sleeper, unsettled, sports] = await Promise.all([
-      db
-        .select({ id: kalshiAccounts.viewerId })
-        .from(kalshiAccounts)
-        .where(eq(kalshiAccounts.viewerId, viewerId))
-        .get(),
-      db
-        .select({ id: predictions.id })
-        .from(predictions)
-        .where(
-          and(
-            eq(predictions.viewerId, viewerId),
-            eq(predictions.status, 'open'),
+    const [kalshi, open, espn, sleeper, unsettled, cashingOut, sports] =
+      await Promise.all([
+        db
+          .select({ id: kalshiAccounts.viewerId })
+          .from(kalshiAccounts)
+          .where(eq(kalshiAccounts.viewerId, viewerId))
+          .get(),
+        db
+          .select({ id: predictions.id })
+          .from(predictions)
+          .where(
+            and(
+              eq(predictions.viewerId, viewerId),
+              eq(predictions.status, 'open'),
+            ),
+          )
+          .limit(1)
+          .get(),
+        db
+          .select({ id: espnAccounts.viewerId })
+          .from(espnAccounts)
+          .where(eq(espnAccounts.viewerId, viewerId))
+          .get(),
+        db
+          .select({ id: sleeperAccounts.viewerId })
+          .from(sleeperAccounts)
+          .where(eq(sleeperAccounts.viewerId, viewerId))
+          .get(),
+        db
+          .select({ id: tradeProposals.id })
+          .from(tradeProposals)
+          .where(
+            and(
+              eq(tradeProposals.viewerId, viewerId),
+              inArray(tradeProposals.status, UNSETTLED),
+            ),
+          )
+          .limit(1)
+          .get(),
+        db
+          .select({ id: cashOuts.id })
+          .from(cashOuts)
+          .where(
+            and(
+              eq(cashOuts.viewerId, viewerId),
+              inArray(cashOuts.status, UNSETTLED_CASH_OUTS),
+            ),
+          )
+          .limit(1)
+          .get(),
+        db
+          .selectDistinct({ sport: fantasyLeagues.sport })
+          .from(fantasyLeagues)
+          .where(
+            and(
+              eq(fantasyLeagues.viewerId, viewerId),
+              eq(fantasyLeagues.enabled, true),
+            ),
           ),
-        )
-        .limit(1)
-        .get(),
-      db
-        .select({ id: espnAccounts.viewerId })
-        .from(espnAccounts)
-        .where(eq(espnAccounts.viewerId, viewerId))
-        .get(),
-      db
-        .select({ id: sleeperAccounts.viewerId })
-        .from(sleeperAccounts)
-        .where(eq(sleeperAccounts.viewerId, viewerId))
-        .get(),
-      db
-        .select({ id: tradeProposals.id })
-        .from(tradeProposals)
-        .where(
-          and(
-            eq(tradeProposals.viewerId, viewerId),
-            inArray(tradeProposals.status, UNSETTLED),
-          ),
-        )
-        .limit(1)
-        .get(),
-      db
-        .selectDistinct({ sport: fantasyLeagues.sport })
-        .from(fantasyLeagues)
-        .where(
-          and(
-            eq(fantasyLeagues.viewerId, viewerId),
-            eq(fantasyLeagues.enabled, true),
-          ),
-        ),
-    ])
+      ])
     const leagues = [...new Set(sports.map((s) => SPORTS[s.sport].league))]
     const live =
       leagues.length > 0 &&
@@ -252,7 +270,7 @@ export class ViewerSync extends DurableObject<CloudflareEnv> {
       openPredictions: Boolean(open),
       espn: Boolean(espn),
       sleeper: Boolean(sleeper),
-      unsettledTrades: Boolean(unsettled),
+      unsettledTrades: Boolean(unsettled) || Boolean(cashingOut),
       fantasyLive: Boolean(live),
     }
   }

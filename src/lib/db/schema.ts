@@ -492,6 +492,11 @@ export const kalshiEvents = sqliteTable('kalshi_events', {
   awayName: text('away_name'),
   gameId: text('game_id'),
   checkedAt: text('checked_at').notNull(),
+  /**
+   * The event's series (KXNFLGAME), for its page on Kalshi: read from
+   * Kalshi's event, never parsed from the ticker (kalshi/links.ts).
+   */
+  seriesTicker: text('series_ticker'),
 })
 
 /** Kalshi's team and player records (structured targets), cached. */
@@ -915,6 +920,70 @@ export const tradeProposals = sqliteTable(
   },
   (table) => [
     index('trade_proposals_viewer_idx').on(table.viewerId, table.createdAt),
+  ],
+)
+
+/**
+ * A Viewer selling a Prediction back on Kalshi (CONTEXT.md, "Cash out";
+ * docs/adr/0012). A single sells into its market's book with an order; a
+ * Combo through a quote (RFQ). Its id is the order's client order id, so
+ * the same cash out can never be sent twice.
+ */
+export const cashOuts = sqliteTable(
+  'cash_outs',
+  {
+    id: text('id').primaryKey(),
+    viewerId: text('viewer_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    /** The Prediction sold (kept if the Prediction is gone). */
+    predictionId: text('prediction_id').notNull(),
+    marketTicker: text('market_ticker').notNull(),
+    title: text('title').notNull(),
+    kind: text('kind').$type<'single' | 'combo'>().notNull(),
+    /** The side held, and sold. */
+    side: text('side').$type<'yes' | 'no'>().notNull(),
+    count: real('count').notNull(),
+    method: text('method').$type<'order' | 'quote'>().notNull(),
+    /** An order's worst price per contract for the side sold, in cents. */
+    limitCents: integer('limit_cents'),
+    /** A quote's price per contract for the side sold, in dollars. */
+    quotePrice: real('quote_price'),
+    /** What it was expected to bring, before fees (dollars). */
+    expectedDollars: real('expected_dollars'),
+    status: text('status')
+      .$type<
+        // A Combo waiting on market makers' quotes.
+        | 'quoting'
+        // A Combo's quote accepted: the maker confirms, then it executes.
+        | 'accepted'
+        // An order sent, its answer not yet back.
+        | 'placing'
+        | 'filled'
+        | 'partial'
+        | 'unfilled'
+        | 'failed'
+        // A quote request dropped: no price came, or the Viewer left.
+        | 'expired'
+        // Sent, but Kalshi's reply was lost: looked up later.
+        | 'unknown'
+      >()
+      .notNull(),
+    rfqId: text('rfq_id'),
+    quoteId: text('quote_id'),
+    orderId: text('order_id'),
+    filledCount: real('filled_count'),
+    /** For the side sold, in dollars per contract. */
+    avgPriceDollars: real('avg_price_dollars'),
+    feesDollars: real('fees_dollars'),
+    error: text('error'),
+    createdAt: text('created_at').notNull(),
+    /** When it was sent to Kalshi (an order placed, a quote accepted). */
+    sentAt: text('sent_at'),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    index('cash_outs_viewer_idx').on(table.viewerId, table.createdAt),
   ],
 )
 

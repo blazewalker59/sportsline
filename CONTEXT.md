@@ -183,6 +183,10 @@ _Avoid_: CLV in the app's text, line movement
 Where a stat Leg stands against its line while the Game is played: the count so far from the live box score (a team's or Player's receiving yards, a Player's points) or the score itself (totals), against what it takes to win ("212 of 300").
 _Avoid_: tracker, status
 
+**Cash out**:
+A Viewer selling an open Prediction back on Kalshi from its sheet, all of it or some contracts, held to confirm. A single sells into its market at the price shown, or up to 2¢ under it, whatever fills at once; a Combo has no order book, so Sportsline asks Kalshi's market makers for a quote and sells at the price the Viewer accepts. It only ever sells what the Viewer holds, with their trade key (docs/adr/0012). Beside it, Open in Kalshi takes them to the market there (a Combo to their portfolio).
+_Avoid_: sell, close, exit (say cash out)
+
 **Fantasy league**:
 A Viewer's fantasy league: on ESPN (football, basketball or baseball), read through their ESPN connection, or on Sleeper (football), read through their Sleeper connection. The Viewer's own Fantasy team in it, and this scoring period's Matchup; both providers' leagues look and behave the same.
 _Avoid_: league (that's a sports League), contest

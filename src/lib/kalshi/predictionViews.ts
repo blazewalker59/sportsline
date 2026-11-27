@@ -36,6 +36,8 @@ export interface LegView {
   teamId: string | null
   /** A stat prop's count so far against its line (212 of 300 rec yds). */
   progress: Progress | null
+  /** Its Kalshi event, for the event's page there (kalshi/cashOutRun.ts). */
+  eventTicker?: string
 }
 
 export interface PredictionView {
@@ -214,6 +216,7 @@ export const getPredictions = createServerFn({ method: 'GET' })
               return {
                 title: leg.title,
                 side: leg.side,
+                eventTicker: leg.eventTicker,
                 chance: forSide(yesChance(leg.marketTicker), leg.side),
                 status:
                   result === 'yes' || result === 'no'

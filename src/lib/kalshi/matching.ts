@@ -98,6 +98,8 @@ export async function gameFor(
       awayName: away?.name ?? null,
       gameId: null,
       checkedAt: new Date(now).toISOString(),
+      // Kept as read before (kalshi/links.ts fills it in when needed).
+      seriesTicker: cached?.seriesTicker ?? null,
     }
   }
   let gameId: string | null = null

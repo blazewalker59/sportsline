@@ -1,5 +1,7 @@
 # Agents propose Kalshi trades; the Viewer approves each one
 
+_Amended by ADR 0012: the trade key also sells what a Viewer holds when they cash out a Prediction._
+
 Viewers want their Agents (docs/adr/0007) to trade on Kalshi for them, typically acting on Sharp picks. An Agent acting on its own with real money is one bad tool call from a costly mistake, so an Agent can only **propose** a trade, and nothing reaches Kalshi until the Viewer approves it in Sportsline.
 
 **A separate trade key.** ADR 0003's connection stays read-only. To trade, a Viewer connects a second Kalshi key, stored the same way (sealed under `KALSHI_ENCRYPTION_KEY`). When it's connected, Kalshi must list its scopes as exactly `write::trade` plus reads. Kalshi's broad `write` scope also grants transfers, so it's refused, as is `write::transfer` and an unscoped key. A leaked trade key can trade but never withdraw or move money. Its only use is placing approved orders.
