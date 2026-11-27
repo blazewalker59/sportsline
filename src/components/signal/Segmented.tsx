@@ -33,7 +33,9 @@ export function Segmented<T extends string>({
       aria-label={label}
       className={cn(
         'well grid auto-cols-fr grid-flow-col gap-1 rounded-control p-1',
-        fill ? 'w-full' : 'inline-grid',
+        // Inline, it keeps its labels' width: the text beside it wraps
+        // instead (a longer description must never squeeze a key).
+        fill ? 'w-full' : 'inline-grid shrink-0',
         className,
       )}
     >
