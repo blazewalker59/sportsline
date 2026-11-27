@@ -3,6 +3,7 @@
  * connection dot, and the height-animated collapse the day strip opens in.
  */
 
+import { useEffect, useState } from 'react'
 import type { Connection } from '@/lib/timeline/useLiveTimeline'
 import { cn } from '@/lib/utils'
 
@@ -61,22 +62,36 @@ export function Collapse({
   )
 }
 
+/** How long a lost or slow connection waits before it says so. */
+const QUIET_MS = 3000
+
+/**
+ * The live connection, said only when it's missing: nothing while plays
+ * arrive by themselves (orange means a live Game, not this), and after a
+ * few seconds without it, "Reconnecting" beside an unlit LED. The wait
+ * keeps a first connect or a quick reconnect from flashing it.
+ */
 export function ConnectionDot({ connection }: { connection: Connection }) {
-  const label = {
-    live: 'Live',
-    connecting: 'Connecting',
-    offline: 'Reconnecting',
-  }[connection]
+  const [lost, setLost] = useState(false)
+  const live = connection === 'live'
+  useEffect(() => {
+    if (live) {
+      setLost(false)
+      return
+    }
+    const t = setTimeout(() => setLost(true), QUIET_MS)
+    return () => clearTimeout(t)
+  }, [live])
   return (
-    <span
-      role="status"
-      aria-label={label}
-      title={label}
-      className="flex size-6 items-center justify-center"
-    >
-      <span
-        className={cn('led', connection === 'live' ? 'led-pulse' : 'led-off')}
-      />
+    <span role="status" className="flex items-center gap-1.5">
+      {lost && (
+        <>
+          <span aria-hidden="true" className="led led-off" />
+          <span className="font-label text-3xs text-muted uppercase">
+            Reconnecting
+          </span>
+        </>
+      )}
     </span>
   )
 }
